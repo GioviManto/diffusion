@@ -1,0 +1,42 @@
+=== [1/4] MAIN HEAVY RUN: report mode, 48 trials ===
+Running Gaussian grid validation...
+Running Laplace grid convergence...
+Running Laplace Gaussian-message approximation error...
+Writing Gaussian visual example...
+Finished all experiments.
+Outputs written to: /private/tmp/claude-501/-Users-gloriabagnato-Desktop-bp-gaussian-ar1-package/f593b25e-dd82-499f-a62a-61c877f30243/scratchpad/heavy/outputs_heavy
+=== [2/4] FINE-GRID CHECK: ref 801, coarse 401 vs fine 801, 16 trials ===
+Running Gaussian grid validation...
+Running Laplace grid convergence...
+Running Laplace Gaussian-message approximation error...
+Writing Gaussian visual example...
+Finished all experiments.
+Outputs written to: /private/tmp/claude-501/-Users-gloriabagnato-Desktop-bp-gaussian-ar1-package/f593b25e-dd82-499f-a62a-61c877f30243/scratchpad/heavy/outputs_heavy_finegrid
+=== [3/4] WIDE-GRID CHECK: [-12,12], 16 trials ===
+Running Gaussian grid validation...
+Running Laplace grid convergence...
+Running Laplace Gaussian-message approximation error...
+Writing Gaussian visual example...
+Finished all experiments.
+Outputs written to: /private/tmp/claude-501/-Users-gloriabagnato-Desktop-bp-gaussian-ar1-package/f593b25e-dd82-499f-a62a-61c877f30243/scratchpad/heavy/outputs_heavy_widegrid
+=== [4/4] PER-TRIAL ANALYSIS: 100 trials per t ===
+Per-trial Gaussian-message error analysis (Laplace chain)
+=========================================================
+n = 50, rho = 0.85, ref grid = 401 on [-8.0, 8.0], trials per t = 100, seed = 7
+
+     t      median         q10         q90         max    P(err>0.1)
+  0.08      0.1667      0.1353      0.2652      0.4422         1.000
+  0.12      0.1317      0.0981      0.2451      0.3048         0.850
+  0.18      0.0851      0.0675      0.1826      0.3149         0.350
+  0.27      0.0625      0.0451      0.1319      0.2623         0.240
+  0.40      0.0346      0.0276      0.0664      0.1736         0.030
+  0.60      0.0193      0.0152      0.0505      0.1340         0.020
+  0.90      0.0154      0.0086      0.0474      0.3267         0.020
+  1.30      0.0279      0.0126      0.1161      1.5806         0.140
+  1.80      0.0364      0.0102      0.6179      0.8732         0.300
+  2.40      0.0046      0.0014      0.0713      0.3423         0.080
+
+Worst trial: t=1.3, trial=1, site=0, relative score error=1.5806
+reference mean=-0.2878 vs Gaussian-message mean=6.0973
+
+=== ALL DONE ===

@@ -1,0 +1,236 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Belief Propagation for Diffusion Scores on Markov Chains</title>
+<style>
+  :root {
+    --bg: #ffffff;
+    --fg: #1a1a1a;
+    --muted: #5f6368;
+    --card-bg: #f7f7f8;
+    --border: #e3e3e6;
+    --accent: #2454ff;
+    --accent-soft: #eef1ff;
+    --code-bg: #f2f2f4;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0f1115;
+      --fg: #e8e8ea;
+      --muted: #9a9ea6;
+      --card-bg: #171a21;
+      --border: #262b35;
+      --accent: #7c9bff;
+      --accent-soft: #1b2140;
+      --code-bg: #1b1e26;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--fg);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+    line-height: 1.55;
+  }
+  .wrap {
+    max-width: 860px;
+    margin: 0 auto;
+    padding: 3rem 1.5rem 5rem;
+  }
+  header { margin-bottom: 2.5rem; }
+  h1 {
+    font-size: 1.9rem;
+    line-height: 1.25;
+    margin: 0 0 0.4rem;
+    letter-spacing: -0.01em;
+  }
+  .subtitle {
+    color: var(--muted);
+    font-size: 1.05rem;
+    margin: 0 0 1.2rem;
+  }
+  .meta {
+    font-size: 0.9rem;
+    color: var(--muted);
+  }
+  .meta a { color: var(--muted); }
+  h2 {
+    font-size: 1.15rem;
+    margin: 2.6rem 0 0.9rem;
+    padding-bottom: 0.4rem;
+    border-bottom: 1px solid var(--border);
+  }
+  p { margin: 0.6rem 0; }
+  .cards {
+    display: grid;
+    gap: 0.8rem;
+  }
+  .card {
+    display: block;
+    padding: 1rem 1.1rem;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    background: var(--card-bg);
+    text-decoration: none;
+    color: var(--fg);
+    transition: border-color 0.15s ease, transform 0.15s ease;
+  }
+  .card:hover {
+    border-color: var(--accent);
+    transform: translateY(-1px);
+  }
+  .card .title {
+    font-weight: 600;
+    font-size: 1rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+  .card .desc {
+    color: var(--muted);
+    font-size: 0.92rem;
+    margin-top: 0.25rem;
+  }
+  .badge {
+    display: inline-block;
+    font-size: 0.72rem;
+    font-weight: 600;
+    padding: 0.15rem 0.5rem;
+    border-radius: 999px;
+    background: var(--accent-soft);
+    color: var(--accent);
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+  }
+  code {
+    background: var(--code-bg);
+    padding: 0.15rem 0.4rem;
+    border-radius: 5px;
+    font-size: 0.88em;
+  }
+  .formula {
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 1rem 1.2rem;
+    margin: 1rem 0;
+    font-size: 0.95rem;
+    overflow-x: auto;
+  }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.92rem;
+    margin: 1rem 0;
+  }
+  th, td {
+    text-align: left;
+    padding: 0.5rem 0.7rem;
+    border-bottom: 1px solid var(--border);
+  }
+  th { color: var(--muted); font-weight: 600; }
+  ul { padding-left: 1.3rem; }
+  li { margin: 0.35rem 0; }
+  footer {
+    margin-top: 3.5rem;
+    padding-top: 1.2rem;
+    border-top: 1px solid var(--border);
+    color: var(--muted);
+    font-size: 0.85rem;
+  }
+  footer a { color: var(--muted); }
+  a { color: var(--accent); }
+  .figure {
+    margin: 1.2rem 0;
+    text-align: center;
+  }
+  .figure img {
+    max-width: 100%;
+    border-radius: 8px;
+    border: 1px solid var(--border);
+  }
+  .figure .caption {
+    font-size: 0.85rem;
+    color: var(--muted);
+    margin-top: 0.5rem;
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <h1>Belief Propagation for Diffusion Scores on Markov Chains</h1>
+    <p class="subtitle">Exact Gaussian AR(1) baseline, and the measured cost of Gaussian message closure on general Markov chains.</p>
+    <p class="meta">Giovanni Mantovani &middot; <a href="https://github.com/GioviManto/bp-gaussian-ar1-diffusion">GitHub repository</a></p>
+  </header>
+
+  <p>
+    The clean signal is a Markov chain <code>a&#8321;:&#8345;</code>, observed through coordinatewise
+    Ornstein&ndash;Uhlenbeck noising at diffusion time <code>t &gt; 0</code>. On a chain, sum-product
+    belief propagation (BP) computes the exact posterior, and the diffusion score follows from the
+    posterior denoiser:
+  </p>
+  <div class="formula">
+    s<sub>i</sub>(x,t) = &part;<sub>x<sub>i</sub></sub> log p<sub>t</sub>(x) = &minus;(x<sub>i</sub> &minus; &alpha;<sub>t</sub> m<sub>i</sub>(x,t)) / &Delta;<sub>t</sub>,
+    &nbsp;&nbsp; m<sub>i</sub>(x,t) = E[a<sub>i</sub> | x&#8321;:&#8345;]
+  </div>
+  <p>
+    Exactness is never the issue&mdash;the issue is <em>representation</em>: for a continuous
+    non-Gaussian chain, each BP message is a whole function. This project first nails the exactly
+    solvable Gaussian case, then measures the error introduced by forcing BP messages back into the
+    Gaussian family (Gaussian/AMP-style closure) on a non-Gaussian test chain.
+  </p>
+
+  <h2>Read this first</h2>
+  <div class="cards">
+    <a class="card" href="https://github.com/GioviManto/bp-gaussian-ar1-diffusion/blob/main/summary_note/bp_diffusion_score_summary.pdf">
+      <div class="title">Summary note <span class="badge">start here</span></div>
+      <div class="desc">5-page PDF: exact identities, the Gaussian baseline, the closure-error experiment, the weak-information instability, and proposed next steps.</div>
+    </a>
+  </div>
+
+  <h2>Full write-ups</h2>
+  <div class="cards">
+    <a class="card" href="https://github.com/GioviManto/bp-gaussian-ar1-diffusion/blob/main/gaussian_ar1/bp_gaussian_ar1_diffusion.pdf">
+      <div class="title">Part I &mdash; Gaussian AR(1): full derivation</div>
+      <div class="desc">Factor graph, generic and Gaussian BP equations, the score/denoiser identity, the precision-matrix route, and the proof the two scores coincide. Verified to ~10&#8315;&sup1;&sup6;.</div>
+    </a>
+    <a class="card" href="https://github.com/GioviManto/bp-gaussian-ar1-diffusion/blob/main/markov_gaussian_approx/report/bp_markov_diffusion_gaussian_approx.pdf">
+      <div class="title">Part II &mdash; General Markov chains: full report</div>
+      <div class="desc">Generic sum-product BP on trees, grid BP and Gaussian-projected BP algorithms, experimental design, and results on the Laplace-innovation chain.</div>
+    </a>
+  </div>
+
+  <h2>Headline result</h2>
+  <p>Relative score error of Gaussian-projected BP vs. reference grid BP, Laplace-innovation AR(1) chain (&rho; = 0.85, n = 50):</p>
+  <table>
+    <tr><th>t</th><th>closure error</th><th>note</th></tr>
+    <tr><td>0.08</td><td>~21%</td><td>systematic &mdash; every one of 100 trials exceeds 10%</td></tr>
+    <tr><td>0.18</td><td>~9%</td><td>decaying</td></tr>
+    <tr><td>0.40</td><td>~4%</td><td>decaying</td></tr>
+    <tr><td>0.90</td><td>~1%</td><td>noisy marginal has effectively Gaussianized</td></tr>
+    <tr><td>&ge;1.8</td><td>unreliable</td><td>naive moment-matching becomes numerically unstable (separate finding, see summary)</td></tr>
+  </table>
+  <div class="figure">
+    <img src="https://raw.githubusercontent.com/GioviManto/bp-gaussian-ar1-diffusion/main/markov_gaussian_approx/outputs_heavy/per_trial/laplace_score_error_quantiles.png" alt="Per-trial distribution of Gaussian-closure score error">
+    <div class="caption">Per-trial distribution (100 trials/t) of the Gaussian-closure score error on the Laplace chain.</div>
+  </div>
+
+  <h2>Repository layout</h2>
+  <ul>
+    <li><code>gaussian_ar1/</code> &mdash; Part I: exact Gaussian AR(1) baseline (PDF, LaTeX, Python, notebook, figures).</li>
+    <li><code>markov_gaussian_approx/</code> &mdash; Part II: general Markov-chain report, grid BP + Gaussian-projected BP code, and heavy validation runs (<code>outputs_heavy/</code>).</li>
+    <li><code>summary_note/</code> &mdash; the 5-page summary linked above.</li>
+  </ul>
+
+  <footer>
+    <a href="https://github.com/GioviManto/bp-gaussian-ar1-diffusion">github.com/GioviManto/bp-gaussian-ar1-diffusion</a>
+  </footer>
+
+</div>
+</body>
+</html>

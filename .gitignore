@@ -1,0 +1,22 @@
+# --- private / heavy: kept locally, never pushed ---
+sources/
+meetings/
+# --- environments & caches ---
+.venv/
+venv/
+__pycache__/
+*.pyc
+.ipynb_checkpoints/
+.DS_Store
+# --- LaTeX aux ---
+*.aux
+*.log
+*.blg
+*.bbl
+*.bcf
+*.out
+*.toc
+*.lof
+*.lot
+*.run.xml
+*.synctex.gz

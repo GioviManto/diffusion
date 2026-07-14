@@ -1,0 +1,15 @@
+{
+  "n_sites": 32,
+  "rho": 0.85,
+  "t_max": 3.0,
+  "t_min": 0.01,
+  "n_batch": 200,
+  "n_steps": 80,
+  "sde_convention": "forward dX = -X dt + sqrt(2) dW; reverse Euler-Maruyama x <- x + h(x + 2s) + sqrt(2h) xi",
+  "provenance": {
+    "timestamp": "2026-07-12 12:17:10",
+    "python": "3.12.5",
+    "numpy": "2.4.2",
+    "platform": "macOS-14.1.1-arm64-arm-64bit"
+  }
+}

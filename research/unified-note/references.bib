@@ -1,0 +1,232 @@
+% ============================================================
+%  Generative diffusion and score-based modelling
+% ============================================================
+
+@inproceedings{SohlDickstein2015,
+    author    = {Sohl-Dickstein, Jascha and Weiss, Eric A. and
+                 Maheswaranathan, Niru and Ganguli, Surya},
+    title     = {Deep Unsupervised Learning using Nonequilibrium Thermodynamics},
+    booktitle = {Proceedings of the 32nd International Conference on
+                 Machine Learning (ICML)},
+    year      = {2015},
+}
+
+@inproceedings{Ho2020,
+    author    = {Ho, Jonathan and Jain, Ajay and Abbeel, Pieter},
+    title     = {Denoising Diffusion Probabilistic Models},
+    booktitle = {Advances in Neural Information Processing Systems},
+    year      = {2020},
+}
+
+@inproceedings{Song2021SDE,
+    author    = {Song, Yang and Sohl-Dickstein, Jascha and Kingma,
+                 Diederik P. and Kumar, Abhishek and Ermon, Stefano and
+                 Poole, Ben},
+    title     = {Score-Based Generative Modeling through Stochastic
+                 Differential Equations},
+    booktitle = {International Conference on Learning Representations
+                 (ICLR)},
+    year      = {2021},
+}
+
+@inproceedings{Karras2022,
+    author    = {Karras, Tero and Aittala, Miika and Aila, Timo and
+                 Laine, Samuli},
+    title     = {Elucidating the Design Space of Diffusion-Based
+                 Generative Models},
+    booktitle = {Advances in Neural Information Processing Systems},
+    year      = {2022},
+}
+
+% ============================================================
+%  Lecture notes and project-internal references
+% ============================================================
+
+@unpublished{Mezard2025,
+    author = {M\'ezard, Marc},
+    title  = {Generative Diffusion: Updated Notes},
+    note   = {Lecture notes, originally from the Carg\`ese summer
+              school, July 2024; progressively enriched. Initial
+              transcription by Beatrice Achilli, Marco Benedetti,
+              J\'er\^ome Garnier-Brun, and Rapha\"el Urfin},
+    month  = dec,
+    year   = {2025},
+}
+
+@misc{Thiery2023,
+    author       = {Thi\'ery, Alexandre},
+    title        = {Reverse Diffusions, Score and {T}weedie},
+    year         = {2023},
+    month        = jun,
+    howpublished = {Online technical note,
+                    \url{https://alexxthiery.github.io/posts/reverse_and_tweedie/reverse_and_tweedie.html}},
+}
+
+@phdthesis{Achilli2024,
+    author = {Achilli, Beatrice},
+    title  = {Score-Based Diffusion: Theory and Phase Transitions},
+    school = {Bocconi University},
+    year   = {2024},
+    note   = {MSc thesis},
+}
+
+@article{Biroli2024,
+    author  = {Biroli, Giulio and Bonnaire, Tony and de Bortoli,
+               Valentin and M\'ezard, Marc},
+    title   = {Dynamical Regimes of Diffusion Models},
+    journal = {Nature Communications},
+    year    = {2024},
+}
+
+% ============================================================
+%  Reverse-time stochastic differential equations
+% ============================================================
+
+@article{Anderson1982,
+    author  = {Anderson, Brian D.~O.},
+    title   = {Reverse-Time Diffusion Equation Models},
+    journal = {Stochastic Processes and Their Applications},
+    volume  = {12},
+    number  = {3},
+    pages   = {313--326},
+    year    = {1982},
+}
+
+@article{HaussmannPardoux1986,
+    author  = {Haussmann, Ulrich G. and Pardoux, \'Etienne},
+    title   = {Time Reversal of Diffusions},
+    journal = {The Annals of Probability},
+    volume  = {14},
+    number  = {4},
+    pages   = {1188--1205},
+    year    = {1986},
+}
+
+% ============================================================
+%  Tweedie's formula and denoising score matching
+% ============================================================
+
+@article{Efron2011,
+    author  = {Efron, Bradley},
+    title   = {{T}weedie's Formula and Selection Bias},
+    journal = {Journal of the American Statistical Association},
+    volume  = {106},
+    number  = {496},
+    pages   = {1602--1614},
+    year    = {2011},
+}
+
+@article{Vincent2011,
+    author  = {Vincent, Pascal},
+    title   = {A Connection Between Score Matching and Denoising Autoencoders},
+    journal = {Neural Computation},
+    volume  = {23},
+    number  = {7},
+    pages   = {1661--1674},
+    year    = {2011},
+}
+
+@article{Hyvarinen2005,
+    author  = {Hyv\"arinen, Aapo},
+    title   = {Estimation of Non-Normalized Statistical Models by
+               Score Matching},
+    journal = {Journal of Machine Learning Research},
+    volume  = {6},
+    pages   = {695--709},
+    year    = {2005},
+}
+
+% ============================================================
+%  Belief propagation, factor graphs, and graphical models
+% ============================================================
+
+@book{Pearl1988,
+    author    = {Pearl, Judea},
+    title     = {Probabilistic Reasoning in Intelligent Systems:
+                 Networks of Plausible Inference},
+    publisher = {Morgan Kaufmann},
+    year      = {1988},
+}
+
+@article{KschischangFreyLoeliger2001,
+    author  = {Kschischang, Frank R. and Frey, Brendan J. and Loeliger,
+               Hans-Andrea},
+    title   = {Factor Graphs and the Sum-Product Algorithm},
+    journal = {IEEE Transactions on Information Theory},
+    volume  = {47},
+    number  = {2},
+    pages   = {498--519},
+    year    = {2001},
+}
+
+@book{Bishop2006,
+    author    = {Bishop, Christopher M.},
+    title     = {Pattern Recognition and Machine Learning},
+    publisher = {Springer},
+    year      = {2006},
+}
+
+@book{MezardMontanari2009,
+    author    = {M\'ezard, Marc and Montanari, Andrea},
+    title     = {Information, Physics, and Computation},
+    publisher = {Oxford University Press},
+    year      = {2009},
+}
+
+% ============================================================
+%  Kalman filter and Rauch--Tung--Striebel smoother
+% ============================================================
+
+@article{Kalman1960,
+    author  = {Kalman, Rudolf E.},
+    title   = {A New Approach to Linear Filtering and Prediction Problems},
+    journal = {Journal of Basic Engineering},
+    volume  = {82},
+    number  = {1},
+    pages   = {35--45},
+    year    = {1960},
+}
+
+@article{RauchTungStriebel1965,
+    author  = {Rauch, Herbert E. and Tung, F. and Striebel, Charlotte T.},
+    title   = {Maximum Likelihood Estimates of Linear Dynamic Systems},
+    journal = {AIAA Journal},
+    volume  = {3},
+    number  = {8},
+    pages   = {1445--1450},
+    year    = {1965},
+}
+
+% ============================================================
+%  AR(1) and stationary time series
+% ============================================================
+
+@book{BrockwellDavis1991,
+    author    = {Brockwell, Peter J. and Davis, Richard A.},
+    title     = {Time Series: Theory and Methods},
+    edition   = {2},
+    publisher = {Springer},
+    year      = {1991},
+}
+
+% ============================================================
+%  OU process / variance-preserving SDE
+% ============================================================
+
+@book{Oksendal2003,
+    author    = {{\O}ksendal, Bernt},
+    title     = {Stochastic Differential Equations},
+    edition   = {6},
+    publisher = {Springer},
+    year      = {2003},
+}
+
+@article{UhlenbeckOrnstein1930,
+    author  = {Uhlenbeck, George E. and Ornstein, Leonard S.},
+    title   = {On the Theory of the {B}rownian Motion},
+    journal = {Physical Review},
+    volume  = {36},
+    number  = {5},
+    pages   = {823--841},
+    year    = {1930},
+}
