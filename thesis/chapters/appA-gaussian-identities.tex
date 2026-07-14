@@ -1,1 +1,102 @@
-% placeholder — content forthcoming
+\chapter{Gaussian Identities Used Throughout}\label{app:gauss}
+
+This appendix collects, with proofs, the handful of Gaussian identities on
+which Chapters~\ref{ch:gaussian}--\ref{ch:bp} rely. Notation: a Gaussian
+density in \emph{moment} parameters is $\Nd(a; m, v)$; in \emph{natural}
+parameters it is
+$\exp(-\tfrac{\lambda}{2} a^2 + \theta a + \mathrm{const})$ with
+$\lambda = 1/v$, $\theta = m/v$.
+
+\section{Quadratic forms and Gaussian normalisation}
+
+For $J \succ 0$ (symmetric positive definite) and any $h$,
+\begin{equation}
+  \int_{\R^K} \exp\!\Big( -\tfrac{1}{2} a^\T J a + h^\T a \Big)\, \dd a
+  = \frac{(2\pi)^{K/2}}{\sqrt{\det J}}
+    \exp\!\Big( \tfrac{1}{2} h^\T J^{-1} h \Big),
+  \label{eq:gauss-int}
+\end{equation}
+by completing the square, $-\tfrac{1}{2}a^\T J a + h^\T a =
+-\tfrac{1}{2}(a - J^{-1}h)^\T J (a - J^{-1}h) + \tfrac{1}{2} h^\T J^{-1}h$,
+and translating. Consequently a density
+$p(a) \propto \exp(-\tfrac{1}{2} a^\T J a + h^\T a)$ is the Gaussian with
+mean $m = J^{-1} h$ and covariance $J^{-1}$: \emph{reading off $(J, h)$
+from a log-density is the fastest route to posterior parameters}, used in
+Proposition~\ref{prop:g-posterior}.
+
+\section{Products of Gaussians in the same variable}
+
+\begin{equation}
+  \Nd(a; m_1, v_1)\, \Nd(a; m_2, v_2)
+  \;\propto\; \Nd\!\big(a;\, m, v\big),
+  \qquad
+  \frac{1}{v} = \frac{1}{v_1} + \frac{1}{v_2},
+  \qquad
+  \frac{m}{v} = \frac{m_1}{v_1} + \frac{m_2}{v_2}.
+  \label{eq:gauss-product}
+\end{equation}
+\emph{Proof.} Add the exponents; the sum of two quadratics in $a$ is a
+quadratic in $a$ whose $a^2$-coefficient is
+$-\tfrac{1}{2}(1/v_1 + 1/v_2)$ and whose linear coefficient is
+$m_1/v_1 + m_2/v_2$; apply \eqref{eq:gauss-int} in one dimension. In
+natural parameters the rule is addition:
+$(\lambda, \theta) = (\lambda_1 + \lambda_2, \theta_1 + \theta_2)$ ---
+which is why the BP updates of Chapter~\ref{ch:bp} are two additions per
+message. $\square$
+
+\section{Affine propagation (marginalisation)}
+
+If $a' = \alpha a + \eta$ with $\eta \sim \Nd(0, \sigma^2)$ independent of
+$a \sim \Nd(m, v)$, then
+\begin{equation}
+  \int \Nd(a'; \alpha a, \sigma^2)\, \Nd(a; m, v)\, \dd a
+  = \Nd\!\big(a';\, \alpha m,\, \alpha^2 v + \sigma^2\big).
+  \label{eq:gauss-predict}
+\end{equation}
+\emph{Proof.} $a'$ is a sum of independent Gaussians, hence Gaussian; its
+mean is $\alpha m$ and its variance $\alpha^2 v + \sigma^2$ by linearity
+of expectation and independence. Read in the reverse direction (solving
+for $a$ given a Gaussian summary of $a'$), the same computation gives
+$\Nd\big(a;\, m'/\alpha,\, (v' + \sigma^2)/\alpha^2\big)$, the backward
+half-step of Chapter~\ref{ch:bp}. $\square$
+
+\section{Gaussian conditioning}
+
+For a jointly Gaussian pair with precision blocks
+$\begin{psmallmatrix} J_{11} & J_{12} \\ J_{12}^\T & J_{22}
+\end{psmallmatrix}$, the conditional of block $1$ given block $2$ is
+Gaussian with precision $J_{11}$ (conditioning \emph{reads off} the
+precision block) and mean shifted by $-J_{11}^{-1} J_{12}\, a_2$;
+marginalisation, dually, is trivial in covariance parameters. This
+precision/covariance duality --- conditioning is local in $J$,
+marginalising is local in $\Sigma$ --- is the algebraic engine behind the
+cavity recursion \eqref{eq:bp-cavity}: integrating a neighbour out of a
+tridiagonal precision produces the rank-one correction
+$-\beta^2/\lambda$ on the adjacent diagonal entry, by the Schur
+complement
+\begin{equation}
+  \begin{pmatrix} \lambda & \beta \\ \beta & J_d \end{pmatrix}
+  \;\longrightarrow\;
+  J_d - \frac{\beta^2}{\lambda}.
+  \label{eq:gauss-schur}
+\end{equation}
+
+\section{Woodbury and the two routes to the score}
+
+The Woodbury/Sherman--Morrison--Woodbury identity,
+$(A + UCV)^{-1} = A^{-1} - A^{-1}U (C^{-1} + V A^{-1} U)^{-1} V A^{-1}$,
+specialised to $\Sigt = \Deltat I + e^{-2t} \Sigz$, connects the noisy
+precision $\Qt$ and the posterior precision
+$J = (e^{-2t}/\Deltat) I + \Qz$:
+\begin{equation}
+  \Qt
+  = \frac{1}{\Deltat}
+    \left( I - \frac{e^{-2t}}{\Deltat}\, J^{-1} \right),
+  \label{eq:gauss-woodbury}
+\end{equation}
+which is exactly the operator form of Tweedie's identity: substituting the
+posterior mean $m = J^{-1} h = J^{-1} (e^{-t}/\Deltat) x$ into
+$S = (e^{-t} m - x)/\Deltat$ gives $S = -\Qt x$ identically. The
+machine-precision agreement of the two score routes
+(Section~\ref{sec:g-score}) is the numerical shadow of
+\eqref{eq:gauss-woodbury}.
