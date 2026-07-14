@@ -108,20 +108,18 @@ repo map); D figure sources.
 - `tectonic main.tex` in thesis/ (tectonic at /opt/homebrew/bin/tectonic; natbib+bibtex).
 - 12 pt, onehalfspacing (~28 lines/page), geometry hmargin=2.5cm.
 
-## Progress tracker (update as chapters land)
+## Progress tracker (updated 2026-07-14)
 
 - [x] Plan, skeleton, preamble
-- [ ] Ch1 Introduction
-- [ ] Ch2 Stat mech
-- [ ] Ch3 Stochastic processes/MCMC
-- [ ] Ch4 SDE/Itô/OU/FP
-- [ ] Ch5 EBM/MRF
-- [ ] Ch6 Diffusion models
-- [ ] Ch7 Gaussian chain
-- [ ] Ch8 Laplace
-- [ ] Ch9 BP/AMP
-- [ ] Ch10 Conclusions
-- [ ] Appendices A–D
-- [ ] References complete & verified
-- [ ] Format audit (lines/page, margins, 4 preliminary pages, ≤10 MB)
-- [ ] Push GitHub repo `diffusion` (private), old repos: user decides archiving
+- [x] Ch1–Ch10 written (137 pp. compiled)
+- [x] Appendices A–C (Gaussian identities, code listings, reproducibility)
+- [x] References (verified entries only; unofficial notes not cited)
+- [x] Format audit: pages 1/2/4 blank, p.3 acknowledgements, content from p.5
+      (odd); A4, 2.5 cm side margins, ~29 lines/page; 1.63 MB ≤ 10 MB
+- [x] Numerical audits re-run on this machine: 72/72 and 55/55 PASS;
+      Laplace closure medians + cosine re-verified from experiment CSVs
+- [x] docs/: RESULT_LEDGER.md, ADVISOR_BRIEFING.md, SOURCE_AUDIT.md
+- [ ] Push GitHub repo `diffusion` (private); old repos: user decides archiving
+- [ ] Giovanni: fill acknowledgements (p. 3), set final title, add student ID
+      to filename at upload (TS<ID>.pdf), review Ch1 RQ wording
+- [ ] Optional next experiments: mixture messages; discrete chain (see briefing)
