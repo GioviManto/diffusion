@@ -1,1 +1,191 @@
-% placeholder — content forthcoming
+\chapter{Energy-Based Models, Markov Random Fields, and Factor Graphs}
+\label{ch:ebm}
+
+Chapter~\ref{ch:statmech} derived the Boltzmann distribution from physics;
+this chapter adopts it as a \emph{modelling language} for data. The three
+formalisms introduced here --- energy-based models, Markov random fields,
+and factor graphs --- are three views of the same object, ordered by
+increasing structural explicitness. The chapter is deliberately compact:
+every definition it contains is used, verbatim, in the research chapters,
+where the noisy Markov chain will be an energy-based model whose factor
+graph is a tree.
+
+\section{Energy-based models}\label{sec:ebm-def}
+
+An \emph{energy-based model} (EBM) over $x \in \mathcal{X}$ is a probability
+distribution specified by an energy function $E_\theta$:
+\begin{equation}
+  p_\theta(x) \;=\; \frac{e^{-E_\theta(x)}}{Z(\theta)},
+  \qquad
+  Z(\theta) = \int_{\mathcal{X}} e^{-E_\theta(x)}\, \dd x ,
+  \label{eq:ebm}
+\end{equation}
+the Boltzmann distribution \eqref{eq:boltzmann} with $\beta$ absorbed into
+the energy and the physics replaced by a parametric family
+\citep{ackley1985learning, lecun2006tutorial}. The appeal of
+\eqref{eq:ebm} is that $E_\theta$ is unconstrained --- any function
+defines a valid unnormalised density; the price is the partition function.
+Every basic operation hits it:
+\begin{itemize}
+  \item \emph{Evaluation} of $p_\theta(x)$ requires $Z(\theta)$ ---
+  intractable in general (Section~\ref{sec:ising}).
+  \item \emph{Sampling} requires MCMC (Chapter~\ref{ch:stochproc}), whose
+  mixing time can be exponential in the presence of the metastability
+  discussed in Section~\ref{sec:ising}.
+  \item \emph{Learning} by maximum likelihood requires the gradient
+  \begin{equation}
+    -\nabla_\theta \log p_\theta(x)
+    = \nabla_\theta E_\theta(x)
+    - \E_{p_\theta}\!\big[ \nabla_\theta E_\theta \big],
+    \label{eq:ebm-gradient}
+  \end{equation}
+  whose second term --- the model expectation --- again demands sampling
+  from $p_\theta$.
+\end{itemize}
+There are two classical escape routes from the partition function, and this
+thesis walks both. The first is the \emph{score}: since
+$\nabla_x \log p_\theta(x) = -\nabla_x E_\theta(x)$, the score is free of
+$Z$ --- differentiating in $x$ kills the constant. Score matching
+(Chapter~\ref{ch:diffusion}) and diffusion models are built on this
+observation. The second is \emph{structure}: when the energy decomposes into
+local terms, marginals and even $Z$ itself can become tractable by dynamic
+programming --- that route is the rest of this chapter.
+
+\section{Markov random fields}\label{sec:mrf}
+
+\begin{definition}[Markov random field]
+Let $G = (V, \mathcal{E})$ be an undirected graph with one random variable
+$x_i$ per node. The collection $x = (x_i)_{i \in V}$ is a \emph{Markov
+random field} (MRF) if it satisfies the local Markov property: for every
+node $i$,
+\begin{equation}
+  p\big(x_i \,\big|\, x_{V \setminus \{i\}}\big)
+  \;=\; p\big(x_i \,\big|\, x_{\partial i}\big),
+  \label{eq:local-markov}
+\end{equation}
+where $\partial i$ is the set of neighbours of $i$ in $G$.
+\end{definition}
+
+The fundamental structure theorem connects this conditional-independence
+definition to the energy picture: by the Hammersley--Clifford theorem
+\citep[proved in][]{besag1974spatial}, a strictly positive density is an MRF
+on $G$ if and only if it factorises over the \emph{cliques} of $G$,
+\begin{equation}
+  p(x) \;=\; \frac{1}{Z} \prod_{C \in \mathrm{cliques}(G)} \psi_C(x_C)
+  \;=\; \frac{1}{Z}\, \exp\Big[ -\sum_C E_C(x_C) \Big] .
+  \label{eq:hammersley-clifford}
+\end{equation}
+Conditional independence, graphical locality, and additive local energies
+are one and the same thing. The Ising model \eqref{eq:ising} is the textbook
+example: cliques are edges, and $E_{(i,j)} = -J_{ij}\sigma_i\sigma_j$.
+
+For \emph{our} purposes the decisive example is one-dimensional. The Markov
+chain factorisation \eqref{eq:chain-factorisation},
+$p(x) = p_0(x_0) \prod_k M(x_{k+1}|x_k)$, is of the form
+\eqref{eq:hammersley-clifford} with $G$ a path graph: a Markov chain is an
+MRF on a line, with energy
+\begin{equation}
+  E(x) \;=\; -\log p_0(x_0) \;-\; \sum_{k=0}^{K-2} \log M(x_{k+1} \,|\, x_k),
+  \label{eq:chain-energy}
+\end{equation}
+a sum of \emph{pairwise, nearest-neighbour} terms. For the Gaussian AR(1)
+chain each term is quadratic, so $E$ is a quadratic form whose coupling
+matrix connects only neighbours --- read: a \emph{tridiagonal precision
+matrix}. Chapter~\ref{ch:gaussian} derives this precision explicitly; the
+reader should note that its tridiagonality is not an accident of Gaussian
+algebra but the Hammersley--Clifford fingerprint of one-dimensional Markov
+structure.
+
+\section{Hidden Markov models: chains observed through noise}
+\label{sec:hmm}
+
+The research problem of this thesis is, structurally, a \emph{hidden Markov
+model} (HMM) \citep{rabiner1989tutorial}: a latent Markov chain
+$(a_0, \dots, a_{K-1})$ evolving by \eqref{eq:ar1}, observed only through
+independent noisy measurements --- in our case, one OU channel
+\eqref{eq:ou-channel} per frame,
+\begin{equation}
+  x_k \;=\; a_k\, e^{-t} + \sqrt{\Deltat}\,\varepsilon_k,
+  \qquad \varepsilon_k \;\text{i.i.d.}\; \Nd(0,1) .
+  \label{eq:hmm-observation}
+\end{equation}
+The joint law of latents and observations inherits both factorisations:
+\begin{equation}
+  p(a, x)
+  \;=\; \underbrace{p_0(a_0) \prod_{k=0}^{K-2} M(a_{k+1}|a_k)}_{\text{chain prior}}
+  \;\cdot\;
+  \underbrace{\prod_{k=0}^{K-1} \Nd\!\big(x_k;\, a_k e^{-t}, \Deltat\big)}_{\text{local likelihoods}} .
+  \label{eq:hmm-joint}
+\end{equation}
+Conditioning on the observations gives the \emph{posterior}
+$p(a | x) \propto p(a, x)$, which is again an MRF on the line: the
+likelihood factors touch one variable each and therefore do not enlarge any
+clique. This innocent remark is the structural core of the thesis, for two
+reasons. First, as shown in Chapter~\ref{ch:diffusion}, the diffusion score
+of the noisy sequence is exactly a posterior expectation under
+\eqref{eq:hmm-joint} --- so computing scores \emph{is} HMM inference.
+Second, posterior inference on chain-shaped MRFs is solvable in $O(K)$ by
+dynamic programming --- the forward--backward algorithm for discrete HMMs
+\citep{rabiner1989tutorial}, the Kalman smoother for linear-Gaussian ones
+\citep{kalman1960new, rauch1965maximum} --- and both are special cases of
+the single algorithm this thesis studies: belief propagation.
+
+\section{Factor graphs}\label{sec:factor-graphs}
+
+MRFs record \emph{which} variables interact but not \emph{how} the joint
+factorises (a triangle of pairwise terms and one triple term have the same
+graph). The representation that makes factorisation itself graphical --- and
+on which message passing is most naturally defined --- is the \emph{factor
+graph} \citep{kschischang2001factor}.
+
+\begin{definition}[Factor graph]
+Given a factorisation $p(x) = \frac{1}{Z}\prod_{a} \psi_a(x_{\partial a})$,
+its factor graph is the bipartite graph with a \emph{variable node} for each
+$x_i$, a \emph{factor node} for each $\psi_a$, and an edge $(i, a)$ whenever
+$x_i \in x_{\partial a}$ (i.e.\ variable $i$ appears in factor $a$).
+\end{definition}
+
+A factor graph is a \emph{tree} when it is connected and cycle-free; trees
+are the domain where the sum--product algorithm of Chapter~\ref{ch:bp}
+computes every marginal exactly \citep{pearl1988probabilistic,
+mezard2009information, bishop2006pattern}.
+
+The posterior \eqref{eq:hmm-joint} of our noisy chain has factor graph:
+variable nodes $a_0, \dots, a_{K-1}$; pairwise factor nodes
+$M_k = M(a_{k+1}|a_k)$ between consecutive variables; and a unary factor
+node $L_k = \Nd(x_k; a_k e^{-t}, \Deltat)$ hanging off each variable (the
+observations $x_k$ are fixed numbers, not nodes). Pictorially it is a
+\emph{caterpillar}: a spine of $K$ variables alternating with $K-1$
+transition factors, plus one likelihood leaf per vertebra. Removing any edge
+disconnects it; it contains no cycle; it is a tree. Hence --- recording the
+conclusion the research chapters will exploit ---
+
+\begin{proposition}\label{prop:chain-tree}
+For any Markov-chain prior and any per-frame observation model, the
+posterior $p(a \,|\, x)$ factorises over a tree-shaped factor graph.
+Exact marginal inference on it costs $O(K)$ message-passing operations.
+\end{proposition}
+
+Note what Proposition~\ref{prop:chain-tree} does \emph{not} say: it does not
+say the messages are finitely parametrisable. For discrete chains they are
+vectors; for the Gaussian chain they close within the Gaussian family
+(Chapter~\ref{ch:bp}); for general continuous chains they are
+infinite-dimensional functions, and \emph{that} --- not the graph topology
+--- is where approximation enters. Keeping ``tree-exactness of the
+algorithm'' separate from ``representability of the messages'' is the
+conceptual hinge of this thesis, and the distinction the Gaussian closure
+results of Chapter~\ref{ch:bp} are designed to quantify.
+
+\section{What learning adds, and why we go exact}\label{sec:ebm-learning}
+
+A learned generative model of sequences --- an EBM with a neural energy, or
+the diffusion models of the next chapter --- must discover the structure
+that equations \eqref{eq:chain-energy}--\eqref{eq:hmm-joint} hand us for
+free. The modelling bet of this thesis is that the exactly solvable case is
+informative about the learned one: if even the \emph{exact} posterior
+develops long-range couplings as noise grows (Chapter~\ref{ch:gaussian}
+makes this precise), then a learned score faces the same fate; and if exact
+inference degrades gracefully under locality constraints
+(Chapter~\ref{ch:bp}), then local architectures are a principled bet, not
+just a cheap one. The next chapter completes the toolkit by explaining how
+modern diffusion models train against these objects at scale.

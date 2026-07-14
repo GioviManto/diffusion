@@ -1,1 +1,271 @@
-% placeholder — content forthcoming
+\chapter{Diffusion Models: from Thermodynamics to Scores}\label{ch:diffusion}
+
+This chapter assembles the material of
+Chapters~\ref{ch:statmech}--\ref{ch:ebm} into the modern theory of
+generative diffusion. We present the discrete-time construction (DDPM), the
+score-matching principle that makes training tractable, the continuous-time
+SDE formulation that unifies both, and the identity --- Tweedie's --- that
+converts the score into a Bayesian posterior expectation. The chapter closes
+with the statistical-physics analyses of diffusion that motivate this
+thesis, and states the gap our research chapters fill.
+
+\section{The generative problem and the diffusion idea}
+
+Given samples of an unknown distribution $p_0$ on $\R^K$, a generative model
+must produce new samples. Diffusion models
+\citep{sohl2015deep, ho2020denoising, song2021scorebased} solve this with a
+two-process design inspired by non-equilibrium thermodynamics:
+a fixed \emph{forward process} gradually corrupts data into pure noise, and
+a learned \emph{reverse process} undoes the corruption step by step. The
+forward process used throughout this thesis is the OU channel of
+Section~\ref{sec:ou}: at diffusion time $t$,
+\begin{equation}
+  x_t \;=\; a\, e^{-t} + \sqrt{\Deltat}\;\varepsilon,
+  \qquad a \sim p_0,\quad \varepsilon \sim \Nd(0, I),
+  \qquad \Deltat = 1 - e^{-2t},
+  \label{eq:forward-marginal}
+\end{equation}
+so that the noised marginal is the convolution
+\begin{equation}
+  p_t(x) \;=\; \int p_0(a)\; \Nd\!\big(x;\, a e^{-t},\, \Deltat I\big)\,
+  \dd a .
+  \label{eq:pt-convolution}
+\end{equation}
+As $t$ grows, $p_t$ interpolates from the data distribution to
+$\Nd(0, I)$. By Anderson's theorem (Section~\ref{sec:reversal}), the
+corruption is undone by the reverse SDE \eqref{eq:reverse-sde}, whose only
+unknown ingredient is the score $\nabla_x \log p_t(x)$ of the noised
+marginals. Generative diffusion is therefore, at bottom, \emph{score
+estimation}: whoever knows $\nabla \log p_t$ for all $t$ can sample from
+$p_0$.
+
+\section{Denoising diffusion probabilistic models}\label{sec:ddpm}
+
+The discrete-time formulation \citep{sohl2015deep, ho2020denoising}
+discretises \eqref{eq:forward-marginal} into a Markov chain
+$q(x_s | x_{s-1}) = \Nd(x_s; \sqrt{1 - \beta_s}\, x_{s-1}, \beta_s I)$ with
+a variance schedule $\beta_1, \dots, \beta_S$, and learns a reverse chain
+$p_\theta(x_{s-1} | x_s)$. Training maximises a variational lower bound on
+the data log-likelihood --- the physicist will recognise the Gibbs
+variational principle \eqref{eq:gibbs-variational} in modern dress.
+
+\begin{toolbox}{The evidence lower bound of a diffusion model}
+For any latent-variable model with joint $p_\theta(x_{0:S})$ and any
+inference distribution $q(x_{1:S} | x_0)$, Jensen's inequality gives
+\begin{align*}
+  \log p_\theta(x_0)
+  &= \log \int p_\theta(x_{0:S})\;\dd x_{1:S}
+   = \log\, \E_{q}\!\left[
+      \frac{p_\theta(x_{0:S})}{q(x_{1:S}|x_0)} \right]
+  \;\geq\; \E_{q}\!\left[
+      \log \frac{p_\theta(x_{0:S})}{q(x_{1:S}|x_0)} \right]
+  =: \mathrm{ELBO}.
+\end{align*}
+Insert the two Markov factorisations
+$p_\theta(x_{0:S}) = p(x_S) \prod_s p_\theta(x_{s-1}|x_s)$ and
+$q(x_{1:S}|x_0) = \prod_s q(x_s|x_{s-1})$, then regroup telescopically using
+Bayes' rule $q(x_s|x_{s-1}) = q(x_{s-1}|x_s, x_0)\, q(x_s|x_0) /
+q(x_{s-1}|x_0)$:
+\begin{equation*}
+  -\mathrm{ELBO}
+  = \underbrace{\kl{q(x_S|x_0)}{p(x_S)}}_{\text{prior term}}
+  + \sum_{s=2}^{S}
+    \underbrace{\E_q\, \kl{q(x_{s-1}|x_s, x_0)}{p_\theta(x_{s-1}|x_s)}}_{
+      \text{one denoising step each}}
+  \;-\; \E_q \log p_\theta(x_0 | x_1).
+\end{equation*}
+The decisive point: because the forward chain is Gaussian and conditioned on
+\emph{both} endpoints, each target $q(x_{s-1} | x_s, x_0)$ is an explicit
+Gaussian. Matching it with a Gaussian $p_\theta$ reduces each KL term to a
+weighted regression of the posterior mean --- concretely, to predicting the
+noise $\varepsilon$ that was added \citep{ho2020denoising}. The
+thermodynamic reading of the ELBO gap as an entropy-production bound goes
+back to \citet{sohl2015deep}. \hfill$\square$
+\end{toolbox}
+
+The practical upshot of \citet{ho2020denoising} is the loss
+\begin{equation}
+  \mathcal{L}(\theta)
+  = \E_{s,\, a \sim p_0,\, \varepsilon}
+    \big\| \varepsilon - \varepsilon_\theta\big(
+      \underbrace{a\,e^{-t_s} + \sqrt{\Delta_{t_s}}\,\varepsilon}_{x_{t_s}},\; s
+    \big) \big\|^2 ,
+  \label{eq:ddpm-loss}
+\end{equation}
+a denoising regression. Its connection with the score is not incidental, as
+the next section shows: predicting the noise \emph{is} estimating
+$\nabla \log p_t$ up to scale.
+
+\section{Score matching}\label{sec:score-matching}
+
+Suppose we model the score directly by a function $s_\theta(x)$ and wish it
+to match $\nabla \log p(x)$ for data from $p$. The naive objective
+$\E_p \| s_\theta - \nabla \log p \|^2$ seems to require knowing the very
+score we lack. Two classical results remove the obstruction.
+
+\begin{toolbox}{Implicit score matching (Hyv\"arinen)}
+Expand the square and keep only $\theta$-dependent terms:
+\begin{equation*}
+  \E_p \norm{s_\theta - \nabla \log p}^2
+  = \E_p \norm{s_\theta}^2
+  - 2\, \E_p \inner{s_\theta}{\nabla \log p}
+  + \text{const}.
+\end{equation*}
+The cross term integrates by parts. Componentwise, using
+$p\,\partial_i \log p = \partial_i p$ and assuming $p\, s_{\theta,i} \to 0$
+at infinity:
+\begin{equation*}
+  \int p\; s_{\theta,i}\; \partial_i \log p \;\dd x
+  = \int s_{\theta,i}\; \partial_i p \;\dd x
+  = - \int p\; \partial_i s_{\theta,i} \;\dd x .
+\end{equation*}
+Therefore
+\begin{equation*}
+  \E_p \norm{s_\theta - \nabla \log p}^2
+  = \E_p\Big[ \norm{s_\theta(x)}^2
+    + 2\, \nabla \cdot s_\theta(x) \Big] + \text{const} :
+\end{equation*}
+an objective involving only the model and data samples
+\citep{hyvarinen2005estimation}. Elegant, but the divergence term is
+expensive for large networks --- which is why diffusion models use the
+denoising variant instead. \hfill$\square$
+\end{toolbox}
+
+\begin{toolbox}{Denoising score matching (Vincent)}
+Fix $t$ and consider the noised marginal \eqref{eq:pt-convolution}, written
+as $p_t(x) = \int p_0(a)\, q_t(x|a)\,\dd a$ with Gaussian kernel
+$q_t(x|a) = \Nd(x; a e^{-t}, \Deltat I)$. Then
+\begin{equation*}
+  \nabla_x \log p_t(x)
+  = \frac{\int p_0(a)\, \nabla_x q_t(x|a)\, \dd a}{p_t(x)}
+  = \int \underbrace{\frac{p_0(a)\, q_t(x|a)}{p_t(x)}}_{=\,p(a|x)}\;
+    \nabla_x \log q_t(x|a)\; \dd a
+  = \E\big[ \nabla_x \log q_t(x|a) \,\big|\, x \big].
+\end{equation*}
+The score of the \emph{marginal} is the posterior average of the score of
+the \emph{kernel} --- and the latter is trivial:
+$\nabla_x \log q_t(x|a) = -(x - a e^{-t})/\Deltat$. A standard
+$L^2$-projection argument turns this into a regression: for any
+$s_\theta$,
+\begin{equation*}
+  \E_{x \sim p_t} \norm{ s_\theta(x) - \nabla \log p_t(x) }^2
+  = \E_{a, x} \norm{ s_\theta(x) - \nabla_x \log q_t(x|a) }^2
+  + \text{const},
+\end{equation*}
+because conditional expectation is exactly the $L^2$ projection onto
+functions of $x$ \citep{vincent2011connection}. Substituting the Gaussian
+kernel score and $x = a e^{-t} + \sqrt{\Deltat}\varepsilon$ gives
+$\nabla_x \log q_t = -\varepsilon / \sqrt{\Deltat}$: \emph{learning the
+score of noisy data is learning to predict the noise}, and the DDPM loss
+\eqref{eq:ddpm-loss} is denoising score matching in disguise.
+\hfill$\square$
+\end{toolbox}
+
+The continuous-time synthesis \citep{song2019generative, song2021scorebased}
+trains one network $s_\theta(x, t)$ against denoising score matching at all
+noise levels and samples with the reverse SDE \eqref{eq:reverse-sde} or its
+deterministic twin, the probability-flow ODE; an accessible exposition is
+\citet{song2021blog}, and \citet{karras2022elucidating} systematise the
+design space.
+
+\section{Tweedie's identity: the score is a denoiser}\label{sec:tweedie}
+
+The middle line of Vincent's derivation deserves its own section, because it
+is the bridge on which the whole thesis walks. Rearranging
+$\nabla \log p_t(x) = \E[-(x - a e^{-t})/\Deltat \mid x]$:
+\begin{equation}
+  \boxed{\;
+  \nabla_x \log p_t(x)
+  \;=\; \frac{e^{-t}\,\E[\,a \,|\, x\,] - x}{\Deltat}
+  \quad\Longleftrightarrow\quad
+  \E[\,a \,|\, x\,]
+  = e^{t} \Big( x + \Deltat\, \nabla_x \log p_t(x) \Big).
+  \;}
+  \label{eq:tweedie}
+\end{equation}
+This is the Tweedie--Miyasawa formula of empirical Bayes
+\citep{robbins1956empirical, miyasawa1961empirical, efron2011tweedie}:
+the score of the noisy marginal and the Bayes-optimal denoiser
+$\E[a|x]$ determine each other exactly, with no assumption whatsoever on
+$p_0$. Three readings will recur:
+\begin{enumerate}
+  \item \emph{Geometric}: the score points from $x$ towards (the contracted
+  image of) the posterior mean of the clean data --- denoising direction and
+  score direction coincide.
+  \item \emph{Statistical}: estimating the score is solving a Bayesian
+  inference problem --- compute a posterior expectation under the joint
+  \eqref{eq:hmm-joint}. Everything Chapter~\ref{ch:ebm} said about
+  inference on graphs now applies to scores.
+  \item \emph{Algorithmic}: for sequence data with Markov prior, the
+  posterior lives on a tree (Proposition~\ref{prop:chain-tree}), so the
+  score is computable by message passing --- the programme of
+  Chapter~\ref{ch:bp}.
+\end{enumerate}
+
+For \emph{vector-valued} data $a \in \R^K$ noised coordinate-wise,
+\eqref{eq:tweedie} holds componentwise with the \emph{full} posterior:
+\begin{equation}
+  \big( \nabla_x \log p_t(x) \big)_k
+  \;=\; \frac{e^{-t}\, \E[\,a_k \,|\, x_0, \dots, x_{K-1}\,] - x_k}{\Deltat}.
+  \label{eq:tweedie-joint}
+\end{equation}
+The conditioning is on \emph{all} coordinates: even though the noise is
+independent across frames, the posterior mean of frame $k$ --- and hence the
+$k$-th score component --- depends on every observation, because the prior
+couples the frames. Equation \eqref{eq:tweedie-joint} is the precise reason
+the \emph{joint} score differs from the per-frame marginal score, a
+distinction that is easy to blur and whose importance for structured data
+was impressed on this project in supervision; Chapter~\ref{ch:gaussian}
+quantifies exactly how much coupling the conditioning induces, as a function
+of $t$.
+
+\section{The statistical physics of generative diffusion}
+\label{sec:statphys-diffusion}
+
+A recent line of work analyses diffusion models with the tools of
+Chapter~\ref{ch:statmech}, in the regime where the score is \emph{exact} ---
+either computed from a solvable $p_0$ or from the empirical measure of $n$
+training points. Three findings frame our work.
+
+\paragraph{Regimes and transitions.} For high-dimensional solvable data
+(Gaussian mixtures, spin models), the reverse dynamics crosses sharp
+dynamical regimes \citep{biroli2023generative, biroli2024dynamical}: a
+\emph{speciation} time at which the trajectory commits to one mode ---
+a spontaneous symmetry breaking in the sense of Section~\ref{sec:ising}
+\citep[see also][]{raya2023spontaneous} --- and, when the score is learned
+from finitely many samples, a \emph{memorisation} (collapse) time below
+which the dynamics condenses onto training points. The phase boundaries are
+computed with free-energy methods, in direct analogy with the random energy
+model.
+
+\paragraph{Sampling as physics.} \citet{ghio2024sampling} map generative
+samplers --- flows, diffusions, autoregressive networks --- onto
+statistical-physics problems and delimit where each is efficient, importing
+the algorithmic-hardness picture of spin glasses
+\citep{zdeborova2016statistical}.
+
+\paragraph{The exactly solvable programme.} The common method of these
+works is to choose $p_0$ rich enough to be interesting and simple enough
+that $\nabla \log p_t$ is available in closed form, then study the
+\emph{exact} generation dynamics. What none of them vary is the
+\emph{internal structure of a single data point}: their coordinates are
+exchangeable or i.i.d.\ conditional on a mode; there is no ordering, no
+dynamics \emph{inside} the sample.
+
+\section{The gap, restated}\label{sec:gap}
+
+Real sequential data --- video, audio, trajectories --- have exactly the
+structure the solvable programme leaves out: an internal (frame) time with a
+Markovian dependence along it. For such data the score
+\eqref{eq:tweedie-joint} is a smoothing posterior on a chain, an object with
+seventy years of inference theory behind it
+(Chapters~\ref{ch:stochproc}--\ref{ch:ebm}). Yet the questions a diffusion
+modeller asks about it --- how does the coupling structure of
+$\nabla \log p_t$ deform with $t$? can it be computed \emph{locally}? what
+survives a Gaussian parametrisation of the messages when the data are not
+Gaussian? what does that imply for score architectures? --- are not answered
+by the classical literature, which fixes the noise level, nor by the
+diffusion literature, which ignores internal structure. Answering them, in
+the fully solvable setting of the AR(1) chain and its non-Gaussian
+perturbations, is the contribution of
+Chapters~\ref{ch:gaussian}--\ref{ch:bp}.
