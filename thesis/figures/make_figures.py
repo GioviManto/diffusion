@@ -441,7 +441,7 @@ def fig_laplace_closure():
     gmed = [np.median(by_t[t]["grid"]) for t in ts]
     fig, ax = plt.subplots(figsize=(4.8, 3.0))
     ax.fill_between(ts, p10, p90, color=NAVY, alpha=0.15, lw=0,
-                    label=r"closure error, 10--90\%")
+                    label="closure error, 10–90%")
     ax.loglog(ts, med, "o-", color=NAVY, ms=3, mew=0,
               label="closure error, median")
     ax.loglog(ts, gmed, "s--", color=GRAY, ms=2.5, mew=0,
