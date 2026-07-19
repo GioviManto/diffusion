@@ -1,7 +1,21 @@
 # Source Audit — what was used, what was archived, and why
 
-Consolidation date: 2026-07-14. Nothing was deleted; everything not listed
-as signal lives intact in `~/Code/Thesis/archive/` (outside the git repo).
+Consolidation date: 2026-07-14; revision v2 on 2026-07-19. Nothing was
+deleted; everything not listed as signal lives intact in
+`~/Code/Thesis/archive/` (outside the git repo).
+
+## Sources added in revision v2 (2026-07-19)
+
+| Source | Used for | Location |
+|---|---|---|
+| `Things-to-change-thesis.pdf` (author feedback) | drives the whole revision | copy in `meetings/` (gitignored) |
+| `Desktop/BOCCONI/.../STAT-MECH/SM_Paper_Notes.pdf` (59-pp reading notes on the cascade paper, Giovanni, Nov 2025) | thesis §4.9 cascade section | external, Desktop (course folder) |
+| `Mantovani_Slides_SM.pdf` + `Script.pdf` (course presentation for Mézard's 41002) | thesis §4.9 | external, Desktop (course folder) |
+| Bachtis–Biroli–Decelle–Seoane, NeurIPS 2024 (cascade paper); LeCun et al. 2006 EBM tutorial; Mézard 2017 PRE; Hopfield 1982; AGS 1985; Ackley–Hinton–Sejnowski 1985; Smolensky 1986; Hinton 2002/2006; Gardner 1988; Saxe 2014; Decelle 2017; Tubiana–Monasson 2017; flow-model papers (Rezende 2015, Papamakarios 2021, Chen 2018, Lipman 2023, Albergo 2023) | new literature chapters; all verified published venues | cited in `thesis/references.bib` |
+
+The unofficial Zdeborová–Krzakala 2021 EPFL lecture notes were removed
+from the bibliography in v2 (uncited after the rewrite; the published
+review `zdeborova2016statistical` covers the material).
 
 ## Signal (in this repo)
 

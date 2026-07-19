@@ -1,10 +1,31 @@
-# Briefing for Jérôme — state of the thesis (2026-07-14)
+# Briefing for Jérôme — state of the thesis (updated 2026-07-19)
 
 One-page summary of what is proved, what is measured, what is speculative,
 and what I propose to do next. Full claim-by-claim classification in
-`RESULT_LEDGER.md`; thesis draft in `thesis/main.pdf` (137 pp., compiles
+`RESULT_LEDGER.md`; thesis draft in `thesis/main.pdf` (119 pp., compiles
 with one `tectonic main.tex`; all numerical audits re-run on this machine:
 72/72 and 55/55 pass).
+
+## Revision of 2026-07-19 (author feedback round)
+
+The draft was restructured on Giovanni's written feedback: 8 chapters
+instead of 10, ~119 pp. instead of 137. The literature review now carries
+the full statistical-mechanics→AI story (spin glasses → Hopfield/Nobel →
+Boltzmann machines/RBMs → statistical mechanics of learning) and a deep
+review of the generative line (LeCun's EBM tutorial → score matching →
+Ho's DDPM → Song's score SDE → flow matching), including a detailed
+section on *Cascade of phase transitions in the training of energy-based
+models* (Bachtis–Biroli–Decelle–Seoane, NeurIPS 2024) built on Giovanni's
+coursework for Mézard's 41002 course. In the research part: Ch. 5 now
+develops the spectral theorem first and studies the precision-matrix
+lifecycle entirely through the spectral form (when/how/how-much
+tridiagonality is lost); BP theory and the Kalman filter are derived in
+full where used; the complexity claim is stated honestly (O(K) *updates*
+always, O(K) *cost* only under a closed message family); "Tweedie" is now
+"the score–posterior identity" throughout; the AMP/TAP analysis
+(t_c(α), α_c = √2−1) moved intact to Appendix C; code listings were
+dropped; every figure was regenerated in a uniform paper style (vector
+PDF, white background) by one script, `thesis/figures/make_figures.py`.
 
 ## What we have shown exactly (closed form + audit)
 

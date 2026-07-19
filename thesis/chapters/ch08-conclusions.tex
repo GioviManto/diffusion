@@ -1,0 +1,139 @@
+\chapter{Discussion and Conclusions}\label{ch:conclusions}
+
+\section{Summary of findings, by research question}
+
+\paragraph{RQ1 --- the exact joint score and its lifecycle.} For the
+stationary AR(1) chain under coordinatewise OU corruption, the joint score
+is the linear field $\score(x,t) = -\Qt x$ with
+$\Qt = (e^{-2t}\Sigz + \Deltat I)^{-1}$, equal --- by the score--posterior
+identity, for any prior --- to the amplified posterior-mean form
+$(e^{-t}\E[a|x] - x)/\Deltat$. Its coupling structure is a complete,
+closed-form lifecycle: exactly tridiagonal at $t = 0$ (the
+Hammersley--Clifford fingerprint of Markovianity), band-filling at rate
+$(\Qt)_{i,i+d} = (-1)^{d-1}(2t)^{d-1}(\Qz^d)_{i,i+d} + O(t^d)$ --- with a
+transcription error of an earlier note corrected and the correction
+audited --- and returning to the identity at the universal rate $e^{-2t}$.
+In the bulk, one dimensionless dial $q(\alpha, t) \in (0, |\alpha|]$
+governs simultaneously the posterior correlation length and the geometric
+decay of evidence influence, with the exactly right limits $q \to 0$
+($t \to 0$) and $q \to |\alpha|$ ($t \to \infty$).
+
+\paragraph{RQ2 --- local computation of a global object.} The posterior of
+any Markov chain observed through per-frame noise lives on a tree-shaped
+factor graph, so sum--product message passing computes every marginal ---
+hence every score component --- exactly, in $O(K)$ message updates; the
+total \emph{cost} is linear only when the messages admit a finite
+parametrisation, which is precisely what the Gaussian case delivers. On
+the Gaussian chain the messages remain Gaussian by \emph{algebraic
+closure} (two lemmas:
+products and affine marginalisation), not by any central-limit argument;
+the resulting algorithm is, update for update, the Kalman filter plus the
+Rauch--Tung--Striebel smoother, and it reproduces the matrix score to
+$10^{-14}$. The joint diffusion score of a Markov sequence \emph{is} a
+smoothing problem --- a bridge that imports seventy years of estimation
+theory into generative modelling.
+
+\paragraph{RQ3 --- the price of the Gaussian closure.} The answer splits
+into three cleanly separated statements. On the Gaussian chain, the
+\emph{score} is closure-independent: mean field, BP, and AMP all solve the
+same linear system for the posterior mean, so all return the exact score.
+The \emph{variance} closure is where AMP pays: the per-node (TAP) closure
+differs from the exact cavity by a single factor of two in the
+discriminant, which produces an exact breakdown time $t_c(\alpha)$ and a
+critical coupling $\alpha_c = \sqrt{2} - 1$ --- a sharp, closed-form
+verdict on the ``central limit theorem on two data points''
+(Appendix~\ref{app:amp}). Beyond
+Gaussianity, on Laplace and other non-Gaussian chains measured against
+validated grid quadrature, the Gaussian message closure costs tens of
+percent of relative score error at small diffusion time (median $0.39$ at
+$t = 0.02$; worst for bimodal innovations), decaying below $10^{-3}$ once
+the diffusion noise Gaussianises the posteriors --- with the error
+amplified at small $t$ by the exact factor $e^{-t}/\Deltat \sim 1/2t$, and
+mitigated, counterintuitively, by \emph{stronger} chain correlation.
+
+\paragraph{RQ4 --- implications for learned scores.} Locality has a price
+and the price has a formula. The influence of evidence at distance $d$
+decays as $q(\alpha,t)^d$; the error of a radius-$r$ local estimator
+decays as $q^r$; and the penalty peaks in the mid-diffusion window, where
+the band of $\Qt$ is fullest --- precisely where generative sampling
+spends its critical steps. At equal locality budget, truncating the
+\emph{inference} (windowed message passing) beats truncating the
+\emph{matrix} (banding the score): $12.3\%$ against $21.0\%$ relative RMS
+at $t = 0.05$. For architecture design the readings are direct: local,
+convolution-like score heads are near-optimal at small and large $t$; the
+receptive field should be sized as $r \gtrsim \xi \log(1/\varepsilon)$
+with $\xi = 1/\log(1/q)$, or grown with diffusion time; and if a local
+computation must be used, it should be a local \emph{algorithm}, not a
+banded linear readout.
+
+\section{Contributions to the literature}
+
+To the exactly solvable programme in the statistical physics of diffusion
+\citep{biroli2023generative, biroli2024dynamical, ghio2024sampling}, this
+thesis adds the missing axis of \emph{internal structure}: a solvable
+model in which a single data point has a dynamics of its own, and in which
+the interplay of internal correlation ($\alpha$) and diffusion time ($t$)
+is charted exactly. To the message-passing literature
+\citep{mezard2009information, zdeborova2016statistical}, it contributes a
+minimal, fully worked case where BP and AMP are \emph{both} solvable and
+\emph{provably different} --- the factor-two discriminant, the phase
+boundary $t_c(\alpha)$, $\alpha_c = \sqrt{2}-1$ --- together with a
+quantitative audit of the Gaussian closure on chains, the regime where its
+classical CLT justification fails by construction. To the practice of
+diffusion modelling, it offers exact baselines: any learned score on
+Markov-like sequence data can now be compared, regime by regime, against
+a closed-form ground truth with known locality laws.
+
+\section{Limitations}
+
+Honesty about scope is part of the method. (i) The exact solutions concern
+\emph{one-dimensional} state per frame and \emph{linear} (AR(1)) dynamics;
+richer per-frame state keeps the tree structure but complicates the
+algebra. (ii) The non-Gaussian results are numerical, not closed-form:
+grid BP is an exact reference only within its validated resolution regime
+($\sqrt{2t} \gtrsim 3\,\dd x$), and the Laplace closure error is a
+measured curve, not a formula. (iii) The locality laws are proved for the
+Gaussian bulk; their non-Gaussian counterparts are only structurally
+delimited (Chapter~\ref{ch:laplace}). (iv) No learning is performed: the
+architecture implications are readings of exact inference results, not
+training experiments. (v) An earlier conjecture on low-rank structure of
+the Laplace $K = 2$ Hessian proved regime-dependent and is deliberately
+not asserted. (vi) Reverse-generation dynamics --- how score errors
+integrate along the sampling trajectory --- was explored only
+preliminarily and is not claimed here.
+
+\section{Future work}
+
+Four directions follow naturally, in increasing ambition.
+\emph{Mixture messages.} The single-Gaussian closure fails worst on
+bimodal beliefs; a two-component mixture closure on the same sweeps would
+separate the message-representation error from the model-mismatch error,
+and is the clearest next algorithmic step.
+\emph{Discrete chains.} Replacing the continuous state with a finite
+alphabet (transition-matrix dynamics, OU noise only in the channel) makes
+BP messages finite vectors --- exact inference with no closure at all ---
+and connects directly to existing tree-reconstruction theory; this was the
+alternative route sketched in supervision.
+\emph{Approximate Markovianity.} Real sequences are only approximately
+Markov; preliminary experiments with a chain-plus-global-latent model
+(rank-one residual) and with hybrid BP-plus-learned-residual scores
+suggest the BP baseline absorbs most of the structure at a fraction of the
+parameters, and deserve a systematic treatment.
+\emph{Reverse dynamics.} Integrate the reverse SDE under exact,
+Gaussian-closed, and truncated scores, and measure where along the
+trajectory the closure and locality errors actually matter for sample
+quality --- the pointwise-versus-dynamical error distinction.
+
+\section{Closing remark}
+
+The thesis began with a black box --- a neural network asked to learn
+$\nabla \log p_t$ --- and ended with a dial, $q(\alpha, t)$, and a phase
+boundary, $\alpha_c = \sqrt{2} - 1$. The distance between those two
+endpoints is the argument for exactly solvable models: when the data have
+structure, the score inherits it in a computable way, and both the
+algorithms that exploit it (message passing) and the shortcuts that betray
+it (closures, truncations) can be judged against ground truth rather than
+against each other. For sequential data with Markov structure, this
+programme is now complete at the Gaussian core and quantitatively mapped
+at its non-Gaussian rim; the frontier --- mixtures, discreteness,
+approximate Markovianity, dynamics --- is stated, and it is sharp.

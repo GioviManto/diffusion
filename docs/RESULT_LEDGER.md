@@ -6,11 +6,15 @@ Every substantive claim of the thesis, classified. Categories:
 **HEURISTIC** (mechanistically argued, not proved) · **SPECULATIVE**
 (conjecture, explicitly not asserted) · **FUTURE** (stated as open).
 
+Revision v2 (2026-07-19): chapters renumbered (Gaussian 7→5, Laplace 8→6,
+BP 9→7); the AMP/TAP results (B5, B7–B9) moved intact to Appendix C of
+the thesis at the author's request — their classification is unchanged.
+
 All audits re-executed on this machine on 2026-07-14:
 `research/gaussian-bp/code/numerical_audit.py` → **72/72 PASS**;
 `research/unified-note/code/numerical_audit.py` → **55/55 PASS**.
 
-## Gaussian chain (thesis Ch. 7)
+## Gaussian chain (thesis Ch. 5)
 
 | # | Claim | Class | Evidence |
 |---|-------|-------|----------|
@@ -27,7 +31,7 @@ All audits re-executed on this machine on 2026-07-14:
 | G11 | Limits `q→0` (t→0), `q→α` (t→∞) | EXACT | algebra |
 | G12 | Locality: RMS error of radius-r estimator decays exactly as `q^r` (rate) | EXACT (rate) / NUMERICAL (prefactor) | slope audit 0.2% |
 
-## Laplace case (thesis Ch. 8)
+## Laplace case (thesis Ch. 6)
 
 | # | Claim | Class | Evidence |
 |---|-------|-------|----------|
@@ -42,7 +46,7 @@ All audits re-executed on this machine on 2026-07-14:
 | L9 | Innovation coordinates: prior factorises iid; likelihood densifies (LᵀL dense) — coupling must live somewhere | EXACT | unit-Jacobian change of variables |
 | L10 | Laplace K=2 Hessian approximately rank-2 | **SPECULATIVE — NOT ASSERTED** (regime-dependent under quick tests; pending HPC) | conjecture15 note |
 
-## BP / AMP (thesis Ch. 9)
+## BP (thesis Ch. 7) / AMP (thesis App. C)
 
 | # | Claim | Class | Evidence |
 |---|-------|-------|----------|

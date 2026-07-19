@@ -1,0 +1,565 @@
+\chapter{The Score as Posterior Expectation: Belief Propagation and the
+Kalman Filter}\label{ch:bp}
+
+Chapter~\ref{ch:gaussian} computed the joint score by inverting a
+$K \times K$ matrix; the score--posterior identity
+(Section~\ref{sec:tweedie}) says the same object is a posterior
+expectation. This chapter takes the Bayesian route seriously and rebuilds
+the score by \emph{message passing}: local computations on the graph of
+the posterior. It answers RQ2 and RQ3, and it is deliberately the most
+self-contained chapter of the thesis: the graphical-model formalism ---
+Markov random fields, factor graphs, the sum--product algorithm --- is
+developed here, where it is used, and in the depth its central role
+deserves. The plan: first the structure of the posterior (a tree), then
+the sum--product algorithm and its exactness, with the honest accounting
+of what ``linear cost'' does and does not mean for continuous variables;
+then the Gaussian case, where the messages close algebraically --- no
+central-limit argument anywhere --- and the sweeps turn out to be,
+update by update, the classical Kalman filter and smoother; finally the
+Gaussian closure on genuinely non-Gaussian chains, measured against exact
+grid quadrature. The per-node closures of statistical physics (AMP, the
+TAP equations), their exact breakdown time on the chain, and the critical
+coupling $\alpha_c = \sqrt{2} - 1$ are developed in
+Appendix~\ref{app:amp}: the results are complete and audited, but they
+sit off the main line of the argument.
+
+\section{The posterior and its graph}\label{sec:bp-problem}
+
+Fix the setting of Chapters~\ref{ch:gaussian}--\ref{ch:laplace}: a Markov
+chain prior $P_0(a) = p_0(a_0) \prod_k M(a_{k+1} | a_k)$, per-frame OU
+evidence, and the posterior
+\begin{equation}
+  p(a \,|\, x) \;\propto\;
+  \underbrace{\psi_{\mathrm{pr}}(a_0)
+  \prod_{k=0}^{K-2} \psi^{(k)}_{\mathrm{tr}}(a_k, a_{k+1})}_{\text{chain prior}}
+  \;
+  \underbrace{\prod_{k=0}^{K-1} \psi^{(k)}_{\mathrm{ob}}(a_k)}_{\text{evidence}},
+  \qquad
+  \psi^{(k)}_{\mathrm{ob}}(a_k) = \Nd\big(x_k;\, e^{-t}a_k,\, \Deltat\big).
+  \label{eq:bp-posterior}
+\end{equation}
+Structurally this is a \emph{hidden Markov model}
+\citep{rabiner1989tutorial}: a latent chain observed through independent
+per-frame noise, and by the score--posterior identity the $k$-th score
+component needs exactly the smoothing marginal $\E[a_k | x]$ of
+\eqref{eq:bp-posterior}. Before computing, we make the structure of this
+object precise, in the language built for it.
+
+\subsection{Markov random fields}\label{sec:mrf}
+
+\begin{definition}[Markov random field]
+Let $G = (V, \mathcal{E})$ be an undirected graph with one random variable
+$x_i$ per node. The collection $x = (x_i)_{i \in V}$ is a \emph{Markov
+random field} (MRF) if it satisfies the local Markov property: for every
+node $i$,
+\begin{equation}
+  p\big(x_i \,\big|\, x_{V \setminus \{i\}}\big)
+  \;=\; p\big(x_i \,\big|\, x_{\partial i}\big),
+  \label{eq:local-markov}
+\end{equation}
+where $\partial i$ is the set of neighbours of $i$ in $G$.
+\end{definition}
+
+The fundamental structure theorem connects this conditional-independence
+definition to the energy picture of Chapter~\ref{ch:diffusion}: by the
+Hammersley--Clifford theorem \citep[proved in][]{besag1974spatial}, a
+strictly positive density is an MRF on $G$ if and only if it factorises
+over the \emph{cliques} of $G$,
+\begin{equation}
+  p(x) \;=\; \frac{1}{Z} \prod_{C \in \mathrm{cliques}(G)} \psi_C(x_C)
+  \;=\; \frac{1}{Z}\, \exp\Big[ -\sum_C E_C(x_C) \Big] .
+  \label{eq:hammersley-clifford}
+\end{equation}
+Conditional independence, graphical locality, and additive local energies
+are one and the same thing. The Ising model \eqref{eq:ising} is the
+textbook example; the decisive example for us is one-dimensional: the
+chain factorisation \eqref{eq:chain-factorisation} makes a Markov chain an
+MRF on a line, with pairwise nearest-neighbour energies. For the Gaussian
+AR(1) chain each energy term is quadratic, so the coupling matrix of the
+quadratic form connects only neighbours --- this is the
+Hammersley--Clifford reading of the tridiagonal precision of
+Chapter~\ref{ch:gaussian} (Remark~\ref{rmk:g-markov-sparsity}), now with
+its proper name. And because the likelihood factors of
+\eqref{eq:bp-posterior} touch one variable each, conditioning on the
+observations does not enlarge any clique: \emph{the posterior is again an
+MRF on the line}, whatever the innovation law.
+
+\subsection{Factor graphs, and the tree}\label{sec:factor-graphs}
+
+MRFs record \emph{which} variables interact but not \emph{how} the joint
+factorises (a triangle of pairwise terms and one triple term have the same
+graph). The representation that makes factorisation itself graphical ---
+and on which message passing is most naturally defined --- is the
+\emph{factor graph} \citep{kschischang2001factor,
+koller2009probabilistic}.
+
+\begin{definition}[Factor graph]
+Given a factorisation $p(x) = \frac{1}{Z}\prod_{a} \psi_a(x_{\partial a})$,
+its factor graph is the bipartite graph with a \emph{variable node} for
+each $x_i$, a \emph{factor node} for each $\psi_a$, and an edge $(i, a)$
+whenever $x_i \in x_{\partial a}$.
+\end{definition}
+
+The factor graph of \eqref{eq:bp-posterior} has $K$ variable nodes, $2K$
+factor nodes ($1$ prior, $K{-}1$ transitions, $K$ observations --- the
+data $x_k$ are constants clamped inside their factors, not nodes), and
+$3K - 1$ edges: each transition factor has degree $2$, prior and
+observations degree $1$. A connected graph with (nodes${}-1$) edges is a
+\emph{tree}. Pictorially it is a \emph{caterpillar}: a spine of variables
+and transition factors, one evidence leaf per vertebra --- in the words of
+the supervision discussion, ``very tree-like: a straight line with things
+on the side''. Every interior variable has degree three; every message
+update combines a small, fixed number of inputs. Recording the conclusion
+the rest of the chapter exploits:
+
+\begin{proposition}\label{prop:chain-tree}
+For any Markov-chain prior and any per-frame observation model, the
+posterior $p(a \,|\, x)$ factorises over a tree-shaped factor graph, and
+all $K$ smoothing marginals are computed exactly by $O(K)$ message
+\emph{updates} (one forward and one backward sweep).
+\end{proposition}
+
+Note carefully what Proposition~\ref{prop:chain-tree} does \emph{not} say:
+it does not say the total \emph{cost} is $O(K)$, because it does not say
+the messages are finitely parametrisable. For discrete chains each message
+is a probability vector and each update is finite arithmetic; for
+continuous chains each message is a \emph{function}, each update is an
+integral in function space, and the cost per update is unbounded in
+general. The count of updates is linear in $K$; the price of an update
+depends entirely on how messages are represented. Keeping
+``tree-exactness of the algorithm'' separate from ``representability of
+the messages'' is the conceptual hinge of this thesis: the first is a
+graph property, settled here once and for all; the second is where all the
+difficulty --- and all of Sections~\ref{sec:bp-gaussian} and
+\ref{sec:bp-nongaussian} --- lives.
+
+\section{The sum--product algorithm}\label{sec:bp-chain}
+
+On a factor graph, sum--product belief propagation passes messages along
+every edge \citep{pearl1988probabilistic, kschischang2001factor,
+mezard2009information}: variable-to-factor messages multiply the incoming
+factor messages from all \emph{other} neighbours, and factor-to-variable
+messages integrate the factor against the incoming variable messages,
+\begin{equation}
+  \nu_{i \to a}(a_i) \propto
+    \prod_{b \in \partial i \setminus a} \hat\nu_{b \to i}(a_i),
+  \qquad
+  \hat\nu_{a \to i}(a_i) \propto
+    \int \psi_a(a_{\partial a})
+    \prod_{j \in \partial a \setminus i} \nu_{j \to a}(a_j)\;
+    \dd a_{\partial a \setminus i},
+  \label{eq:bp-rules}
+\end{equation}
+with the belief at node $i$ proportional to
+$\prod_{a \in \partial i} \hat\nu_{a \to i}(a_i)$. The ``exclude the
+recipient'' rule is the heart of the algorithm: the message $i \to a$
+summarises everything node $i$ knows \emph{except} what it learned from
+$a$, so that no piece of evidence is ever counted twice along a path. On a
+tree this bookkeeping is perfect: each edge separates the graph into two
+disjoint halves, the message crossing it summarises exactly the half
+behind it, and the equations \eqref{eq:bp-rules} have a unique solution,
+reached in one inward and one outward pass, whose beliefs are the
+\emph{exact} marginals \citep[Theorem~14.1]{mezard2009information}. On
+graphs with cycles the same updates, iterated, define \emph{loopy} BP ---
+extraordinarily useful, but approximate \citep{weiss2001correctness,
+malioutov2006walk}; none of that is needed here, because our graph is a
+tree.
+
+For \emph{discrete} variables each message is a finite probability vector
+and \eqref{eq:bp-rules} is arithmetic. For \emph{continuous} variables
+each message is a probability \emph{density} --- an infinite-dimensional
+object --- and the update integrals must be carried out in function space.
+This is the obstruction, identified sharply in supervision, that makes
+``BP on continuous chains'' a research question rather than a textbook
+exercise. There are exactly three ways out: (i) discrete data (retreat to
+finite alphabets); (ii) a family of densities closed under the updates ---
+the Gaussian route, exact for our Gaussian chain, as we prove next;
+(iii) numerical function representation --- the grid route, which
+Section~\ref{sec:bp-nongaussian} uses as exact reference for non-Gaussian
+chains.
+
+\subsection{The chain sweeps, with the bookkeeping made explicit}
+
+On the chain, \eqref{eq:bp-rules} collapses into one forward and one
+backward sweep. The bookkeeping deserves unusual care --- an earlier
+version of this project's notes fell into a trap here, caught only by the
+numerical audit.
+
+\begin{proposition}[Convention A]\label{prop:bp-convA}
+Define messages
+\begin{align}
+  \mu_{\to 0}(a_0) &:= \psi_{\mathrm{pr}}(a_0),
+  &
+  \mu_{\to k+1}(a_{k+1}) &:= \int
+    \psi^{(k)}_{\mathrm{tr}}(a_k, a_{k+1})\,
+    \psi^{(k)}_{\mathrm{ob}}(a_k)\,
+    \mu_{\to k}(a_k)\; \dd a_k ,
+  \label{eq:bp-fwd}\\
+  \mu_{\leftarrow K-1}(a_{K-1}) &:= 1,
+  &
+  \mu_{\leftarrow k-1}(a_{k-1}) &:= \int
+    \psi^{(k-1)}_{\mathrm{tr}}(a_{k-1}, a_k)\,
+    \psi^{(k)}_{\mathrm{ob}}(a_k)\,
+    \mu_{\leftarrow k}(a_k)\; \dd a_k .
+  \label{eq:bp-bwd}
+\end{align}
+Then for every $k$,
+\begin{equation}
+  p(a_k \,|\, x) \;\propto\;
+  \mu_{\to k}(a_k)\;
+  \psi^{(k)}_{\mathrm{ob}}(a_k)\;
+  \mu_{\leftarrow k}(a_k) :
+  \label{eq:bp-combine}
+\end{equation}
+the forward message into $a_k$ carries the evidence $x_0, \dots, x_{k-1}$
+only, the backward message carries $x_{k+1}, \dots, x_{K-1}$ only, and the
+local evidence enters once, at combination time.
+\end{proposition}
+
+The proof is direct marginalisation: integrating \eqref{eq:bp-posterior}
+over all $a_j$, $j \neq k$, splits at $a_k$ by the Markov property into
+independent left and right halves, and peeling the innermost variable of
+each half yields the recursions. What deserves the reader's full attention
+is the \emph{bookkeeping}:
+
+\begin{remark}[The double-counting trap]\label{rmk:bp-trap}
+A natural-looking alternative (call it Convention B) absorbs the local
+evidence into the forward message,
+$\mu^{\mathrm{B}}_{\to k} = \mu^{\mathrm{A}}_{\to k} \cdot
+\psi^{(k)}_{\mathrm{ob}}$. Under Convention B the product
+\eqref{eq:bp-combine} counts $x_k$ \emph{twice} and must be corrected by
+dividing one factor back out. Convention A is the bookkeeping under which
+the textbook combination rule is correct \emph{as written}. The audit was
+decisive: under Convention A the BP score matches the matrix score to
+$10^{-14}$; under naive Convention B the disagreement is order one. This
+is the single most error-prone point of the construction --- hence every
+message in this thesis is stated with its evidence content made explicit.
+\end{remark}
+
+Each sweep computes $K - 1$ messages, and the combination at each node
+multiplies three univariate functions: $O(K)$ updates, as
+Proposition~\ref{prop:chain-tree} promised --- with the cost of each
+update still an open bill, to be settled family by family.
+
+\section{The Gaussian case: closure, and the Kalman filter}
+\label{sec:bp-gaussian}
+
+For the Gaussian chain, two elementary facts make the message space
+finite-dimensional --- and they are the \emph{only} facts needed.
+
+\begin{toolbox}{The two closure lemmas of Gaussian message passing}
+\emph{Lemma 1 (products).} For Gaussians in the same variable,
+\begin{equation*}
+  \Nd(a; m_1, v_1) \times \Nd(a; m_2, v_2)
+  \;\propto\; \Nd(a; m, v),
+  \qquad
+  \frac{1}{v} = \frac{1}{v_1} + \frac{1}{v_2},
+  \qquad
+  \frac{m}{v} = \frac{m_1}{v_1} + \frac{m_2}{v_2} :
+\end{equation*}
+add the exponents; the sum of two quadratics in $a$ is a quadratic in $a$,
+with precisions and precision-weighted means adding. (In the natural
+parameters $\lambda = 1/v$, $\theta = m/v$ the rule is literally
+$(\lambda, \theta) \mapsto (\lambda_1 + \lambda_2,\,
+\theta_1 + \theta_2)$.)
+
+\emph{Lemma 2 (affine marginalisation).} Pushing a Gaussian through the
+AR(1) transition,
+\begin{equation*}
+  \int \Nd(a'; \alpha a, \sigma_\eta^2)\; \Nd(a; m, v)\; \dd a
+  \;=\; \Nd(a';\, \alpha m,\, \alpha^2 v + \sigma_\eta^2),
+\end{equation*}
+because $a' = \alpha a + \eta$ with independent Gaussian summands: means
+and variances transform as stated, and Gaussianity is preserved. The same
+computation read in the reverse direction gives the backward analogue
+$\Nd\big(a;\, m'/\alpha,\, (v' + \sigma_\eta^2)/\alpha^2\big)$.
+
+Together: the Gaussian family is closed under exactly the two operations
+the recursions \eqref{eq:bp-fwd}--\eqref{eq:bp-bwd} perform. Note also
+that the local evidence, read as a function of $a_k$, is itself Gaussian
+--- $\psi^{(k)}_{\mathrm{ob}}(a_k) \propto
+\Nd(a_k;\, e^{t} x_k,\, \Deltat e^{2t})$, a pseudo-observation at the
+deconvolved location $e^t x_k$ with precision $e^{-2t}/\Deltat$, the
+pinning strength of Chapter~\ref{ch:gaussian}. \hfill$\square$
+\end{toolbox}
+
+\begin{theorem}[Gaussian closure of BP on the chain]\label{thm:bp-closure}
+For the Gaussian AR(1) chain under the OU channel, every BP message and
+every belief is exactly Gaussian, at every node, for every
+$(K, \alpha, t)$. Each message is carried by two numbers, so each update
+is $O(1)$ arithmetic and the two sweeps compute the exact posterior
+marginals --- hence, via the score--posterior identity, the exact joint
+score --- at total cost $O(K)$. \emph{Here, and only here, the linear
+update count of Proposition~\ref{prop:chain-tree} becomes a linear cost.}
+\end{theorem}
+
+\begin{proof}[Derivation]
+Induction along each sweep. The initial messages are Gaussian (the prior;
+the flat message is the $\lambda \to 0$ limit of the family). Each step of
+\eqref{eq:bp-fwd}--\eqref{eq:bp-bwd} is one application of Lemma~1 (absorb
+the local evidence) followed by one of Lemma~2 (push through the
+transition); the combination \eqref{eq:bp-combine} is Lemma~1 twice.
+Exactness follows from tree-exactness of sum--product.
+\end{proof}
+
+\begin{remark}[Closure is algebra, not a central limit theorem]
+\label{rmk:bp-no-clt}
+The closure holds at node degree two just as it would at degree two
+thousand: it is a property of the Gaussian \emph{family} under
+multiplication and affine marginalisation, not an
+aggregation-of-many-influences effect. This answers precisely the doubt
+raised in supervision --- whether Gaussian messages on a chain could be
+trusted, given that the usual central-limit justification needs many
+incoming messages. For \emph{exact} Gaussian BP, no CLT is invoked
+anywhere, so there is nothing to fail. The CLT enters only to justify the
+\emph{per-node} closures of statistical physics (AMP/TAP) --- and there,
+on the chain, it fails exactly as predicted; Appendix~\ref{app:amp} makes
+that failure quantitative, complete with an exact breakdown time and the
+critical coupling $\alpha_c = \sqrt{2} - 1$.
+\end{remark}
+
+\subsection{The sweeps are the Kalman filter and smoother}
+\label{sec:bp-kalman}
+
+Executing the Gaussian sweeps in mean--variance arithmetic reproduces,
+line by line, the most famous algorithm of estimation theory. The
+identification deserves to be displayed rather than asserted.
+
+\begin{toolbox}{The Kalman filter, derived from the BP sweep}
+Write the forward message in Convention A as
+$\mu_{\to k} = \Nd(a_k;\, m_{k|k-1},\, P_{k|k-1})$ --- in filtering
+language, the \emph{predicted} state given past observations. One BP step
+does two things.
+
+\emph{Update (absorb the evidence; Lemma 1).} Multiplying by the
+pseudo-observation $\Nd(a_k; e^t x_k, \Deltat e^{2t})$ gives the
+\emph{filtered} Gaussian $\Nd(a_k; m_{k|k}, P_{k|k})$ with
+\begin{align*}
+  \frac{1}{P_{k|k}} &= \frac{1}{P_{k|k-1}} + \frac{e^{-2t}}{\Deltat},\\
+  m_{k|k} &= P_{k|k} \left( \frac{m_{k|k-1}}{P_{k|k-1}}
+        + \frac{e^{-t} x_k}{\Deltat} \right)
+  = m_{k|k-1} + G_k \big( e^{t} x_k - m_{k|k-1} \big),
+\end{align*}
+where the second form defines the \emph{Kalman gain}
+$G_k = P_{k|k} \, e^{-2t}/\Deltat \in (0,1)$: the filtered mean is the
+prediction, corrected by a gain-weighted innovation --- the celebrated
+predictor--corrector structure \citep{kalman1960new}.
+
+\emph{Predict (push through the dynamics; Lemma 2).} Propagating through
+the AR(1) transition,
+\begin{equation*}
+  m_{k+1|k} = \alpha\, m_{k|k},
+  \qquad
+  P_{k+1|k} = \alpha^2 P_{k|k} + \sigma_\eta^2 :
+\end{equation*}
+contract the mean, inflate the variance by the innovation noise. The
+forward BP sweep \emph{is} the Kalman filter --- not analogous to it,
+equal to it, message by message.
+
+\emph{Smoothing (combine both directions).} The belief
+\eqref{eq:bp-combine} multiplies the filtered forward Gaussian by the
+backward message (Lemma 1 once more), producing the posterior marginal
+given \emph{all} observations, $\Nd(a_k; m_{k|K-1}, P_{k|K-1})$. Carrying
+out the same algebra backwards recursion-by-recursion yields the classical
+fixed-interval smoother of \citet{rauch1965maximum}: the two-sweep BP
+schedule on the chain is exactly the Kalman filter followed by the RTS
+smoother, the Gaussian specialisation of sum--product
+\citep{kschischang2001factor, bishop2006pattern}. \hfill$\square$
+\end{toolbox}
+
+The score--posterior identity then gives the punchline of RQ2: \emph{the
+$k$-th component of the joint diffusion score is an affine function of the
+Kalman-smoothed estimate of frame $k$},
+\begin{equation}
+  S_k(x, t)
+  \;=\; \frac{e^{-t}\, m_{k|K-1} - x_k}{\Deltat} .
+  \label{eq:bp-score-kalman}
+\end{equation}
+Score computation for Markov sequences is a smoothing problem, and seventy
+years of smoothing theory apply verbatim.
+
+\paragraph{Machine-precision agreement.} The computational companion runs
+BP against the matrix route of Chapter~\ref{ch:gaussian} over $80$
+configurations --- $K \in \{2,3,5,8,16\}$, $\alpha \in \{0.2, 0.5, 0.9,
+-0.4\}$, $t \in \{0.05, 0.3, 1, 3\}$, random $x$: maximum disagreement
+$1.3 \times 10^{-15}$ on posterior means, $3.9 \times 10^{-15}$ on
+variances, $1.2 \times 10^{-14}$ on scores --- double-precision rounding
+accumulated along the recursion, nothing more. An independent
+implementation, written from scratch against the supervision-call
+specification alone, reproduces the same agreement; and a worked $K = 3$
+instance with every message spelled out numerically is part of the
+companion notebooks. One qualitative detail of that instance is worth
+repeating: at $x = (1.2, -0.4, 0.8)$ the score component $S_1$ is
+\emph{positive} although $x_1 < 0$ --- the neighbours pull the posterior
+mean of the middle frame positive. No per-frame marginal score can produce
+this; it is inter-frame evidence sharing, the joint effect of
+Section~\ref{sec:g-K2}, in numbers.
+
+\section{The Gaussian closure beyond Gaussianity}\label{sec:bp-nongaussian}
+
+On the Laplace chain of Chapter~\ref{ch:laplace}, BP is still exact in
+principle but its messages are genuinely infinite-dimensional
+(Remark~\ref{rmk:l-breakdown}). This is where the closure question becomes
+a measurement. Two solvers are compared on identical data.
+
+\paragraph{Exact reference: grid BP.} Messages are represented by their
+values on $M$ equispaced points in $[-A, A]$ and updated by trapezoidal
+quadrature --- option (iii) of Section~\ref{sec:bp-chain}, at cost
+$O(K M^2)$: the honest price of function-valued messages. Calibration on
+the exactly solvable Gaussian chain shows the trapezoid rule on analytic,
+rapidly decaying integrands converges \emph{spectrally} (aliasing error
+$\sim e^{-2\pi^2 \sigma^2/\dd x^2}$), so failure is abrupt, not gradual:
+at $M = 101$, $A = 8$ the score error sits at the $10^{-15}$ floor down to
+$t = 0.02$ and fails only when the likelihood width $\sqrt{2t}$ approaches
+the grid step. The working configuration for all non-Gaussian experiments
+is $M = 401$, $A = 8$ (reference $M = 801$), with the resolution
+constraint $\sqrt{2t} \gtrsim 3\,\dd x$ checked automatically; grid
+self-convergence error remains $10^4$--$10^7$ times smaller than the
+effect being measured at every $t$. Within its validated regime, grid BP
+\emph{is} the exact score.
+
+\paragraph{The object under test: Gaussian-projected BP.} The same
+sweeps, with every message forced into the Gaussian family by moment
+matching --- the algorithm one would actually deploy when quadrature is
+unaffordable, and the chain analogue of the per-node closures of
+Appendix~\ref{app:amp}.
+
+\paragraph{The error instrument.} All score errors are amplified
+posterior-mean errors: for any two solvers producing means
+$\widehat m, m_{\mathrm{ref}}$ and scores by the score--posterior
+identity,
+\begin{equation}
+  \widehat s - s_{\mathrm{ref}}
+  = \frac{e^{-t}}{\Deltat}\,
+    \big( \widehat m - m_{\mathrm{ref}} \big),
+  \qquad
+  \frac{e^{-t}}{\Deltat} \sim \frac{1}{2t} \;\; (t \downarrow 0),
+  \label{eq:bp-master-error}
+\end{equation}
+an exact identity (algebra, not approximation) whose numerical residual is
+logged in every experiment and sits at $10^{-15}$--$10^{-12}$ throughout.
+Equation \eqref{eq:bp-master-error} explains \emph{a priori} why small
+diffusion times are the danger zone: whatever the closure does to the
+posterior mean is amplified by $1/2t$ in the score.
+
+\subsection{Findings on the Laplace chain}
+
+On the Laplace chain ($\rho = 0.85$, $n = 40$, $60$ trials per $t$,
+reference $M = 801$): the median relative score error of the Gaussian
+closure is
+\begin{center}
+\begin{tabular}{@{}lcccc@{}}
+\toprule
+$t$ & $0.02$ & $0.08$ & $0.4$ & $2.4$ \\
+\midrule
+median relative score error & $0.39$ & $0.17$ & $3.5 \times 10^{-2}$
+& $7.6 \times 10^{-5}$ \\
+\bottomrule
+\end{tabular}
+\end{center}
+with failure probability $\Prob(\mathrm{err} > 0.1)$ equal to $1$ for
+$t \leq 0.08$ and $0$ for $t \geq 0.9$
+(Figure~\ref{fig:bp-closure}). The closure error is thus of order tens of
+percent in the small-$t$ regime and decays below $10^{-3}$ once diffusion
+noise Gaussianises the tilted posteriors --- the quantitative form of the
+supervision intuition that ``at long diffusion times the world is
+Gaussian, so probably you have no problem''. Inspection of the worst
+trials shows the mechanism: the reference belief is sharply non-Gaussian
+(occasionally bimodal), the single Gaussian commits to a compromise mean,
+and \eqref{eq:bp-master-error} amplifies the shift. The score
+\emph{direction}, however, remains far more accurate than its magnitude
+throughout: the median cosine similarity between projected and reference
+scores is $0.92$ even at $t = 0.02$ (where the magnitude error is $39\%$),
+exceeds $0.99$ for all $t \geq 0.12$, and the worst single trial of the
+whole sweep stays above $0.78$.
+
+\begin{figure}[t]\centering
+\includegraphics[width=0.74\linewidth]{figures/fig_laplace_closure.pdf}
+\caption{\textbf{Gaussian closure error on the Laplace chain} (median and
+10--90\% band) against the grid error budget measured on identical data
+($\rho = 0.85$): the closure error dominates the reference error by
+$10^4$--$10^7$ at every $t$, so the measurement is trustworthy where it is
+used.}
+\label{fig:bp-closure}
+\end{figure}
+
+\subsection{Varying the innovation: what makes closure hard}
+
+Sweeping six innovation families with \emph{identical} covariance
+$\rho^{|i-j|}$ --- Laplace, Student-$t$ ($\nu = 5, 8$), and symmetric
+Gaussian mixtures of increasing separation --- isolates the shape of the
+innovation law as the only moving part. Three findings:
+\begin{enumerate}
+  \item \emph{Noise level dominates.} Every family's error decays to
+  $\sim 10^{-3}$ or below by $t = 2.4$; all meaningful closure error lives
+  at $t \lesssim 0.4$.
+  \item \emph{Both signs of non-Gaussianity hurt; bimodality hurts most.}
+  At $t = 0.05$, $\rho = 0.5$: strongly bimodal mixture $0.94$, Laplace
+  $0.52$, Student-$t_{\nu=5}$ $0.32$, mildly bimodal mixture $0.07$. A
+  single Gaussian cannot represent two posterior modes, and commits to the
+  gap between them.
+  \item \emph{Stronger correlation helps, not hurts.} Laplace at
+  $t = 0.05$: error $0.43, 0.27, 0.13$ for $\rho = 0.5, 0.85, 0.95$.
+  Informative neighbours act like extra Gaussian observations and
+  Gaussianise the local tilted posterior; the naive intuition that message
+  errors ``propagate farther'' at strong coupling is not what happens on
+  chains.
+\end{enumerate}
+
+\subsection{Truncating the matrix versus truncating the inference}
+\label{sec:bp-truncation}
+
+The last supervision question --- take the exact score and truncate it to
+tridiagonal: how bad? --- admits two inequivalent readings, and keeping
+them apart turns out to matter. \emph{Truncate the answer} (variant a):
+band the matrix, $\widehat S = -Q_t^{(b)} x$ with entries beyond
+$|i - j| \leq b$ zeroed. \emph{Truncate the algorithm} (variant b): let
+messages travel at most $r$ hops --- exact inference on the window
+$x_{k-r}, \dots, x_{k+r}$, the local estimator of
+Section~\ref{sec:g-locality}. Both estimators are linear in $x$, so their
+RMS errors over the data law are deterministic traces --- no sampling.
+At equal locality budget ($b = r = 1$, $K = 40$, $\alpha = 0.8$):
+\begin{center}
+\begin{tabular}{@{}lcccc@{}}
+\toprule
+relative RMS score error & $t = 0.05$ & $t = 0.3$ & $t = 1$ & $t = 3$ \\
+\midrule
+banded matrix ($b = 1$)      & $0.210$ & $0.302$ & $0.135$ & $0.0035$ \\
+truncated inference ($r = 1$) & $0.123$ & $0.235$ & $0.130$ & $0.0035$ \\
+\bottomrule
+\end{tabular}
+\end{center}
+Two lessons. First, the cost of locality is non-monotone in $t$ and peaks
+at intermediate times --- the same mid-diffusion window where the band of
+$Q_t$ is fullest (Chapter~\ref{ch:gaussian}) and where generative
+sampling spends its critical steps. Second, at small $t$ \emph{cutting the
+algorithm beats cutting the answer} ($12.3\%$ vs $21.0\%$ at $t = 0.05$):
+the windowed inference solves a correctly normalised problem on its
+window, while zeroing entries of an inverse produces a matrix that is the
+inverse of nothing and misstates the diagonal. The two coincide at large
+$t$, where all off-diagonal content dies. The error of either truncation
+decays geometrically in the allowed range, at the rate $q(\alpha, t)$ of
+Theorem~\ref{thm:g-locality}.
+
+\section{What this chapter established}\label{sec:bp-summary}
+
+\emph{Exact} (proved, and verified to $10^{-12}$--$10^{-15}$): the factor
+graph of the noisy chain is a tree, so the two BP sweeps compute all
+smoothing marginals exactly in $O(K)$ message updates; on the Gaussian
+chain the messages close algebraically in the Gaussian family --- no CLT
+--- so the updates cost $O(1)$ each and BP, which is exactly the Kalman
+filter plus RTS smoother, reproduces the matrix score to machine
+precision. \emph{Numerical} (measured against validated exact
+references): the Gaussian closure error on non-Gaussian chains ---
+$\sim\!20$--$40\%$ at small $t$, $< 10^{-3}$ at large $t$, worst for
+bimodal innovations, decreasing in $\rho$ --- with the score direction
+much more robust than its magnitude; and the locality comparison, where
+truncated inference beats the truncated matrix at small $t$.
+\emph{Heuristic}: the architecture reading --- local, convolution-like
+score networks with receptive field sized by $q(\alpha, t)$ (or grown
+with $t$) are near-optimal outside the mid-diffusion window, and the
+exactly quantified penalty inside it is the price of locality, not an
+artefact. The per-node closures of statistical physics, and the exact
+phase boundary they develop on this very model, are worked out in
+Appendix~\ref{app:amp}; the findings, limitations, and follow-up
+programme are consolidated in the next chapter.

@@ -108,18 +108,78 @@ repo map); D figure sources.
 - `tectonic main.tex` in thesis/ (tectonic at /opt/homebrew/bin/tectonic; natbib+bibtex).
 - 12 pt, onehalfspacing (~28 lines/page), geometry hmargin=2.5cm.
 
-## Progress tracker (updated 2026-07-14)
+## REVISION v2 (2026-07-19) — advisor/author feedback round
 
-- [x] Plan, skeleton, preamble
-- [x] Ch1–Ch10 written (137 pp. compiled)
-- [x] Appendices A–C (Gaussian identities, code listings, reproducibility)
-- [x] References (verified entries only; unofficial notes not cited)
-- [x] Format audit: pages 1/2/4 blank, p.3 acknowledgements, content from p.5
-      (odd); A4, 2.5 cm side margins, ~29 lines/page; 1.63 MB ≤ 10 MB
-- [x] Numerical audits re-run on this machine: 72/72 and 55/55 PASS;
-      Laplace closure medians + cosine re-verified from experiment CSVs
-- [x] docs/: RESULT_LEDGER.md, ADVISOR_BRIEFING.md, SOURCE_AUDIT.md
-- [ ] Push GitHub repo `diffusion` (private); old repos: user decides archiving
+Source: `Things-to-change-thesis.pdf` (Desktop/Diffusion). Directives:
+less redundant; less textbook, more thesis; purpose stated before every deep
+dive; way fewer pages; less AI-sounding; formulas must fit toolboxes;
+"Tweedie" → score as posterior expectation; §7.4–7.5 rebuilt around the
+spectral form + tridiagonality-loss study (paper-style white-background
+charts); Laplace restricted to 100%-certain material; BP theory + Kalman
+explained extensively, O(K) claim corrected (only for closed families);
+cancel §9.4 (AMP) and bulk fixed point from body → appendix; cancel all code
+listings; long derivations & nice-to-have theory → appendices; INSIST on
+stat-mech↔AI story (Hopfield Nobel, EBMs/LeCun, Ho, Song, flows, Biroli–
+Bonnaire–Mézard, cascade of phase transitions NeurIPS 2024 — Giovanni's
+coursework: Mantovani_Slides_SM.pdf + SM_Paper_Notes.pdf, 41002 course).
+
+### New chapter map (8 chapters, target ~100 pp total)
+
+1. Introduction (trimmed, purpose-driven)
+2. Statistical Mechanics and the Origins of Learning Machines
+   — condensed physics core (Hamiltonian→Liouville→ensembles→Boltzmann→
+   free energy→Ising; long proofs → App. B) + THE AI STORY: spin glasses
+   (SK), Hopfield 1982 + Nobel 2024, Amit–Gutfreund–Sompolinsky capacity,
+   Boltzmann machines (Ackley–Hinton–Sejnowski), RBMs (Smolensky, Hinton CD),
+   deep belief nets, Gardner space of interactions, Mézard 2017 PRE
+   (Hopfield ↔ RBM ↔ message passing — the bridge to Ch. 7).
+3. Stochastic Processes, SDEs, and the Ornstein–Uhlenbeck Channel
+   — merged old ch3+ch4, condensed: Markov chains, AR(1), MCMC (MH/Gibbs/
+   Langevin), Itô, OU, Fokker–Planck, Anderson reversal. Purpose-first.
+4. From Energy-Based Models to Diffusion and Flows (deep lit review)
+   — EBMs (LeCun 2006 tutorial deep), score matching (Hyvärinen; Vincent),
+   DDPM (Sohl-Dickstein; Ho deep), score SDE (Song deep), probability-flow
+   ODE → normalizing flows → flow matching; stat-phys of diffusion
+   (Biroli–Mézard 2023; Biroli–Bonnaire–De Bortoli–Mézard 2024; Ghio 2024;
+   Achilli memorization; Raya–Ambrogioni); CASCADE OF PHASE TRANSITIONS
+   (Bachtis–Biroli–Decelle–Seoane 2024): RBM training as effective cooling,
+   Curie–Weiss/Mattis mapping, two critical times, FSS — then the gap + RQs.
+5. The Gaussian Chain Solved Exactly (reworked §7.4/7.5: spectral theorem
+   first → spectral form → tridiagonality-loss study across t; "score as
+   posterior expectation" naming; K=2 kept; band-fill kept brief)
+6. Laplace Innovations (restricted: K=1 exact results, screened Poisson,
+   where closed forms stop; innovation coordinates brief)
+7. Score as Posterior Expectation: BP and Kalman (extensive BP theory:
+   factor graphs + HMM here, where used; sum–product; Kalman filter/RTS
+   derived properly; Gaussian closure lemmas; machine-precision result;
+   complexity stated honestly — O(K) updates only under a closed family;
+   non-Gaussian closure experiments kept; NO AMP, NO bulk fixed point)
+8. Discussion and Conclusions
+Appendices: A Gaussian identities; B Long derivations (Liouville, max-ent,
+Itô, ELBO, denoising SM proof, band-fill Neumann, transfer matrix);
+C AMP/TAP and the bulk fixed point (moved from body — incl. t_c(α),
+α_c=√2−1); D Reproducibility (repo map + audits; NO code listings).
+
+### Figure policy
+Paper-style: white background, no grid clutter, serif-compatible, consistent
+palette (matplotlib default-white + explicit style block), vector PDF.
+
+## Progress tracker (updated 2026-07-19, revision v2)
+
+- [x] Revision v2 executed in full (see REVISION v2 section above):
+      8 chapters, 119 pp., AI/stat-mech story + EBM→diffusion→flows +
+      cascade section written; Ch5 spectral rework; Ch7 BP+Kalman full
+      derivation, honest O(K); AMP → App. C; code listings cancelled;
+      "Tweedie" → score–posterior identity; \nocite{*} removed (all 76
+      bib entries cited; unofficial ZK-2021 notes dropped)
+- [x] All figures regenerated paper-style (vector PDF, white background)
+      by `thesis/figures/make_figures.py`
+- [x] Format audit v2: pages 1/2/4 blank, p.3 acknowledgements, TOC from
+      p.5, Ch1 from p.9 (odd); A4; 0.69 MB ≤ 10 MB; no undefined refs
+- [x] docs/ updated: RESULT_LEDGER (renumbered), ADVISOR_BRIEFING (v2
+      changelog), SOURCE_AUDIT (v2 sources incl. cascade coursework)
 - [ ] Giovanni: fill acknowledgements (p. 3), set final title, add student ID
       to filename at upload (TS<ID>.pdf), review Ch1 RQ wording
+- [ ] Giovanni: archive (not delete) old GitHub repos after sending Jérôme
+      the new link
 - [ ] Optional next experiments: mixture messages; discrete chain (see briefing)

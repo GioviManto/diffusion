@@ -48,13 +48,20 @@ when they are forced apart.
 
 The literature this work builds on can be organised in three strands.
 
-\paragraph{Statistical physics of diffusion models.} Closed-form analyses of
-diffusion generation exist for Gaussian mixtures, random energy models, and
-high-dimensional asymptotics \citep{biroli2023generative, biroli2024dynamical,
-ghio2024sampling}. These works treat the data as unstructured collections of
-samples; the time axis they study is the \emph{diffusion} time. The internal
-time of a \emph{sequence} --- the fact that a video frame is correlated with
-its neighbours through a dynamical rule --- is absent from these analyses.
+\paragraph{Statistical physics of learning machines.} Machine learning and
+statistical mechanics share a genealogy that runs from spin glasses through
+the Hopfield network and the Boltzmann machine to today's generative
+models, a lineage recognised by the 2024 Nobel Prize in Physics
+\citep{hopfield1982neural, ackley1985learning, nobel2024physics}. Its
+modern branch produced closed-form analyses of diffusion generation for
+Gaussian mixtures, random energy models, and high-dimensional asymptotics
+\citep{biroli2023generative, biroli2024dynamical, ghio2024sampling}, and,
+on the training side, the demonstration that energy-based models learn
+through a cascade of phase transitions \citep{bachtis2024cascade}. These
+works treat the data as unstructured collections of samples; the time axis
+they study is the \emph{diffusion} (or training) time. The internal time of
+a \emph{sequence} --- the fact that a video frame is correlated with its
+neighbours through a dynamical rule --- is absent from these analyses.
 
 \paragraph{Inference on chains.} Exact posterior inference on Gauss--Markov
 chains is classical: the Kalman filter and smoother
@@ -138,13 +145,15 @@ following.
   cost $O(K)$ instead of $O(K^3)$.
 
   \item \textbf{An exact phase boundary for the AMP closure}
-  (Chapter~\ref{ch:bp}). On the chain, BP and AMP produce the \emph{same
+  (Appendix~\ref{app:amp}). On the chain, BP and AMP produce the \emph{same
   score} but \emph{different posterior variances}. We show the difference is
   a single factor of two in a closure discriminant ($J_d^2 - 4\beta^2$ for BP
   against $J_d^2 - 8\beta^2$ for AMP), prove that the BP fixed point exists
   for every coupling and diffusion time, and derive the exact AMP breakdown
   time $t_c(\alpha)$ together with the critical coupling
-  $\alpha_c = \sqrt{2} - 1$ below which AMP never breaks down.
+  $\alpha_c = \sqrt{2} - 1$ below which AMP never breaks down. These
+  results are developed in an appendix because they branch off the thesis's
+  main line; they are complete and fully audited.
 
   \item \textbf{A quantitative audit of the Gaussian closure beyond
   Gaussianity} (Chapters~\ref{ch:laplace} and~\ref{ch:bp}). For
@@ -160,10 +169,9 @@ following.
 
   \item \textbf{A reproducible computational companion.} All results are
   backed by open, dependency-light Python code with deterministic numerical
-  audits ($72/72$ and $55/55$ independent checks, re-executed at build
-  time); the code and the
-  figures it generates are part of the thesis repository and are listed in
-  Appendix~\ref{app:code}.
+  audits ($72/72$ and $55/55$ independent checks, re-executed on the
+  build machine); the code and the figures it generates are part of the
+  thesis repository, documented in Appendix~\ref{app:repro}.
 \end{enumerate}
 
 \section{Methodology}
@@ -183,38 +191,42 @@ Appendix~\ref{app:repro}.
 
 \section{Structure of the thesis}
 
-The thesis is organised in two movements: a foundations movement
-(Chapters~\ref{ch:statmech}--\ref{ch:diffusion}) that builds, from first
-principles, every tool the research movement needs, and a research movement
+The thesis is organised in two movements: a literature-review movement
+(Chapters~\ref{ch:statmech}--\ref{ch:diffusion}) that tells the story this
+work belongs to and builds every tool it uses, and a research movement
 (Chapters~\ref{ch:gaussian}--\ref{ch:bp}) that contains the original
-contributions.
+contributions. Throughout, the rule is that theory is developed where it
+is needed, at the depth its use demands, with longer algebraic passages
+isolated in numbered \emph{toolboxes} and full derivations of supporting
+results collected in the appendices.
 
-Chapter~\ref{ch:statmech} develops statistical mechanics from Hamiltonian
-mechanics: phase space, Liouville's theorem, the Boltzmann--Gibbs
-distribution, free energy, and the Ising paradigm of complex systems.
-Chapter~\ref{ch:stochproc} covers stochastic processes and Markov-chain Monte
-Carlo: stationarity, detailed balance, Metropolis--Hastings and Gibbs
-sampling, and introduces the AR(1) chain that serves as the running example
-of the whole thesis. Chapter~\ref{ch:sde} builds the continuous-time toolkit:
-Brownian motion, the It\^o integral and It\^o's lemma, the
-Ornstein--Uhlenbeck process --- the corruption channel of diffusion models
---- and the Fokker--Planck equation, closing the loop with the Boltzmann
-distribution of Chapter~\ref{ch:statmech}. Chapter~\ref{ch:ebm} treats
-energy-based models, Markov random fields, hidden Markov models, and factor
-graphs --- the representational language of the research chapters.
-Chapter~\ref{ch:diffusion} assembles these pieces into modern diffusion
-models: the DDPM construction, the score-SDE formulation, score matching,
-Tweedie's identity, and the statistical-physics analyses of generative
-diffusion that motivate this work.
+Chapter~\ref{ch:statmech} develops the statistical mechanics this thesis
+uses --- phase space and Liouville's theorem, the Boltzmann--Gibbs
+distribution, free energy, the Ising model --- and then follows the
+discipline into machine learning: spin glasses, the Hopfield network, the
+Boltzmann machine and its restricted variant, and the statistical
+mechanics of learning, up to the modern results on training-time phase
+transitions. Chapter~\ref{ch:stochproc} supplies the probabilistic
+dynamics: Markov chains, the AR(1) running example, sampling by dynamics,
+the It\^o calculus, the Ornstein--Uhlenbeck corruption channel, the
+Fokker--Planck equation, and Anderson's time-reversal theorem.
+Chapter~\ref{ch:diffusion} reviews modern generative modelling in depth:
+energy-based models in LeCun's formulation, score matching, the DDPM
+construction, the score-SDE synthesis, flow models, the score as a
+posterior expectation, and the statistical-physics analyses of diffusion
+--- including the cascade of phase transitions in energy-based-model
+training --- that frame our research questions.
 
-Chapter~\ref{ch:gaussian} solves the Gaussian chain exactly (RQ1).
+Chapter~\ref{ch:gaussian} solves the Gaussian chain exactly (RQ1), with
+the spectral form of the precision matrix as the organising object.
 Chapter~\ref{ch:laplace} leaves Gaussianity in the most controlled way
-possible --- Laplace innovations --- and shows what the joint score looks like
-when it is no longer linear (first half of RQ3). Chapter~\ref{ch:bp}
-recomputes everything by message passing: BP, its Gaussian specialisation and
-the Kalman connection (RQ2), the AMP closure and its exact phase boundary,
-the closure error on non-Gaussian chains (RQ3), and the locality laws that
-answer RQ4. Chapter~\ref{ch:conclusions} summarises the findings per research
+possible --- Laplace innovations --- and shows what the joint score looks
+like when it is no longer linear (first half of RQ3). Chapter~\ref{ch:bp}
+develops belief propagation and the Kalman filter in full, proves the
+Gaussian closure, and measures the closure error on non-Gaussian chains
+(RQ2, RQ3) together with the locality laws that answer RQ4.
+Chapter~\ref{ch:conclusions} summarises the findings per research
 question, discusses limitations, and lays out the research programme that
-follows from them. Three appendices collect Gaussian identities, the code
-listings, and the reproducibility protocol.
+follows. Four appendices collect Gaussian identities, long derivations,
+the AMP/TAP analysis with its exact phase boundary, and the
+reproducibility protocol.
