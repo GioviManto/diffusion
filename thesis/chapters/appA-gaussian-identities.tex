@@ -1,7 +1,7 @@
 \chapter{Gaussian Identities Used Throughout}\label{app:gauss}
 
 This appendix collects, with proofs, the handful of Gaussian identities on
-which Chapters~\ref{ch:gaussian}--\ref{ch:bp} rely. Notation: a Gaussian
+which Chapter~\ref{ch:gaussian} relies. Notation: a Gaussian
 density in \emph{moment} parameters is $\Nd(a; m, v)$; in \emph{natural}
 parameters it is
 $\exp(-\tfrac{\lambda}{2} a^2 + \theta a + \mathrm{const})$ with
@@ -40,9 +40,9 @@ quadratic in $a$ whose $a^2$-coefficient is
 $-\tfrac{1}{2}(1/v_1 + 1/v_2)$ and whose linear coefficient is
 $m_1/v_1 + m_2/v_2$; apply \eqref{eq:gauss-int} in one dimension. In
 natural parameters the rule is addition:
-$(\lambda, \theta) = (\lambda_1 + \lambda_2, \theta_1 + \theta_2)$ ---
-which is why the BP updates of Chapter~\ref{ch:bp} are two additions per
-message. $\square$
+$(\lambda, \theta) = (\lambda_1 + \lambda_2, \theta_1 + \theta_2)$,
+which is why the BP updates of Chapter~\ref{ch:gaussian} are two
+additions per message. $\square$
 
 \section{Affine propagation (marginalisation)}
 
@@ -58,7 +58,7 @@ mean is $\alpha m$ and its variance $\alpha^2 v + \sigma^2$ by linearity
 of expectation and independence. Read in the reverse direction (solving
 for $a$ given a Gaussian summary of $a'$), the same computation gives
 $\Nd\big(a;\, m'/\alpha,\, (v' + \sigma^2)/\alpha^2\big)$, the backward
-half-step of Chapter~\ref{ch:bp}. $\square$
+half-step of the BP sweep. $\square$
 
 \section{Gaussian conditioning}
 
@@ -68,8 +68,8 @@ $\begin{psmallmatrix} J_{11} & J_{12} \\ J_{12}^\T & J_{22}
 Gaussian with precision $J_{11}$ (conditioning \emph{reads off} the
 precision block) and mean shifted by $-J_{11}^{-1} J_{12}\, a_2$;
 marginalisation, dually, is trivial in covariance parameters. This
-precision/covariance duality --- conditioning is local in $J$,
-marginalising is local in $\Sigma$ --- is the algebraic engine behind the
+precision/covariance duality (conditioning is local in $J$,
+marginalising is local in $\Sigma$) is the algebraic engine behind the
 cavity recursion \eqref{eq:bp-cavity}: integrating a neighbour out of a
 tridiagonal precision produces the rank-one correction
 $-\beta^2/\lambda$ on the adjacent diagonal entry, by the Schur
@@ -83,7 +83,7 @@ complement
 
 \section{Woodbury and the two routes to the score}
 
-The Woodbury/Sherman--Morrison--Woodbury identity,
+The Woodbury identity
 $(A + UCV)^{-1} = A^{-1} - A^{-1}U (C^{-1} + V A^{-1} U)^{-1} V A^{-1}$,
 specialised to $\Sigt = \Deltat I + e^{-2t} \Sigz$, connects the noisy
 precision $\Qt$ and the posterior precision

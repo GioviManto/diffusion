@@ -183,3 +183,29 @@ palette (matplotlib default-white + explicit style block), vector PDF.
 - [ ] Giovanni: archive (not delete) old GitHub repos after sending Jérôme
       the new link
 - [ ] Optional next experiments: mixture messages; discrete chain (see briefing)
+
+---
+
+## REVISION v3 (2026-07-21) — condensation pass
+
+Standing editorial contract received 2026-07-21 (senior-editor prompt +
+complaints: too long for the information given, humbler RQs, linear
+narrative, no ping-pong, one-place-per-topic, formal charts, cut
+redundancy, keep bulk-fixed-point only if 100% verified).
+
+Executed: 119 pp → 68 pp; 8 chapters → 5 (1 Intro · 2 Model/identities/
+context/research-development · 3 Gaussian complete incl. BP+Kalman+
+locality+truncation · 4 Laplace complete incl. grid reference+closure
+measurements · 5 Conclusions); appendices A Gaussian identities ·
+B AMP (independently re-verified 2026-07-21, kept per the 100% rule) ·
+C reproducibility. Figures 11 → 7. RQ1–RQ4 replaced by the author's
+modest versions. Em dashes ~300 → 0; banned phrases removed. v2 sources
+archived at ~/Code/Thesis/archive/thesis-v2-chapters/.
+
+Editorial registers (standing documents, update each pass):
+`thesis/editorial/DECISIONS.md`, `CHANGELOG.md`, `CORRECTNESS.md`,
+`FIGURES.md`.
+
+User TODOs unchanged: acknowledgements text (p.3), final title,
+TS<studentID>.pdf rename at upload, archive old GitHub repos after
+Jérôme has the new link.

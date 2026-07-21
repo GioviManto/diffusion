@@ -1,0 +1,85 @@
+\chapter{Discussion and Conclusions}\label{ch:conclusions}
+
+\section{Findings}\label{sec:conclusions-findings}\label{sec:conclusions-amp}
+
+\paragraph{Derived exactly.} For the stationary AR(1) chain under
+coordinatewise OU corruption, the joint score is $\score(x,t) = -\Qt x$
+with $\Qt = (e^{-2t}\Sigz + \Deltat I)^{-1}$, equal by the
+score--posterior identity to $(e^{-t}\E[a|x] - x)/\Deltat$ (RQ1). Its
+coupling structure has a closed-form lifecycle: exactly tridiagonal at
+$t = 0$, filling one diagonal per order in $t$ by the band-fill law
+\eqref{eq:g-bandfill}, and returning to the identity at rate $e^{-2t}$.
+In the bulk, the single quantity $q(\alpha, t) \in (0, |\alpha|]$ governs
+both the posterior correlation length and the geometric decay of evidence
+influence, with limits $q \to 0$ as $t \to 0$ and $q \to |\alpha|$ as
+$t \to \infty$. The posterior of the noisy chain lives on a tree-shaped
+factor graph, on which the two BP sweeps compute all smoothing marginals
+in $O(K)$ message updates; on the Gaussian chain the messages close
+algebraically in the Gaussian family, the recursion is the Kalman filter
+followed by the RTS smoother, and the cost becomes $O(K)$ (RQ2). The
+error of a radius-$r$ local score estimator decays exactly as $q^r$
+(RQ4). On the same model, the per-node AMP/TAP closure returns the exact
+score (the mean fixed point is closure-independent) but a different
+variance, with existence boundary, breakdown time $t_c(\alpha)$, and
+critical coupling $\alpha_c = \sqrt{2} - 1$ in closed form
+(Appendix~\ref{app:amp}); all of these formulas were re-verified
+independently.
+
+\paragraph{Measured numerically.} The two Gaussian score routes agree to
+$10^{-15}$--$10^{-14}$ across the tested $(K, \alpha, t)$ grid, with an
+independently written implementation reproducing the agreement. On
+Laplace chains, Gaussian-projected BP measured against validated grid
+quadrature has median relative score error $0.39$ at $t = 0.02$,
+decaying below $10^{-3}$ for $t \gtrsim 0.9$; the error is amplified at
+small $t$ by the exact factor $e^{-t}/\Deltat$, is worst for bimodal
+innovation laws, and decreases with stronger chain correlation, while
+the score direction remains accurate (median cosine $\geq 0.92$
+throughout) (RQ3). At equal locality budget, truncating the inference is
+more accurate than truncating the score matrix at small $t$ ($12.3\%$
+against $21.0\%$ at $t = 0.05$).
+
+\paragraph{The Gaussian-to-Laplace comparison.} The structural lesson is
+where exactness is lost: the tree, the two-sweep schedule, and the
+score--posterior identity survive any innovation law; what breaks is the
+representability of messages in a finite-dimensional family. The
+practical lesson is when it matters: the Gaussian closure is essentially
+free at moderate and large diffusion times, and expensive precisely in
+the small-$t$ regime where the score magnitude is amplified, though even
+there the score direction is preserved much better than its magnitude.
+
+\section{What the model suggests but does not establish}
+
+Within the Gaussian benchmark, local score computations are near-optimal
+away from intermediate diffusion times, the required receptive field
+scales as $\xi \log(1/\varepsilon)$ with $\xi = 1/\log(1/q)$, and a
+local algorithm is preferable to a banded linear readout. These are
+properties of exact inference in one controlled model. Whether trained
+score networks on real sequence data inherit them is untested here and
+would require learning experiments.
+
+\section{Limitations}
+
+(i) The exact solutions concern one-dimensional state per frame and
+linear AR(1) dynamics. (ii) The non-Gaussian results are numerical: grid
+BP is a reference only within its validated resolution regime
+($\sqrt{2t} \gtrsim 3\,\dd x$), and the Laplace closure error is a
+measured curve, not a formula. (iii) The locality laws are proved for
+the Gaussian bulk; their non-Gaussian counterparts are only structurally
+delimited. (iv) No learning is performed. (v) An earlier conjecture on
+low-rank structure of the Laplace $K = 2$ posterior Hessian failed
+outside a narrow regime and is not asserted. (vi) How score errors
+accumulate along the reverse generation trajectory was not studied.
+
+\section{Future work}
+
+Three directions follow directly from what was measured. First, mixture
+messages: the single-Gaussian closure fails worst on bimodal beliefs, so
+a two-component mixture closure on the same sweeps would separate the
+representation error from the model mismatch, and is the clearest next
+algorithmic step. Second, discrete chains: with a finite alphabet the BP
+messages are finite vectors and inference is exact with no closure at
+all, giving a second solvable benchmark. Third, reverse dynamics:
+integrating the reverse SDE under exact, Gaussian-projected, and
+truncated scores would show where along the trajectory the closure and
+locality errors matter for generation, turning the pointwise error
+measurements of this thesis into dynamical ones.

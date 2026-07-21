@@ -1,12 +1,30 @@
-# Briefing for Jérôme — state of the thesis (updated 2026-07-19)
+# Briefing for Jérôme — state of the thesis (updated 2026-07-21)
 
 One-page summary of what is proved, what is measured, what is speculative,
 and what I propose to do next. Full claim-by-claim classification in
-`RESULT_LEDGER.md`; thesis draft in `thesis/main.pdf` (119 pp., compiles
+`RESULT_LEDGER.md`; thesis draft in `thesis/main.pdf` (68 pp., compiles
 with one `tectonic main.tex`; all numerical audits re-run on this machine:
 72/72 and 55/55 pass).
 
-## Revision of 2026-07-19 (author feedback round)
+## Revision of 2026-07-21 (condensation round, v3)
+
+On Giovanni's second feedback round ("too long for the information we
+give") the draft was condensed 119 pp → 68 pp and restructured to 5
+chapters: 1 Introduction (modest RQ1–RQ4) · 2 Model + score identities +
+related work + research development (the old three background chapters,
+40 pp → 8 pp; the AI-history and cascade material reduced to a cited
+related-work discussion) · 3 the complete Gaussian case in one chapter
+(matrix score, spectral lifecycle, BP, Kalman, bulk, locality,
+truncation) · 4 the complete non-Gaussian case in one chapter (Laplace,
+grid reference, Gaussian-projection measurements) · 5 conclusions.
+Appendices: A Gaussian identities · B AMP/TAP bulk fixed point (every
+formula independently re-verified before keeping it, per the "100% sure
+or delete" rule) · C reproducibility. A new research-development section
+records the toy models, the per-frame→joint score correction, and the
+continuous-message bottleneck. Figures cut 11 → 7, one per distinct
+result. Editorial registers in `thesis/editorial/`.
+
+## Revision of 2026-07-19 (author feedback round, v2 — superseded by v3)
 
 The draft was restructured on Giovanni's written feedback: 8 chapters
 instead of 10, ~119 pp. instead of 137. The literature review now carries

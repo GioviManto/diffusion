@@ -100,51 +100,6 @@ def q_of(a, t):
 
 
 # ================= fig_spectral =================
-def fig_spectral():
-    K, a = 40, 0.8
-    S0 = sigma0(K, a)
-    w, U = np.linalg.eigh(S0)
-    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(6.4, 2.5))
-    ts = np.linspace(0, 3, 200)
-    for wi in w:
-        ax1.plot(ts, np.exp(-2 * ts) * wi + (1 - np.exp(-2 * ts)),
-                 color=NAVY, lw=0.6, alpha=0.45)
-    ax1.axhline(1.0, color=GRAY, lw=0.6, ls="--")
-    ax1.set_xlabel(r"diffusion time $t$")
-    ax1.set_ylabel(r"eigenvalues $\lambda_i(t)$")
-    ax1.set_title(r"$\lambda_i(t) = e^{-2t}\omega_i + \Delta_t \to 1$")
-    for j, col in zip([K - 1, K - 3, K - 6], [NAVY, RED, OLIVE]):
-        ax2.plot(np.arange(K), U[:, j], color=col, lw=1.1,
-                 label=rf"$u_{{{K - j}}}$")
-    ax2.set_xlabel(r"frame index $k$")
-    ax2.set_ylabel("eigenvector component")
-    ax2.set_title(r"top eigenvectors of $\Sigma_0$ (near-Fourier)")
-    ax2.legend(ncol=3, loc="upper right")
-    fig.tight_layout()
-    save(fig, "fig_spectral.pdf")
-
-
-# ================= fig_precision_lifecycle =================
-def fig_precision_lifecycle():
-    K, a = 15, 0.8
-    times = [0.0, 0.15, 0.6, 3.0]
-    fig, axes = plt.subplots(1, 4, figsize=(6.6, 2.0))
-    for ax, t in zip(axes, times):
-        Q = Qt(K, a, t) if t > 0 else Q0(K, a)
-        v = np.max(np.abs(Q))
-        im = ax.imshow(Q, cmap="RdBu_r", vmin=-v, vmax=v)
-        ax.set_title(rf"$t = {t:g}$")
-        ax.set_xticks([0, K - 1])
-        ax.set_yticks([0, K - 1])
-        for s in ax.spines.values():
-            s.set_visible(True)
-            s.set_linewidth(0.4)
-        fig.colorbar(im, ax=ax, fraction=0.046, pad=0.03)
-    fig.tight_layout()
-    save(fig, "fig_precision_lifecycle.pdf")
-
-
-# ================= fig_band_fill =================
 def fig_band_fill():
     K, a = 25, 0.9
     i0 = K // 2 - 2
@@ -265,44 +220,24 @@ def _laplace_score(x, t, b=1.0):
 def fig_laplace_k1():
     x = np.linspace(-5, 5, 401)
     times = [0.05, 0.2, 0.6, 1.5]
-    fig, ax = plt.subplots(figsize=(4.6, 2.9))
-    ax.plot(x, np.exp(-np.abs(x)) / 2, ":", color="k", lw=1.0,
-            label=r"Laplace prior")
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(6.4, 2.7))
+    ax1.plot(x, np.exp(-np.abs(x)) / 2, ":", color="k", lw=1.0,
+             label=r"prior")
     for t, col in zip(times, CYCLE):
-        ax.plot(x, _laplace_pt(x, t), color=col, label=rf"$t = {t:g}$")
-    ax.plot(x, np.exp(-x ** 2 / 2) / np.sqrt(2 * np.pi), "--",
-            color=GRAY, lw=1.0, label=r"$\mathcal{N}(0,1)$")
-    ax.set_xlabel(r"$x$")
-    ax.set_ylabel(r"$p_t^{(1)}(x)$")
-    ax.legend(ncol=2)
-    save(fig, "fig06_K1_density.pdf")
-
-    fig, ax = plt.subplots(figsize=(4.6, 2.9))
-    for t, col in zip(times, CYCLE):
-        ax.plot(x, _laplace_score(x, t), color=col, label=rf"$t = {t:g}$")
-    ax.plot(x, -x, "--", color=GRAY, lw=1.0, label=r"$-x$")
-    ax.set_xlabel(r"$x$")
-    ax.set_ylabel(r"$S(x, t)$")
-    ax.legend(ncol=2)
-    save(fig, "fig07_K1_score.pdf")
-
-    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(6.4, 2.6))
-    for t, col in zip([0.3, 0.1, 0.03, 0.01], CYCLE):
-        ax1.plot(x, _laplace_score(x, t), color=col, label=rf"$t = {t:g}$")
-    ax1.plot(x, -np.sign(x), "--", color="k", lw=1.0,
-             label=r"$-\mathrm{sign}(x)$")
+        ax1.plot(x, _laplace_pt(x, t), color=col, label=rf"$t = {t:g}$")
+    ax1.plot(x, np.exp(-x ** 2 / 2) / np.sqrt(2 * np.pi), "--",
+             color=GRAY, lw=1.0, label=r"$\mathcal{N}(0,1)$")
     ax1.set_xlabel(r"$x$")
-    ax1.set_ylabel(r"$S(x,t)$")
-    ax1.set_title(r"$t \to 0$: prior score")
-    ax1.legend(fontsize=7)
-    for t, col in zip([1.0, 2.0, 4.0, 6.0], CYCLE):
+    ax1.set_ylabel(r"$p_t^{(1)}(x)$")
+    ax1.legend(fontsize=7, ncol=2)
+    for t, col in zip(times, CYCLE):
         ax2.plot(x, _laplace_score(x, t), color=col, label=rf"$t = {t:g}$")
-    ax2.plot(x, -x, "--", color="k", lw=1.0, label=r"$-x$")
+    ax2.plot(x, -x, "--", color=GRAY, lw=1.0, label=r"$-x$")
     ax2.set_xlabel(r"$x$")
-    ax2.set_title(r"$t \to \infty$: Gaussian attractor")
-    ax2.legend(fontsize=7)
+    ax2.set_ylabel(r"$S(x, t)$")
+    ax2.legend(fontsize=7, ncol=2)
     fig.tight_layout()
-    save(fig, "fig08_K1_score_limits.pdf")
+    save(fig, "fig_laplace_k1.pdf")
 
 
 # ================= fig_bulk_variance =================
@@ -453,8 +388,6 @@ def fig_laplace_closure():
 
 
 if __name__ == "__main__":
-    fig_spectral()
-    fig_precision_lifecycle()
     fig_band_fill()
     fig_tridiag_loss()
     fig_local_vs_full()

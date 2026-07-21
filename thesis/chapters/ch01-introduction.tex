@@ -1,232 +1,167 @@
 \chapter{Introduction}\label{ch:intro}
 
-\section{Topic and motivation}
+\section{The problem}
 
-Generative diffusion models have become the dominant paradigm for synthesising
-high-dimensional data: they power state-of-the-art systems for images, audio,
-video, and molecular structures \citep{sohl2015deep, ho2020denoising,
-song2021scorebased, karras2022elucidating}. Their central object is the
-\emph{score function} --- the gradient of the log-density of progressively
+Generative diffusion models synthesise data by reversing a noising
+process, and the object that makes the reversal possible is the
+\emph{score function}, the gradient of the log-density of progressively
 noised data,
 \begin{equation}
-  \score(x, t) \;=\; \nabla_x \log p_t(x),
+  \score(x, t) \;=\; \nabla_x \log p_t(x)
   \label{eq:intro-score}
 \end{equation}
-which is all a model needs to know in order to reverse a noising process and
-turn pure noise back into data \citep{anderson1982reverse}. In practice the
-score is approximated by a neural network trained by denoising score matching
-\citep{hyvarinen2005estimation, vincent2011connection}; the network is a black
-box, and the structure of what it has to learn remains poorly understood.
+\citep{sohl2015deep, ho2020denoising, song2021scorebased,
+anderson1982reverse}. In applications the score is approximated by a
+neural network trained by denoising score matching
+\citep{hyvarinen2005estimation, vincent2011connection}; the network is a
+black box, and the structure of the function it has to learn is hard to
+inspect. A complementary research programme, developed in the
+statistical-physics community, studies data distributions simple enough
+that the score can be computed exactly, yet rich enough to reproduce
+phenomena observed in real systems \citep{biroli2023generative,
+biroli2024dynamical, raya2023spontaneous, ghio2024sampling}. Exact scores
+make every regime and transition along the generation trajectory
+traceable to explicit formulas.
 
-A complementary research programme, initiated in the statistical-physics
-community, replaces the black box with \emph{exactly solvable models}: data
-distributions simple enough that the score can be computed in closed form, yet
-rich enough to exhibit the phenomena observed in real systems --- speciation,
-memorisation, and dynamical phase transitions along the generation trajectory
-\citep{biroli2023generative, biroli2024dynamical, raya2023spontaneous,
-ghio2024sampling}. Exact scores act as a microscope: every regime, transition
-time, and failure mode can be traced back to explicit formulas.
+The models analysed in that programme treat a data point as an
+unstructured collection of coordinates. Much real data is not of this
+kind: a video, an audio signal, or a time series is a \emph{trajectory},
+a sequence of frames coupled by a dynamical rule. For such data the
+relevant score is the \emph{joint} score of the whole noisy sequence, and
+its structure is shaped by the interaction of two times: the internal
+(frame) time of the sequence and the diffusion time of the noising
+process. This thesis studies that interaction in the simplest setting in
+which it is nontrivial and exactly solvable.
 
-This thesis extends the exactly solvable programme in a direction that is
-natural for data with \emph{temporal or sequential structure}: the data are not
-a cloud of independent points but a \emph{trajectory} $a_0, a_1, \dots,
-a_{K-1}$ of a Markov process --- the prototype of a video, a time series, or
-any dynamic object. Each frame of the trajectory is corrupted independently by
-an Ornstein--Uhlenbeck (OU) channel, and the object of study is the
-\emph{joint} score of the whole noisy sequence. Two classical bodies of theory
-then meet the modern one. First, the joint score of a Markov chain turns out
-to be governed by the algebra of structured matrices --- Toeplitz covariances,
-tridiagonal precisions, and their spectral properties. Second, computing the
-score is an exercise in Bayesian inference on a tree-shaped factor graph, the
-home turf of \emph{belief propagation} (BP) and its Gaussian projection,
-\emph{approximate message passing} (AMP) \citep{pearl1988probabilistic,
-mezard2009information, donoho2009message}. The thesis develops both routes in
-full detail, proves where they coincide, and measures precisely what is lost
-when they are forced apart.
+\section{The model and the gap}
 
-\section{Positioning and gap}
+The data model is the stationary first-order autoregressive chain,
+$a_{k+1} = \alpha a_k + \eta_k$ with $|\alpha| < 1$ and
+$\sigma_\eta^2 = 1 - \alpha^2$, whose trajectory
+$a = (a_0, \dots, a_{K-1})$ constitutes one data point. Each frame is
+corrupted independently by the Ornstein--Uhlenbeck channel for a
+diffusion time $t$. Two classical bodies of theory meet here. The joint
+score of the noisy sequence is governed by the algebra of structured
+matrices: Toeplitz covariances, tridiagonal precisions, and their common
+eigenbasis. And, by an identity that holds for any data distribution, the
+score is an affine function of a posterior expectation, so computing it
+is Bayesian smoothing on a chain, the domain of belief propagation and of
+the Kalman filter \citep{kalman1960new, rauch1965maximum,
+pearl1988probabilistic, kschischang2001factor}.
 
-The literature this work builds on can be organised in three strands.
+Three gaps motivate the work (the supporting literature is reviewed in
+Chapter~\ref{ch:background}). The exactly solvable diffusion literature
+does not treat data points with internal Markov structure. The classical
+smoothing literature fixes the observation noise and does not ask how the
+posterior, hence the score, deforms as the diffusion time varies. And the
+Gaussian message approximations of applied inference are classically
+justified by a central-limit argument that requires many incoming
+messages per node, whereas a chain provides two; we are not aware of a
+quantitative assessment of that approximation on chain-structured
+diffusion posteriors.
 
-\paragraph{Statistical physics of learning machines.} Machine learning and
-statistical mechanics share a genealogy that runs from spin glasses through
-the Hopfield network and the Boltzmann machine to today's generative
-models, a lineage recognised by the 2024 Nobel Prize in Physics
-\citep{hopfield1982neural, ackley1985learning, nobel2024physics}. Its
-modern branch produced closed-form analyses of diffusion generation for
-Gaussian mixtures, random energy models, and high-dimensional asymptotics
-\citep{biroli2023generative, biroli2024dynamical, ghio2024sampling}, and,
-on the training side, the demonstration that energy-based models learn
-through a cascade of phase transitions \citep{bachtis2024cascade}. These
-works treat the data as unstructured collections of samples; the time axis
-they study is the \emph{diffusion} (or training) time. The internal time of
-a \emph{sequence} --- the fact that a video frame is correlated with its
-neighbours through a dynamical rule --- is absent from these analyses.
-
-\paragraph{Inference on chains.} Exact posterior inference on Gauss--Markov
-chains is classical: the Kalman filter and smoother
-\citep{kalman1960new, rauch1965maximum}, hidden Markov models
-\citep{rabiner1989tutorial}, and their unifying formulation as sum--product
-message passing on factor graphs \citep{kschischang2001factor,
-mezard2009information}. What this literature does not ask is the question that
-matters for generative modelling: \emph{how does the exact posterior --- and
-therefore the exact score --- deform as a function of the diffusion time},
-and what does that deformation imply for the architecture of a network that
-must learn it?
-
-\paragraph{Message passing with continuous variables.} BP is exact on trees
-for discrete variables, where messages are finite vectors of probabilities.
-For continuous variables the messages become probability \emph{densities} ---
-infinite-dimensional objects --- and practical algorithms must close them
-within a parametric family, almost always the Gaussian one; this is the step
-that turns BP into AMP, known in physics as the
-Thouless--Anderson--Palmer (TAP) approach \citep{thouless1977solution,
-donoho2009message, zdeborova2016statistical}. The classical justification of
-the Gaussian closure is a central-limit argument valid when every node
-receives many messages. On a chain each node receives exactly two: the
-central-limit argument fails by construction, and the quality of the Gaussian
-closure on chain-structured diffusion posteriors was, to the best of our
-knowledge, unquantified.
-
-The gap, in one sentence: \emph{there is no end-to-end, exactly solvable
-account of the joint diffusion score of a structured sequence --- its matrix
-structure, its message-passing computation, and the price of the Gaussian
-closure when the sequence is not Gaussian.}
-
-\section{Research questions}
-
-The thesis addresses four questions.
+\section{Research questions}\label{sec:rq}
 
 \begin{itemize}
-  \item[\textbf{RQ1.}] What is the exact joint score of a Markov chain
-  corrupted by an OU channel, and how does its structure --- concretely, the
-  posterior precision matrix --- evolve along the diffusion time, from the
-  sparse Markov regime at $t \to 0$ to the isotropic regime at $t \to \infty$?
+  \item[\textbf{RQ1.}] For a stationary Gaussian AR(1) chain observed
+  through coordinatewise Ornstein--Uhlenbeck noise, what is the joint
+  score, and how do its spatial couplings vary with the diffusion time?
 
-  \item[\textbf{RQ2.}] Can the joint score be computed \emph{locally}, by
-  message passing on the chain's factor graph, rather than globally by matrix
-  inversion? In the Gaussian case, how does belief propagation relate to the
-  classical Kalman smoother, and does it reproduce the closed-form score
-  exactly?
+  \item[\textbf{RQ2.}] How can the same Gaussian-chain score be computed
+  by belief propagation, and how does the resulting recursion relate to
+  Kalman filtering and smoothing?
 
-  \item[\textbf{RQ3.}] When the messages are forced into a Gaussian family ---
-  the AMP/TAP closure --- what survives and what breaks? On the Gaussian
-  chain, is the closure exact; and on a non-Gaussian (Laplace-innovation)
-  chain, how large is the closure error as a function of the diffusion time?
+  \item[\textbf{RQ3.}] For selected non-Gaussian innovation models, how
+  accurate is a Gaussian-message approximation relative to a validated
+  numerical belief-propagation reference, over the parameter ranges
+  studied?
 
-  \item[\textbf{RQ4.}] What do the exact results imply for \emph{learned}
-  scores: when is a local (banded, convolution-like) score architecture
-  sufficient, and what is the exact law governing the error of local
-  truncations?
+  \item[\textbf{RQ4.}] In the Gaussian model, how rapidly does the
+  influence of remote observations on the score decay, and what limited
+  guidance does this provide for local approximations of the score?
 \end{itemize}
+
+These questions are deliberately confined to the models named in them. No
+claim is made about general Markov processes, about universal properties
+of learned diffusion scores, or about practical neural architectures.
 
 \section{Contributions}
 
-The main contributions, each developed in a dedicated chapter, are the
-following.
-
 \begin{enumerate}
-  \item \textbf{A complete closed-form solution of the Gaussian benchmark}
-  (Chapter~\ref{ch:gaussian}). For the stationary AR(1) chain under OU
-  corruption we derive the joint score, diagonalise it in closed form, and
-  characterise the full lifecycle of the posterior precision matrix: a
-  corrected \emph{band-fill law} for the small-$t$ growth of its
-  off-diagonals, and exact bulk formulas for its inverse --- variance,
-  geometric decay rate $q(\alpha, t)$ of posterior correlations, and their
-  limits. The band-fill law corrects a transcription error in an earlier
-  working note; the correction is validated numerically.
+  \item For the stationary Gaussian AR(1) chain under OU corruption, we
+  derive the joint score in closed form, diagonalise it for all diffusion
+  times in a single eigenbasis, and characterise the evolution of its
+  coupling structure: a band-fill law
+  $(\Qt)_{i,i+d} = (-1)^{d-1}(2t)^{d-1}(\Qz^d)_{i,i+d} + O(t^d)$ for
+  small $t$, a return to isotropy at rate $e^{-2t}$, and exact bulk
+  formulas for the posterior variance and the geometric decay rate
+  $q(\alpha, t)$ of posterior correlations. The band-fill law corrects a
+  prefactor error in an earlier working note of this project; the
+  correction is verified numerically (Chapter~\ref{ch:gaussian}).
 
-  \item \textbf{An equation-by-equation message-passing construction of the
-  score} (Chapter~\ref{ch:bp}). We build the factor graph of the noisy chain,
-  specialise the sum--product equations to it, prove that Gaussian messages
-  are closed under the updates (two elementary facts suffice), and show that
-  the resulting algorithm --- Gaussian BP, algebraically identical to a
-  Kalman smoother --- reproduces the matrix score to machine precision at
-  cost $O(K)$ instead of $O(K^3)$.
+  \item We derive the belief-propagation computation of the same score on
+  the chain's factor graph, show algebraically that Gaussian messages are
+  closed under the updates, identify the resulting recursion, update by
+  update, with the Kalman filter and the Rauch--Tung--Striebel smoother,
+  and verify that it reproduces the matrix score to within
+  double-precision rounding across a parameter grid. We state the
+  complexity honestly: the message-update count is $O(K)$ for any
+  innovation law; the cost is $O(K)$ only because the Gaussian family is
+  finite-dimensional (Chapter~\ref{ch:gaussian}).
 
-  \item \textbf{An exact phase boundary for the AMP closure}
-  (Appendix~\ref{app:amp}). On the chain, BP and AMP produce the \emph{same
-  score} but \emph{different posterior variances}. We show the difference is
-  a single factor of two in a closure discriminant ($J_d^2 - 4\beta^2$ for BP
-  against $J_d^2 - 8\beta^2$ for AMP), prove that the BP fixed point exists
-  for every coupling and diffusion time, and derive the exact AMP breakdown
-  time $t_c(\alpha)$ together with the critical coupling
-  $\alpha_c = \sqrt{2} - 1$ below which AMP never breaks down. These
-  results are developed in an appendix because they branch off the thesis's
-  main line; they are complete and fully audited.
+  \item For Laplace-innovation chains we establish which identities
+  remain exact, locate the precise step at which closed forms stop, and
+  measure the accuracy of Gaussian-projected BP against a numerically
+  validated grid implementation of the functional recursion: the median
+  relative score error is $0.39$ at $t = 0.02$ and decays below $10^{-3}$
+  for $t \gtrsim 0.9$, with the score direction substantially more
+  accurate than its magnitude, in the tested regimes
+  (Chapter~\ref{ch:laplace}).
 
-  \item \textbf{A quantitative audit of the Gaussian closure beyond
-  Gaussianity} (Chapters~\ref{ch:laplace} and~\ref{ch:bp}). For
-  Laplace-innovation chains --- where exact inference is still available
-  through deterministic grid quadrature on the same factor graph --- we
-  measure the score error of Gaussian-projected BP: it peaks around
-  $20\%$ (relative $L^2$) at small diffusion time and decays below $1\%$ as
-  the noisy marginals Gaussianise, while the score \emph{direction} remains
-  accurate throughout. We also show that at small $t$ \emph{truncating the
-  inference} (local BP sweeps) is markedly more accurate than \emph{truncating
-  the score matrix} (banding), quantifying the advantage of local message
-  passing over local linear algebra.
+  \item In the Gaussian model we prove that the error of a radius-$r$
+  local estimator of the score decays as $q(\alpha,t)^r$, and we measure
+  that truncating the inference (windowed message passing) is more
+  accurate than truncating the score matrix (banding) at small diffusion
+  times (Chapter~\ref{ch:gaussian}).
 
-  \item \textbf{A reproducible computational companion.} All results are
-  backed by open, dependency-light Python code with deterministic numerical
-  audits ($72/72$ and $55/55$ independent checks, re-executed on the
-  build machine); the code and the figures it generates are part of the
-  thesis repository, documented in Appendix~\ref{app:repro}.
+  \item As a separate, self-contained result, we characterise the
+  per-node (AMP/TAP) closure on the same model: it returns the exact
+  score but a different posterior variance, with an existence boundary in
+  closed form, a breakdown time $t_c(\alpha)$, and a critical coupling
+  $\alpha_c = \sqrt{2} - 1$. All formulas are independently re-verified;
+  the material is placed in Appendix~\ref{app:amp} because it branches
+  off the main line (statement of results in
+  Section~\ref{sec:conclusions-amp}).
 \end{enumerate}
 
-\section{Methodology}
+As a methodological point, no neural network is trained anywhere:
+every claim is either derived by explicit algebra or measured
+numerically against an independently computed reference, and all numbers
+in the thesis are regenerated by deterministic audit scripts
+(Appendix~\ref{app:repro}). We regard this reproducibility as a strength
+of the method, not as a contribution in itself.
 
-The methodology is deliberately old-fashioned: \emph{no neural networks, no
-black boxes --- closed forms first, numerics as audit}. Every claim is either
-proved by explicit algebra (the derivations are spelled out step by step, with
-the longer algebraic passages isolated in numbered \emph{toolboxes}) or
-verified by deterministic numerical checks against brute-force ground truth,
-in the spirit of the exactly solvable programme of
-\citet{biroli2023generative}. Where an approximation is introduced (the
-Gaussian closure of BP messages, local truncations), its error is measured
-against an exact reference computed by an independent method (matrix algebra
-or dense grid quadrature). The empirical setting, the audit protocol, and the
-software packages are described alongside the results and in
-Appendix~\ref{app:repro}.
+\section{Scope and limitations}
 
-\section{Structure of the thesis}
+The exact results concern one-dimensional state per frame, linear AR(1)
+dynamics, and stationary initial conditions. The non-Gaussian results are
+numerical, valid within the validated resolution regime of the reference
+solver and the tested parameter ranges. The locality results are proved
+for the Gaussian bulk only. No learning experiments are performed, so any
+implication for trained score networks is a hypothesis suggested by a
+controlled model, not an established property of practical systems.
 
-The thesis is organised in two movements: a literature-review movement
-(Chapters~\ref{ch:statmech}--\ref{ch:diffusion}) that tells the story this
-work belongs to and builds every tool it uses, and a research movement
-(Chapters~\ref{ch:gaussian}--\ref{ch:bp}) that contains the original
-contributions. Throughout, the rule is that theory is developed where it
-is needed, at the depth its use demands, with longer algebraic passages
-isolated in numbered \emph{toolboxes} and full derivations of supporting
-results collected in the appendices.
+\section{Outline}
 
-Chapter~\ref{ch:statmech} develops the statistical mechanics this thesis
-uses --- phase space and Liouville's theorem, the Boltzmann--Gibbs
-distribution, free energy, the Ising model --- and then follows the
-discipline into machine learning: spin glasses, the Hopfield network, the
-Boltzmann machine and its restricted variant, and the statistical
-mechanics of learning, up to the modern results on training-time phase
-transitions. Chapter~\ref{ch:stochproc} supplies the probabilistic
-dynamics: Markov chains, the AR(1) running example, sampling by dynamics,
-the It\^o calculus, the Ornstein--Uhlenbeck corruption channel, the
-Fokker--Planck equation, and Anderson's time-reversal theorem.
-Chapter~\ref{ch:diffusion} reviews modern generative modelling in depth:
-energy-based models in LeCun's formulation, score matching, the DDPM
-construction, the score-SDE synthesis, flow models, the score as a
-posterior expectation, and the statistical-physics analyses of diffusion
---- including the cascade of phase transitions in energy-based-model
-training --- that frame our research questions.
-
-Chapter~\ref{ch:gaussian} solves the Gaussian chain exactly (RQ1), with
-the spectral form of the precision matrix as the organising object.
-Chapter~\ref{ch:laplace} leaves Gaussianity in the most controlled way
-possible --- Laplace innovations --- and shows what the joint score looks
-like when it is no longer linear (first half of RQ3). Chapter~\ref{ch:bp}
-develops belief propagation and the Kalman filter in full, proves the
-Gaussian closure, and measures the closure error on non-Gaussian chains
-(RQ2, RQ3) together with the locality laws that answer RQ4.
-Chapter~\ref{ch:conclusions} summarises the findings per research
-question, discusses limitations, and lays out the research programme that
-follows. Four appendices collect Gaussian identities, long derivations,
-the AMP/TAP analysis with its exact phase boundary, and the
-reproducibility protocol.
+Chapter~\ref{ch:background} defines the model, derives the
+score--posterior identity, reviews the relevant literature, and records
+how the research questions took shape, including the preliminary
+experiments. Chapter~\ref{ch:gaussian} contains the complete Gaussian
+analysis: the exact score, its spectral form and lifecycle, belief
+propagation and its identification with Kalman smoothing, and the
+locality laws. Chapter~\ref{ch:laplace} contains the complete
+non-Gaussian analysis: what survives with Laplace innovations, where
+closed forms stop, and the measured cost of the Gaussian message family.
+Chapter~\ref{ch:conclusions} states findings, limitations, and future
+questions. The appendices collect Gaussian identities, the AMP/TAP
+analysis, and the reproducibility protocol.

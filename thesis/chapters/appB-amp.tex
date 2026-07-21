@@ -1,0 +1,205 @@
+\chapter{AMP, TAP, and the Bulk Fixed Point}\label{app:amp}
+
+This appendix develops the per-node Gaussian closures of statistical
+physics, AMP and the TAP equations, on the Gaussian chain, and proves the
+exact breakdown announced in Remark~\ref{rmk:bp-no-clt}. The results are
+complete, audited, and independently re-verified; they are collected here
+rather than in Chapter~\ref{ch:gaussian} because they branch off the
+thesis's main line. Summary: on the chain, AMP still returns the exact
+score, but its variance closure fails past an exact breakdown time
+$t_c(\alpha)$, with critical coupling $\alpha_c = \sqrt{2} - 1$.
+
+\section{The bulk cavity fixed point of BP}\label{sec:amp-bulk-bp}
+
+Chapter~\ref{ch:gaussian} solved the bulk covariance by matrix algebra;
+the same formulas re-emerge from the message recursion, which is worth
+exhibiting because it localises where BP and AMP differ. In the bulk,
+parametrise the forward message (evidence absorbed) by its precision
+$\lambda_k$; the closure lemmas of Section~\ref{sec:bp-gaussian} give the
+scalar recursion
+\begin{equation}
+  \lambda_{k+1} \;=\; J_d - \frac{\beta^2}{\lambda_k},
+  \label{eq:bp-cavity}
+\end{equation}
+with $J_d, \beta$ the bulk parameters \eqref{eq:g-bulk-params}: absorbing
+one neighbour's summary costs the Gaussian-integration correction
+$-\beta^2/\lambda$. The fixed points are
+$\lambda^\pm = \big( J_d \pm \sqrt{J_d^2 - 4\beta^2} \big)/2$, and since
+$J_d - 2|\beta| = e^{-2t}/\Deltat + (1 - |\alpha|)^2/\sigma_\eta^2 > 0$
+(Chapter~\ref{ch:gaussian}), the attractive upper fixed point
+\begin{equation}
+  \boxed{\;\lambda^\ast = \frac{J_d + \sqrt{J_d^2 - 4\beta^2}}{2}\;}
+  \label{eq:bp-lambdastar}
+\end{equation}
+exists for every $\alpha \in (-1,1)$ and $t > 0$, with
+$|f'(\lambda^\ast)| = \beta^2/\lambda^{\ast 2} < 1$: the sweep converges
+geometrically from any initialisation. Recombining the two directions and
+the local term, and using the fixed-point relation
+$\beta^2/\lambda^\ast = J_d - \lambda^\ast$,
+\begin{equation}
+  \Lambda_{\mathrm{bulk}}
+  = J_d - \frac{2\beta^2}{\lambda^\ast}
+  = 2\lambda^\ast - J_d
+  = \sqrt{J_d^2 - 4\beta^2}
+  \quad\Longrightarrow\quad
+  V_{\mathrm{exact}} = \frac{1}{\sqrt{J_d^2 - 4\beta^2}} ,
+  \label{eq:bp-bulkvar}
+\end{equation}
+in exact agreement with Theorem~\ref{thm:g-bulk-cov}. Belief propagation
+on the Gaussian chain has no phase transition: the cavity fixed point
+exists always, and the discriminant $J_d^2 - 4\beta^2$ is the quantity to
+watch as the closure is modified.
+
+\section{AMP/TAP: same score, different variance}\label{sec:bp-amp}
+
+AMP, the algorithmic form of the TAP equations
+\citep{thouless1977solution, donoho2009message, zdeborova2016statistical},
+is the message passing one uses when the factor graph is dense: each
+message is then a sum of many weak contributions, approximately Gaussian
+by a central-limit argument, and one tracks per-node means and variances
+instead of per-edge messages, with the Onsager term correcting the
+self-influence. Rigorous derivations of AMP from BP exist in that dense
+limit \citep{genovese2026amp}. The chain is the opposite regime in every
+respect (diagonal measurement, coupling in the prior, degree two), so it
+isolates what the per-node closure costs. Viewing the posterior as a
+Gaussian Markov field with precision $J$ and field $h$, the three schemes
+solve, at each node,
+\begin{equation}
+  \text{mean field: } V_i = \frac{1}{J_{ii}};
+  \qquad
+  \text{AMP/TAP: } V_i = \frac{1}{J_{ii} - \sum_{k \neq i} J_{ik}^2 V_k};
+  \qquad
+  \text{BP: } V_i = (J^{-1})_{ii} .
+  \label{eq:bp-three-closures}
+\end{equation}
+The AMP closure is the BP cavity with the exclusion of the receiving
+neighbour dropped ($V_{k \to i} \approx V_k$): an $O(1/N)$ change on a
+dense graph, an $O(1)$ change on a chain with two neighbours.
+
+\begin{theorem}[The score is closure-independent]\label{thm:bp-same-score}
+For a Gaussian posterior, the fixed-point condition for the means is the
+same linear system $J m = h$ under mean field, BP, and AMP. All three
+schemes hence return the exact posterior mean and, via the
+score--posterior identity, the same exact joint score, for every
+$(K, \alpha, t)$, regardless of whether their variance closures are
+accurate or even solvable.
+\end{theorem}
+
+The proof is one line: in each scheme the mean update at node $i$ reads
+$m_i \leftarrow (h_i - \sum_{k \neq i} J_{ik} m_k)/J_{ii}$ at the fixed
+point; the closures modify the uncertainty bookkeeping, not the linear
+relation among means, and the unique solution of $Jm = h$ is the exact
+posterior mean. Numerically, AMP means agree with exact means to
+$4.3 \times 10^{-12}$ and AMP scores with BP scores to
+$1.7 \times 10^{-12}$ across all tested configurations.
+
+For the variances the story splits. In the bulk the AMP closure
+\eqref{eq:bp-three-closures} reads $V = 1/(J_d - 2\beta^2 V)$; the BP
+cavity is $V_{\mathrm{cav}} = 1/(J_d - \beta^2 V_{\mathrm{cav}})$. The
+entire difference between BP and AMP on the chain is a factor of two:
+both neighbours included where BP excludes one.
+
+\begin{theorem}[AMP bulk variance, breakdown time, critical coupling]
+\label{thm:bp-amp-breakdown}
+The AMP bulk closure is the quadratic $2\beta^2 V^2 - J_d V + 1 = 0$,
+with physical root
+\begin{equation}
+  V_{\mathrm{AMP}}
+  = \frac{J_d - \sqrt{J_d^2 - 8\beta^2}}{4\beta^2},
+  \label{eq:bp-amp-var}
+\end{equation}
+which exists iff $J_d \geq 2\sqrt{2}\,|\beta|$, strictly stronger than
+BP's always-true $J_d > 2|\beta|$. Since $J_d(t)$ decreases monotonically
+in $t$, the existence condition fails, if ever, past a single time;
+solving it as an equality gives
+\begin{equation}
+  \boxed{\;
+  t_c(\alpha) = -\tfrac{1}{2} \log \frac{g}{1+g},
+  \qquad
+  g(\alpha) = \frac{2\sqrt{2}\,|\alpha| - 1 - \alpha^2}{1 - \alpha^2},
+  \;}
+  \label{eq:bp-tc}
+\end{equation}
+finite exactly when $g > 0$, i.e.
+\begin{equation}
+  \boxed{\;|\alpha| \;>\; \alpha_c \;=\; \sqrt{2} - 1 \;\approx\; 0.4142 .\;}
+  \label{eq:bp-alphac}
+\end{equation}
+For $|\alpha| \leq \alpha_c$ the AMP variance has a fixed point at every
+diffusion time; for $|\alpha| > \alpha_c$ it ceases to exist for all
+$t > t_c(\alpha)$. In the weak-coupling regime the two closures agree to
+second order, with
+\begin{equation}
+  V_{\mathrm{AMP}} - V_{\mathrm{exact}}
+  = \frac{2\beta^4}{J_d^5} + O\!\Big(\frac{\beta^6}{J_d^7}\Big)
+  \;>\; 0 :
+  \label{eq:bp-weak}
+\end{equation}
+AMP always overestimates the bulk variance, at fourth order in the
+coupling.
+\end{theorem}
+
+\begin{toolbox}{Roots, branch, and the phase boundary}
+\emph{Branch selection.} The quadratic has roots
+$V_\pm = (J_d \pm \sqrt{J_d^2 - 8\beta^2})/(4\beta^2)$; as $\beta \to 0$,
+$V_- \to 1/J_d$ (the decoupled answer) while $V_+$ diverges, so $V_-$ is
+the physical branch, and the attractive fixed point of the damped
+iteration used in practice.
+\emph{Critical coupling.} $g > 0 \iff \alpha^2 - 2\sqrt{2}|\alpha| + 1 < 0
+\iff |\alpha| \in (\sqrt{2}-1, \sqrt{2}+1)$; intersecting with
+$|\alpha| < 1$ leaves $|\alpha| > \sqrt{2} - 1$. Consistency check at
+$t = \infty$: there the posterior is the bare prior, and the existence
+condition applied to $\Qz$ itself reads
+$(1 + \alpha^2) \geq 2\sqrt{2}|\alpha|$, i.e.\ AMP applied to a bare
+AR(1) chain has a variance fixed point iff $|\alpha| \leq \sqrt{2} - 1$,
+which is \eqref{eq:bp-alphac} read backwards.
+\emph{Weak coupling.} With $\epsilon := \beta^2/J_d^2$:
+$(1 - 4\epsilon)^{-1/2} = 1 + 2\epsilon + 6\epsilon^2 + O(\epsilon^3)$
+for the exact variance;
+$1 - \sqrt{1 - 8\epsilon} = 4\epsilon + 8\epsilon^2 + O(\epsilon^3)$,
+divided by $4\epsilon J_d$, gives
+$V_{\mathrm{AMP}} = (1 + 2\epsilon + 8\epsilon^2 + O(\epsilon^3))/J_d$;
+subtract. \hfill$\square$
+\end{toolbox}
+
+\begin{figure}[t]\centering
+\includegraphics[width=\linewidth]{figures/fig_bulk_variance.pdf}
+\caption{The three closures in closed form. Left
+($\alpha = 0.8 > \alpha_c$): exact $=$ BP, AMP \eqref{eq:bp-amp-var}, and
+mean field; the AMP branch terminates with a square-root singularity at
+the breakdown time $t_c(0.8) = 0.228$ from \eqref{eq:bp-tc} (shaded: no
+fixed point). Right ($\alpha = 0.3 < \alpha_c$): AMP exists at every $t$
+and slightly overestimates the variance, as predicted by
+\eqref{eq:bp-weak}.}
+\label{fig:bp-bulkvar}
+\end{figure}
+
+\begin{figure}[t]\centering
+\includegraphics[width=\linewidth]{figures/fig_bp_vs_amp.pdf}
+\caption{BP against AMP on a finite chain ($K = 9$, $\alpha = 0.8$).
+Left: the AMP mean error (about $10^{-12}$, flat in $t$:
+Theorem~\ref{thm:bp-same-score}) against the AMP variance error, which
+grows with $t$ until the closure stops converging (shaded). Right:
+existence of the AMP variance fixed point in the $(\alpha, t)$ plane; the
+black curve is the boundary $t_c(\alpha)$ of \eqref{eq:bp-tc}, the dashed
+line $\alpha_c = \sqrt{2}-1$; theory and iteration agree at all $180$
+scanned points.}
+\label{fig:bp-vs-amp}
+\end{figure}
+
+Numerically, on a $K = 12$ chain at $\alpha = 0.8$: the AMP score error
+stays at $10^{-13}$--$10^{-12}$ for every $t$, while the variance error
+is $1.3 \times 10^{-4}$ at $t = 0.05$, $3.5 \times 10^{-2}$ at $t = 0.2$,
+and past $t \approx 0.23$ the variance update has no positive fixed point
+at all. The audit further verifies the closed form \eqref{eq:bp-amp-var}
+against the converged iteration to $2.5 \times 10^{-12}$; the existence
+condition at all $180$ points of an $(\alpha, t)$ scan; $t_c$ against the
+bisected flip point of the iteration to $6.6 \times 10^{-6}$ relative;
+convergence below $\alpha_c$ even at $t = 50$; and the weak-coupling
+ratio $(V_{\mathrm{AMP}} - V_{\mathrm{exact}})/(2\beta^4/J_d^5) \to 1$
+within $0.4\%$. The interpretation is not that AMP is wrong; on a dense
+benchmark (random $N = 600$ symmetric positive-definite precision) the
+same closure gets variances to $1.7 \times 10^{-3}$ where mean field errs
+at $4 \times 10^{-2}$. It is built for a different graph: the
+central-limit justification of the per-node closure needs many incoming
+messages, and a chain provides two.

@@ -35,21 +35,19 @@ at improbable hours across improbable time zones.
 \setcounter{page}{5}
 \tableofcontents
 \clearpage
+% ensure the thesis body starts on an odd (right) page
+\ifodd\value{page}\else\null\thispagestyle{empty}\clearpage\fi
 
 \input{chapters/ch01-introduction}
-\input{chapters/ch02-statistical-mechanics}
-\input{chapters/ch03-stochastic-tools}
-\input{chapters/ch04-generative-models}
-\input{chapters/ch05-gaussian-chain}
-\input{chapters/ch06-laplace}
-\input{chapters/ch07-belief-propagation}
-\input{chapters/ch08-conclusions}
+\input{chapters/ch02-background}
+\input{chapters/ch03-gaussian-chain}
+\input{chapters/ch04-laplace}
+\input{chapters/ch05-conclusions}
 
 \appendix
 \input{chapters/appA-gaussian-identities}
-\input{chapters/appB-derivations}
-\input{chapters/appC-amp}
-\input{chapters/appD-reproducibility}
+\input{chapters/appB-amp}
+\input{chapters/appC-reproducibility}
 
 % ------------------------------------------------------------
 % Bibliography — author-date (writing guide, Attachment 2)
