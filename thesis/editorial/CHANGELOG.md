@@ -74,3 +74,14 @@ Every v2 chapter file and the 119-pp PDF archived at
   bottleneck, the discarded rank-two conjecture. Sources: archived
   toy-model notes and project memory; no new claims, no dates, no quoted
   conversations.
+
+## v3.1 (2026-07-21) — proofread pass
+
+Page-by-page visual QA of the 68-pp build (all pages rendered; sample of
+13 inspected in detail across every chapter and appendix). One defect
+found and fixed: Ch4 experimental sections used $\rho$ for the chain
+correlation and $n$ for the chain length where the rest of the thesis
+uses $\alpha$ and $K$; renamed throughout Ch4 (values unchanged; for the
+AR(1) chain the experiment's correlation parameter is the AR
+coefficient). No other prose, layout, figure, or toolbox issues found.
+Rebuild clean: 68 pp, 0 overfull, 0 undefined references.

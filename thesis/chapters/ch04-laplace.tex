@@ -265,7 +265,7 @@ the algorithm one would deploy when quadrature is unaffordable, and the
 chain analogue of the per-node closures of statistical physics
 (Appendix~\ref{app:amp}).
 
-On the Laplace chain ($\rho = 0.85$, $n = 40$ frames, $60$ trials per
+On the Laplace chain (chain correlation $\alpha = 0.85$, $K = 40$ frames, $60$ trials per
 $t$, reference $M = 801$), the median relative score error of the
 Gaussian closure is
 \begin{center}
@@ -296,7 +296,7 @@ not theorems.
 \begin{figure}[t]\centering
 \includegraphics[width=0.74\linewidth]{figures/fig_laplace_closure.pdf}
 \caption{Gaussian-closure score error on the Laplace chain
-($\rho = 0.85$, $n = 40$, $60$ trials per $t$; median and 10--90\%
+($\alpha = 0.85$, $K = 40$, $60$ trials per $t$; median and 10--90\%
 band) against the grid error budget measured on identical data. The
 closure error exceeds the reference error by $10^4$ to $10^7$ at every
 $t$, so the measurement is trustworthy where it is used.}
@@ -306,18 +306,18 @@ $t$, so the measurement is trustworthy where it is used.}
 \subsection{Varying the innovation law}
 
 Sweeping six innovation families with identical covariance
-$\rho^{|i-j|}$ (Laplace, Student-$t$ with $\nu = 5, 8$, and symmetric
+$\alpha^{|i-j|}$ (Laplace, Student-$t$ with $\nu = 5, 8$, and symmetric
 Gaussian mixtures of increasing separation) isolates the shape of the
 innovation law as the only moving part. Three observations, all within
 the tested grids. First, the noise level dominates: every family's error
 decays to about $10^{-3}$ or below by $t = 2.4$; all substantial closure
 error lives at $t \lesssim 0.4$. Second, bimodality is the worst case: at
-$t = 0.05$, $\rho = 0.5$, the median error is $0.94$ for a strongly
+$t = 0.05$, $\alpha = 0.5$, the median error is $0.94$ for a strongly
 bimodal mixture, $0.52$ for Laplace, $0.32$ for Student-$t_{\nu=5}$, and
 $0.07$ for a mildly bimodal mixture; a single Gaussian cannot represent
 two posterior modes and commits to the gap between them. Third, stronger
 chain correlation helps rather than hurts: for Laplace at $t = 0.05$ the
-error is $0.43$, $0.27$, $0.13$ at $\rho = 0.5$, $0.85$, $0.95$;
+error is $0.43$, $0.27$, $0.13$ at $\alpha = 0.5$, $0.85$, $0.95$;
 informative neighbours act like additional Gaussian observations and
 Gaussianise the local tilted posteriors.
 
