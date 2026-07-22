@@ -1,18 +1,17 @@
 \chapter{Preliminary Work: From Toy Models to a Minimal Model}
 \label{ch:development}\label{sec:development}
 
-Research rarely proceeds in the order in which it is finally written.
 This chapter records how the questions of Chapter~\ref{ch:intro} took
 their final form: the initial framing, the exploratory models built in
 the first months of the project, the conceptual error those models
 exposed, and the corrections from supervision that fixed the object of
-study. We include this material because the failures were load-bearing:
-each one eliminated a formulation and left the next one sharper. All
-preliminary code, interactive laboratories, and notes are archived in a
-dedicated repository, separate from the reproducibility package of
-Appendix~\ref{app:repro}.\footnote{%
-\url{https://github.com/GioviManto/Score_Diffusion}, directory
-\texttt{Toy-models}.}
+study. We record this material because each failed formulation
+constrained the next one, and the sequence explains why the final model
+looks the way it does. All preliminary code, interactive laboratories,
+and notes are archived in a dedicated preliminary-work repository
+(\texttt{Score\_Diffusion}, directory \texttt{Toy-models}), kept
+separate from the reproducibility package of Appendix~\ref{app:repro}
+and available together with it.
 
 \section{The initial framing: dynamic objects}\label{sec:dev-initial}
 
@@ -118,8 +117,8 @@ The toy models delivered the geometric intuition they were built for,
 and one lasting technical observation: everywhere a closed form
 existed, the score's cross-frame components were controlled by the
 \emph{conditional} structure of the joint law, not by the marginal law
-of single frames. What the toy models also did, less gloriously, was
-expose a conceptual error in how the project was computing scores.
+of single frames. The toy models also exposed a conceptual error in
+how the project was computing scores.
 
 \section{The joint-score correction}\label{sec:dev-correction}
 
@@ -134,8 +133,8 @@ x_{K-1})$, whose $k$-th component is a conditional expectation over the
 \emph{full} posterior of the clean frames, as in
 \eqref{eq:tweedie-joint}.
 
-For the stationary models of this thesis the correction is not
-cosmetic; it is everything. Under the variance-preserving channel every
+For the stationary models of this thesis the correction changes the
+object of study completely. Under the variance-preserving channel every
 noisy frame is marginally $\Nd(0, 1)$ at every diffusion time, so the
 per-frame marginal score is $-x_k$: independent of $t$, independent of
 the dynamics, identical for every model in this thesis. All information

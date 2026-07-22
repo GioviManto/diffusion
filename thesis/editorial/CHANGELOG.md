@@ -165,3 +165,25 @@ keep one-topic-one-place discipline and contain no em-dash decoration.
   the new related-work text states only what the cited papers' abstracts
   and statements support). App. A, App. C unchanged except the O(1)
   phrase in App. B prose.
+
+## v4.1 (2026-07-22) — anonymity and prose pass (author request)
+
+- Bocconi anonymity: removed the only author-identifying string in the
+  document, the GitHub URL footnote in Ch. 6; the preliminary-work
+  repository is now referenced by name only (Score_Diffusion,
+  Toy-models), matching the anonymous style of App. C. Verified zero
+  occurrences of author name, student ID, usernames, or URLs across all
+  chapters.
+- De-AI prose pass over the restored/new chapters. Removed or rewrote:
+  the chapter-opening aphorism of Ch. 6 ("Research rarely proceeds..."),
+  "load-bearing failures", "less gloriously", "it is everything",
+  "Nothing here is original; everything here is used", "the structural
+  fact this thesis lives on", "in one stroke", "tractable island" (Ch. 5
+  duplicate; the Ch. 2 instance kept), "the bridge on which the whole
+  thesis walks", "not a new species", "earns its place three times
+  over", "mathematical licence", "the single most important equation",
+  "not an analogy; it is a genealogy", "literally a phase of matter",
+  "waiting at the approximate end". Also replaced the acknowledgements
+  placeholder with a plain one for the author to overwrite.
+- Rebuild: 125 pp, 0 overfull, 0 undefined references, body starts
+  p. 11 (odd).

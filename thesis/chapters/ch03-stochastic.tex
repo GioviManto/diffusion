@@ -3,16 +3,16 @@
 
 Chapter~\ref{ch:statmech} answered the question ``which distribution?'':
 Boltzmann's. This chapter answers ``how does probability move?'', in
-discrete and in continuous time, and it earns its place in the thesis
-three times over. Markov chains are the \emph{data} whose diffusion score
+discrete and in continuous time. Its material enters the thesis in
+three places. Markov chains are the \emph{data} whose diffusion score
 we compute exactly (the AR(1) sequence of Section~\ref{sec:ar1} is the
 running example of every research chapter); stochastic differential
 equations are the \emph{corruption and generation processes} of diffusion
 models (the Ornstein--Uhlenbeck channel of Section~\ref{sec:ou} appears
 on every page of the research chapters); and the Fokker--Planck and
 time-reversal theorems of
-Sections~\ref{sec:fokker-planck}--\ref{sec:reversal} are the mathematical
-licence for the entire generative programme reviewed in
+Sections~\ref{sec:fokker-planck}--\ref{sec:reversal} are the
+mathematical basis of the generative programme reviewed in
 Chapter~\ref{ch:diffusion}. Standard references are
 \citet{robert2004monte, brockwell1991time, oksendal2003stochastic,
 gardiner2009stochastic, risken1996fokker}.
@@ -73,8 +73,7 @@ about \emph{factorisation}: the joint law of the first $K$ states is
   \;=\; p_0(x_0)\, \prod_{k=0}^{K-2} M(x_{k+1} \,|\, x_k) .
   \label{eq:chain-factorisation}
 \end{equation}
-This one-line factorisation is the single most important equation of the
-thesis. It says that the joint distribution of a Markov trajectory is a
+This factorisation is the most heavily used equation of the thesis. It says that the joint distribution of a Markov trajectory is a
 product of \emph{local} terms, each touching two consecutive variables:
 the structure that makes the chain a tree in the factor-graph sense of
 Chapter~\ref{ch:graphs}, that makes its precision matrix tridiagonal in

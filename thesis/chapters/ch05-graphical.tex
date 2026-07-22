@@ -12,8 +12,9 @@ classical incarnation, the Kalman filter, and the mean-field closures
 (TAP, AMP) of statistical physics. The chapter closes with the
 architectural side of the same story: convolutional networks, receptive
 fields, and the recent identification of U-Nets with belief propagation
-on hierarchical models. Nothing here is original; everything here is
-used.
+on hierarchical models. All of this material is standard; references
+are given section by section, and the research chapters use every part
+of it.
 
 \section{The multivariate Gaussian, in both parametrisations}
 \label{sec:gauss-vectors}
@@ -67,15 +68,15 @@ that follows \citep{bishop2006pattern, koller2009probabilistic}:
   Gaussian likelihoods is addition.
 \end{itemize}
 
-The dual reading of zeros is the structural fact this thesis lives on. A
+The dual reading of zeros is used constantly in this thesis. A
 zero in the \emph{covariance} means marginal independence of two
 coordinates. A zero in the \emph{precision} means \emph{conditional}
 independence given all the others: from the conditioning rule, if
 $J_{ij} = 0$ then $a_i$ and $a_j$ do not interact once the rest is fixed.
 A Gaussian vector can be, and in this thesis always is, globally
 correlated (dense $\Sigma$) while conditionally local (sparse $J$). Which
-matrix one should look at depends on the question, and confusing the two
-is the most common error in reasoning about Gaussian dependence.
+matrix one should look at depends on the question, and confusing the
+two is a common source of error in reasoning about Gaussian dependence.
 
 \section{Matrix tools: the spectral theorem and matrix inversion}
 \label{sec:matrix-tools}
@@ -99,9 +100,9 @@ eigenvalues alone: if no eigenvalue vanishes,
 \end{equation*} Second, affine images
 share the eigenbasis: $(cA + dI)\, u_i = (c\,\omega_i + d)\, u_i$, so a
 whole family of matrices of the form $c(t) A + d(t) I$ is diagonalised
-once and for all by the $U$ of $A$. This is the fact that will
-diagonalise the entire diffusion lifecycle of
-Chapter~\ref{ch:gaussian} in one stroke. Third, for the symmetric
+once and for all by the $U$ of $A$. Chapter~\ref{ch:gaussian} uses
+exactly this fact to diagonalise the diffusion problem at every noise
+level simultaneously. Third, for the symmetric
 Toeplitz covariances produced by stationary processes
 (Section~\ref{sec:stationarity}), the eigenvectors are asymptotically the
 Fourier modes of the sequence \citep{brockwell1991time}: stationary
@@ -196,7 +197,7 @@ $x_i \in x_{\partial a}$.
 
 A connected factor graph with one fewer edge than nodes is a
 \emph{tree}: it contains no cycles, so any edge separates it into two
-disjoint components. Trees are the tractable island of inference: on
+disjoint components. Trees are the tractable case of inference: on
 them, marginals and partition functions are computable exactly by the
 recursion of the next section, whatever the alphabet of the variables.
 The factor graph of a Markov chain observed through per-node noise is a

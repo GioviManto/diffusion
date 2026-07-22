@@ -32,8 +32,8 @@ them as unrelated tricks. The energy-based view of
 \citet{lecun2006tutorial} is the antidote: it is the direct continuation
 of the Boltzmann-machine programme of
 Section~\ref{sec:boltzmann-machines}, and, as this chapter unfolds,
-diffusion models will appear not as a new species but as the member of
-the family that finally solved its oldest problem.
+diffusion models will appear as the member of the energy-based family
+that finally solved its oldest problem.
 
 An \emph{energy-based model} (EBM) over $x \in \mathcal{X}$ assigns to
 each configuration a scalar energy $E_\theta(x)$ measuring how badly $x$
@@ -297,8 +297,8 @@ all of them.
 
 \section{The score as a posterior expectation}\label{sec:tweedie}
 
-The middle line of Vincent's derivation deserves its own section, because
-it is the bridge on which the whole thesis walks. Rearranging
+The middle line of Vincent's derivation deserves its own section,
+because every result of this thesis passes through it. Rearranging
 $\nabla \log p_t(x) = \E[-(x - a e^{-t})/\Deltat \mid x]$:
 \begin{equation}
   \boxed{\;
