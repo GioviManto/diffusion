@@ -60,3 +60,16 @@ a (clean frames), x (noisy frames), K frames, alpha coupling,
 sigma_eta^2 = 1 - alpha^2, mu = e^{-t}, Delta_t = 1 - e^{-2t},
 Sigma_0/Q_0 clean covariance/precision, Sigma_t/Q_t noisy, J posterior
 precision, J_d/beta bulk parameters, q bulk decay rate, S(x,t) score.
+
+## v4 structure decision (2026-07-22, author request)
+Depth restored; the v3 "shortest thesis" priority is overridden by the
+author for background and preliminary work. New chapter map:
+1 Introduction (humble RQs kept) · 2 Statistical mechanics -> learning
+machines · 3 Stochastic processes + OU · 4 EBMs -> diffusion -> flows +
+stat-phys-of-diffusion + cascade · 5 Gaussian vectors + graphical models
++ BP + AMP + CNN locality · 6 Preliminary work (toy models, board
+models) · 7 Gaussian chain · 8 Laplace · 9 Conclusions · App A/B/C.
+Standing rules unchanged: one topic in one place, no ping-pong, no
+em-dash decoration, no O(K) complexity talk (new, this pass), figures
+sober matplotlib, never call numerics proof, App B stays only while
+fully verified.

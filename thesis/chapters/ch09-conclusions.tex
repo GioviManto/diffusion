@@ -13,10 +13,10 @@ In the bulk, the single quantity $q(\alpha, t) \in (0, |\alpha|]$ governs
 both the posterior correlation length and the geometric decay of evidence
 influence, with limits $q \to 0$ as $t \to 0$ and $q \to |\alpha|$ as
 $t \to \infty$. The posterior of the noisy chain lives on a tree-shaped
-factor graph, on which the two BP sweeps compute all smoothing marginals
-in $O(K)$ message updates; on the Gaussian chain the messages close
-algebraically in the Gaussian family, the recursion is the Kalman filter
-followed by the RTS smoother, and the cost becomes $O(K)$ (RQ2). The
+factor graph, on which one forward and one backward BP sweep compute all
+smoothing marginals; on the Gaussian chain the messages close
+algebraically in the Gaussian family, and the recursion is the Kalman
+filter followed by the RTS smoother (RQ2). The
 error of a radius-$r$ local score estimator decays exactly as $q^r$
 (RQ4). On the same model, the per-node AMP/TAP closure returns the exact
 score (the mean fixed point is closure-independent) but a different

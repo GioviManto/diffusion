@@ -1,5 +1,5 @@
 \chapter{The Gaussian Chain: Exact Score, Belief Propagation, and
-Locality}\label{ch:gaussian}\label{ch:bp}
+Locality}\label{ch:gaussian}
 
 This chapter answers RQ1, RQ2, and the Gaussian half of RQ4. For the
 stationary AR(1) chain under the OU channel we compute the joint score
@@ -93,7 +93,7 @@ the right boundary is symmetric. \hfill$\square$
 \label{rmk:g-markov-sparsity}
 A zero in the precision matrix is a conditional independence given all
 other variables; by the Hammersley--Clifford theorem
-\citep{besag1974spatial}, factorisation over the cliques of a graph and
+(Section~\ref{sec:mrf}), factorisation over the cliques of a graph and
 conditional independence with respect to that graph are the same property.
 Gaussianity entered the derivation only to identify the precision with the
 Hessian of $-\log P_0$; the support of that Hessian, nearest neighbours
@@ -208,13 +208,10 @@ full lifecycle the next section derives, in miniature.
 \label{sec:g-lifecycle}
 
 How does $\Qt$ interpolate between the tridiagonal $\Qz$ at $t = 0$ and
-the identity at $t = \infty$? The analysis rests on two standard facts of
-linear algebra. Every symmetric $A \in \R^{K \times K}$ has an orthonormal
-eigenbasis, $A = U \operatorname{diag}(\omega_i) U^\T$ with
-$U^\T U = I$ (the spectral theorem), so analytic operations act on
-eigenvalues alone: $A^{-1} = U \operatorname{diag}(1/\omega_i) U^\T$ when
-no eigenvalue vanishes. And affine images share the eigenbasis:
-$(cA + dI) u_i = (c\,\omega_i + d)\, u_i$. Applying the second fact to the
+the identity at $t = \infty$? The analysis rests on the spectral theorem
+and its affine-family corollary (Section~\ref{sec:matrix-tools}): affine
+images of a symmetric matrix share its eigenbasis,
+$(cA + dI)\, u_i = (c\,\omega_i + d)\, u_i$. Applying this to the
 forward map \eqref{eq:g-Sigt}, which is affine in $\Sigz$, gives the
 representation from which everything in this section follows.
 
@@ -238,7 +235,7 @@ $\Qt$ are those of $\Sigz$, frozen for all $t$, while each eigenvalue
 flows along the affine path $\omega_i \mapsto e^{-2t}\omega_i + \Deltat$,
 monotonically towards $1$. Because $\Sigz$ is symmetric Toeplitz, its
 eigenvectors are asymptotically the Fourier modes of the sequence
-\citep{brockwell1991time}: in frequency space the denoising problem is $K$
+(Section~\ref{sec:matrix-tools}): in frequency space the denoising problem is $K$
 independent scalar problems at every diffusion time. Two computational
 corollaries are recorded for later use: factoring $\Deltat$ out of
 \eqref{eq:g-Sigt} gives the SNR form
@@ -355,11 +352,10 @@ fills, then empties.}
 \label{fig:g-tridiagloss}
 \end{figure}
 
-\section{Belief propagation on the chain}\label{sec:bp-chain}
-\label{sec:bp-problem}\label{sec:mrf}\label{sec:factor-graphs}
+\section{Belief propagation on the chain}\label{sec:bp-chain}\label{sec:bp-problem}
 
-The matrix route costs $O(K^3)$ (or $O(K^2)$ using structure) and is
-global. The score--posterior identity says the same object is a posterior
+The matrix route inverts a $K \times K$ matrix, a global computation
+over the whole sequence. The score--posterior identity says the same object is a posterior
 expectation, and the posterior has a structure that supports local
 computation. This section develops that computation once, in full.
 
@@ -380,11 +376,8 @@ through independent per-frame noise. By \eqref{eq:tweedie-joint}, the
 $k$-th score component requires exactly the smoothing marginal
 $\E[a_k | x]$ of \eqref{eq:bp-posterior}.
 
-The representation that makes the factorisation itself graphical is the
-\emph{factor graph} \citep{kschischang2001factor, koller2009probabilistic}:
-a bipartite graph with a variable node for each $a_i$, a factor node for
-each factor $\psi$, and an edge whenever a variable enters a factor. The
-factor graph of \eqref{eq:bp-posterior} has $K$ variable nodes, $2K$
+The factor graph of this posterior (Section~\ref{sec:factor-graphs})
+has $K$ variable nodes, $2K$
 factor nodes (one prior, $K{-}1$ transitions, $K$ observations; the data
 $x_k$ are constants clamped inside their factors) and $3K - 1$ edges. A
 connected graph with one fewer edge than nodes is a tree: here, a spine of
@@ -393,36 +386,24 @@ variables and transition factors with one evidence leaf per variable.
 \begin{proposition}\label{prop:chain-tree}
 For any Markov-chain prior and any per-frame observation model, the
 posterior $p(a \,|\, x)$ factorises over a tree-shaped factor graph, and
-all $K$ smoothing marginals are computed exactly by $O(K)$ message
-\emph{updates} (one forward and one backward sweep).
+all $K$ smoothing marginals are computed exactly by one forward and one
+backward sweep of sum--product messages.
 \end{proposition}
 
-Proposition~\ref{prop:chain-tree} does not say the total \emph{cost} is
-$O(K)$, because it says nothing about how messages are represented. For
-discrete chains each message is a probability vector and each update is
-finite arithmetic; for continuous chains each message is a function, each
-update is an integral in function space, and the cost per update is
-unbounded in general. Keeping tree-exactness of the algorithm (a graph
-property) separate from representability of the messages (a property of
-the model's function class) is the conceptual hinge of this thesis; the
-Gaussian case closes the gap, and Chapter~\ref{ch:laplace} measures what
-happens when it no longer does.
+Proposition~\ref{prop:chain-tree} counts sweeps, not work: it says
+nothing about how the messages are represented, and for continuous
+variables each message is a function
+(Section~\ref{sec:sum-product}). Keeping tree-exactness of the
+algorithm (a graph property) separate from representability of the
+messages (a property of the model's function class) is the conceptual
+hinge of this thesis; the Gaussian case closes the gap, and
+Chapter~\ref{ch:laplace} measures what happens when it no longer does.
 
 \subsection{The sum--product recursion, with the bookkeeping explicit}
 
-On a factor graph, sum--product belief propagation passes messages along
-every edge: variable-to-factor messages multiply the incoming factor
-messages from all other neighbours, and factor-to-variable messages
-integrate the factor against the incoming variable messages
-\citep{pearl1988probabilistic, kschischang2001factor,
-mezard2009information}. The exclusion of the recipient from each product
-is the heart of the algorithm: the message from $i$ to $a$ summarises
-everything $i$ knows except what it learned from $a$, so no evidence is
-counted twice along a path. On a tree each edge separates the graph into
-two halves, the message crossing it summarises exactly the half behind it,
-and the recursion terminates in one inward and one outward pass with the
-exact marginals \citep[Thm.~14.1]{mezard2009information}. On the chain the
-schedule collapses into two sweeps, and the bookkeeping deserves care.
+Specialising the sum--product rules \eqref{eq:bp-rules} to this tree,
+the schedule collapses into one forward and one backward sweep
+(Theorem~\ref{thm:tree-exact}), and the bookkeeping deserves care.
 
 \begin{proposition}[Chain sweeps, Convention A]\label{prop:bp-convA}
 Define messages
@@ -476,71 +457,45 @@ content explicit.
 \section{The Gaussian closure and the Kalman smoother}
 \label{sec:bp-gaussian}\label{sec:bp-kalman}
 
-For the Gaussian chain, two elementary facts make the message space
-finite-dimensional, and they are the only facts needed.
-
-\begin{toolbox}{The two closure lemmas of Gaussian message passing}
-\emph{Lemma 1 (products).} For Gaussians in the same variable,
-\begin{equation*}
-  \Nd(a; m_1, v_1) \times \Nd(a; m_2, v_2)
-  \;\propto\; \Nd(a; m, v),
-  \qquad
-  \frac{1}{v} = \frac{1}{v_1} + \frac{1}{v_2},
-  \qquad
-  \frac{m}{v} = \frac{m_1}{v_1} + \frac{m_2}{v_2} :
-\end{equation*}
-the sum of two quadratics in $a$ is a quadratic in $a$; precisions and
-precision-weighted means add.
-
-\emph{Lemma 2 (affine marginalisation).} Pushing a Gaussian through the
-AR(1) transition,
-\begin{equation*}
-  \int \Nd(a'; \alpha a, \sigma_\eta^2)\; \Nd(a; m, v)\; \dd a
-  \;=\; \Nd(a';\, \alpha m,\, \alpha^2 v + \sigma_\eta^2),
-\end{equation*}
-because $a' = \alpha a + \eta$ is a sum of independent Gaussians. Read in
-the reverse direction the same computation gives
-$\Nd\big(a;\, m'/\alpha,\, (v' + \sigma_\eta^2)/\alpha^2\big)$.
-
-The Gaussian family is closed under exactly the two operations the
-recursions \eqref{eq:bp-fwd}--\eqref{eq:bp-bwd} perform. The local
-evidence, read as a function of $a_k$, is itself Gaussian:
+For the Gaussian chain, the two closure lemmas of
+Toolbox~\ref{tb:closure} are the only facts needed: the recursions
+\eqref{eq:bp-fwd}--\eqref{eq:bp-bwd} perform exactly one product and one
+affine marginalisation per step. The local evidence, read as a function
+of $a_k$, is itself Gaussian,
 $\psi^{(k)}_{\mathrm{ob}}(a_k) \propto
-\Nd(a_k;\, e^{t} x_k,\, \Deltat e^{2t})$, a pseudo-observation at the
-deconvolved location $e^t x_k$ with precision $e^{-2t}/\Deltat$.
-\hfill$\square$
-\end{toolbox}
+\Nd(a_k;\, e^{t} x_k,\, \Deltat e^{2t})$: a pseudo-observation at the
+deconvolved location $e^t x_k$ with precision $e^{-2t}/\Deltat$, the
+pinning strength that appears throughout this chapter.
 
 \begin{theorem}[Gaussian closure of BP on the chain]\label{thm:bp-closure}
 For the Gaussian AR(1) chain under the OU channel, every BP message and
 every belief is exactly Gaussian, at every node, for every
-$(K, \alpha, t)$. Each message is carried by two numbers, each update is
-$O(1)$ arithmetic, and the two sweeps compute the exact posterior
-marginals, hence the exact joint score, at total cost $O(K)$. Here, and
-only here, the linear update count of Proposition~\ref{prop:chain-tree}
-becomes a linear cost.
+$(K, \alpha, t)$. Each message is carried by two numbers, each update
+is a few arithmetic operations, and the two sweeps compute the exact
+posterior marginals, hence the exact joint score. Here, and only here,
+the sweep count of Proposition~\ref{prop:chain-tree} translates into an
+actual computation of fixed, small cost per frame.
 \end{theorem}
 
 \begin{proof}[Derivation]
-Induction along each sweep. The initial messages are Gaussian (the prior;
-the flat message is the zero-precision limit of the family). Each step of
-\eqref{eq:bp-fwd}--\eqref{eq:bp-bwd} is one application of Lemma~1 (absorb
-the local evidence) followed by one of Lemma~2 (push through the
-transition); the combination \eqref{eq:bp-combine} is Lemma~1 twice.
-Exactness follows from tree-exactness of sum--product.
+Induction along each sweep. The initial messages are Gaussian (the
+prior; the flat message is the zero-precision limit of the family). Each
+step of \eqref{eq:bp-fwd}--\eqref{eq:bp-bwd} is one application of
+Lemma~1 of Toolbox~\ref{tb:closure} (absorb the local evidence) followed
+by one of Lemma~2 (push through the transition); the combination
+\eqref{eq:bp-combine} is Lemma~1 twice. Exactness follows from tree
+exactness of sum--product (Theorem~\ref{thm:tree-exact}).
 \end{proof}
 
 \begin{remark}[Closure is algebra, not a central limit theorem]
 \label{rmk:bp-no-clt}
-The closure holds at node degree two exactly as it would at any degree:
-it is a property of the Gaussian family under multiplication and affine
-marginalisation, not an aggregation effect. No central-limit argument is
-invoked anywhere, so there is nothing for the chain's low degree to
-break. The central-limit argument matters only for the per-node closures
-of statistical physics (AMP, the TAP equations), and on the chain it
-fails in a way that can be made exact; that analysis, complete with a
-breakdown time $t_c(\alpha)$ and a critical coupling
-$\alpha_c = \sqrt{2} - 1$, is developed in Appendix~\ref{app:amp}.
+The closure just proved holds at node degree two exactly as it would at
+any degree: it is algebra, not an aggregation effect, as discussed in
+Section~\ref{sec:gaussian-bp}. The central-limit argument matters only
+for the per-node closures of statistical physics
+(Section~\ref{sec:amp-intro}), and on the chain those fail in a way that
+can be made exact, with a breakdown time $t_c(\alpha)$ and a critical
+coupling $\alpha_c = \sqrt{2} - 1$ (Appendix~\ref{app:amp}).
 \end{remark}
 
 Executing the Gaussian sweeps in mean--variance arithmetic reproduces,
@@ -578,9 +533,9 @@ backward message (Lemma~1 once more), producing the posterior marginal
 given all observations, $\Nd(a_k; m_{k|K-1}, P_{k|K-1})$; carrying out
 the same algebra for the backward recursion yields the fixed-interval
 smoother of \citet{rauch1965maximum}. The two-sweep BP schedule on the
-chain is the Kalman filter followed by the RTS smoother, the Gaussian
-specialisation of sum--product \citep{kschischang2001factor,
-bishop2006pattern}. \hfill$\square$
+chain is the Kalman filter followed by the RTS smoother, exactly as the
+generic correspondence of Section~\ref{sec:gaussian-bp} predicts.
+\hfill$\square$
 \end{toolbox}
 
 Combining with the score--posterior identity answers RQ2: the $k$-th

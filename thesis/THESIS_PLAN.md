@@ -209,3 +209,15 @@ Editorial registers (standing documents, update each pass):
 User TODOs unchanged: acknowledgements text (p.3), final title,
 TS<studentID>.pdf rename at upload, archive old GitHub repos after
 Jérôme has the new link.
+
+## REVISION v4 (2026-07-22)
+Author requested re-expansion: full intro + related work back, deep
+background on stat mech/AI, EBMs, diffusion/flows, the Mezard-Biroli-
+Achilli-Garnier-Brun-Bonnaire line (sources/papers + main-sources), deep
+explanations of all tools (stationarity, Markov, Gaussian, OU, spectral
+theorem, inverses, MRF, BP, AMP, CNN analogy), preliminary work from
+github.com/GioviManto/Score_Diffusion (toy models + board sketches), no
+O(K) talk, no AI-styled charts. Delivered: 9-chapter structure, 124 pp,
+see thesis/editorial/CHANGELOG.md v4.0. User TODOs unchanged
+(acknowledgements, final title, TS<studentID> rename, old-repo
+archival after Jerome has the new link).

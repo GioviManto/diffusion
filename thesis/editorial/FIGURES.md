@@ -27,3 +27,18 @@ is used).
 | fig_precision_lifecycle.pdf | heatmap triptych restating what fig_band_fill + fig_tridiag_loss quantify |
 | fig06_K1_density.pdf, fig07_K1_score.pdf | merged into fig_laplace_k1.pdf |
 | fig08_K1_score_limits.pdf | limits are exact statements in the text; plot added nothing |
+
+## v4 (2026-07-22)
+- `fig_bulk_variance.pdf` — RESTYLED: black/gray line styles, dotted t_c
+  marker with horizontal annotation; shaded no-fixed-point region removed.
+- `fig_bp_vs_amp.pdf` — RESTYLED: right panel is now a line phase diagram
+  (closed-form boundary + open-circle iteration checks + text phase
+  labels) instead of a two-colour imshow; title no longer references a
+  colour.
+- `fig_toymodel_score.pdf` — NEW (Ch. 6): two-frame toy model
+  (trimodal mixture prior, additive dynamics), noised joint density and
+  joint score field at t = 0.15; exact mixture formulas, quiver masked
+  where density < 1.5% of max. Distinct claim: the joint score of a
+  minimal dynamic object is visibly coupled across frames.
+All 8 figures produced by thesis/figures/make_figures.py (matplotlib,
+vector PDF, white background, colourblind-safe or monochrome).

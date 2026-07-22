@@ -264,16 +264,16 @@ def fig_bulk_variance():
     for ax, a, tmax in [(ax1, 0.8, 1.2), (ax2, 0.3, 4.0)]:
         ts = np.linspace(0.005, tmax, 500)
         Vex, Vamp, Vmf = _closures(a, ts)
-        ax.plot(ts, Vex, color=NAVY, label=r"exact $=$ BP")
-        ax.plot(ts, Vamp, color=RED, label=r"AMP")
-        ax.plot(ts, Vmf, color=OLIVE, lw=1.0, label=r"mean field")
+        ax.plot(ts, Vex, color="k", label=r"exact (BP)")
+        ax.plot(ts, Vamp, color="k", ls="--", label=r"AMP")
+        ax.plot(ts, Vmf, color=GRAY, lw=1.0, ls="-.", label=r"mean field")
         tc = t_c(a)
         if np.isfinite(tc) and tc < tmax:
-            ax.axvspan(tc, tmax, color=RED, alpha=0.08, lw=0)
-            ax.axvline(tc, color=RED, lw=0.7, ls=":")
-            ax.text(tc, ax.get_ylim()[1] * 0.55, rf"$t_c = {tc:.3f}$",
-                    color=RED, fontsize=7.5, ha="left", rotation=90,
-                    va="center")
+            ax.axvline(tc, color="k", lw=0.6, ls=":")
+            ax.annotate(rf"$t_c = {tc:.3f}$", xy=(tc, 0.02),
+                        xycoords=("data", "axes fraction"),
+                        xytext=(4, 0), textcoords="offset points",
+                        fontsize=8, ha="left", va="bottom")
         ax.set_xlabel(r"diffusion time $t$")
         ax.set_ylabel(r"bulk posterior variance")
         ax.set_title(rf"$\alpha = {a}$")
@@ -326,37 +326,42 @@ def fig_bp_vs_amp():
             var_err.append(abs(Vamp - Vex) / Vex)
         else:
             var_err.append(np.nan)
-    ax1.semilogy(ts, mean_err, color=NAVY, label="AMP mean error")
-    ax1.semilogy(ts, var_err, color=RED, label="AMP variance error")
+    ax1.semilogy(ts, mean_err, color="k", label="AMP mean error")
+    ax1.semilogy(ts, var_err, color="k", ls="--",
+                 label="AMP variance error")
     tc = t_c(a)
-    ax1.axvspan(tc, ts[-1], color=RED, alpha=0.08, lw=0)
-    ax1.axvline(tc, color=RED, lw=0.7, ls=":")
+    ax1.axvline(tc, color="k", lw=0.6, ls=":")
+    ax1.annotate(r"$t_c$", xy=(tc, 0.03), xycoords=("data", "axes fraction"),
+                 xytext=(4, 0), textcoords="offset points", fontsize=8,
+                 ha="left", va="bottom")
     ax1.set_xlabel(r"diffusion time $t$")
     ax1.set_ylabel("relative error")
     ax1.set_title(rf"$K = {K}$, $\alpha = {a}$")
     ax1.legend()
 
-    alphas = np.linspace(0.05, 0.98, 90)
-    tgrid = np.linspace(0.01, 1.5, 90)
-    exist = np.zeros((len(tgrid), len(alphas)))
-    for j, al in enumerate(alphas):
-        for i, t in enumerate(tgrid):
-            exist[i, j] = 1.0 if np.isfinite(_amp_var_iter(
-                al, t, iters=800)) else 0.0
-    ax2.imshow(exist, origin="lower", aspect="auto",
-               extent=[alphas[0], alphas[-1], tgrid[0], tgrid[-1]],
-               cmap=matplotlib.colors.ListedColormap(
-                   ["#f3dede", "#e8eef5"]))
+    # phase diagram: closed-form boundary, with the fixed-point iteration
+    # sampled on a coarse grid as an independent check (markers)
     aa = np.linspace(np.sqrt(2) - 1 + 1e-4, 0.98, 200)
     ax2.plot(aa, [t_c(v) for v in aa], color="k", lw=1.2,
              label=r"$t_c(\alpha)$ (closed form)")
     ax2.axvline(np.sqrt(2) - 1, color="k", lw=0.8, ls="--",
                 label=r"$\alpha_c = \sqrt{2} - 1$")
+    a_chk = np.linspace(0.45, 0.96, 12)
+    t_bound = []
+    for al in a_chk:
+        tg = np.linspace(0.01, 1.5, 300)
+        ok = np.array([np.isfinite(_amp_var_iter(al, t, iters=800))
+                       for t in tg])
+        t_bound.append(tg[np.argmax(~ok)] if (~ok).any() else np.nan)
+    ax2.plot(a_chk, t_bound, "o", color="k", ms=3.5, mfc="white",
+             mew=0.8, label="iteration boundary")
+    ax2.text(0.30, 1.05, "fixed point\nexists", fontsize=8, ha="center")
+    ax2.text(0.87, 1.05, "no fixed\npoint", fontsize=8, ha="center")
     ax2.set_xlabel(r"$\alpha$")
     ax2.set_ylabel(r"$t$")
-    ax2.set_ylim(tgrid[0], tgrid[-1])
-    ax2.set_title("AMP variance fixed point exists (blue)")
-    ax2.legend(fontsize=7, loc="upper left")
+    ax2.set_xlim(0.05, 0.98)
+    ax2.set_ylim(0.0, 1.5)
+    ax2.legend(fontsize=7, loc="lower left")
     fig.tight_layout()
     save(fig, "fig_bp_vs_amp.pdf")
 
@@ -387,6 +392,80 @@ def fig_laplace_closure():
     save(fig, "fig_laplace_closure.pdf")
 
 
+# ================= fig_toymodel_score =================
+def fig_toymodel_score():
+    """Two-frame toy model (TM2/TM7): trimodal prior, additive dynamics,
+    joint density and joint score field after OU diffusion time t.
+    Everything is an explicit 2-D Gaussian mixture, so density and score
+    are evaluated in closed form."""
+    mus = np.array([-2.0, 0.0, 2.0])
+    ws = np.array([0.35, 0.30, 0.35])
+    s2 = 0.4 ** 2          # prior component variance
+    c = 1.0                # drift
+    sig2 = 0.45 ** 2       # innovation variance
+    t = 0.15
+    e = np.exp(-t)
+    Dt = 1 - np.exp(-2 * t)
+
+    means, covs = [], []
+    for mu in mus:
+        m = np.array([mu, mu + c])
+        C = np.array([[s2, s2], [s2, s2 + sig2]])
+        means.append(e * m)
+        covs.append(np.exp(-2 * t) * C + Dt * np.eye(2))
+
+    def mixture(pts):
+        dens = np.zeros(len(pts))
+        comp = []
+        for w, m, C in zip(ws, means, covs):
+            Ci = np.linalg.inv(C)
+            d = pts - m
+            q = np.einsum("ni,ij,nj->n", d, Ci, d)
+            g = w * np.exp(-0.5 * q) / (2 * np.pi * np.sqrt(np.linalg.det(C)))
+            comp.append((g, Ci, m))
+            dens += g
+        score = np.zeros_like(pts)
+        for g, Ci, m in comp:
+            score += (g / dens)[:, None] * ((m - pts) @ Ci.T)
+        return dens, score
+
+    lim = 4.2
+    gx = np.linspace(-lim, lim, 220)
+    gy = np.linspace(-lim, lim, 220)
+    X, Y = np.meshgrid(gx, gy)
+    pts = np.column_stack([X.ravel(), Y.ravel()])
+    dens, _ = mixture(pts)
+    Z = dens.reshape(X.shape)
+
+    qx = np.linspace(-lim, lim, 23)
+    qy = np.linspace(-lim, lim, 23)
+    QX, QY = np.meshgrid(qx, qy)
+    qpts = np.column_stack([QX.ravel(), QY.ravel()])
+    qdens, sc = mixture(qpts)
+    # show the field only where the density is non-negligible; the score
+    # of a Gaussian tail grows linearly and would dominate the picture
+    mask = qdens > 0.015 * qdens.max()
+    U = np.where(mask, sc[:, 0], np.nan).reshape(QX.shape)
+    V = np.where(mask, sc[:, 1], np.nan).reshape(QX.shape)
+
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(6.4, 3.1))
+    levels = np.linspace(Z.max() * 0.04, Z.max(), 9)
+    ax1.contour(X, Y, Z, levels=levels, colors="k", linewidths=0.6)
+    ax1.set_xlabel(r"$x_0$")
+    ax1.set_ylabel(r"$x_1$")
+    ax1.set_title(r"noised joint density $p_t(x_0, x_1)$")
+    ax1.set_aspect("equal")
+
+    ax2.contour(X, Y, Z, levels=levels, colors=GRAY, linewidths=0.4)
+    ax2.quiver(QX, QY, U, V, color="k", width=0.0035, scale=40)
+    ax2.set_xlabel(r"$x_0$")
+    ax2.set_ylabel(r"$x_1$")
+    ax2.set_title(r"joint score $\nabla \log p_t$")
+    ax2.set_aspect("equal")
+    fig.tight_layout()
+    save(fig, "fig_toymodel_score.pdf")
+
+
 if __name__ == "__main__":
     fig_band_fill()
     fig_tridiag_loss()
@@ -395,4 +474,5 @@ if __name__ == "__main__":
     fig_bulk_variance()
     fig_bp_vs_amp()
     fig_laplace_closure()
+    fig_toymodel_score()
     print("all figures regenerated")

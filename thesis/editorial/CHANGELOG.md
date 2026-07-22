@@ -85,3 +85,83 @@ uses $\alpha$ and $K$; renamed throughout Ch4 (values unchanged; for the
 AR(1) chain the experiment's correlation parameter is the AR
 coefficient). No other prose, layout, figure, or toolbox issues found.
 Rebuild clean: 68 pp, 0 overfull, 0 undefined references.
+
+## v4.0 (2026-07-22) — re-expansion pass (author request)
+
+Result: 68 pp -> 124 pp, 5 chapters -> 9, 7 figures -> 8, clean build
+(0 overfull boxes, 0 undefined references), body starts p. 11 (odd).
+Author's instruction: restore the full introduction and related work, go
+deep on statistical mechanics / AI history, EBMs, diffusion and flows,
+and the Mezard-Biroli-Achilli-Garnier-Brun-Bonnaire literature; explain
+deeply every tool used (stationarity, Markov chains, Gaussian density,
+OU, spectral theorem, inverses, MRFs, BP, AMP, CNN locality analogy);
+discuss the Score_Diffusion preliminary work and toy models; remove all
+O(K) complexity talk; fix remaining AI-styled charts. The earlier
+problem was ping-pong and filler, not depth, so the restored chapters
+keep one-topic-one-place discipline and contain no em-dash decoration.
+
+### Restored from the v2 archive (logged per contract; reintroduction
+### explicitly requested by the author)
+- Ch. 2 Statistical Mechanics and the Origins of Learning Machines
+  (Hamiltonian mechanics, Liouville, ensembles, Boltzmann two ways, free
+  energy, Ising, spin glasses, Hopfield, Boltzmann machines, statistical
+  mechanics of learning) — from v2 ch02, em-dashes removed, ping-pong
+  trimmed.
+- Ch. 3 Stochastic Processes, SDEs, and the OU Channel — from v2 ch03
+  (incl. MCMC/Langevin, Ito, Fokker-Planck, Anderson), PLUS a new formal
+  stationarity section (strict/weak, Toeplitz consequence). "Mother
+  theorem" title replaced by "Anderson's theorem". The MH detailed-
+  balance proof reference now cites Robert-Casella (the v2 appendix
+  derivation stays deleted).
+- Ch. 4 From Energy-Based Models to Diffusion and Flows — from v2 ch04
+  with the full cascade section (one-mode RBM toolbox) restored, and the
+  statistical-physics-of-diffusion review EXPANDED with newly cited
+  papers (all metadata verified against the PDFs in sources/):
+  achilli2026speciation, garnierbrun2026biased, bonnaire2025memorize,
+  sclocchi2025phase, mei2024unets, holderrieth2025flow,
+  ronneberger2015unet, krzakala2024statphys, achilli2026thesis,
+  lai2025principles.
+
+### New chapters
+- Ch. 5 Gaussian Vectors, Graphical Models, and Message Passing:
+  multivariate Gaussian in both parametrisations, precision-zeros =
+  conditional independence, spectral theorem + Neumann/Woodbury, MRFs +
+  Hammersley-Clifford, factor graphs, sum-product + tree exactness,
+  Gaussian closure lemmas (moved here from the Gaussian chapter),
+  classical Kalman as Gaussian sum-product, TAP/AMP genealogy with the
+  CLT logic spelled out, CNN/receptive-field/U-Net locality section
+  (Mei's U-Nets-as-BP).
+- Ch. 6 Preliminary Work: initial dynamic-objects framing + propagator
+  hypothesis, the circle/rotating-data models from the first supervision
+  meetings (board sketches used as source material only), toy models
+  TM1-TM7 described individually with the Score_Diffusion repo cited in
+  a footnote, the joint-score correction, minimal-model choice,
+  continuous-message bottleneck, discarded rank-two conjecture.
+
+### Rewritten / edited
+- Ch. 1 Introduction restored to full v2 depth (topic/motivation,
+  three-strand positioning, methodology, structure) while KEEPING the v3
+  humble RQ1-RQ4 verbatim and the restrained contribution list.
+- Ch. 7 (ex Ch. 3) Gaussian chain: generic MRF/factor-graph/sum-product/
+  closure-lemma material moved to Ch. 5 and replaced by pointers; all
+  O(K)/O(1)/O(K^3)/O(KM^2) language removed thesis-wide and replaced by
+  plain-language cost statements (author: "avoid the bullshit of O(k)").
+- Ch. 8 (ex Ch. 4) Laplace and Ch. 9 (ex Ch. 5) conclusions: same O(K)
+  cleanup; content unchanged.
+
+### Figures
+- fig_bulk_variance, fig_bp_vs_amp redesigned in sober journal style:
+  no shaded "phase" regions, no colour-referencing titles, no rotated
+  labels; the AMP phase diagram is now a black closed-form boundary
+  curve with open-circle iteration checkpoints and text-labelled phases.
+  Captions updated to match.
+- NEW fig_toymodel_score (Ch. 6): two-frame toy model joint density +
+  joint score field, computed from closed-form Gaussian-mixture
+  expressions, black-and-white contours/quiver, low-density region
+  masked.
+
+### Not changed
+- App. B AMP results and all numerical claims (no new claims introduced;
+  the new related-work text states only what the cited papers' abstracts
+  and statements support). App. A, App. C unchanged except the O(1)
+  phrase in App. B prose.

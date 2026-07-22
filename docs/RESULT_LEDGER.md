@@ -14,7 +14,7 @@ All audits re-executed on this machine on 2026-07-14:
 `research/gaussian-bp/code/numerical_audit.py` → **72/72 PASS**;
 `research/unified-note/code/numerical_audit.py` → **55/55 PASS**.
 
-## Gaussian chain (thesis Ch. 3)
+## Gaussian chain (thesis Ch. 7)
 
 | # | Claim | Class | Evidence |
 |---|-------|-------|----------|
@@ -31,7 +31,7 @@ All audits re-executed on this machine on 2026-07-14:
 | G11 | Limits `q→0` (t→0), `q→α` (t→∞) | EXACT | algebra |
 | G12 | Locality: RMS error of radius-r estimator decays exactly as `q^r` (rate) | EXACT (rate) / NUMERICAL (prefactor) | slope audit 0.2% |
 
-## Laplace case (thesis Ch. 4)
+## Laplace case (thesis Ch. 8)
 
 | # | Claim | Class | Evidence |
 |---|-------|-------|----------|
@@ -42,11 +42,11 @@ All audits re-executed on this machine on 2026-07-14:
 | L5 | Curvature `H_t(x)` is x-dependent field (Var[a|x] non-constant) | EXACT (structure) | Tweedie differentiation |
 | L6 | Score from chain messages: two 1D recursions + one 1D integral per frame | EXACT | Tweedie + sum–product |
 | L7 | Boundary message = `p_t^{(1)}(x' − μα a)` in closed form | EXACT | innovation substitution |
-| L8 | General messages have no clean closed form (≥2 kinks per integrand) | EXACT (structural argument) | Remark in Ch. 4 |
+| L8 | General messages have no clean closed form (≥2 kinks per integrand) | EXACT (structural argument) | Remark in Ch. 8 |
 | L9 | Innovation coordinates: prior factorises iid; likelihood densifies (LᵀL dense) — coupling must live somewhere | EXACT | unit-Jacobian change of variables |
 | L10 | Laplace K=2 Hessian approximately rank-2 | **SPECULATIVE — NOT ASSERTED** (regime-dependent under quick tests; pending HPC) | conjecture15 note |
 
-## BP (thesis Ch. 3) / AMP (thesis App. B)
+## BP (thesis Chs. 5 and 7) / AMP (thesis App. B)
 
 | # | Claim | Class | Evidence |
 |---|-------|-------|----------|

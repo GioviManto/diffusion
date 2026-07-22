@@ -25,3 +25,20 @@ verified or not fit for purpose), QUALIFIED (kept with weakened wording).
 
 - Non-Gaussian locality laws: only structurally delimited; stated as open.
 - Reverse-dynamics error propagation: not claimed; listed as future work.
+
+## v4 additions (2026-07-22)
+No new numerical or mathematical claims introduced. New related-work
+statements are cited summaries; each new bib entry's title/authors/arXiv
+id was extracted directly from the PDF in sources/ before citing
+(achilli2026speciation 2602.04404, garnierbrun2026biased 2603.03469,
+bonnaire2025memorize 2505.17638, sclocchi2025phase 2402.16991,
+mei2024unets 2404.18444, holderrieth2025flow 2506.02070,
+krzakala2024statphys lecture notes 2024, achilli2026thesis Bocconi PhD
+thesis, lai2025principles 2510.21890, ronneberger2015unet MICCAI 2015).
+Restored v2 chapters (2, 3, 4) reuse previously audited derivations
+verbatim up to style. Ch. 5/6 contain standard textbook material
+(cited) and project history (from the archived Score_Diffusion repo and
+board photos); the board content is used as narrative source only, not
+quoted or presented as evidence. The two restyled appendix figures
+recompute the same audited formulas; the new toy-model figure evaluates
+elementary Gaussian-mixture identities on a grid.

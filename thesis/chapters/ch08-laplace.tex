@@ -33,7 +33,8 @@ The score--posterior identity \eqref{eq:tweedie-joint} holds for any
 $p_0$. The posterior factorises over the same tree-shaped factor graph
 (Proposition~\ref{prop:chain-tree}), so the sum--product recursion
 \eqref{eq:bp-fwd}--\eqref{eq:bp-bwd} still computes exact smoothing
-marginals in $O(K)$ message updates. And the OU likelihood factors are
+marginals in one forward and one backward sweep. And the OU likelihood
+factors are
 still Gaussian in $a_k$. What is lost is representability: the messages
 are no longer Gaussian, no finite-dimensional family we know of is closed
 under the updates, and the cost of an update is no longer bounded. The
@@ -225,7 +226,8 @@ both are diagonal at once.
 Since functional messages admit no closed form, the exact recursion is
 approximated numerically: messages are represented by their values on $M$
 equispaced points in $[-A, A]$ and the update integrals are carried out
-by trapezoidal quadrature, at cost $O(K M^2)$ per sweep. This
+by trapezoidal quadrature, each update touching every pair of grid
+points. This
 \emph{grid BP} is a numerical approximation of the functional-message
 recursion, and it can serve as a reference only inside a validated
 regime, which we establish on the exactly solvable Gaussian chain. There

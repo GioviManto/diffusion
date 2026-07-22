@@ -6,7 +6,29 @@ and what I propose to do next. Full claim-by-claim classification in
 with one `tectonic main.tex`; all numerical audits re-run on this machine:
 72/72 and 55/55 pass).
 
-## Revision of 2026-07-21 (condensation round, v3)
+## Revision of 2026-07-22 (re-expansion round, v4)
+
+On Giovanni's third feedback round the background was restored to full
+depth (his diagnosis: the earlier problem was cross-referencing ping-pong
+and filler, not depth). The draft is now 124 pp in 9 chapters:
+1 Introduction (modest RQs kept) - 2 Statistical mechanics and the
+origins of learning machines - 3 Stochastic processes and the OU channel
+- 4 EBMs to diffusion and flows, with an expanded review of the
+statistical physics of diffusion (Biroli-Mezard 2023, dynamical regimes
+2024, speciation with general class structure Achilli-Benedetti-Biroli-
+Mezard 2026, memorisation Bonnaire-Urfin-Biroli-Mezard 2025, biased
+generalisation Garnier-Brun et al. 2026, hierarchical transition
+Sclocchi-Favero-Wyart, cascade Bachtis et al. in full) - 5 Gaussian
+vectors, graphical models, message passing (MRF/Hammersley-Clifford,
+sum-product, Gaussian BP/Kalman, TAP/AMP, U-Nets-as-BP and the CNN
+locality analogy) - 6 Preliminary work (Score_Diffusion toy models
+TM1-TM7, the circle models from the first meetings, the joint-score
+correction) - 7 Gaussian chain - 8 Laplace - 9 Conclusions. All
+complexity-class (O(K)) talk removed; appendix figures redesigned in
+plain journal style; one new figure (two-frame toy-model joint score).
+No new claims; all new citations verified against the source PDFs.
+
+## Revision of 2026-07-21 (condensation round, v3 — superseded by v4)
 
 On Giovanni's second feedback round ("too long for the information we
 give") the draft was condensed 119 pp → 68 pp and restructured to 5

@@ -74,7 +74,8 @@ solve, at each node,
 \end{equation}
 The AMP closure is the BP cavity with the exclusion of the receiving
 neighbour dropped ($V_{k \to i} \approx V_k$): an $O(1/N)$ change on a
-dense graph, an $O(1)$ change on a chain with two neighbours.
+dense graph, but a change of fixed, order-one size on a chain with
+two neighbours.
 
 \begin{theorem}[The score is closure-independent]\label{thm:bp-same-score}
 For a Gaussian posterior, the fixed-point condition for the means is the
@@ -167,8 +168,9 @@ subtract. \hfill$\square$
 \caption{The three closures in closed form. Left
 ($\alpha = 0.8 > \alpha_c$): exact $=$ BP, AMP \eqref{eq:bp-amp-var}, and
 mean field; the AMP branch terminates with a square-root singularity at
-the breakdown time $t_c(0.8) = 0.228$ from \eqref{eq:bp-tc} (shaded: no
-fixed point). Right ($\alpha = 0.3 < \alpha_c$): AMP exists at every $t$
+the breakdown time $t_c(0.8) = 0.228$ from \eqref{eq:bp-tc} (dotted
+line); beyond it AMP has no variance fixed point.
+Right ($\alpha = 0.3 < \alpha_c$): AMP exists at every $t$
 and slightly overestimates the variance, as predicted by
 \eqref{eq:bp-weak}.}
 \label{fig:bp-bulkvar}
@@ -179,11 +181,13 @@ and slightly overestimates the variance, as predicted by
 \caption{BP against AMP on a finite chain ($K = 9$, $\alpha = 0.8$).
 Left: the AMP mean error (about $10^{-12}$, flat in $t$:
 Theorem~\ref{thm:bp-same-score}) against the AMP variance error, which
-grows with $t$ until the closure stops converging (shaded). Right:
-existence of the AMP variance fixed point in the $(\alpha, t)$ plane; the
-black curve is the boundary $t_c(\alpha)$ of \eqref{eq:bp-tc}, the dashed
-line $\alpha_c = \sqrt{2}-1$; theory and iteration agree at all $180$
-scanned points.}
+grows with $t$ up to the breakdown time $t_c$ (dotted line). Right: the
+phase boundary of the AMP variance fixed point in the $(\alpha, t)$
+plane: the solid curve is the closed form $t_c(\alpha)$ of
+\eqref{eq:bp-tc}, the dashed line is $\alpha_c = \sqrt{2}-1$, and the
+open circles mark the breakdown as located independently by damped
+fixed-point iteration; the audit suite performs the same comparison over
+$180$ points of this plane.}
 \label{fig:bp-vs-amp}
 \end{figure}
 

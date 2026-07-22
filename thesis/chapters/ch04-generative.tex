@@ -1,0 +1,550 @@
+\chapter{From Energy-Based Models to Diffusion and Flows}
+\label{ch:diffusion}\label{ch:ebm}
+
+Chapter~\ref{ch:statmech} left the generative branch of machine learning
+at the Boltzmann machine: a model is an energy, learning is moment
+matching, sampling is dynamics. This chapter follows that branch to the
+present. It reviews, in the depth their role in this thesis demands, the
+three ideas the research chapters build on: the energy-based view of
+modelling \citep{lecun2006tutorial}, the score-matching principle that
+removed the partition function from training
+\citep{hyvarinen2005estimation, vincent2011connection}, and the diffusion
+construction that turned denoising into a complete generative method
+\citep{sohl2015deep, ho2020denoising, song2021scorebased}, together with
+its deterministic sibling, the flow model. The chapter then reviews the
+statistical-physics literature on diffusion models, from the
+high-dimensional analyses of \citet{biroli2023generative} to the
+speciation, memorisation, and generalisation results of the
+Biroli--M\'ezard line of work, and, on the training side, the cascade of
+phase transitions in energy-based-model learning
+\citep{bachtis2024cascade}. It closes by stating the gap this thesis
+addresses.
+
+\section{Energy-based models}\label{sec:ebm-def}
+
+Modern generative modelling asks a single question: given samples of an
+unknown distribution $p_0$, build a machine that produces new ones. The
+last decade produced several answers: variational autoencoders
+\citep{kingma2014auto}, adversarial networks
+\citep{goodfellow2014generative}, normalizing flows
+\citep{rezende2015variational}, diffusion models. It is easy to present
+them as unrelated tricks. The energy-based view of
+\citet{lecun2006tutorial} is the antidote: it is the direct continuation
+of the Boltzmann-machine programme of
+Section~\ref{sec:boltzmann-machines}, and, as this chapter unfolds,
+diffusion models will appear not as a new species but as the member of
+the family that finally solved its oldest problem.
+
+An \emph{energy-based model} (EBM) over $x \in \mathcal{X}$ assigns to
+each configuration a scalar energy $E_\theta(x)$ measuring how badly $x$
+fits the model's idea of the data: low energy for plausible
+configurations, high for implausible ones. In
+\citeauthor{lecun2006tutorial}'s formulation the energy is the primitive
+object: inference means finding low-energy configurations, and learning
+means shaping the landscape, pushing the energy of observed data down and
+the energy of everything else up. A probabilistic model is recovered
+whenever one normalises with the Gibbs measure of
+Chapter~\ref{ch:statmech},
+\begin{equation}
+  p_\theta(x) \;=\; \frac{e^{-E_\theta(x)}}{Z(\theta)},
+  \qquad
+  Z(\theta) = \int_{\mathcal{X}} e^{-E_\theta(x)}\, \dd x ,
+  \label{eq:ebm}
+\end{equation}
+the Boltzmann distribution \eqref{eq:boltzmann} with $\beta$ absorbed
+into the energy and the physics replaced by a parametric family. The
+appeal of \eqref{eq:ebm} is that $E_\theta$ is unconstrained: any
+function defines a valid unnormalised density. The price is the
+partition function, and every basic operation hits it. \emph{Evaluating}
+$p_\theta(x)$ requires $Z(\theta)$, intractable in general
+(Section~\ref{sec:ising}). \emph{Sampling} requires the MCMC machinery of
+Section~\ref{sec:mcmc}, whose mixing time can be exponential in the
+presence of metastability. \emph{Learning} by maximum likelihood requires
+the gradient
+\begin{equation}
+  -\nabla_\theta \log p_\theta(x)
+  = \nabla_\theta E_\theta(x)
+  - \E_{p_\theta}\!\big[ \nabla_\theta E_\theta \big],
+  \label{eq:ebm-gradient}
+\end{equation}
+the ``push down on data, pull up on the model's own samples'' rule, the
+continuous-variable form of the Boltzmann-machine rule
+\eqref{eq:bm-learning}, whose second term again demands sampling from
+$p_\theta$. \citet{lecun2006tutorial} frame the alternatives
+systematically: either fight the negative phase with \emph{contrastive}
+losses that pull up only on well-chosen offending configurations
+(contrastive divergence \citep{hinton2002training} being the
+MCMC-flavoured member of the family), or design architectures and
+regularisers that bound the volume of low-energy space so that no pull-up
+is needed. The lesson of the tutorial is that the partition function is
+not an accounting detail; it is \emph{the} design constraint of the
+field.
+
+There are two classical escape routes, and this thesis walks both. The
+first is the \emph{score}: since
+$\nabla_x \log p_\theta(x) = -\nabla_x E_\theta(x)$, the gradient of the
+log-density in $x$ is free of $Z$, because differentiating in $x$ kills
+the constant. Sections~\ref{sec:score-matching}--\ref{sec:tweedie} build
+the modern edifice standing on this observation. The second is
+\emph{structure}: when the energy decomposes into local terms, marginals
+and even $Z$ itself become computable by dynamic programming; that route
+(Markov random fields, factor graphs, message passing) is developed in
+Chapter~\ref{ch:graphs}.
+
+\section{The diffusion idea}\label{sec:diffusion-idea}
+
+Diffusion models \citep{sohl2015deep, ho2020denoising,
+song2021scorebased} solve the generative problem with a two-process
+design inspired by non-equilibrium thermodynamics: a fixed \emph{forward
+process} gradually corrupts data into pure noise, and a learned
+\emph{reverse process} undoes the corruption step by step. A recent
+book-length survey of the family is \citet{lai2025principles}. The
+forward process used throughout this thesis is the OU channel of
+Section~\ref{sec:ou}: at diffusion time $t$,
+\begin{equation}
+  x_t \;=\; a\, e^{-t} + \sqrt{\Deltat}\;\varepsilon,
+  \qquad a \sim p_0,\quad \varepsilon \sim \Nd(0, I),
+  \qquad \Deltat = 1 - e^{-2t},
+  \label{eq:forward-marginal}
+\end{equation}
+so that the noised marginal is the convolution
+\begin{equation}
+  p_t(x) \;=\; \int p_0(a)\; \Nd\!\big(x;\, a e^{-t},\, \Deltat I\big)\,
+  \dd a .
+  \label{eq:pt-convolution}
+\end{equation}
+As $t$ grows, $p_t$ interpolates from the data distribution to
+$\Nd(0, I)$. By Anderson's theorem (Section~\ref{sec:reversal}), the
+corruption is undone by the reverse SDE \eqref{eq:reverse-sde}, whose
+only unknown ingredient is the score $\nabla_x \log p_t(x)$ of the noised
+marginals. Generative diffusion is therefore, at bottom, \emph{score
+estimation}: whoever knows $\nabla \log p_t$ for all $t$ can sample from
+$p_0$. Note what this design buys relative to
+Section~\ref{sec:ebm-def}: no energy is ever normalised, no equilibrium
+is ever awaited. The Markov-chain convergence problem of MCMC is replaced
+by a \emph{fixed-horizon} integration of an SDE whose drift is learned.
+The partition-function problem has not been solved; it has been
+side-stepped, by working only with objects (scores) from which $Z$ has
+already been differentiated away.
+
+\section{Denoising diffusion probabilistic models}\label{sec:ddpm}
+
+The discrete-time formulation \citep{sohl2015deep, ho2020denoising}
+discretises \eqref{eq:forward-marginal} into a Markov chain
+$q(x_s | x_{s-1}) = \Nd(x_s; \sqrt{1 - \beta_s}\, x_{s-1}, \beta_s I)$
+with a variance schedule $\beta_1, \dots, \beta_S$, and learns a reverse
+chain $p_\theta(x_{s-1} | x_s)$. Training maximises a variational lower
+bound on the data log-likelihood; the physicist will recognise the Gibbs
+variational principle \eqref{eq:gibbs-variational} in modern dress.
+
+\begin{toolbox}{The evidence lower bound of a diffusion model}
+For any latent-variable model with joint $p_\theta(x_{0:S})$ and any
+inference distribution $q(x_{1:S} | x_0)$, Jensen's inequality gives
+\begin{align*}
+  \log p_\theta(x_0)
+  &= \log \int p_\theta(x_{0:S})\;\dd x_{1:S}
+   = \log\, \E_{q}\!\left[
+      \frac{p_\theta(x_{0:S})}{q(x_{1:S}|x_0)} \right] \\
+  &\geq\; \E_{q}\!\left[
+      \log \frac{p_\theta(x_{0:S})}{q(x_{1:S}|x_0)} \right]
+  \;=:\; \mathrm{ELBO}.
+\end{align*}
+Insert the two Markov factorisations
+$p_\theta(x_{0:S}) = p(x_S) \prod_s p_\theta(x_{s-1}|x_s)$ and
+$q(x_{1:S}|x_0) = \prod_s q(x_s|x_{s-1})$, then regroup telescopically
+using Bayes' rule
+$q(x_s|x_{s-1}) = q(x_{s-1}|x_s, x_0)\, q(x_s|x_0) / q(x_{s-1}|x_0)$:
+\begin{align*}
+  -\mathrm{ELBO}
+  \;=\;& \kl{q(x_S|x_0)}{p(x_S)}
+  \;-\; \E_q \log p_\theta(x_0 | x_1) \\
+  &+ \sum_{s=2}^{S}
+    \E_q\, \kl{q(x_{s-1}|x_s, x_0)}{p_\theta(x_{s-1}|x_s)} ,
+\end{align*}
+one denoising step per summand. The decisive point: because the forward
+chain is Gaussian and conditioned on \emph{both} endpoints, each target
+$q(x_{s-1} | x_s, x_0)$ is an explicit Gaussian. Matching it with a
+Gaussian $p_\theta$ reduces each KL term to a weighted regression of the
+posterior mean; concretely, to predicting the noise $\varepsilon$ that
+was added \citep{ho2020denoising}. The thermodynamic reading of the ELBO
+gap as an entropy-production bound goes back to \citet{sohl2015deep}.
+\hfill$\square$
+\end{toolbox}
+
+The practical upshot of \citet{ho2020denoising} is the loss
+\begin{equation}
+  \mathcal{L}(\theta)
+  = \E_{s,\, a \sim p_0,\, \varepsilon}
+    \big\| \varepsilon - \varepsilon_\theta\big(
+      \underbrace{a\,e^{-t_s} + \sqrt{\Delta_{t_s}}\,\varepsilon}_{x_{t_s}},\; s
+    \big) \big\|^2 ,
+  \label{eq:ddpm-loss}
+\end{equation}
+a denoising regression, and the empirical discovery that this simplified
+objective, with each noise level weighted equally and all the variational
+bookkeeping dropped, trains photorealistic image models. Its connection
+with the score is not incidental, as the next section shows: predicting
+the noise \emph{is} estimating $\nabla \log p_t$ up to scale.
+
+\section{Score matching}\label{sec:score-matching}
+
+Suppose we model the score directly by a function $s_\theta(x)$ and wish
+it to match $\nabla \log p(x)$ for data from $p$. The naive objective
+$\E_p \| s_\theta - \nabla \log p \|^2$ seems to require knowing the very
+score we lack. Two classical results remove the obstruction.
+
+\begin{toolbox}{Implicit score matching (Hyv\"arinen)}
+Expand the square and keep only $\theta$-dependent terms:
+\begin{equation*}
+  \E_p \norm{s_\theta - \nabla \log p}^2
+  = \E_p \norm{s_\theta}^2
+  - 2\, \E_p \inner{s_\theta}{\nabla \log p}
+  + \text{const}.
+\end{equation*}
+The cross term integrates by parts. Componentwise, using
+$p\,\partial_i \log p = \partial_i p$ and assuming
+$p\, s_{\theta,i} \to 0$ at infinity:
+\begin{equation*}
+  \int p\; s_{\theta,i}\; \partial_i \log p \;\dd x
+  = \int s_{\theta,i}\; \partial_i p \;\dd x
+  = - \int p\; \partial_i s_{\theta,i} \;\dd x .
+\end{equation*}
+Therefore
+\begin{equation*}
+  \E_p \norm{s_\theta - \nabla \log p}^2
+  = \E_p\Big[ \norm{s_\theta(x)}^2
+    + 2\, \nabla \cdot s_\theta(x) \Big] + \text{const} :
+\end{equation*}
+an objective involving only the model and data samples
+\citep{hyvarinen2005estimation}. Elegant, but the divergence term is
+expensive for large networks, which is why diffusion models use the
+denoising variant instead. \hfill$\square$
+\end{toolbox}
+
+\begin{toolbox}{Denoising score matching (Vincent)}
+Fix $t$ and consider the noised marginal \eqref{eq:pt-convolution},
+written as $p_t(x) = \int p_0(a)\, q_t(x|a)\,\dd a$ with Gaussian kernel
+$q_t(x|a) = \Nd(x; a e^{-t}, \Deltat I)$. Then
+\begin{equation*}
+  \nabla_x \log p_t(x)
+  = \frac{\int p_0(a)\, \nabla_x q_t(x|a)\, \dd a}{p_t(x)}
+  = \int \underbrace{\frac{p_0(a)\, q_t(x|a)}{p_t(x)}}_{=\,p(a|x)}
+    \nabla_x \log q_t(x|a)\, \dd a ,
+\end{equation*}
+so that
+\begin{equation*}
+  \nabla_x \log p_t(x)
+  \;=\; \E\big[ \nabla_x \log q_t(x|a) \,\big|\, x \big] :
+\end{equation*}
+the score of the \emph{marginal} is the posterior average of the score of
+the \emph{kernel}, and the latter is trivial,
+$\nabla_x \log q_t(x|a) = -(x - a e^{-t})/\Deltat$. A standard
+$L^2$-projection argument turns this into a regression: for any
+$s_\theta$,
+\begin{equation*}
+  \E_{x \sim p_t} \norm{ s_\theta(x) - \nabla \log p_t(x) }^2
+  = \E_{a, x} \norm{ s_\theta(x) - \nabla_x \log q_t(x|a) }^2
+  + \text{const},
+\end{equation*}
+because conditional expectation is exactly the $L^2$ projection onto
+functions of $x$ \citep{vincent2011connection}. Substituting the Gaussian
+kernel score and $x = a e^{-t} + \sqrt{\Deltat}\varepsilon$ gives
+$\nabla_x \log q_t = -\varepsilon / \sqrt{\Deltat}$: \emph{learning the
+score of noisy data is learning to predict the noise}, and the DDPM loss
+\eqref{eq:ddpm-loss} is denoising score matching in disguise.
+\hfill$\square$
+\end{toolbox}
+
+The continuous-time synthesis \citep{song2019generative,
+song2021scorebased} trains one network $s_\theta(x, t)$ against denoising
+score matching at all noise levels and samples with the reverse SDE
+\eqref{eq:reverse-sde}; an accessible exposition is \citet{song2021blog},
+and \citet{karras2022elucidating} systematise the design space. This is
+the resolution, promised in Section~\ref{sec:ebm-def}, of the
+energy-based model's oldest problem: \citeauthor{song2019generative}
+replace the energy by its gradient, the equilibrium sampler by a
+finite-time reverse SDE, and the intractable likelihood by a regression
+whose targets are exact.
+
+\section{Flows: the deterministic side of the same coin}\label{sec:flows}
+
+Anderson's theorem has a deterministic twin. As noted in
+Section~\ref{sec:reversal}, the marginals $p_t$ of the forward SDE are
+also transported by the noise-free \emph{probability-flow ODE} with
+velocity $f - \tfrac{g^2}{2}\nabla \log p_t$ \citep{song2021scorebased}:
+the same score, consumed by an ODE instead of an SDE, turns generation
+into a smooth, invertible map from Gaussian noise to data. This places
+diffusion models inside an older family. \emph{Normalizing flows}
+\citep{rezende2015variational, papamakarios2021normalizing} construct an
+invertible map $T_\theta$ and evaluate likelihoods through the
+change-of-variables formula; their continuous-time version parametrises
+the velocity field of an ODE directly \citep{chen2018neural}. What
+diffusion brought to this family is a \emph{simulation-free training
+signal}: \emph{flow matching} \citep{lipman2023flow} and stochastic
+interpolants \citep{albergo2023building} show that one can regress the
+velocity field of any prescribed interpolation between noise and data
+(the OU path \eqref{eq:forward-marginal} being one choice among many)
+with the same conditional trick as denoising score matching, never
+integrating the ODE during training; a systematic introduction is
+\citet{holderrieth2025flow}. The unifying statement is worth recording:
+DDPMs, score SDEs, and flow-matching models all learn a vector field
+whose ground truth is a \emph{conditional expectation under the noising
+channel}; they differ in the path of marginals and in whether sampling is
+stochastic or deterministic. Every exact result of this thesis therefore
+speaks to the whole family at once: the object we compute in closed form,
+the conditional expectation behind the field, is the training target of
+all of them.
+
+\section{The score as a posterior expectation}\label{sec:tweedie}
+
+The middle line of Vincent's derivation deserves its own section, because
+it is the bridge on which the whole thesis walks. Rearranging
+$\nabla \log p_t(x) = \E[-(x - a e^{-t})/\Deltat \mid x]$:
+\begin{equation}
+  \boxed{\;
+  \nabla_x \log p_t(x)
+  \;=\; \frac{e^{-t}\,\E[\,a \,|\, x\,] - x}{\Deltat}
+  \quad\Longleftrightarrow\quad
+  \E[\,a \,|\, x\,]
+  = e^{t} \Big( x + \Deltat\, \nabla_x \log p_t(x) \Big).
+  \;}
+  \label{eq:tweedie}
+\end{equation}
+We refer to \eqref{eq:tweedie} throughout as the \emph{score--posterior
+identity}; in the empirical-Bayes literature it is known as Tweedie's
+formula \citep{robbins1956empirical, miyasawa1961empirical,
+efron2011tweedie}. The score of the noisy marginal and the Bayes-optimal
+denoiser $\E[a|x]$ determine each other exactly, with no assumption
+whatsoever on $p_0$. Three readings will recur:
+\begin{enumerate}
+  \item \emph{Geometric}: the score points from $x$ towards (the
+  contracted image of) the posterior mean of the clean data; denoising
+  direction and score direction coincide.
+  \item \emph{Statistical}: estimating the score is solving a Bayesian
+  inference problem, namely computing a posterior expectation. The score
+  is not \emph{like} an inference target; it \emph{is} one.
+  \item \emph{Algorithmic}: for sequence data with a Markov prior, that
+  inference problem lives on a tree-shaped graph, so the score is
+  computable by message passing, the programme made precise in
+  Chapter~\ref{ch:graphs} and executed in Chapter~\ref{ch:gaussian}.
+\end{enumerate}
+
+For \emph{vector-valued} data $a \in \R^K$ noised coordinate-wise,
+\eqref{eq:tweedie} holds componentwise with the \emph{full} posterior:
+\begin{equation}
+  \big( \nabla_x \log p_t(x) \big)_k
+  \;=\; \frac{e^{-t}\, \E[\,a_k \,|\, x_0, \dots, x_{K-1}\,] - x_k}{\Deltat}.
+  \label{eq:tweedie-joint}
+\end{equation}
+The conditioning is on \emph{all} coordinates: even though the noise is
+independent across frames, the posterior mean of frame $k$, and hence the
+$k$-th score component, depends on every observation, because the prior
+couples the frames. Equation \eqref{eq:tweedie-joint} is the precise
+reason the \emph{joint} score differs from the per-frame marginal score,
+a distinction that is easy to blur and whose importance for structured
+data was impressed on this project in supervision
+(Chapter~\ref{ch:development}); Chapter~\ref{ch:gaussian} quantifies
+exactly how much coupling the conditioning induces, as a function of $t$.
+
+\section{The statistical physics of generative diffusion}
+\label{sec:statphys-diffusion}
+
+A line of work initiated by Biroli, M\'ezard, and collaborators analyses
+diffusion models with the tools of Chapter~\ref{ch:statmech}, in the
+regime where the score is \emph{exact}: either computed from a solvable
+$p_0$ or from the empirical measure of $n$ training points. Because this
+is the literature our research extends, we review it in some detail.
+
+\paragraph{High dimensions and the cost of asymmetry.}
+\citet{biroli2023generative} analyse generative diffusion in the
+high-dimensional limit for two controlled data models, a Gaussian model
+and the Curie--Weiss ferromagnet. In the latter, the reverse dynamics
+undergoes the symmetry-breaking mechanism of Section~\ref{sec:ising}: at
+a critical diffusion time the trajectory commits to one of the two
+low-temperature states. Their sharpest quantitative point concerns data
+requirements: to reconstruct the \emph{relative weights} of two
+asymmetric modes, the number of training samples must be much larger than
+the data dimension, and the paper characterises the scaling laws in
+dimension and sample size for efficient generation.
+
+\paragraph{The three regimes of the backward dynamics.}
+\citet{biroli2024dynamical} study the backward process when the score has
+been trained optimally on $n$ samples in dimension $d$, and identify
+three dynamical regimes separated by two transitions. Starting from pure
+noise, the trajectory first behaves as a free (Brownian-like) process;
+at the \emph{speciation} time it commits to the gross structure of the
+data (a class, a mode), through a mechanism analogous to spontaneous
+symmetry breaking; at the later \emph{collapse} time the trajectory is
+attracted to an individual memorised training point, through a mechanism
+analogous to condensation in a glass. The speciation time is computable
+from a spectral analysis of the data correlation matrix, and the collapse
+time from an excess-entropy estimate; the dependence of the collapse time
+on $n$ and $d$ quantifies the curse of dimensionality for diffusion
+models. Related transition phenomena along the generation trajectory were
+exhibited by \citet{raya2023spontaneous}.
+
+\paragraph{Speciation with general class structure.}
+\citet{achilli2026speciation} develop the general theory of the
+speciation transition: where earlier analyses required classes separated
+by their first moments (Gaussian mixtures with distinct means), they
+characterise speciation times for arbitrary class structures through a
+free-entropy difference criterion, recovering the known Gaussian-mixture
+results and extending them to classes that differ only through
+higher-order or collective features, with successive speciation events
+for multiple classes. A hierarchical counterpart is
+\citet{sclocchi2025phase}: in a hierarchical generative model of data,
+the backward process started from time $t$ exhibits a phase transition at
+a threshold time at which the probability of preserving the high-level
+class drops abruptly, while low-level features evolve smoothly; beyond
+the transition a regenerated sample can retain low-level elements of the
+original image while its class has changed. The statistical-physics
+treatment of generative diffusion in solvable models is developed at
+book length in the doctoral thesis of \citet{achilli2026thesis}.
+
+\paragraph{Memorisation and generalisation.} When the score is learned
+from finitely many samples rather than computed exactly, the question
+becomes when generation generalises and when it memorises.
+\citet{bonnaire2025memorize} identify two timescales in the training
+dynamics: an early time $\tau_{\mathrm{gen}}$ at which the model begins
+to generate high-quality samples, and a later time $\tau_{\mathrm{mem}}$
+beyond which memorisation of training data emerges;
+$\tau_{\mathrm{mem}}$ grows linearly with the training-set size $n$ while
+$\tau_{\mathrm{gen}}$ stays constant, opening a widening window in which
+overparameterised models generalise, a form of implicit dynamical
+regularisation. \citet{garnierbrun2026biased} refine the picture by
+identifying a phase of \emph{biased} generalisation in between: the test
+loss still decreases while the model increasingly favours samples
+anomalously close to training points, so the standard early-stopping
+criterion does not certify genuine novelty. \citet{ghio2024sampling} map
+generative samplers (flows, diffusions, autoregressive networks) onto
+statistical-physics sampling problems and delimit where each is
+efficient, importing the algorithmic-hardness picture of spin glasses
+\citep{zdeborova2016statistical}.
+
+\paragraph{The exactly solvable programme, and what it holds fixed.} The
+common method of these works is to choose $p_0$ rich enough to be
+interesting and simple enough that $\nabla \log p_t$ is available in
+closed form, then study the exact generation dynamics. What none of them
+vary is the \emph{internal structure of a single data point}: their
+coordinates are exchangeable or i.i.d.\ conditional on a mode. There is
+no ordering and no dynamics \emph{inside} the sample. That axis is
+precisely where this thesis works.
+
+\section{Learning as a cascade of phase transitions}\label{sec:cascade}
+
+The works above put phase transitions on the \emph{sampling} side of
+generative modelling. A complementary result, \citet{bachtis2024cascade},
+which this section examines in detail, puts them on the \emph{training}
+side, and completes the argument of Section~\ref{sec:statmech-learning}
+that learning itself is a sequence of symmetry breakings. The object of
+study is the restricted Boltzmann machine of
+Section~\ref{sec:boltzmann-machines}, the minimal trainable EBM, with
+energy $E(v, h) = -v^\T W h - b^\T v - c^\T h$ and the moment-matching
+gradient \eqref{eq:bm-learning}. The central idea is to track training
+through the singular value decomposition of the weight matrix,
+\begin{equation}
+  W \;=\; \sum_{\gamma=1}^{r} w_\gamma\, u_\gamma \bar u_\gamma^\T ,
+  \label{eq:rbm-svd}
+\end{equation}
+whose modes $(u_\gamma, \bar u_\gamma)$ act as candidate order
+parameters: the magnetisation of the visible layer along mode $\gamma$,
+$m_\gamma = u_\gamma \cdot v / \sqrt{N_v}$, measures whether the learned
+Gibbs measure has developed structure in that direction. At
+initialisation the weights are small and the model is a paramagnet: no
+direction in configuration space is preferred. The claim of
+\citet{bachtis2024cascade} is that training is an \emph{effective
+cooling}: as the singular values grow, the model crosses a sequence of
+genuine second-order phase transitions, one for each feature it learns,
+each signalled by a diverging susceptibility and falling in the
+mean-field (Curie--Weiss) universality class. The mechanism is visible in
+a two-line calculation.
+
+\begin{toolbox}{The retrieval transition of a one-mode RBM}
+Following \citet{bachtis2024cascade}, take a single Gaussian hidden unit
+of variance $1/N_v$ coupled to $N_v$ binary visibles through a weight
+vector $w$: the energy is
+$E(v, h) = -h\, w \cdot v + \tfrac{N_v}{2} h^2$. Integrating out the
+Gaussian $h$ gives the visible marginal
+\begin{equation*}
+  p(v) \;\propto\; \exp\!\Big[ \tfrac{1}{2 N_v}\, (w \cdot v)^2 \Big] :
+\end{equation*}
+a Mattis/Hopfield measure (Section~\ref{sec:hopfield}) whose single
+pattern is $w$ itself, made extensive by the $1/N_v$ variance scaling.
+Write $w = \bar w\, \xi$ with $\xi \in \{-1,+1\}^{N_v}$ and let
+$m = \tfrac{1}{N_v} \sum_i \xi_i v_i$ be the overlap; then
+$p(v) \propto \exp[\tfrac{N_v \bar w^2}{2} m^2]$. Counting configurations
+at fixed overlap ($\asymp \exp[N_v H(\tfrac{1+m}{2})]$ with $H$ the
+binary entropy) gives the free-entropy density
+\begin{equation*}
+  \phi(m) \;=\; \frac{\bar w^2}{2}\, m^2 + H\!\Big(\frac{1+m}{2}\Big)
+  \;=\; \log 2 + \frac{\bar w^2 - 1}{2}\, m^2 - \frac{m^4}{12} + O(m^6).
+\end{equation*}
+This is a Landau expansion: the quadratic coefficient changes sign at
+$\bar w^2 = \norm{w}^2 / N_v = 1$. Below the threshold the maximiser is
+$m = 0$ (paramagnet); above it two symmetric maximisers $\pm m^*$ appear
+continuously (retrieval). The transition is second order with mean-field
+exponents, and the susceptibility along $w$ diverges as
+$\norm{w}^2/N_v \uparrow 1$. Growing a singular value during training is
+therefore literally a quench through a Curie--Weiss critical point.
+\hfill$\square$
+\end{toolbox}
+
+\paragraph{Why a cascade.} With data generated by a Hopfield teacher
+whose two patterns are correlated combinations
+$\xi^{1,2} = \eta_1 \pm \eta_2$ of orthogonal directions, the data
+covariance is rank two with unequal strengths, and the early-time
+gradient flow of the student's SVD amplitudes along $\eta_1$ and $\eta_2$
+is exponential with \emph{two different rates}. The stronger direction
+(the centre of mass of the clusters) reaches its critical magnitude
+first: the learned measure splits into two lumps along $\pm\eta_1$. The
+weaker direction keeps growing at its own rate and crosses criticality
+later, splitting each lump again: four modes, the full teacher, retrieved
+in hierarchical order. Each crossing is a distinct second-order
+transition with its own critical time, its own diverging susceptibility,
+and hysteresis below it. Learning proceeds coarse-to-fine not by accident
+of optimisation but because the critical times are ordered by the
+spectrum of the data.
+
+\paragraph{Evidence on real data.} On MNIST, CelebA, and human-genome
+data, \citet{bachtis2024cascade} track the susceptibilities of individual
+SVD modes during training of binary--binary RBMs and observe the same
+signatures: successive susceptibility peaks that sharpen with system
+size, finite-size-scaling collapses consistent with mean-field exponents
+$(\gamma, \nu) = (1, \tfrac12)$ at upper critical dimension four, and
+hysteresis, the operational fingerprints of genuine transitions rather
+than smooth crossovers. This confirms and sharpens the earlier picture of
+RBM learning as progressive alignment with the data's principal
+components \citep{decelle2017spectral}, of feature emergence as
+condensation \citep{tubiana2017emergence}, and of sequential mode
+learning in linear networks \citep{saxe2014exact}; a broad review of the
+EBM--physics interface is \citet{carbone2025hitchhiker}.
+
+\paragraph{What this means for the thesis.} Phase transitions now appear
+on both faces of generative diffusion: in \emph{sampling}, as speciation
+events along the reverse trajectory \citep{biroli2024dynamical,
+achilli2026speciation}, and in \emph{training}, as the cascade just
+described. Both are hierarchies of symmetry breakings ordered by the
+data's spectrum. Our research adds the axis that both literatures hold
+fixed: the structure of the inference problem \emph{inside a single data
+point}, and how the diffusion time $t$ deforms it. The chain we solve is
+the minimal model in which that question is non-trivial and answerable
+exactly.
+
+\section{The gap, restated}\label{sec:gap}\label{sec:related}
+
+Real sequential data (video, audio, trajectories) have exactly the
+structure the solvable programme leaves out: an internal (frame) time
+with a Markovian dependence along it. For such data the score
+\eqref{eq:tweedie-joint} is a smoothing posterior on a chain, an object
+with seventy years of inference theory behind it. Yet the questions a
+diffusion modeller asks about it are not answered by the classical
+literature, which fixes the noise level, nor by the diffusion literature,
+which ignores internal structure: how does the coupling structure of
+$\nabla \log p_t$ deform with $t$? Can it be computed locally? What
+survives a Gaussian parametrisation of the messages when the data are not
+Gaussian? What limited guidance does that give for score architectures?
+Answering these questions, in the fully solvable setting of the AR(1)
+chain and its non-Gaussian perturbations, is the contribution of
+Chapters~\ref{ch:gaussian} and~\ref{ch:laplace}, with the inference tools
+prepared in Chapter~\ref{ch:graphs} and the path that led to the precise
+formulation recorded in Chapter~\ref{ch:development}.
