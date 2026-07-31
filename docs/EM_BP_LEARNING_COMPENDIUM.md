@@ -241,6 +241,63 @@ matters, the denoiser error: 0.083, 0.080, 0.061, 0.060, 0.037. Any claim about
 
 ---
 
+### 4.9 The N^{−1/2} rate is *not* established (exp_06 Part 4)
+
+Smooth kernels only (the Laplace kernel is disqualified by §5.1). RMSE over 4
+replicates:
+
+| N | Gaussian ρ | Gaussian q | mixture ρ | mixture var |
+|---|---|---|---|---|
+| 64 | 0.0170 | 0.0493 | 0.0202 | 0.0234 |
+| 128 | 0.0058 | 0.0176 | 0.0057 | 0.0195 |
+| 256 | 0.0108 | 0.0174 | 0.0109 | 0.0103 |
+| 512 | 0.0118 | 0.0067 | 0.0102 | 0.0184 |
+| 1024 | 0.0048 | 0.0074 | 0.0063 | 0.0058 |
+
+Fitted log-log slopes: **−0.26, −0.69, −0.25, −0.41** against the predicted
+−0.50. The sequences are non-monotone in `N`.
+
+**This does not confirm the parametric rate, and should not be reported as
+though it did.** With 4 replicates an RMSE estimate carries roughly ±35%, which
+is more than enough to produce this scatter under a true −0.5 slope — the data
+is *consistent* with `N^{−1/2}` and provides no real evidence for it. Prop. 5's
+consequence remains a theoretical statement here. Confirming it needs the
+replicate runs (`hpc/slurm_replicates.sbatch`, and `--set n_rep_rate=32`), which
+is why that is ranked #2 in the handoff's next steps.
+
+### 4.10 Lattice quantization, measured (exp_06 Part 5)
+
+The estimate ρ̂ from the Laplace M-step, against grid size and true value:
+
+| M | ρ\*=0.770 | ρ\*=0.800 | ρ\*=0.813 |
+|---|---|---|---|
+| 201 | **0.750** | **0.750** | **0.750** |
+| 401 | 0.778 | 0.778 | 0.818 |
+| 801 | 0.778 | 0.808 | 0.822 |
+| 1601 | 0.780 | 0.792 | 0.820 |
+
+**At M=201 all three distinct true values collapse onto the single lattice
+point 3/4.** The estimates are visibly rationals with small denominators (7/9,
+9/11, 21/26, 19/24). Refining the grid helps but the error plateaus around
+0.008–0.01 rather than converging to zero.
+
+Two corrections this forces:
+
+- **The "spuriously exactly right at ρ\*=0.8" framing was too simple.** Part 1
+  (N=1024, M=401) returned ρ̂ = 0.8 to 1e-16; Part 5 (N=256, M=401, same ρ\*)
+  returns 0.778. The lattice *constrains* the estimator; which lattice point it
+  selects depends on the data. So the 1e-16 in §4.5 is a coincidence of that
+  configuration, not a property of ρ\* being a lattice point.
+- ⚠️ **This part has a design flaw.** The seed is `rng_for("exp06-p5", rho_true,
+  m_size)`, so each grid size draws *different data* — the across-`M` comparison
+  is confounded by resampling, and the `b`-error column (which does not improve
+  with `M`, and worsens for ρ\*=0.770) cannot be interpreted at all. The
+  within-`M` collapse at M=201 stands, since three different datasets all
+  produced exactly 0.750. Fixing this means dropping `m_size` from the seed key
+  so the grid is the only thing that varies; it is listed in the handoff.
+
+---
+
 ## 5. Findings recorded rather than smoothed over
 
 ### 5.1 The Laplace M-step is exact but lattice-quantized
@@ -248,9 +305,11 @@ matters, the denoiser error: 0.083, 0.080, 0.061, 0.060, 0.037. Any claim about
 The minimizer of `Σ Ξ[k,j]|u_k − ρu_j|` is a *breakpoint*, i.e. one of the
 ratios `u_k/u_j`. On a uniform grid through the origin these are rationals `m/l`,
 and a low-denominator value like 4/5 has many aliases (8/10, 12/15, …) pooling
-weight onto it. So ρ̂ snaps to simple rationals: **spuriously exactly right when
-the truth happens to be one** (ρ\* = 0.8 is), and stuck at lattice resolution
-when it isn't. This is real for the discretized model, not an algorithmic bug.
+weight onto it. So ρ̂ snaps to simple rationals — measured in §4.10, where at
+M=201 three distinct true values (0.770, 0.800, 0.813) **all** return exactly
+0.750, and where refining the grid plateaus the error near 0.008 rather than
+driving it to zero. This is real for the discretized model, not an algorithmic
+bug.
 Smooth kernels (Gaussian, mixture) have M-steps that are ratios of smooth
 moments and are free of it — which is why the reported rates use those.
 
@@ -291,11 +350,23 @@ own internals, not only to the baseline it is compared against.
 
 ## 7. Status
 
-**Complete and verified:** theory (14 pp), implementation, 30/30 tests, exp_08,
-exp_06 Parts 1–2, **all of exp_07**, cluster support.
+**Complete:** theory (14 pp), implementation, 30/30 tests, cluster support, and
+**all of exp_06, exp_07, exp_08**. Every experiment ran to completion and its
+outputs are committed.
 
-**Running at time of writing:** exp_06 Parts 3–5 (misspecification sweep,
-`N^{−1/2}` rates, quantization vs grid). Partial outputs are committed as WIP.
+**Established:** the E-step exactness and the `Ξ` compression (Props. 1–2, and
+monotonicity violation of exactly 0 in every EM run across all experiments);
+Fisher's identity as a substitute for autodiff (Prop. 3, verified to ~1e-9);
+the information budget and its asymmetry between correlation and innovation
+scale (§4.6); the headline sample-efficiency advantage and its capacity control
+(§4.1–4.2); recovery of an unknown innovation law from noisy data alone (§4.8).
+
+**Measured but not established:** the `N^{−1/2}` rate (§4.9 — 4 replicates,
+slopes −0.26 to −0.69 against a predicted −0.50; consistent with the theory,
+evidence for it thin). This is the main gap.
+
+**Known defect:** exp_06 Part 5 confounds grid size with the random seed
+(§4.10); its across-`M` trend and its `b`-error column need a re-run.
 
 **Not started:** the items in §6.3, §6.4, and §6.1 — hybrid non-Markov
 correction, structured-architecture baseline, and distillation of the BP
