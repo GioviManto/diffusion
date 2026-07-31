@@ -85,7 +85,7 @@ and is the natural next comparison, not something settled here.
     experiments/  exp_01 ... exp_08, all with --quick smoke mode
     outputs/      CSV + JSON + PNG per experiment (committed results)
     notebooks/    executed analysis notebooks 01-04
-    tests/        pytest suite (35 tests)
+    tests/        pytest suite (37 tests)
     report/       updated_report.tex / .pdf   (Layers 1-4)
                   em_bp_learning.tex / .pdf   (Layer 5 theory)
     audit/        Layer-1 audit note

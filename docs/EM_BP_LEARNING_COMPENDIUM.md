@@ -62,7 +62,7 @@ Pure numpy, no autodiff, no new dependencies.
 | `experiments/exp_06_…` | Correctness: monotonicity, Fisher information, misspecification, rates, quantization |
 | `experiments/exp_07_…` | The headline: EM-BP vs a score network |
 | `experiments/exp_08_…` | The literal gradient route vs the exact M-step |
-| `tests/test_em_bp.py` | 21 tests (35 total in the package, all passing), including five independent cross-checks (§5.5) |
+| `tests/test_em_bp.py` | 23 tests (37 total in the package, all passing), including five independent cross-checks (§5.5) |
 | `hpc/`, `tools/merge_replicates.py` | Cluster templates and replicate merging |
 
 **The four rungs**, all consuming the same `Ξ`:

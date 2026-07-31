@@ -579,3 +579,74 @@ def test_dsm_baseline_is_not_broken():
     # Complementarity: eps wins at low noise, x0 wins at high noise.
     assert errors["eps"][0.1] < errors["x0"][0.1]
     assert errors["x0"][1.6] < errors["eps"][1.6]
+
+
+def test_mixture_m_step_reaches_a_local_maximum_of_q():
+    """The ECM used by the headline kernel really maximizes Q.
+
+    The Gaussian and Laplace M-steps are single closed-form solves and are
+    checked above. The mixture M-step is an inner EM over the component label
+    alternated with a weighted least-squares solve for rho, so "it looks like a
+    maximizer" is a weaker claim there. Iterated to convergence on a fixed Xi,
+    no nearby parameter may beat it.
+    """
+    grid, weights = make_grid(8.0, 201)
+    prior = LaplaceAR1(RHO)
+    rng = rng_for("test-mix-mstep")
+    _, X, alpha, delta = _sample(prior, 40, 0.3, rng)
+
+    start = MixtureInnovationKernel.init(
+        3, rho=0.4, var=0.7, rng=rng_for("test-mix-mstep-init")
+    )
+    stats = e_step(grid, weights, start.log_transition_matrix(grid), X, alpha, delta)
+
+    current = start
+    q_prev = -np.inf
+    for _ in range(60):
+        current = current.m_step(stats, grid)
+        q_now = q_value(stats, current.log_transition_matrix(grid))
+        assert q_now >= q_prev - 1e-9, "inner ECM decreased Q"
+        q_prev = q_now
+
+    q_best = q_value(stats, current.log_transition_matrix(grid))
+    perturb = rng_for("test-mix-mstep-perturb")
+    for _ in range(30):
+        cand = MixtureInnovationKernel(
+            rho=current.rho + float(perturb.normal(0, 0.02)),
+            pi=np.abs(current.pi + perturb.normal(0, 0.01, current.pi.shape)),
+            mu=current.mu + perturb.normal(0, 0.02, current.mu.shape),
+            s2=np.maximum(current.s2 + perturb.normal(0, 0.01, current.s2.shape), 1e-4),
+        )
+        cand = MixtureInnovationKernel(cand.rho, cand.pi / cand.pi.sum(),
+                                       cand.mu, cand.s2)
+        assert q_value(stats, cand.log_transition_matrix(grid)) <= q_best + 1e-7
+
+
+def test_innovation_moments_match_sampling_from_the_fitted_mixture():
+    """The moment formulas behind the reported kurtosis recovery.
+
+    Section 4.8 of the compendium reports a recovered excess kurtosis; that
+    number comes from a closed-form expression over the mixture components, so
+    an error in it would silently corrupt the headline claim about recovering a
+    heavy tail. Checked against draws from the very same mixture.
+    """
+    rng = rng_for("test-innovation-moments")
+    kernel = MixtureInnovationKernel(
+        rho=0.8,
+        pi=np.array([0.5, 0.3, 0.2]),
+        mu=np.array([0.15, -0.2, 0.05]),
+        s2=np.array([0.05, 0.25, 0.9]),
+    )
+    mom = kernel.innovation_moments
+
+    n = 4_000_000
+    comp = rng.choice(len(kernel.pi), size=n, p=kernel.pi)
+    eps = kernel.mu[comp] + np.sqrt(kernel.s2[comp]) * rng.standard_normal(n)
+
+    m1 = eps.mean()
+    m2 = eps.var()
+    excess = ((eps - m1) ** 4).mean() / m2**2 - 3.0
+
+    assert abs(mom["innovation_mean"] - m1) < 5e-3
+    assert abs(mom["innovation_var"] - m2) / m2 < 5e-3
+    assert abs(mom["innovation_excess_kurtosis"] - excess) < 2e-2
