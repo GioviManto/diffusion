@@ -48,7 +48,7 @@ from __future__ import annotations
 
 import numpy as np
 
-from common import experiment_parser, provenance
+from common import apply_overrides, experiment_parser, provenance, select_parts
 from src.bp_grid import make_grid
 from src.denoiser import bp_posterior_mean, evaluate_denoiser
 from src.em import e_step_multi, fit_em, q_gradient
@@ -433,52 +433,79 @@ def main() -> None:
         "EM through exact BP: monotonicity, recovery, information, rate.",
     )
     args = parser.parse_args()
+
+    quick = {
+        "grid_size": 201, "n_chains": 128, "n_inits": 3,
+        "t_price": (0.1, 0.4), "n_rep": 3, "n_info": 100, "n_chains_price": 256,
+        "components": (2, 4), "t_eval": (0.2, 0.8),
+        "sizes_kurtosis": (128, 512), "sizes_rate": (64, 256), "n_rep_rate": 2,
+        "quantization_grids": (201, 401), "quantization_rhos": (0.8, 0.77),
+        "n_chains_quantization": 128,
+    }
+    full = {
+        "grid_size": GRID_M, "n_chains": 1024, "n_inits": 6,
+        "t_price": (0.05, 0.1, 0.2, 0.4, 0.8, 1.6), "n_rep": 10, "n_info": 400,
+        "n_chains_price": 256,
+        "components": (2, 3, 5, 8), "t_eval": (0.1, 0.2, 0.4, 0.8, 1.6),
+        "sizes_kurtosis": (128, 256, 512, 1024, 2048),
+        "sizes_rate": (64, 128, 256, 512, 1024), "n_rep_rate": 4,
+        "quantization_grids": (201, 401, 801, 1601),
+        "quantization_rhos": (0.8, 0.77, 0.813), "n_chains_quantization": 256,
+    }
+    cfg = apply_overrides(quick if args.quick else full, args.set)
+
+    def p1(grid, weights, out):
+        write_csv(out / "monotonicity.csv", part1_monotonicity(
+            grid, weights, cfg["n_chains"], cfg["n_inits"], out))
+
+    def p2(grid, weights, out):
+        write_csv(out / "price_of_noising.csv", part2_price_of_noise(
+            grid, weights, cfg["n_chains_price"], cfg["t_price"],
+            cfg["n_rep"], cfg["n_info"], out))
+
+    def p3(grid, weights, out):
+        mis_rows, kurt_rows = part3_misspecified(
+            grid, weights, cfg["n_chains"], cfg["components"],
+            cfg["t_eval"], cfg["sizes_kurtosis"], out)
+        write_csv(out / "misspecified_mixture.csv", mis_rows)
+        write_csv(out / "kurtosis_vs_n.csv", kurt_rows)
+
+    def p4(grid, weights, out):
+        write_csv(out / "em_rate.csv", part4_rate(
+            grid, weights, cfg["sizes_rate"], cfg["n_rep_rate"], out))
+
+    def p5(grid, weights, out):
+        write_csv(out / "laplace_quantization.csv", part5_quantization(
+            cfg["quantization_grids"], cfg["quantization_rhos"],
+            cfg["n_chains_quantization"], out))
+
+    parts = {
+        "monotonicity": ("monotonicity and recovery", p1),
+        "price_of_noising": ("price of noising vs Fisher information", p2),
+        "misspecified": ("misspecified mixture kernel", p3),
+        "rate": ("sample-size rate", p4),
+        "quantization": ("Laplace lattice quantization", p5),
+    }
+    if args.list_parts:
+        print("\n".join(parts))
+        return
+
+    selected = select_parts(parts, args.only)
     out = ensure_dir(args.output_dir)
-    grid, weights = make_grid(GRID_A, 201 if args.quick else GRID_M)
+    grid, weights = make_grid(GRID_A, cfg["grid_size"])
 
-    if args.quick:
-        n_chains, n_inits = 128, 3
-        t_price, n_rep, n_info = (0.1, 0.4), 3, 100
-        comps, t_eval = (2, 4), (0.2, 0.8)
-        sizes_k, sizes_r, n_rep_rate = (128, 512), (64, 256), 2
-        grid_sizes, rho_vals, n_q = (201, 401), (0.8, 0.77), 128
-    else:
-        n_chains, n_inits = 1024, 6
-        t_price, n_rep, n_info = (0.05, 0.1, 0.2, 0.4, 0.8, 1.6), 10, 400
-        comps, t_eval = (2, 3, 5, 8), (0.1, 0.2, 0.4, 0.8, 1.6)
-        sizes_k = (128, 256, 512, 1024, 2048)
-        sizes_r, n_rep_rate = (64, 128, 256, 512, 1024), 4
-        grid_sizes, rho_vals, n_q = (201, 401, 801, 1601), (0.8, 0.77, 0.813), 256
-
-    write_json(out / "params.json", {
+    # One params file per selection, so parallel array tasks do not race for
+    # the same filename and each output stays traceable to its own invocation.
+    tag = "_".join(selected) if args.only else "all"
+    write_json(out / f"params_{tag}.json", {
         "n_sites": N_SITES, "rho_true": RHO_TRUE, "grid_half_width": GRID_A,
-        "grid_size": len(grid), "t_train": T_TRAIN, "n_chains": n_chains,
-        "n_inits": n_inits, "t_price": t_price, "n_rep": n_rep,
-        "n_info": n_info, "components": comps, "t_eval": t_eval,
-        "sizes_kurtosis": sizes_k, "sizes_rate": sizes_r,
-        "n_rep_rate": n_rep_rate,
-        "quantization_grids": grid_sizes, "quantization_rhos": rho_vals,
-        "quick": args.quick, **provenance(),
+        "t_train": T_TRAIN, "quick": args.quick, "parts": list(selected),
+        "overrides": args.set, **cfg, **provenance(),
     })
 
-    print("Part 1: monotonicity and recovery ...", flush=True)
-    write_csv(out / "monotonicity.csv",
-              part1_monotonicity(grid, weights, n_chains, n_inits, out))
-    print("Part 2: price of noising vs Fisher information ...", flush=True)
-    write_csv(out / "price_of_noising.csv",
-              part2_price_of_noise(grid, weights, 256, t_price, n_rep, n_info, out))
-    print("Part 3: misspecified mixture kernel ...", flush=True)
-    mis_rows, kurt_rows = part3_misspecified(
-        grid, weights, n_chains, comps, t_eval, sizes_k, out
-    )
-    write_csv(out / "misspecified_mixture.csv", mis_rows)
-    write_csv(out / "kurtosis_vs_n.csv", kurt_rows)
-    print("Part 4: sample-size rate ...", flush=True)
-    write_csv(out / "em_rate.csv",
-              part4_rate(grid, weights, sizes_r, n_rep_rate, out))
-    print("Part 5: Laplace lattice quantization ...", flush=True)
-    write_csv(out / "laplace_quantization.csv",
-              part5_quantization(grid_sizes, rho_vals, n_q, out))
+    for name, (label, fn) in selected.items():
+        print(f"[{name}] {label} ...", flush=True)
+        fn(grid, weights, out)
     print(f"Done -> {out}")
 
 

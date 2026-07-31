@@ -50,7 +50,7 @@ import time
 
 import numpy as np
 
-from common import experiment_parser, provenance
+from common import apply_overrides, experiment_parser, provenance, select_parts
 from src.bp_grid import make_grid
 from src.denoiser import (
     bp_posterior_mean,
@@ -101,6 +101,16 @@ def noisy_groups(A: np.ndarray, t_values, rng: np.random.Generator):
 
 PARAMETERIZATIONS = ("eps", "x0")
 
+# Replicate index, mixed into every seed that draws *training* data or
+# initializes a model, and deliberately NOT into the test set: replicates must
+# differ in what the methods learn from and agree on what they are judged
+# against, or the comparison stops being paired.
+SEED_TAG = 0
+
+
+def train_rng(*keys):
+    return rng_for(*keys, "seed", SEED_TAG)
+
 
 def score_both(kernel, nets, grid, weights, bundle, t_values, tag: dict):
     """Evaluate the BP denoiser and every trained network on the test bundle."""
@@ -122,7 +132,7 @@ def train_nets(A, rng_key, hidden, n_steps):
     """One network per parameterization, on the same clean chains."""
     return {
         mode: train_dsm_denoiser(
-            A, T_TRAIN, rng_for(*rng_key, mode), hidden=hidden,
+            A, T_TRAIN, train_rng(*rng_key, mode), hidden=hidden,
             n_steps=n_steps, parameterization=mode,
         )
         for mode in PARAMETERIZATIONS
@@ -139,13 +149,13 @@ def part1_sample_efficiency(grid, weights, sizes, hidden, n_steps, out):
     rows, cost_rows = [], []
 
     for n_chains in sizes:
-        rng = rng_for("exp07-p1", n_chains)
+        rng = train_rng("exp07-p1", n_chains)
         A = np.stack([prior.sample(rng, N_SITES) for _ in range(n_chains)])
 
         t0 = time.perf_counter()
         kernel, trace = fit_em(
             MixtureInnovationKernel.init(
-                N_COMPONENTS, rho=0.3, var=0.8, rng=rng_for("exp07-init")
+                N_COMPONENTS, rho=0.3, var=0.8, rng=train_rng("exp07-init")
             ),
             grid, weights, noisy_groups(A, T_TRAIN, rng), n_iters=120,
         )
@@ -193,12 +203,12 @@ def part1_sample_efficiency(grid, weights, sizes, hidden, n_steps, out):
 def part2_capacity(grid, weights, n_chains, archs, step_counts, out):
     prior = LaplaceAR1(RHO_TRUE)
     _, bundle = make_test_set(prior, grid, weights, T_TRAIN, N_TEST)
-    rng = rng_for("exp07-p1", n_chains)
+    rng = train_rng("exp07-p1", n_chains)
     A = np.stack([prior.sample(rng, N_SITES) for _ in range(n_chains)])
 
     kernel, _ = fit_em(
         MixtureInnovationKernel.init(
-            N_COMPONENTS, rho=0.3, var=0.8, rng=rng_for("exp07-init")
+            N_COMPONENTS, rho=0.3, var=0.8, rng=train_rng("exp07-init")
         ),
         grid, weights, noisy_groups(A, T_TRAIN, rng), n_iters=120,
     )
@@ -215,7 +225,7 @@ def part2_capacity(grid, weights, n_chains, archs, step_counts, out):
         for n_steps in step_counts:
             for mode in PARAMETERIZATIONS:
                 dsm = train_dsm_denoiser(
-                    A, T_TRAIN, rng_for("exp07-p2", str(hidden), n_steps, mode),
+                    A, T_TRAIN, train_rng("exp07-p2", str(hidden), n_steps, mode),
                     hidden=hidden, n_steps=n_steps, parameterization=mode,
                 )
                 err = float(np.mean([
@@ -260,12 +270,12 @@ def part2_capacity(grid, weights, n_chains, archs, step_counts, out):
 def part3_transfer(grid, weights, n_chains, t_probe, hidden, n_steps, out):
     prior = LaplaceAR1(RHO_TRUE)
     _, bundle = make_test_set(prior, grid, weights, t_probe, N_TEST)
-    rng = rng_for("exp07-p1", n_chains)
+    rng = train_rng("exp07-p1", n_chains)
     A = np.stack([prior.sample(rng, N_SITES) for _ in range(n_chains)])
 
     kernel, _ = fit_em(
         MixtureInnovationKernel.init(
-            N_COMPONENTS, rho=0.3, var=0.8, rng=rng_for("exp07-init")
+            N_COMPONENTS, rho=0.3, var=0.8, rng=train_rng("exp07-init")
         ),
         grid, weights, noisy_groups(A, T_TRAIN, rng), n_iters=120,
     )
@@ -299,9 +309,9 @@ def part3_transfer(grid, weights, n_chains, t_probe, hidden, n_steps, out):
 
 def part4_inference_cost(grid, weights, batch_sizes, hidden, out):
     prior = LaplaceAR1(RHO_TRUE)
-    rng = rng_for("exp07-p4")
+    rng = train_rng("exp07-p4")
     kernel = MixtureInnovationKernel.init(
-        N_COMPONENTS, rho=0.8, var=0.36, rng=rng_for("exp07-init")
+        N_COMPONENTS, rho=0.8, var=0.36, rng=train_rng("exp07-init")
     )
     A = np.stack([prior.sample(rng, N_SITES) for _ in range(max(batch_sizes))])
     # Timing only -- neither model needs to be well fitted to measure a
@@ -334,50 +344,76 @@ def main() -> None:
         "EM-learned BP denoiser vs a denoising-score-matching network.",
     )
     args = parser.parse_args()
+
+    quick = {
+        "grid_size": 201, "sizes": (64, 256), "net_hidden": (64, 64),
+        "net_steps": 1500, "archs": ((32, 32), (128, 128)),
+        "step_counts": (1000, 4000), "capacity_n": 256,
+        "t_probe": (0.05, 0.2, 0.8, 3.0), "inference_batches": (32, 128),
+        "seed": 0,
+    }
+    full = {
+        "grid_size": GRID_M, "sizes": (32, 64, 128, 256, 512, 1024, 2048),
+        "net_hidden": (128, 128), "net_steps": 20000,
+        "archs": ((32, 32), (128, 128), (256, 256), (512, 512)),
+        "step_counts": (1000, 5000, 20000), "capacity_n": 1024,
+        "t_probe": (0.02, 0.05, 0.1, 0.15, 0.2, 0.3, 0.4, 0.6, 0.8, 1.2, 1.6,
+                    2.4, 3.2),
+        "inference_batches": (32, 128, 512),
+        "seed": 0,
+    }
+    cfg = apply_overrides(quick if args.quick else full, args.set)
+
+    global SEED_TAG
+    SEED_TAG = cfg["seed"]
+
+    def p1(grid, weights, out):
+        rows, cost_rows = part1_sample_efficiency(
+            grid, weights, cfg["sizes"], cfg["net_hidden"], cfg["net_steps"], out)
+        write_csv(out / "sample_efficiency.csv", rows)
+        write_csv(out / "training_cost.csv", cost_rows)
+
+    def p2(grid, weights, out):
+        write_csv(out / "capacity.csv", part2_capacity(
+            grid, weights, cfg["capacity_n"], cfg["archs"],
+            cfg["step_counts"], out))
+
+    def p3(grid, weights, out):
+        write_csv(out / "transfer.csv", part3_transfer(
+            grid, weights, cfg["capacity_n"], cfg["t_probe"],
+            cfg["net_hidden"], cfg["net_steps"], out))
+
+    def p4(grid, weights, out):
+        write_csv(out / "inference_cost.csv", part4_inference_cost(
+            grid, weights, cfg["inference_batches"], cfg["net_hidden"], out))
+
+    parts = {
+        "sample_efficiency": ("sample efficiency", p1),
+        "capacity": ("network capacity and training budget", p2),
+        "transfer": ("transfer across the noise schedule", p3),
+        "inference_cost": ("inference cost", p4),
+    }
+    if args.list_parts:
+        print("\n".join(parts))
+        return
+
+    selected = select_parts(parts, args.only)
     out = ensure_dir(args.output_dir)
-    grid, weights = make_grid(GRID_A, 201 if args.quick else GRID_M)
+    grid, weights = make_grid(GRID_A, cfg["grid_size"])
 
-    if args.quick:
-        sizes = (64, 256)
-        hidden, n_steps = (64, 64), 1500
-        archs, step_counts = ((32, 32), (128, 128)), (1000, 4000)
-        cap_n = 256
-        t_probe = (0.05, 0.2, 0.8, 3.0)
-        batches = (32, 128)
-    else:
-        sizes = (32, 64, 128, 256, 512, 1024, 2048)
-        hidden, n_steps = (128, 128), 20000
-        archs = ((32, 32), (128, 128), (256, 256), (512, 512))
-        step_counts = (1000, 5000, 20000)
-        cap_n = 1024
-        t_probe = (0.02, 0.05, 0.1, 0.15, 0.2, 0.3, 0.4, 0.6, 0.8, 1.2, 1.6, 2.4, 3.2)
-        batches = (32, 128, 512)
-
-    write_json(out / "params.json", {
-        "n_sites": N_SITES, "rho_true": RHO_TRUE, "grid_size": len(grid),
-        "grid_half_width": GRID_A, "t_train": T_TRAIN,
-        "n_components": N_COMPONENTS, "n_test": N_TEST, "sizes": sizes,
-        "parameterizations": PARAMETERIZATIONS,
-        "net_hidden": hidden, "net_steps": n_steps, "archs": [str(a) for a in archs],
-        "step_counts": step_counts, "capacity_n": cap_n, "t_probe": t_probe,
-        "inference_batches": batches, "quick": args.quick, **provenance(),
+    tag = "_".join(selected) if args.only else "all"
+    write_json(out / f"params_{tag}.json", {
+        "n_sites": N_SITES, "rho_true": RHO_TRUE, "grid_half_width": GRID_A,
+        "t_train": T_TRAIN, "n_components": N_COMPONENTS, "n_test": N_TEST,
+        "parameterizations": PARAMETERIZATIONS, "quick": args.quick,
+        "parts": list(selected), "overrides": args.set,
+        **{k: (str(v) if k == "archs" else v) for k, v in cfg.items()},
+        **provenance(),
     })
 
-    print("Part 1: sample efficiency ...", flush=True)
-    rows, cost_rows = part1_sample_efficiency(
-        grid, weights, sizes, hidden, n_steps, out
-    )
-    write_csv(out / "sample_efficiency.csv", rows)
-    write_csv(out / "training_cost.csv", cost_rows)
-    print("Part 2: network capacity and training budget ...", flush=True)
-    write_csv(out / "capacity.csv",
-              part2_capacity(grid, weights, cap_n, archs, step_counts, out))
-    print("Part 3: transfer across the noise schedule ...", flush=True)
-    write_csv(out / "transfer.csv",
-              part3_transfer(grid, weights, cap_n, t_probe, hidden, n_steps, out))
-    print("Part 4: inference cost ...", flush=True)
-    write_csv(out / "inference_cost.csv",
-              part4_inference_cost(grid, weights, batches, hidden, out))
+    for name, (label, fn) in selected.items():
+        print(f"[{name}] {label} ...", flush=True)
+        fn(grid, weights, out)
     print(f"Done -> {out}")
 
 

@@ -133,3 +133,24 @@ held *within* each run, so previously reported numbers stand as measurements —
 they were simply not reproducible. `rng_for` now uses a fixed digest, verified
 identical across processes. Experiments 06 and 07 were run under the fix;
 outputs committed for exp_01–exp_05 predate it and have not been regenerated.
+
+## Running on a cluster
+
+`hpc/` holds SLURM array templates and `hpc/README.md` explains them. The parts
+of exp_06 and exp_07 are independent and write disjoint CSVs into a shared
+output directory, so one array task per part needs no merge step:
+
+```bash
+python experiments/exp_06_em_parameter_recovery.py --list-parts
+python experiments/exp_06_em_parameter_recovery.py --only rate \
+    --set n_rep_rate=32 --set 'sizes_rate=(64,128,256,512,1024,4096)'
+```
+
+`--set` accepts any key shown in `params_*.json`; unknown keys are rejected so
+a typo in a job script fails immediately instead of silently running defaults.
+
+For error bars on the headline curve, `hpc/slurm_replicates.sbatch` runs the
+sample-efficiency sweep under independent training seeds (`--set seed=K`) and
+`tools/merge_replicates.py` merges them. The held-out test set and its exact-BP
+reference are deliberately *not* reseeded, so replicates differ in what the
+methods learn from and agree on what they are judged against.
