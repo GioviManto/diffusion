@@ -252,7 +252,7 @@ def e_step_multi(
 
 
 def clean_statistics(
-    grid: np.ndarray, weights: np.ndarray, A: np.ndarray
+    grid: np.ndarray, A: np.ndarray
 ) -> ExpectedStatistics:
     """Statistics for *clean* chains, i.e. the t -> 0 limit of the E-step.
 
@@ -262,6 +262,12 @@ def clean_statistics(
     interpolation, which preserves the first moment exactly) puts the clean-data
     MLE and the noisy-data EM on a common footing: identical M-step code, only
     the way Xi is built differs. This is the "no noising required" baseline.
+
+    No quadrature weights appear here, and that is not an oversight: the
+    clean-data Xi is a *counting* measure over observed transitions, whereas the
+    BP Xi is belief mass that already absorbed the weights. Both sum to the edge
+    count, which is exactly the property the M-steps rely on, so the two are
+    interchangeable inputs despite being built from different objects.
 
     A : (B, n) clean chains.
     """
@@ -376,7 +382,7 @@ def fit_clean(kernel, grid: np.ndarray, A: np.ndarray, n_iters: int = 1):
     available, no noising is needed to identify the prior, and the denoiser at
     every noise level follows from BP for free.
     """
-    stats = clean_statistics(grid, np.ones(len(grid)), A)
+    stats = clean_statistics(grid, A)
     current = kernel
     for _ in range(n_iters):
         current = current.m_step(stats, grid)

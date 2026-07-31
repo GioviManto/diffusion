@@ -577,6 +577,38 @@ against $\rho^\star$; the reported $N^{-1/2}$ rates use the smooth kernels,
 whose M-steps are ratios of smooth moments and vary continuously.
 \end{remark}
 
+\begin{remark}[The literal gradient route, measured]
+\label{rem:gradient-route}
+The suggestion that started this layer was phrased as gradient ascent --- iterate
+along $\nabla_\theta L$ from a random start --- rather than as EM. Fisher's
+identity makes that route immediately available, since \eqref{eq:fisher} is the
+gradient of the exact marginal likelihood from the same single BP pass. Both
+routes share the E-step and the statistic $\Xibf$; they differ only in what they
+do with it:
+\begin{equation}
+  \text{gradient:}\quad \theta \leftarrow \theta + \eta\,\langle\Xibf, \nabla_\theta\log K_\theta\rangle,
+  \qquad
+  \text{EM:}\quad \theta \leftarrow \arg\max_\theta \langle\Xibf, \log K_\theta\rangle .
+\end{equation}
+Experiment~08 measures them side by side, and the answer is not one-sided. On
+the smooth Gaussian kernel a well-chosen rate is fully competitive (it reached a
+marginally \emph{higher} likelihood than EM in the same number of iterations,
+both converged), while a rate four times larger diverges and violates
+monotonicity by tens of nats. On the Laplace kernel the gradient route actually
+recovers $\rho$ \emph{better} than the exact M-step --- because the exact
+M-step is the quantized one (Remark~\ref{rem:quantization}), and gradient steps
+move continuously --- while doing worse on the scale $b$ and giving up exact
+monotonicity.
+
+So the two are complementary rather than ranked. The exact M-step is
+step-size-free and exactly monotone, and should be preferred wherever it exists
+and the kernel is smooth; the gradient route earns its place where the M-step
+has no closed form (Rung 4) or where its exact solution is a discretization
+artifact (Rung 2). What is common to both, and is the point of
+Proposition~\ref{prop:fisher}, is that neither ever differentiates through the
+forward--backward recursion.
+\end{remark}
+
 \subsection{Rung 3 --- unknown innovation law}
 
 Keep the linear autoregression but make the innovation density essentially free:
