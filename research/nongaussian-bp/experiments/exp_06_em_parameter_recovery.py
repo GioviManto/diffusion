@@ -384,22 +384,29 @@ def part5_quantization(grid_sizes, rho_values, n_chains, out):
     the ratios u_k / u_j. On a uniform grid through the origin those ratios are
     rationals m / l, and a low-denominator value such as 4/5 has many aliases
     (8/10, 12/15, ...) that pool weight onto it. So rho_hat lands on simple
-    rationals, spuriously exactly right when the truth happens to be one and
-    stuck at lattice resolution when it is not.
+    rationals; which one it lands on depends on the data, so a truth that
+    happens to sit on the lattice is sometimes recovered to machine precision
+    and sometimes not, at the same grid size.
 
     Reported as a limitation of *this kernel on this grid*, not of EM: the
     smooth kernels' M-steps are ratios of moments and vary continuously.
+
+    The seed deliberately excludes the grid size. An earlier version keyed on
+    it, which made every grid draw a different dataset and confounded the
+    across-M trend with resampling -- the one thing this part exists to
+    measure. Now the data is fixed per rho_true and the grid is the only thing
+    that varies down each column.
     """
     rows = []
     for rho_true in rho_values:
         prior = LaplaceAR1(rho_true)
+        rng_data = rng_for("exp06-p5", rho_true)
+        A = np.stack([prior.sample(rng_data, N_SITES) for _ in range(n_chains)])
+        groups = noisy_groups(A, T_TRAIN, rng_data)
         for m_size in grid_sizes:
             grid, weights = make_grid(GRID_A, m_size)
-            rng = rng_for("exp06-p5", rho_true, m_size)
-            A = np.stack([prior.sample(rng, N_SITES) for _ in range(n_chains)])
             fitted, trace = fit_em(
-                LaplaceAR1Kernel(0.3, 0.8), grid, weights,
-                noisy_groups(A, T_TRAIN, rng), n_iters=80,
+                LaplaceAR1Kernel(0.3, 0.8), grid, weights, groups, n_iters=80,
             )
             rows.append({
                 "rho_true": rho_true,

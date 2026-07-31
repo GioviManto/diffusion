@@ -21,7 +21,7 @@ first — this file is only about how to continue safely.
 cd /path/to/diffusion
 python3 -m venv .venv && .venv/bin/pip install -r research/nongaussian-bp/requirements.txt
 cd research/nongaussian-bp
-../../.venv/bin/python -m pytest tests/ -q          # expect 30 passed, ~70 s
+../../.venv/bin/python -m pytest tests/ -q          # expect 33 passed, ~80 s
 ```
 
 `.venv/` is gitignored — recreate it, don't look for it. Pure numpy/scipy; **no

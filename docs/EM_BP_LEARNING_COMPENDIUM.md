@@ -62,7 +62,7 @@ Pure numpy, no autodiff, no new dependencies.
 | `experiments/exp_06_…` | Correctness: monotonicity, Fisher information, misspecification, rates, quantization |
 | `experiments/exp_07_…` | The headline: EM-BP vs a score network |
 | `experiments/exp_08_…` | The literal gradient route vs the exact M-step |
-| `tests/test_em_bp.py` | 16 tests (30 total in the package, all passing) |
+| `tests/test_em_bp.py` | 19 tests (33 total in the package, all passing), including three independent cross-checks (§5.5) |
 | `hpc/`, `tools/merge_replicates.py` | Cluster templates and replicate merging |
 
 **The four rungs**, all consuming the same `Ξ`:
@@ -334,6 +334,29 @@ At N=400 the neural kernel (873 params) is dominated on **both** axes by the
 score error 0.052 vs 0.026. The efficiency argument is about matching the
 hypothesis class to the structure — and it applies to the structured method's
 own internals, not only to the baseline it is compared against.
+
+---
+
+### 5.5 Independent cross-checks
+
+The tests above mostly verify the code against itself or against finite
+differences of its own output. Three checks deliberately do not, taking routes
+that share no code with the E-step:
+
+| check | route | result |
+|---|---|---|
+| **`Ξ` vs brute force** | Enumerate all `M^n` discretized configurations of the joint posterior and marginalize by summation — no messages anywhere | `max|Ξ_BP − Ξ_enum| / max(Ξ)` = **1.0e-14**; evidence agrees to 1.9e-15 |
+| **Evidence vs Monte Carlo** | Importance sampling `p_t(x) = E_{a∼p_0}[∏ᵢ N(xᵢ; α aᵢ, Δ)]` on the **Laplace** chain, where no closed form exists | BP −6.406521 vs MC −6.406111 ± 0.000691 (4M samples) → **0.59 s.e.** |
+| **EM fixed point is stationary** | Fisher's identity evaluates `∇L` without reference to how the M-step chose its update | `‖∇L‖` falls from 1.3e3 to 1.6e-4, a factor of **8.1e6** |
+
+The first is the strongest single piece of evidence for the whole layer: it
+pins the entire E-step — forward-backward recursion, pairwise accumulation, and
+quadrature weights together — against explicit enumeration. The second extends
+the evidence check beyond the Gaussian case, which is the only one with a
+closed form. The third confirms EM lands on a stationary point of the
+*marginal* likelihood rather than merely a fixed point of the M-step map.
+
+All three are permanent tests, not one-off scripts.
 
 ---
 

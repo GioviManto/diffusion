@@ -1,0 +1,82 @@
+{
+  "n_sites": 32,
+  "rho_true": 0.8,
+  "grid_half_width": 8.0,
+  "t_train": [
+    0.1,
+    0.2,
+    0.4,
+    0.8,
+    1.6
+  ],
+  "quick": false,
+  "parts": [
+    "rate"
+  ],
+  "overrides": [
+    "n_rep_rate=12"
+  ],
+  "grid_size": 401,
+  "n_chains": 1024,
+  "n_inits": 6,
+  "t_price": [
+    0.05,
+    0.1,
+    0.2,
+    0.4,
+    0.8,
+    1.6
+  ],
+  "n_rep": 10,
+  "n_info": 400,
+  "n_chains_price": 256,
+  "components": [
+    2,
+    3,
+    5,
+    8
+  ],
+  "t_eval": [
+    0.1,
+    0.2,
+    0.4,
+    0.8,
+    1.6
+  ],
+  "sizes_kurtosis": [
+    128,
+    256,
+    512,
+    1024,
+    2048
+  ],
+  "sizes_rate": [
+    64,
+    128,
+    256,
+    512,
+    1024
+  ],
+  "n_rep_rate": 12,
+  "quantization_grids": [
+    201,
+    401,
+    801,
+    1601
+  ],
+  "quantization_rhos": [
+    0.8,
+    0.77,
+    0.813
+  ],
+  "n_chains_quantization": 256,
+  "timestamp": "2026-07-31 23:14:03",
+  "python": "3.11.15",
+  "numpy": "2.4.6",
+  "platform": "Linux-6.18.5-x86_64-with-glibc2.39",
+  "hostname": "vm",
+  "slurm_job_id": "",
+  "slurm_array_task_id": "",
+  "cpu_count": "4",
+  "blas_threads": "4"
+}

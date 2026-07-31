@@ -354,3 +354,134 @@ def test_mdn_gradient_matches_finite_differences():
             fd = (hi - lo) / (2 * eps)
             if abs(fd) > 1e-6:
                 assert abs(grads[layer][i, j] - fd) / abs(fd) < 1e-4
+
+
+# ----------------------------------------------------------------------------
+# Independent cross-checks: routes that share no code with the E-step
+# ----------------------------------------------------------------------------
+
+def _brute_force_xi(grid, weights, log_K, X, alpha, delta, log_mu):
+    """Pairwise marginals by enumerating every discretized configuration.
+
+    Deliberately shares nothing with the forward-backward recursion: it builds
+    the joint mass over the M^n configuration space and marginalizes by
+    summation. Only feasible for a tiny grid and chain, which is the point --
+    it pins the E-step against a route with no messages in it at all.
+    """
+    import itertools
+
+    m, n = len(grid), X.shape[1]
+    K, mu = np.exp(log_K), np.exp(log_mu)
+    xi = np.zeros((m, m))
+    total_log_z = 0.0
+
+    for x in X:
+        ell = np.exp(
+            -0.5 * (x[:, None] - alpha * grid[None, :]) ** 2 / delta
+        ) / np.sqrt(2.0 * np.pi * delta)
+        joint = {}
+        for cfg in itertools.product(range(m), repeat=n):
+            val = np.prod([weights[j] for j in cfg]) * mu[cfg[0]] * ell[0, cfg[0]]
+            for i in range(1, n):
+                val *= K[cfg[i], cfg[i - 1]] * ell[i, cfg[i]]
+            joint[cfg] = val
+        z = sum(joint.values())
+        total_log_z += np.log(z)
+        for cfg, val in joint.items():
+            for i in range(n - 1):
+                xi[cfg[i + 1], cfg[i]] += val / z
+    return xi, total_log_z
+
+
+def test_xi_matches_brute_force_enumeration():
+    """The whole E-step, against explicit enumeration of the joint posterior."""
+    grid, weights = make_grid(3.0, 11)
+    log_mu = -0.5 * grid**2 - 0.5 * np.log(2.0 * np.pi)
+    prior = GaussianAR1(0.7)
+    rng = rng_for("test-em-bruteforce")
+    alpha, delta = alpha_delta(0.5)
+    A = np.stack([prior.sample(rng, 4) for _ in range(3)])
+    X = alpha * A + np.sqrt(delta) * rng.standard_normal(A.shape)
+    log_k = prior.log_transition_matrix(grid)
+
+    stats = e_step(grid, weights, log_k, X, alpha, delta, log_mu)
+    xi_bf, log_z_bf = _brute_force_xi(grid, weights, log_k, X, alpha, delta, log_mu)
+
+    assert np.abs(stats.xi - xi_bf).max() / xi_bf.max() < 1e-12
+    assert abs(stats.log_evidence - log_z_bf) / abs(log_z_bf) < 1e-12
+
+
+def test_evidence_matches_monte_carlo_on_a_nongaussian_chain():
+    """Evidence on the Laplace chain, where no closed form exists.
+
+    The Gaussian test above pins the evidence against an analytic formula; this
+    one pins it on a prior that has none, by importance sampling
+    p_t(x) = E_{a ~ p_0}[prod_i N(x_i; alpha a_i, Delta)] directly from the
+    clean chain. Tolerance is set from the Monte Carlo standard error, not
+    guessed.
+    """
+    grid, weights = make_grid(10.0, 1201)
+    prior = LaplaceAR1(0.8)
+    rng = rng_for("test-em-mc")
+    n = 4
+    alpha, delta = alpha_delta(0.6)
+    a_true = prior.sample(rng, n)
+    x = alpha * a_true + np.sqrt(delta) * rng.standard_normal(n)
+
+    stats = e_step(
+        grid, weights, prior.log_transition_matrix(grid), x[None, :], alpha, delta
+    )
+
+    rng_mc = np.random.default_rng(12345)
+    chunk, n_chunks = 200_000, 5
+    acc = acc_sq = 0.0
+    for _ in range(n_chunks):
+        a = np.empty((chunk, n))
+        a[:, 0] = rng_mc.standard_normal(chunk)
+        for i in range(1, n):
+            a[:, i] = 0.8 * a[:, i - 1] + rng_mc.laplace(0.0, prior.b, size=chunk)
+        log_w = (
+            -0.5 * (x[None, :] - alpha * a) ** 2 / delta
+            - 0.5 * np.log(2.0 * np.pi * delta)
+        ).sum(axis=1)
+        w = np.exp(log_w)
+        acc += w.sum()
+        acc_sq += (w**2).sum()
+
+    total = chunk * n_chunks
+    mean = acc / total
+    log_se = np.sqrt(max(acc_sq / total - mean**2, 0.0) / total) / mean
+    assert abs(stats.log_evidence - np.log(mean)) < 5.0 * log_se
+
+
+def test_em_fixed_point_is_stationary_for_the_marginal_likelihood():
+    """EM converges to a stationary point of L, not merely of the M-step map.
+
+    Checked through Fisher's identity, which computes grad L without reference
+    to how the M-step chose its update -- so a M-step that converged to the
+    wrong place would be caught here.
+    """
+    grid, weights = make_grid(8.0, 301)
+    prior = GaussianAR1(0.8)
+    rng = rng_for("test-em-stationary")
+    groups = []
+    for t in (0.2, 0.6):
+        alpha, delta = alpha_delta(t)
+        A = np.stack([prior.sample(rng, 20) for _ in range(120)])
+        groups.append(
+            (alpha * A + np.sqrt(delta) * rng.standard_normal(A.shape), alpha, delta)
+        )
+
+    start = GaussianAR1Kernel(0.2, 0.9)
+    grad_start = q_gradient(
+        e_step_multi(grid, weights, start.log_transition_matrix(grid), groups),
+        start.grad_log_transition_matrix(grid),
+    )
+    fitted, trace = fit_em(start, grid, weights, groups, n_iters=200, tol=0.0)
+    grad_end = q_gradient(
+        e_step_multi(grid, weights, fitted.log_transition_matrix(grid), groups),
+        fitted.grad_log_transition_matrix(grid),
+    )
+
+    assert trace.monotone_violation < 1e-8
+    assert np.linalg.norm(grad_end) < 1e-5 * np.linalg.norm(grad_start)

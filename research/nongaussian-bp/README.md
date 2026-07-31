@@ -82,10 +82,10 @@ and is the natural next comparison, not something settled here.
     src/          core library (priors, noising, grid BP, Gaussian BP, exact
                   scores, Markov approximations, numpy MLP, reverse samplers,
                   EM + parameterized kernels + denoiser comparison)
-    experiments/  exp_01 ... exp_07, all with --quick smoke mode
+    experiments/  exp_01 ... exp_08, all with --quick smoke mode
     outputs/      CSV + JSON + PNG per experiment (committed results)
     notebooks/    executed analysis notebooks 01-04
-    tests/        pytest suite (30 tests)
+    tests/        pytest suite (33 tests)
     report/       updated_report.tex / .pdf   (Layers 1-4)
                   em_bp_learning.tex / .pdf   (Layer 5 theory)
     audit/        Layer-1 audit note
@@ -106,8 +106,7 @@ python experiments/exp_06_em_parameter_recovery.py
 python experiments/exp_07_em_vs_score_network.py
 ```
 
-`tests/test_em_bp.py` runs many small EM fits and takes ~6 minutes; the rest of
-the suite is seconds. Experiments 06 and 07 take roughly an hour each at full
+`tests/test_em_bp.py` runs many small EM fits; the whole suite takes ~80 s. Experiments 06 and 07 take roughly an hour each at full
 settings — use `--quick` for a minutes-scale smoke run.
 
 Every experiment: deterministic seeds via `src.utils.rng_for` (common random
