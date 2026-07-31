@@ -590,23 +590,35 @@ do with it:
   \qquad
   \text{EM:}\quad \theta \leftarrow \arg\max_\theta \langle\Xibf, \log K_\theta\rangle .
 \end{equation}
-Experiment~08 measures them side by side, and the answer is not one-sided. On
-the smooth Gaussian kernel a well-chosen rate is fully competitive (it reached a
-marginally \emph{higher} likelihood than EM in the same number of iterations,
-both converged), while a rate four times larger diverges and violates
-monotonicity by tens of nats. On the Laplace kernel the gradient route actually
-recovers $\rho$ \emph{better} than the exact M-step --- because the exact
-M-step is the quantized one (Remark~\ref{rem:quantization}), and gradient steps
-move continuously --- while doing worse on the scale $b$ and giving up exact
-monotonicity.
+Experiment~08 measures them side by side ($256$ chains, $n = 24$, $120$
+iterations), and the answer is not one-sided.
 
-So the two are complementary rather than ranked. The exact M-step is
-step-size-free and exactly monotone, and should be preferred wherever it exists
-and the kernel is smooth; the gradient route earns its place where the M-step
-has no closed form (Rung 4) or where its exact solution is a discretization
-artifact (Rung 2). What is common to both, and is the point of
-Proposition~\ref{prop:fisher}, is that neither ever differentiates through the
-forward--backward recursion.
+On the smooth Gaussian kernel the gradient route \emph{converges to the same
+place}: at $\eta = 0.5$ it matches EM's final log-likelihood to $2\times10^{-9}$
+nats and its parameter errors to four digits. At $\eta = 0.1$ it is simply not
+there yet ($1.6$ nats short); at $\eta = 2$ it diverges, violating monotonicity
+by $527$ nats; at $\eta = 8$ it leaves the admissible set entirely. Nothing is
+gained over EM here, and a step size must be tuned to lose nothing.
+
+On the Laplace kernel the gradient route is genuinely \emph{better}. It reaches
+a higher log-likelihood than the exact M-step ($-8064.7$ against $-8066.6$ at
+$\eta = 0.1$) and better parameters on both coordinates ($|\Delta\rho| = 0.022$
+against $0.050$, $|\Delta b| = 0.013$ against $0.027$). The reason is
+Remark~\ref{rem:quantization}: EM's M-step here is exactly optimal for the
+discretized model and lands on a lattice point, reaching a genuine fixed point
+after $72$ iterations with $\hat\rho$ stuck $0.05$ from the truth, while
+gradient steps move continuously and walk past it. Divergence, when it happens,
+is unmistakable rather than subtle --- at $\eta = 8$ the scale collapses toward
+a near-delta kernel and the reported log-density goes positive.
+
+So the two are complementary rather than ranked, and the split is not the one
+intuition suggests. The exact M-step is step-size-free and exactly monotone, and
+should be preferred wherever it exists \emph{and} the kernel is smooth. The
+gradient route earns its place precisely where the M-step is least trustworthy:
+where it has no closed form (Rung 4), or where its exact solution is an artifact
+of the discretization rather than of the model (Rung 2). What is common to both,
+and is the point of Proposition~\ref{prop:fisher}, is that neither ever
+differentiates through the forward--backward recursion.
 \end{remark}
 
 \subsection{Rung 3 --- unknown innovation law}
@@ -705,18 +717,28 @@ rate reporting itself as too large.
 
 \begin{remark}[More expressive is not better here]
 \label{rem:rung4-loses}
-On the Laplace chain with $400$ observed noisy chains, the neural kernel
-($873$ parameters) reaches a \emph{higher} training log-likelihood than the
-mixture kernel of Rung 3 ($13$ parameters) --- $-16652$ against $-16656$ --- and
-a \emph{worse} held-out denoiser: relative score error $0.052$ against $0.026$.
-That is ordinary overfitting, and it is worth stating plainly because the
-temptation this note is arguing against --- reach for the network --- reappears
-one level down. Rung 4 is the right tool when the transition genuinely has
-state-dependent shape that Rung 3 cannot express; on data where a linear
-autoregression with a free innovation law is correct, it buys nothing and costs
-two orders of magnitude in parameters. The efficiency argument of
-Section~\ref{sec:efficiency} is an argument for matching the hypothesis class to
-the structure, not an argument that neural components are inadmissible.
+On the Laplace chain with $400$ observed noisy chains ($M = 201$, $250$ EM
+iterations), the neural kernel with $873$ parameters is dominated on
+\emph{both} axes by the $13$-parameter mixture kernel of Rung 3: training
+log-likelihood $-16781$ against $-16656$, and held-out relative score error
+$0.052$ against $0.026$. It has not bought expressivity that this data needs; it
+has bought optimization difficulty, since a gradient M-step under a monotonicity
+safeguard makes slower progress per iteration than a closed-form one.
+
+The one place the network does edge ahead is instructive and not a
+recommendation: run \emph{without} the safeguard of
+Remark~\ref{rem:backtrack} at $\eta = 0.05$, it attains $-16652$, marginally
+above the mixture's likelihood, while its held-out error stays worse at
+$0.059$ --- ordinary overfitting, reached by a procedure that violated
+monotonicity by $1452$ nats to get there.
+
+Rung 4 is the right tool when the transition genuinely has state-dependent
+shape that Rung 3 cannot express. On data where a linear autoregression with a
+free innovation law is correct, it costs two orders of magnitude in parameters
+and returns nothing. The efficiency argument of Section~\ref{sec:efficiency} is
+an argument for matching the hypothesis class to the structure --- and it
+applies to the structured method's own internals, not only to the baseline it
+is being compared against.
 \end{remark}
 
 % =====================================================================

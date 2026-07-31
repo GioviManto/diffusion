@@ -1,0 +1,26 @@
+{
+  "n_sites": 24,
+  "rho_true": 0.8,
+  "grid_size": 301,
+  "grid_half_width": 8.0,
+  "t_train": [
+    0.1,
+    0.2,
+    0.4,
+    0.8,
+    1.6
+  ],
+  "n_chains": 256,
+  "n_iters": 120,
+  "learning_rates": [
+    0.1,
+    0.5,
+    2.0,
+    8.0
+  ],
+  "quick": false,
+  "timestamp": "2026-07-31 12:52:50",
+  "python": "3.11.15",
+  "numpy": "2.4.6",
+  "platform": "Linux-6.18.5-x86_64-with-glibc2.39"
+}
