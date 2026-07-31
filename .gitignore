@@ -20,3 +20,7 @@ __pycache__/
 *.lot
 *.run.xml
 *.synctex.gz
+
+# --- latexmk build databases ---
+*.fdb_latexmk
+*.fls
