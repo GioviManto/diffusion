@@ -123,7 +123,47 @@ largest networks (512×512 at 20k steps is the worst cell in the table, 0.373 ε
 0.408 x₀). So the gap is overfitting at this data budget, not a badly chosen
 architecture — which is the control the comparison needed.
 
-### 4.3 EM behaves exactly as the theory says (exp_06 Part 1)
+### 4.3 Transfer across the noise schedule (exp_07 Part 3) — with a correction
+
+EM-BP wins at **all 13** probed noise levels, `t` from 0.02 to 3.2, by 4.5×–19×
+against whichever parameterization is better at that level.
+
+| t | in schedule | ε-net | x₀-net | **EM-BP** | best-net / EM |
+|---|---|---|---|---|---|
+| 0.02 | no | 0.766 | 3.527 | **0.170** | 4.5× |
+| 0.10 | yes | 0.326 | 0.792 | **0.051** | 6.4× |
+| 0.40 | yes | 0.190 | 0.216 | **0.016** | 11.9× |
+| 1.60 | yes | 0.162 | 0.029 | **0.0041** | 6.9× |
+| 3.20 | no | 0.247 | 0.007 | **0.0004** | 19.0× |
+
+**The expected mechanism is not what the data shows, and this corrects the
+experiment's own premise.** The part was designed around "the network must
+extrapolate in `t`" — but there is *no cliff* at the schedule boundary, and the
+ratio does not separate in-schedule from out-of-schedule levels (4.5, 5.3 out;
+6.4 in; 7.3 out; 8.3 in; …). Time enters through smooth features and the target
+moves smoothly with `t`, so the network handles that one direction adequately.
+**The difficulty is in x-space, not t-space.** The extrapolation claim should
+not be made.
+
+What *is* real: EM-BP's error varies smoothly across the whole range with no
+schedule dependence whatsoever, because it has no schedule to leave. And the x₀
+parameterization fails outright at low noise (3.53 at t=0.02, against 0.766 for
+ε and 0.170 for EM-BP) — the concrete case for training both.
+
+### 4.4 Inference cost — the honest loss (exp_07 Part 4)
+
+| batch | BP ms/chain | net ms/chain | slowdown |
+|---|---|---|---|
+| 32 | 2.01 | 0.0096 | 211× |
+| 128 | 1.23 | 0.0043 | 289× |
+| 512 | 1.31 | 0.0041 | 320× |
+
+At M=401, grid BP is **211×–320× slower** per chain than a network forward pass
+— larger than the ~100× seen at M=201 in smoke runs, since cost is `O(nM²)`.
+Reverse diffusion calls the denoiser at *every* integration step, so this is the
+weakest point of the whole story.
+
+### 4.5 EM behaves exactly as the theory says (exp_06 Part 1)
 
 N=1024, M=401, Laplace kernel, 6 random initializations including ρ₀ = −0.42:
 
@@ -134,7 +174,7 @@ N=1024, M=401, Laplace kernel, 6 random initializations including ρ₀ = −0.4
 ⚠️ The reported `rho_err = 1e-16` is **not** perfect recovery — see §5.1. The
 honest number here is `b_err = 0.005` (1.2%).
 
-### 4.4 The price of noising, against the information budget (exp_06 Part 2)
+### 4.6 The price of noising, against the information budget (exp_06 Part 2)
 
 Fisher information per noisy chain computed exactly from single-chain BP passes
 via Prop. 3 — no simulation, no numerical differentiation. Realized error over
@@ -152,7 +192,7 @@ Two readings:
 1. **The channel destroys the innovation scale far faster than the correlation.** `J[q,q]` falls **142×** from t=0.05 to t=1.6 while `J[ρ,ρ]` falls **26×**. Second-order structure survives noising; the shape information carrying non-Gaussianity does not. Same asymmetry Layer 2 found for the Gaussian closure, now stated as an information budget rather than an error measurement.
 2. **The estimator is close to efficient where it works** — realized sd within ~±30% of Cramér-Rao for t ≤ 0.8. At t=1.6 it stops working and the information says it must: bias dwarfs sd, and CRLB(q)=0.215 is 60% of `q_true` itself.
 
-### 4.5 The gradient route vs the exact M-step (exp_08)
+### 4.7 The gradient route vs the exact M-step (exp_08)
 
 The advice was phrased as *gradient* ascent, not EM, so both were measured. They
 share the E-step and `Ξ` and differ only in what they do with it. **The split is
@@ -165,7 +205,7 @@ not the one intuition suggests:**
 gradient route where the M-step has no closed form (rung 4) or where its exact
 solution is a discretization artifact (rung 2).
 
-### 4.6 Recovering an unknown innovation law
+### 4.8 Recovering an unknown innovation law
 
 The mixture kernel, which has never heard of the Laplace density, fitted to
 **noisy observations only** (2000 chains, noise up to t=1.6):
@@ -221,7 +261,7 @@ own internals, not only to the baseline it is compared against.
 
 ## 6. Limitations
 
-1. **Inference cost is the honest loss.** Grid BP is `O(nM²)` per chain per evaluation; a network forward pass is a few matmuls. Measured slowdown ~100× (smoke run: 82–190× per chain). Since reverse diffusion evaluates the denoiser at every integration step, this is not a detail. Distilling the fitted BP denoiser into a network, or using Layer-2 Gaussian-projected BP at inference, is the obvious next step — not something claimed here.
+1. **Inference cost is the honest loss.** Grid BP is `O(nM²)` per chain per evaluation; a network forward pass is a few matmuls. Measured slowdown **211×–320×** at M=401 (§4.4). Since reverse diffusion evaluates the denoiser at every integration step, this is not a detail. Distilling the fitted BP denoiser into a network, or using Layer-2 Gaussian-projected BP at inference, is the obvious next step — not something claimed here.
 2. **EM is slower to train here.** 443 s at N=2048 vs ~37 s for the network, and EM's cost grows linearly in `N` while the network's is fixed by its step count. The win is in *data*, not in wall-clock.
 3. **Everything rests on the chain assumption.** If the prior is not Markov the estimator is misspecified in a way no amount of data fixes. Layer 4 showed the correction is exactly rank one for AR(1)+global-latent priors, suggesting a hybrid — untested here.
 4. **The baseline is a vanilla MLP, as specified.** A temporal convolution or U-Net would carry a locality prior of its own and should close part of the gap. What it would not acquire is the exactness of the risk decomposition or the uniformity in `t` of Prop. 5. This is the natural next comparison and is **not settled**.
@@ -233,11 +273,10 @@ own internals, not only to the baseline it is compared against.
 ## 7. Status
 
 **Complete and verified:** theory (14 pp), implementation, 30/30 tests, exp_08,
-exp_06 Parts 1–2, exp_07 Parts 1–2, cluster support.
+exp_06 Parts 1–2, **all of exp_07**, cluster support.
 
 **Running at time of writing:** exp_06 Parts 3–5 (misspecification sweep,
-`N^{−1/2}` rates, quantization vs grid), exp_07 Parts 3–4 (transfer to unseen
-noise levels, inference-cost accounting). Partial outputs are committed as WIP.
+`N^{−1/2}` rates, quantization vs grid). Partial outputs are committed as WIP.
 
 **Not started:** the items in §6.3, §6.4, and §6.1 — hybrid non-Markov
 correction, structured-architecture baseline, and distillation of the BP

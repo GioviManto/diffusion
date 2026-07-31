@@ -817,8 +817,20 @@ The content of Proposition~\ref{prop:sensitivity} is the word \emph{uniformly}:
 one $N^{-1/2}$-consistent parameter estimate delivers an $N^{-1/2}$-accurate
 denoiser at \emph{every} noise level simultaneously. The network gets no such
 statement; its error must be paid for separately in every region of $(x,t)$ it
-is asked about, and in particular it must extrapolate when asked about a $t$
-outside its training schedule.
+is asked about.
+
+It is worth recording that the obvious corollary of this --- that the network
+should visibly break at noise levels outside its training schedule --- is
+\emph{false}, and experiment~07 Part~3 was designed expecting it. Across
+thirteen levels from $t = 0.02$ to $t = 3.2$ the network shows no cliff at the
+schedule boundary, and the EM-BP advantage (a factor of $4.5$ to $19$) does not
+separate in-schedule from out-of-schedule levels at all. Diffusion time enters
+through smooth features and the target moves smoothly with $t$, so a network
+handles that one direction adequately: the estimation difficulty lives in
+$x$-space, not in $t$-space. What survives is the weaker but real statement
+that EM-BP has no schedule to leave --- its error varies smoothly across the
+whole range because its parameters are properties of the clean chain and BP
+supplies each $t$ exactly.
 
 \subsection{What the comparison must control}
 
@@ -858,8 +870,9 @@ up to favour the network wherever there was a choice:
 \item \textbf{Inference cost is the honest loss.} Grid BP costs $O(nM^2)$ per
   chain per evaluation; a network forward pass is a few matmuls. Since reverse
   diffusion evaluates the denoiser at every integration step, this is not a
-  detail. The measured slowdown is two orders of magnitude
-  (experiment~07 Part~4) and is reported as prominently as the wins. The natural
+  detail. The measured slowdown is $211\times$ to $320\times$ at $M = 401$
+  (experiment~07 Part~4, $1.2$--$2.0$\,ms per chain against $4$--$10\,\mu$s for a
+  forward pass) and is reported as prominently as the wins. The natural
   responses --- distilling the fitted BP denoiser into a network, or using the
   Gaussian-projected BP of Layer 2 at inference --- are the obvious next step,
   not something claimed here.

@@ -38,7 +38,14 @@ Part 2 (capacity). Test error vs network size at fixed N, to check the network
 Part 3 (transfer across the noise schedule). Both methods evaluated at noise
   levels *outside* the training schedule. EM-BP has no schedule to leave: its
   parameters are properties of the clean chain, and BP supplies every t exactly.
-  The network must extrapolate in t.
+  This part was written expecting the network to break outside its schedule.
+  It does not: measured across t in [0.02, 3.2] there is no cliff at the
+  boundary and the EM-BP advantage does not separate in-schedule from
+  out-of-schedule levels. Time enters through smooth features and the target
+  moves smoothly with t, so the network handles that direction adequately --
+  the difficulty is in x-space. The part is kept because the negative result
+  is worth having and because it does show the x0 parameterization failing
+  outright at low noise.
 Part 4 (cost accounting, honestly). Training seconds, parameter counts, and
   inference seconds per chain. The last one is where BP loses, and it is
   reported as prominently as the wins.
