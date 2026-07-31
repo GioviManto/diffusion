@@ -570,11 +570,18 @@ Proposition~\ref{prop:fisher} is fine and the quadrature is not.
 $|u_k - \rho u_j|$ is a breakpoint, i.e.\ one of the ratios $u_k/u_j$. On a
 uniform grid through the origin these ratios are rationals $m/l$, and a
 low-denominator value such as $4/5$ has many aliases ($8/10$, $12/15$, \dots)
-that pool weight onto it. So $\hat\rho$ lands on simple rationals: spuriously
-\emph{exactly} correct when the truth happens to be one, and stuck at lattice
-resolution when it is not. Experiment~06 Part~5 measures this against $M$ and
-against $\rho^\star$; the reported $N^{-1/2}$ rates use the smooth kernels,
-whose M-steps are ratios of smooth moments and vary continuously.
+that pool weight onto it. Experiment~06 Part~5 measures the consequence with
+the data held fixed so that the grid is the only thing varying, and it is worse
+than a resolution limit: $4/5$ acts as an \emph{attractor}. For
+$\rho^\star = 0.7913$, chosen deliberately off the simple lattice, $\hat\rho$ is
+pinned at exactly $0.8000$ across an eightfold grid refinement
+($M = 201 \to 1601$), holding a constant bias of $0.0087$; at $M = 201$ three
+distinct true values collapse onto $0.8000$. Refining the grid does not help,
+because this is a bias and not a discretization error that vanishes with $dx$.
+It also contaminates the scale: where $\rho$ is snapped away from the truth the
+error in $b$ is three to four times larger. The reported rates accordingly use
+the smooth kernels, whose M-steps are ratios of smooth moments and vary
+continuously.
 \end{remark}
 
 \begin{remark}[The literal gradient route, measured]

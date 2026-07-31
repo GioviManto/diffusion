@@ -265,36 +265,37 @@ consequence remains a theoretical statement here. Confirming it needs the
 replicate runs (`hpc/slurm_replicates.sbatch`, and `--set n_rep_rate=32`), which
 is why that is ranked #2 in the handoff's next steps.
 
-### 4.10 Lattice quantization, measured (exp_06 Part 5)
+### 4.10 Lattice quantization, measured (exp_06 Part 5, re-run)
 
-The estimate ρ̂ from the Laplace M-step, against grid size and true value:
+ρ̂ from the Laplace M-step, with the **data held fixed per ρ\*** so the grid is
+the only thing varying down each column:
 
-| M | ρ\*=0.770 | ρ\*=0.800 | ρ\*=0.813 |
-|---|---|---|---|
-| 201 | **0.750** | **0.750** | **0.750** |
-| 401 | 0.778 | 0.778 | 0.818 |
-| 801 | 0.778 | 0.808 | 0.822 |
-| 1601 | 0.780 | 0.792 | 0.820 |
+| M | ρ\*=0.7700 | ρ\*=0.7913 | ρ\*=0.8000 | ρ\*=0.8130 |
+|---|---|---|---|---|
+| 201 | 0.7500 | **0.8000** | 0.8000 | **0.8000** |
+| 401 | 0.7778 | **0.8000** | 0.8000 | **0.8000** |
+| 801 | 0.7857 | **0.8000** | 0.8000 | 0.8108 |
+| 1601 | 0.7852 | **0.8000** | 0.8000 | 0.8113 |
 
-**At M=201 all three distinct true values collapse onto the single lattice
-point 3/4.** The estimates are visibly rationals with small denominators (7/9,
-9/11, 21/26, 19/24). Refining the grid helps but the error plateaus around
-0.008–0.01 rather than converging to zero.
+**4/5 is an attractor of the weighted-median M-step, and refining the grid does
+not escape it.** For ρ\* = 0.7913 — chosen deliberately off the simple lattice —
+the estimate is pinned at exactly 0.8000 across an **8× grid refinement**, with a
+constant 0.0087 bias. That is not a resolution limit that more grid points would
+fix; it is a fixed bias. At M=201 three distinct true values (0.7913, 0.8000,
+0.8130) all return exactly 0.8000.
 
-Two corrections this forces:
+The `b` error is now interpretable too, and shows the damage propagating: where
+ρ is snapped away from the truth (ρ\*=0.8130) the scale error sits at ~0.027,
+roughly 3–4× the ~0.008 seen where ρ is recovered. ρ error contaminates `b`,
+because `b` is estimated conditional on the snapped ρ.
 
-- **The "spuriously exactly right at ρ\*=0.8" framing was too simple.** Part 1
-  (N=1024, M=401) returned ρ̂ = 0.8 to 1e-16; Part 5 (N=256, M=401, same ρ\*)
-  returns 0.778. The lattice *constrains* the estimator; which lattice point it
-  selects depends on the data. So the 1e-16 in §4.5 is a coincidence of that
-  configuration, not a property of ρ\* being a lattice point.
-- ⚠️ **This part has a design flaw.** The seed is `rng_for("exp06-p5", rho_true,
-  m_size)`, so each grid size draws *different data* — the across-`M` comparison
-  is confounded by resampling, and the `b`-error column (which does not improve
-  with `M`, and worsens for ρ\*=0.770) cannot be interpreted at all. The
-  within-`M` collapse at M=201 stands, since three different datasets all
-  produced exactly 0.750. Fixing this means dropping `m_size` from the seed key
-  so the grid is the only thing that varies; it is listed in the handoff.
+⚠️ **This supersedes the first run of this part, and corrects a claim I made
+from it.** That run keyed its seed on the grid size, so every cell drew
+different data; I reported from it that "at M=201 three distinct true values all
+return exactly 0.750". With the confound removed the collapse is real but lands
+on **0.800**, not 0.750 — the specific attractor in the first run was itself an
+artifact of the resampling. The qualitative phenomenon survives; that particular
+number did not.
 
 ---
 
@@ -305,11 +306,11 @@ Two corrections this forces:
 The minimizer of `Σ Ξ[k,j]|u_k − ρu_j|` is a *breakpoint*, i.e. one of the
 ratios `u_k/u_j`. On a uniform grid through the origin these are rationals `m/l`,
 and a low-denominator value like 4/5 has many aliases (8/10, 12/15, …) pooling
-weight onto it. So ρ̂ snaps to simple rationals — measured in §4.10, where at
-M=201 three distinct true values (0.770, 0.800, 0.813) **all** return exactly
-0.750, and where refining the grid plateaus the error near 0.008 rather than
-driving it to zero. This is real for the discretized model, not an algorithmic
-bug.
+weight onto it. So ρ̂ snaps to simple rationals — measured in §4.10, where
+ρ\*=0.7913 is pinned at exactly 0.8000 across an 8× grid refinement with a
+constant 0.0087 bias, and three distinct true values collapse onto 0.8000 at
+M=201. This is real for the discretized model, not an algorithmic bug, and it
+is a *bias* rather than a resolution limit: more grid points do not help.
 Smooth kernels (Gaussian, mixture) have M-steps that are ratios of smooth
 moments and are free of it — which is why the reported rates use those.
 
