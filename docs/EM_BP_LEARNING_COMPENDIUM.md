@@ -207,18 +207,37 @@ solution is a discretization artifact (rung 2).
 
 ### 4.8 Recovering an unknown innovation law
 
-The mixture kernel, which has never heard of the Laplace density, fitted to
-**noisy observations only** (2000 chains, noise up to t=1.6):
+The mixture kernel has never heard of the Laplace density it must recover. Fitted
+to **noisy observations only** (N=1024, one noisy realization per chain, noise
+levels up to t=1.6, never a clean sample):
 
-| quantity | recovered | true |
-|---|---|---|
-| ρ | 0.799 | 0.800 |
-| innovation variance | 0.370 | 0.360 |
-| innovation excess kurtosis | **2.84** | **3.00** |
+| C | ρ̂ | innov. var | innov. excess kurtosis | innov. mean | logL |
+|---|---|---|---|---|---|
+| 2 | 0.806 | 0.363 | 1.95 | −0.005 | −42659.4 |
+| 3 | 0.807 | 0.360 | 2.23 | −0.005 | −42658.4 |
+| 5 | 0.808 | 0.360 | 2.62 | −0.005 | −42655.7 |
+| 8 | 0.807 | 0.361 | **2.71** | −0.005 | −42655.5 |
+| *true* | *0.800* | *0.360* | *3.00* | *0* | |
 
-The heavy tail is recovered without ever seeing a clean sample and without being
-told the family. At 400 chains the kurtosis is only ~1.4 — this is the quantity
-that needs data, which is exactly what §4.4 predicts.
+The variance is recovered essentially exactly from C=3 up; the heavy tail
+climbs monotonically with C toward its true value; the likelihood increases with
+C; monotonicity violation is exactly 0 throughout. The fitted innovation mean
+lands at −0.005 **without being constrained to** — which is the empirical
+justification for not enforcing `Σπ_cμ_c = 0` (doing so by projection broke
+monotone ascent, §5.3).
+
+Induced denoiser error against exact BP under the *true* prior is best around
+C=5 (0.0117 at t=0.4, 0.0225 at t=0.2); at t=0.1 the largest mixture is
+slightly worse than C=3 (0.050 vs 0.038), mild overfitting at the low-noise end.
+`identity_residual` max 2.0e-14.
+
+⚠️ **The kurtosis estimate is high-variance, and should not be presented as a
+clean convergence curve.** At C=8 with one replicate per N it reads 2.91, 3.45,
+3.70, 3.29, 2.64 for N = 128 … 2048 — non-monotone, and overshooting the true
+3.0 in the middle. What *does* improve monotonically with N is the quantity that
+matters, the denoiser error: 0.083, 0.080, 0.061, 0.060, 0.037. Any claim about
+"how much data the heavy tail needs" requires the replicate runs in
+`hpc/slurm_replicates.sbatch`, not this single-replicate sweep.
 
 ---
 
