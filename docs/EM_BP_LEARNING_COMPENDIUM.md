@@ -62,7 +62,7 @@ Pure numpy, no autodiff, no new dependencies.
 | `experiments/exp_06_…` | Correctness: monotonicity, Fisher information, misspecification, rates, quantization |
 | `experiments/exp_07_…` | The headline: EM-BP vs a score network |
 | `experiments/exp_08_…` | The literal gradient route vs the exact M-step |
-| `tests/test_em_bp.py` | 19 tests (33 total in the package, all passing), including three independent cross-checks (§5.5) |
+| `tests/test_em_bp.py` | 21 tests (35 total in the package, all passing), including five independent cross-checks (§5.5) |
 | `hpc/`, `tools/merge_replicates.py` | Cluster templates and replicate merging |
 
 **The four rungs**, all consuming the same `Ξ`:
@@ -356,7 +356,30 @@ the evidence check beyond the Gaussian case, which is the only one with a
 closed form. The third confirms EM lands on a stationary point of the
 *marginal* likelihood rather than merely a fixed point of the M-step map.
 
-All three are permanent tests, not one-off scripts.
+Two further checks target the things that would invalidate the **headline
+comparison** specifically, rather than the machinery:
+
+| check | why it matters | result |
+|---|---|---|
+| **Reference denoiser vs Monte Carlo** | Every number in exp_07 is a deviation from `bp_posterior_mean` under the true prior. If the yardstick were wrong, all of them would be. | relative L2 difference **1.1e-3** over 6M samples, with every coordinate inside the MC standard error |
+| **The baseline network can actually learn** | If the DSM implementation were subtly broken, "EM-BP wins" would be an artifact rather than a sample-efficiency effect. Trained on a *Gaussian* chain where the exact denoiser is closed-form and linear. | best mean relative error **0.099** — it learns; the implementation is sound |
+
+The second is load-bearing and its numbers are worth quoting. Given 8000 chains
+(4× exp_07's largest budget), 40 000 steps (2× exp_07's), and a much easier
+problem (n=8 rather than 32, Gaussian rather than Laplace, a *linear* target),
+the best the network reaches is 0.099. EM-BP reaches **0.016** on the harder
+Laplace problem at n=32 with 2048 chains. So the gap in §4.1 is not an artifact
+of a crippled baseline.
+
+The same run also confirms the parameterization complementarity the write-up
+claims, and shows why it is structural rather than incidental: ε-prediction
+recovers the mean as `(x − √Δ·ẑ)/α`, so it amplifies network error by `√Δ/α` —
+negligible at low noise, but a factor of ~4.9 at t=1.6, where its error blows up
+to 1.19 against x₀'s 0.156. At t=0.1 the ordering reverses (0.038 vs 0.076).
+Reporting only one parameterization would have been misleading in whichever
+direction it was chosen.
+
+All five are permanent tests, not one-off scripts.
 
 ---
 

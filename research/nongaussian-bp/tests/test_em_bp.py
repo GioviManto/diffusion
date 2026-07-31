@@ -485,3 +485,97 @@ def test_em_fixed_point_is_stationary_for_the_marginal_likelihood():
 
     assert trace.monotone_violation < 1e-8
     assert np.linalg.norm(grad_end) < 1e-5 * np.linalg.norm(grad_start)
+
+
+# ----------------------------------------------------------------------------
+# Validity of the exp_07 comparison itself
+# ----------------------------------------------------------------------------
+
+def test_bp_reference_denoiser_matches_monte_carlo():
+    """The yardstick exp_07 scores everything against.
+
+    Every number in the EM-BP vs network comparison is a deviation from
+    `bp_posterior_mean` under the true prior. If that reference were wrong,
+    every number would be. Cross-checked here by importance sampling
+    E[a | x] straight from the clean chain -- no BP involved.
+    """
+    from src.denoiser import bp_posterior_mean
+
+    grid, weights = make_grid(10.0, 1201)
+    prior = LaplaceAR1(0.8)
+    rng = rng_for("test-ref-denoiser")
+    n, t = 5, 0.5
+    alpha, delta = alpha_delta(t)
+    a_true = prior.sample(rng, n)
+    x = alpha * a_true + np.sqrt(delta) * rng.standard_normal(n)
+
+    m_bp = bp_posterior_mean(prior, grid, weights, x[None, :], t)[0]
+
+    rng_mc = np.random.default_rng(777)
+    chunk, n_chunks = 250_000, 8
+    num, den = np.zeros(n), 0.0
+    for _ in range(n_chunks):
+        a = np.empty((chunk, n))
+        a[:, 0] = rng_mc.standard_normal(chunk)
+        for i in range(1, n):
+            a[:, i] = 0.8 * a[:, i - 1] + rng_mc.laplace(0.0, prior.b, size=chunk)
+        log_w = (-0.5 * (x[None, :] - alpha * a) ** 2 / delta).sum(axis=1)
+        w = np.exp(log_w - log_w.max())
+        num += (w[:, None] * a).sum(axis=0)
+        den += w.sum()
+    m_mc = num / den
+
+    assert np.linalg.norm(m_bp - m_mc) / np.linalg.norm(m_mc) < 1e-2
+
+
+def test_dsm_baseline_is_not_broken():
+    """The score network must be able to learn, or the comparison is worthless.
+
+    Trained on a *Gaussian* chain, where the exact denoiser is available in
+    closed form and is linear in x, with generous data. If the baseline were
+    subtly broken the exp_07 result would be an artifact rather than a
+    sample-efficiency effect, so this is a load-bearing test.
+
+    It also pins the complementarity of the two parameterizations that the
+    write-up claims: eps recovers the mean as (x - sqrt(Delta) z)/alpha and so
+    amplifies network error by sqrt(Delta)/alpha, which is small at low noise
+    and large at high noise; x0 has the opposite profile.
+    """
+    from src.denoiser import dsm_posterior_mean, train_dsm_denoiser
+    from src.exact_scores import exact_gaussian_posterior_mean
+
+    n_sites = 8
+    prior = GaussianAR1(0.8)
+    sigma0 = prior.covariance(n_sites)
+    t_train = (0.1, 0.4, 1.6)
+
+    rng = rng_for("test-dsm-sound")
+    A = np.stack([prior.sample(rng, n_sites) for _ in range(3000)])
+    rng_test = rng_for("test-dsm-sound-test")
+    A_test = np.stack([prior.sample(rng_test, n_sites) for _ in range(256)])
+
+    errors = {}
+    for mode in ("eps", "x0"):
+        dsm = train_dsm_denoiser(
+            A, t_train, rng_for("test-dsm-sound-train", mode),
+            hidden=(128, 128), n_steps=12000, parameterization=mode,
+        )
+        per_t = {}
+        for t in t_train:
+            alpha, delta = alpha_delta(t)
+            X = alpha * A_test + np.sqrt(delta) * rng_test.standard_normal(A_test.shape)
+            m_exact = np.stack(
+                [exact_gaussian_posterior_mean(x, sigma0, alpha, delta) for x in X]
+            )
+            m_net = dsm_posterior_mean(dsm, X, t)
+            per_t[t] = float(
+                np.linalg.norm(m_net - m_exact) / np.linalg.norm(m_exact)
+            )
+        errors[mode] = per_t
+
+    best_mean = min(float(np.mean(list(v.values()))) for v in errors.values())
+    assert best_mean < 0.25, f"baseline network cannot learn a linear denoiser: {errors}"
+
+    # Complementarity: eps wins at low noise, x0 wins at high noise.
+    assert errors["eps"][0.1] < errors["x0"][0.1]
+    assert errors["x0"][1.6] < errors["eps"][1.6]
