@@ -381,6 +381,7 @@ class MDNKernel:
     net: MLP
     n_components: int
     lr: float = 5e-2
+    backtrack_scales: tuple[float, ...] = (1.0, 0.5, 0.25, 0.125, 0.0625)
     _adam: dict = None  # type: ignore[assignment]
 
     @classmethod
@@ -442,11 +443,16 @@ class MDNKernel:
         )
 
     def m_step(self, stats: ExpectedStatistics, grid: np.ndarray) -> "MDNKernel":
-        """One Adam ascent step on Q -- a generalized (gradient) M-step.
+        """One backtracked Adam ascent step on Q -- a generalized M-step.
 
-        Generalized EM only requires Q to *increase*, not to be maximized, so a
-        single gradient step per E-step keeps the monotone-ascent guarantee for
-        a small enough learning rate.
+        Generalized EM requires Q to *increase*, not to be maximized. A fixed
+        learning rate does not deliver that: run without the backtracking below,
+        this kernel raised the marginal log-likelihood overall but violated
+        monotonicity by hundreds of nats along the way, at which point EM's one
+        guarantee is gone and a diverging run is indistinguishable from a slow
+        one. We therefore evaluate Q after the step and halve it until the step
+        is an ascent, which is cheap: Q is the contraction <Xi, log K>, and Xi
+        is already in hand.
 
         The gradient uses the centered statistic
 
@@ -481,10 +487,25 @@ class MDNKernel:
         # Ascent on Q == descent on -Q; scaling by the edge count keeps the
         # learning rate dataset-size independent.
         grads = self.net.backward(cache, -grad_out / max(stats.n_edges, 1))
-        self._adam_step(grads)
+
+        q_before = float(np.sum(stats.xi * self.log_transition_matrix(grid)))
+        saved = [p.copy() for p in self.net.params]
+        direction = self._adam_direction(grads)
+        for scale in self.backtrack_scales:
+            for p, s, d_p in zip(self.net.params, saved, direction):
+                p[...] = s - scale * d_p
+            q_after = float(np.sum(stats.xi * self.log_transition_matrix(grid)))
+            if np.isfinite(q_after) and q_after >= q_before:
+                return self
+        # No ascent found: stay put rather than take a step that would break the
+        # guarantee. A run that stalls here is reporting that its learning rate
+        # is too large, which is information; a run that silently descends is not.
+        for p, s in zip(self.net.params, saved):
+            p[...] = s
         return self
 
-    def _adam_step(self, grads) -> None:
+    def _adam_direction(self, grads) -> list[np.ndarray]:
+        """Adam update direction at unit scale (moments are advanced here)."""
         if self._adam is None:
             self._adam = {
                 "m": [np.zeros_like(p) for p in self.net.params],
@@ -494,14 +515,14 @@ class MDNKernel:
         st = self._adam
         st["step"] += 1
         b1, b2, eps = 0.9, 0.999, 1e-8
+        direction = []
         for j, g in enumerate(grads):
             st["m"][j] = b1 * st["m"][j] + (1 - b1) * g
             st["v"][j] = b2 * st["v"][j] + (1 - b2) * g**2
             mh = st["m"][j] / (1 - b1 ** st["step"])
             vh = st["v"][j] / (1 - b2 ** st["step"])
-            self.net.params[j] = self.net.params[j] - self.lr * mh / (
-                np.sqrt(vh) + eps
-            )
+            direction.append(self.lr * mh / (np.sqrt(vh) + eps))
+        return direction
 
 
 def _logsumexp_rows(z: np.ndarray) -> np.ndarray:

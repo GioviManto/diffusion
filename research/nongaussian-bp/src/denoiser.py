@@ -73,6 +73,7 @@ def score_from_mean(
 @dataclass
 class DSMResult:
     net: MLP
+    parameterization: str
     loss_history: list[float]
     seconds: float
     n_params: int
@@ -88,19 +89,35 @@ def train_dsm_denoiser(
     batch_size: int = 128,
     lr: float = 2e-3,
     log_every: int = 200,
+    parameterization: str = "eps",
 ) -> DSMResult:
-    """Vanilla diffusion training: predict the clean chain from the noisy one.
+    """Vanilla diffusion training, in either standard parameterization.
 
-    Minimizes  E_{a, t, z} || m_phi(x, t) - a ||^2  with x = alpha_t a +
-    sqrt(Delta_t) z, whose minimizer is exactly E[a | x, t]. This is the same
-    target BP computes, so the two methods are directly comparable and the
-    network is not being handicapped by a different objective.
+    With x = alpha_t a + sqrt(Delta_t) z, the network either predicts the clean
+    chain ("x0") or the noise ("eps"):
+
+        x0 :  minimize E || a_phi(x,t) - a ||^2,   m_hat = a_phi
+        eps:  minimize E || z_phi(x,t) - z ||^2,   m_hat = (x - sqrt(Delta) z_phi) / alpha
+
+    Both have the same minimizer, E[a | x, t] -- the object BP computes -- so
+    neither is handicapped by a surrogate loss. They are *not* equivalent in
+    finite samples, because z = (x - alpha a)/sqrt(Delta) makes the two losses
+    differ by the factor alpha_t^2 / Delta_t: eps-prediction upweights small t
+    sharply, and its posterior mean inherits a sqrt(Delta_t)/alpha_t prefactor
+    that suppresses network error exactly where the x0 parameterization is
+    weakest. Since eps-prediction is the standard diffusion recipe and the
+    stronger baseline at low noise, it is the default here; `x0` is retained so
+    the comparison can be reported both ways rather than resting on a choice
+    that happens to flatter the structured method.
 
     A_train : (N, n) clean chains -- the data budget.
     t_values: noise levels sampled uniformly at each step (the training
               schedule); the same levels are used for evaluation.
     """
     import time
+
+    if parameterization not in ("eps", "x0"):
+        raise ValueError(f"Unknown parameterization {parameterization!r}.")
 
     n_data, n_sites = A_train.shape
     sizes = (n_sites + 3,) + tuple(hidden) + (n_sites,)
@@ -109,7 +126,7 @@ def train_dsm_denoiser(
 
     m_state = [np.zeros_like(p) for p in net.params]
     v_state = [np.zeros_like(p) for p in net.params]
-    beta1, beta2, eps = 0.9, 0.999, 1e-8
+    beta1, beta2, eps_adam = 0.9, 0.999, 1e-8
     history: list[float] = []
 
     t0 = time.perf_counter()
@@ -119,25 +136,27 @@ def train_dsm_denoiser(
         t = t_arr[rng.integers(0, len(t_arr), size=len(idx))]
         alpha = np.exp(-t)[:, None]
         delta = (1.0 - np.exp(-2.0 * t))[:, None]
-        x = alpha * a + np.sqrt(delta) * rng.standard_normal(a.shape)
+        z = rng.standard_normal(a.shape)
+        x = alpha * a + np.sqrt(delta) * z
 
         feats = np.concatenate([x, time_features(t)], axis=1)
         out, cache = net.forward(feats)
-        diff = out - a
-        grad_out = 2.0 * diff / len(idx)
-        grads = net.backward(cache, grad_out)
+        target = z if parameterization == "eps" else a
+        diff = out - target
+        grads = net.backward(cache, 2.0 * diff / len(idx))
         for j, g in enumerate(grads):
             m_state[j] = beta1 * m_state[j] + (1 - beta1) * g
             v_state[j] = beta2 * v_state[j] + (1 - beta2) * g**2
             m_hat = m_state[j] / (1 - beta1**step)
             v_hat = v_state[j] / (1 - beta2**step)
-            net.params[j] = net.params[j] - lr * m_hat / (np.sqrt(v_hat) + eps)
+            net.params[j] = net.params[j] - lr * m_hat / (np.sqrt(v_hat) + eps_adam)
         if step % log_every == 0 or step == 1:
             history.append(float(np.mean(diff**2)))
     seconds = time.perf_counter() - t0
 
     return DSMResult(
         net=net,
+        parameterization=parameterization,
         loss_history=history,
         seconds=seconds,
         n_params=net.n_params,
@@ -145,12 +164,28 @@ def train_dsm_denoiser(
     )
 
 
-def dsm_posterior_mean(net: MLP, X: np.ndarray, t: float) -> np.ndarray:
-    """Network estimate of E[a | x] at a single noise level."""
+def dsm_posterior_mean(
+    result: DSMResult | MLP, X: np.ndarray, t: float, parameterization: str | None = None
+) -> np.ndarray:
+    """Network estimate of E[a | x] at a single noise level.
+
+    Accepts a `DSMResult` (which carries its own parameterization) or a bare
+    `MLP` plus an explicit parameterization.
+    """
+    if isinstance(result, DSMResult):
+        net, mode = result.net, result.parameterization
+    else:
+        net, mode = result, parameterization
+    if mode not in ("eps", "x0"):
+        raise ValueError("Parameterization must be given for a bare MLP.")
+
+    alpha, delta = alpha_delta(t)
     t_arr = np.full(X.shape[0], float(t))
     feats = np.concatenate([X, time_features(t_arr)], axis=1)
     out, _ = net.forward(feats)
-    return out
+    if mode == "x0":
+        return out
+    return (X - np.sqrt(delta) * out) / alpha
 
 
 # ----------------------------------------------------------------------------

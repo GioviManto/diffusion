@@ -632,9 +632,10 @@ Let a small MLP $\phi$ map a state to the parameters of a conditional mixture,
 \end{equation}
 a mixture-density network, nonparametric in both the location and the shape of
 the transition. There is no closed-form M-step, so we take one Adam step on $Q$
-per E-step --- generalized EM, which only requires $Q$ to increase. The gradient
-is where the structure pays off. By the chain rule applied to
-\eqref{eq:Q-bilinear},
+per E-step --- generalized EM, which only requires $Q$ to increase, and which
+therefore requires \emph{checking} that it does; see
+Remark~\ref{rem:backtrack}. The gradient is where the structure pays off. By the
+chain rule applied to \eqref{eq:Q-bilinear},
 \begin{equation}
   \frac{\partial Q}{\partial \phi}
   \;=\;
@@ -654,6 +655,37 @@ is the centered statistic, $p_j$ being the grid-normalized kernel column; the
 subtracted term is the derivative of the column log-partition, the familiar
 ``observed minus expected'' form. Verified against finite differences of the
 exact evidence to $1.6 \times 10^{-6}$ relative.
+
+\begin{remark}[A fixed learning rate is not an ascent step]
+\label{rem:backtrack}
+``Generalized EM only needs $Q$ to increase'' is a licence to take a cheap
+M-step, not a licence to skip the check. Run with a fixed Adam step, this kernel
+raised the marginal log-likelihood overall ($-18978 \to -16652$ nats on a
+400-chain fit) while violating monotonicity by $547$ nats at $\eta = 0.02$ and
+$1452$ at $\eta = 0.05$ --- at which point EM's one guarantee is gone and a
+diverging run looks exactly like a slow one. Backtracking the step until $Q$
+actually increases restores exact monotonicity ($0$ violation at both rates) at
+negligible cost, since $Q = \langle\Xibf, \log K\rangle$ is one contraction of a
+matrix already in hand. It is also diagnostic: at $\eta = 0.05$ the backtracked
+run stalls at $-17392$ instead of silently descending, which is the learning
+rate reporting itself as too large.
+\end{remark}
+
+\begin{remark}[More expressive is not better here]
+\label{rem:rung4-loses}
+On the Laplace chain with $400$ observed noisy chains, the neural kernel
+($873$ parameters) reaches a \emph{higher} training log-likelihood than the
+mixture kernel of Rung 3 ($13$ parameters) --- $-16652$ against $-16656$ --- and
+a \emph{worse} held-out denoiser: relative score error $0.052$ against $0.026$.
+That is ordinary overfitting, and it is worth stating plainly because the
+temptation this note is arguing against --- reach for the network --- reappears
+one level down. Rung 4 is the right tool when the transition genuinely has
+state-dependent shape that Rung 3 cannot express; on data where a linear
+autoregression with a free innovation law is correct, it buys nothing and costs
+two orders of magnitude in parameters. The efficiency argument of
+Section~\ref{sec:efficiency} is an argument for matching the hypothesis class to
+the structure, not an argument that neural components are inadmissible.
+\end{remark}
 
 % =====================================================================
 \section{Why this should beat a score network}
@@ -747,7 +779,15 @@ up to favour the network wherever there was a choice:
   strictly less.
 \item \textbf{Objective} is denoising score matching, whose minimizer is exactly
   $\E[a\mid x,t]$ --- the same target BP computes. The network is not
-  handicapped by a surrogate loss.
+  handicapped by a surrogate loss. Both standard parameterizations are trained
+  and reported: noise prediction ($\|z_\phi - z\|^2$, the usual diffusion
+  recipe) and clean-signal prediction ($\|a_\phi - a\|^2$). They share a
+  minimizer but not a finite-sample loss, the two differing by the weight
+  $\alpha_t^2/\Delta_t$; noise prediction additionally recovers the mean as
+  $(x - \sqrt{\Delta_t}\, z_\phi)/\alpha_t$, whose $\sqrt{\Delta_t}$ prefactor
+  suppresses network error exactly where signal prediction is weakest. Resting
+  the comparison on whichever parameterization happens to lose would not be
+  evidence of anything.
 \item \textbf{Capacity and training budget} are swept, so the comparison cannot
   hinge on an undersized or undertrained network.
 \item \textbf{Evaluation} is on held-out chains against exact grid BP under the
@@ -773,6 +813,16 @@ up to favour the network wherever there was a choice:
   Markov, the estimator is misspecified in a way no amount of data fixes.
   Layer~4 showed the correction is exactly rank one for AR(1)-plus-global-latent
   priors, which suggests a hybrid, but that is not tested here.
+\item \textbf{Seeding.} While preparing this layer we found that the package's
+  seeding helper derived its seeds from Python's builtin \texttt{hash}, which is
+  salted per process for strings (PEP 456). Since every call mixes in a string
+  tag, no experiment in the package was bit-reproducible from a fresh
+  interpreter, contrary to what its documentation claimed. The paired
+  ``common random numbers'' property that the method comparisons actually rely
+  on held \emph{within} each run, so previously reported numbers stand as
+  measurements; but they were not reproducible. The helper now uses a fixed
+  digest and the experiments here were re-run under it. Earlier layers'
+  committed outputs have not been regenerated.
 \item \textbf{The state space must be represented.} The $M^2$ in every cost is
   the price of continuous messages, and it is what makes the extension beyond
   scalar-valued sites nontrivial. Nothing in Section~\ref{sec:em} requires a
@@ -783,6 +833,17 @@ up to favour the network wherever there was a choice:
   ``EM beats a score network'' is demonstrated in this setting, not in general;
   in particular the network's disadvantage would shrink if the prior were
   complicated enough that the chain family were itself a poor description.
+\item \textbf{The baseline is a vanilla network, as specified --- and that is a
+  real restriction.} The comparison uses a fully connected MLP, sweeping width
+  and training budget and reporting both standard parameterizations (noise
+  prediction and clean-signal prediction). It does \emph{not} use an
+  architecture that encodes sequence structure. A temporal convolution or a
+  U-Net would carry a locality prior of its own and should be expected to close
+  part of the gap; what it would not acquire is the exactness of
+  \eqref{eq:risk} or the uniformity in $t$ of Proposition~\ref{prop:sensitivity}.
+  Establishing where a structured \emph{architecture} lands relative to a
+  structured \emph{estimator} is the natural next comparison and is not settled
+  here.
 \end{enumerate}
 
 % =====================================================================

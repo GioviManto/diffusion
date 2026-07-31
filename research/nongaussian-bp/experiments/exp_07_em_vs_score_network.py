@@ -25,6 +25,11 @@ choice:
     exact grid BP under the true prior.
   - The network's objective is the one whose minimizer is exactly the target,
     so it is not handicapped by a surrogate loss.
+  - Both standard parameterizations are trained and reported: noise prediction
+    ("eps", the usual diffusion recipe, which carries a sqrt(Delta_t)/alpha_t
+    prefactor that suppresses network error at low noise) and clean-signal
+    prediction ("x0"). Resting the comparison on whichever happens to lose
+    would not be evidence of anything.
 
 Part 1 (sample efficiency). Test error vs N, the headline curve.
 Part 2 (capacity). Test error vs network size at fixed N, to check the network
@@ -94,8 +99,11 @@ def noisy_groups(A: np.ndarray, t_values, rng: np.random.Generator):
     return groups
 
 
-def score_both(kernel, net, grid, weights, bundle, t_values, tag: dict):
-    """Evaluate both denoisers on the shared test bundle."""
+PARAMETERIZATIONS = ("eps", "x0")
+
+
+def score_both(kernel, nets, grid, weights, bundle, t_values, tag: dict):
+    """Evaluate the BP denoiser and every trained network on the test bundle."""
     rows = []
     for t in t_values:
         X, m_ref = bundle[t]
@@ -103,10 +111,22 @@ def score_both(kernel, net, grid, weights, bundle, t_values, tag: dict):
                      **evaluate_denoiser(
                          bp_posterior_mean(kernel, grid, weights, X, t),
                          m_ref, X, t)})
-        rows.append({**tag, "method": "dsm_net", "t": t,
-                     **evaluate_denoiser(
-                         dsm_posterior_mean(net, X, t), m_ref, X, t)})
+        for mode, dsm in nets.items():
+            rows.append({**tag, "method": f"dsm_net_{mode}", "t": t,
+                         **evaluate_denoiser(
+                             dsm_posterior_mean(dsm, X, t), m_ref, X, t)})
     return rows
+
+
+def train_nets(A, rng_key, hidden, n_steps):
+    """One network per parameterization, on the same clean chains."""
+    return {
+        mode: train_dsm_denoiser(
+            A, T_TRAIN, rng_for(*rng_key, mode), hidden=hidden,
+            n_steps=n_steps, parameterization=mode,
+        )
+        for mode in PARAMETERIZATIONS
+    }
 
 
 # ----------------------------------------------------------------------------
@@ -131,27 +151,25 @@ def part1_sample_efficiency(grid, weights, sizes, hidden, n_steps, out):
         )
         em_seconds = time.perf_counter() - t0
 
-        dsm = train_dsm_denoiser(
-            A, T_TRAIN, rng_for("exp07-net", n_chains),
-            hidden=hidden, n_steps=n_steps,
-        )
+        nets = train_nets(A, ("exp07-net", n_chains), hidden, n_steps)
 
         tag = {"n_chains": n_chains}
-        rows += score_both(kernel, dsm.net, grid, weights, bundle, T_TRAIN, tag)
+        rows += score_both(kernel, nets, grid, weights, bundle, T_TRAIN, tag)
         cost_rows.append({
             "n_chains": n_chains,
             "em_seconds": em_seconds,
             "em_iters": len(trace.log_evidence),
             "em_n_params": int(len(kernel.theta)),
             "em_monotone_violation": trace.monotone_violation,
-            "net_seconds": dsm.seconds,
-            "net_n_params": dsm.n_params,
-            "net_grad_steps": dsm.n_grad_steps,
-            "net_final_dsm_loss": dsm.loss_history[-1],
+            "net_n_params": nets["eps"].n_params,
+            "net_grad_steps": nets["eps"].n_grad_steps,
+            **{f"net_{m}_seconds": nets[m].seconds for m in PARAMETERIZATIONS},
+            **{f"net_{m}_final_loss": nets[m].loss_history[-1]
+               for m in PARAMETERIZATIONS},
         })
 
     fig, ax = new_figure(ncols=2, figsize=(11.0, 4.2))
-    for method, style in (("em_bp", "o-"), ("dsm_net", "s-")):
+    for method, style in (("em_bp", "o-"), ("dsm_net_eps", "s-"), ("dsm_net_x0", "^-")):
         for j, key in enumerate(("score_rel_l2", "mean_rel_l2")):
             agg = []
             for n in sizes:
@@ -195,31 +213,36 @@ def part2_capacity(grid, weights, n_chains, archs, step_counts, out):
     rows = []
     for hidden in archs:
         for n_steps in step_counts:
-            dsm = train_dsm_denoiser(
-                A, T_TRAIN, rng_for("exp07-p2", str(hidden), n_steps),
-                hidden=hidden, n_steps=n_steps,
-            )
-            err = float(np.mean([
-                evaluate_denoiser(
-                    dsm_posterior_mean(dsm.net, bundle[t][0], t),
-                    bundle[t][1], bundle[t][0], t,
-                )["score_rel_l2"]
-                for t in T_TRAIN
-            ]))
-            rows.append({
-                "n_chains": n_chains, "hidden": str(hidden), "n_steps": n_steps,
-                "net_n_params": dsm.n_params, "net_seconds": dsm.seconds,
-                "net_score_rel_l2": err,
-                "em_score_rel_l2": em_err,
-                "em_n_params": int(len(kernel.theta)),
-                "ratio_net_over_em": err / em_err,
-            })
+            for mode in PARAMETERIZATIONS:
+                dsm = train_dsm_denoiser(
+                    A, T_TRAIN, rng_for("exp07-p2", str(hidden), n_steps, mode),
+                    hidden=hidden, n_steps=n_steps, parameterization=mode,
+                )
+                err = float(np.mean([
+                    evaluate_denoiser(
+                        dsm_posterior_mean(dsm, bundle[t][0], t),
+                        bundle[t][1], bundle[t][0], t,
+                    )["score_rel_l2"]
+                    for t in T_TRAIN
+                ]))
+                rows.append({
+                    "n_chains": n_chains, "hidden": str(hidden),
+                    "n_steps": n_steps, "parameterization": mode,
+                    "net_n_params": dsm.n_params, "net_seconds": dsm.seconds,
+                    "net_score_rel_l2": err,
+                    "em_score_rel_l2": em_err,
+                    "em_n_params": int(len(kernel.theta)),
+                    "ratio_net_over_em": err / em_err,
+                })
 
     fig, ax = new_figure()
     for hidden in archs:
-        sub = [r for r in rows if r["hidden"] == str(hidden)]
-        ax.loglog([r["n_steps"] for r in sub], [r["net_score_rel_l2"] for r in sub],
-                  "o-", label=f"net {hidden}, {sub[0]['net_n_params']} params")
+        for mode, ls in zip(PARAMETERIZATIONS, ("o-", "^--")):
+            sub = [r for r in rows
+                   if r["hidden"] == str(hidden) and r["parameterization"] == mode]
+            ax.loglog([r["n_steps"] for r in sub],
+                      [r["net_score_rel_l2"] for r in sub], ls,
+                      label=f"{mode}, {hidden}, {sub[0]['net_n_params']} params")
     ax.axhline(em_err, color="k", ls="--", lw=1.5,
                label=f"EM-BP ({len(kernel.theta)} params)")
     ax.set_xlabel("gradient steps")
@@ -246,11 +269,9 @@ def part3_transfer(grid, weights, n_chains, t_probe, hidden, n_steps, out):
         ),
         grid, weights, noisy_groups(A, T_TRAIN, rng), n_iters=120,
     )
-    dsm = train_dsm_denoiser(
-        A, T_TRAIN, rng_for("exp07-net", n_chains), hidden=hidden, n_steps=n_steps
-    )
+    nets = train_nets(A, ("exp07-net", n_chains), hidden, n_steps)
 
-    rows = score_both(kernel, dsm.net, grid, weights, bundle, t_probe,
+    rows = score_both(kernel, nets, grid, weights, bundle, t_probe,
                       {"n_chains": n_chains})
     for r in rows:
         r["in_training_schedule"] = bool(
@@ -258,7 +279,7 @@ def part3_transfer(grid, weights, n_chains, t_probe, hidden, n_steps, out):
         )
 
     fig, ax = new_figure()
-    for method, style in (("em_bp", "o-"), ("dsm_net", "s-")):
+    for method, style in (("em_bp", "o-"), ("dsm_net_eps", "s-"), ("dsm_net_x0", "^-")):
         sub = sorted([r for r in rows if r["method"] == method], key=lambda r: r["t"])
         ax.loglog([r["t"] for r in sub], [r["score_rel_l2"] for r in sub],
                   style, label=method)
@@ -283,6 +304,8 @@ def part4_inference_cost(grid, weights, batch_sizes, hidden, out):
         N_COMPONENTS, rho=0.8, var=0.36, rng=rng_for("exp07-init")
     )
     A = np.stack([prior.sample(rng, N_SITES) for _ in range(max(batch_sizes))])
+    # Timing only -- neither model needs to be well fitted to measure a
+    # forward pass, so the network is trained for a token number of steps.
     dsm = train_dsm_denoiser(A[:64], T_TRAIN, rng, hidden=hidden, n_steps=50)
 
     rows = []
@@ -293,7 +316,7 @@ def part4_inference_cost(grid, weights, batch_sizes, hidden, out):
         bp_posterior_mean(kernel, grid, weights, X, 0.4)
         bp_sec = time.perf_counter() - t0
         t0 = time.perf_counter()
-        dsm_posterior_mean(dsm.net, X, 0.4)
+        dsm_posterior_mean(dsm, X, 0.4)
         net_sec = time.perf_counter() - t0
         rows.append({
             "batch": b, "grid_size": len(grid),
@@ -325,7 +348,7 @@ def main() -> None:
         sizes = (32, 64, 128, 256, 512, 1024, 2048)
         hidden, n_steps = (128, 128), 20000
         archs = ((32, 32), (128, 128), (256, 256), (512, 512))
-        step_counts = (1000, 5000, 20000, 50000)
+        step_counts = (1000, 5000, 20000)
         cap_n = 1024
         t_probe = (0.02, 0.05, 0.1, 0.15, 0.2, 0.3, 0.4, 0.6, 0.8, 1.2, 1.6, 2.4, 3.2)
         batches = (32, 128, 512)
@@ -334,6 +357,7 @@ def main() -> None:
         "n_sites": N_SITES, "rho_true": RHO_TRUE, "grid_size": len(grid),
         "grid_half_width": GRID_A, "t_train": T_TRAIN,
         "n_components": N_COMPONENTS, "n_test": N_TEST, "sizes": sizes,
+        "parameterizations": PARAMETERIZATIONS,
         "net_hidden": hidden, "net_steps": n_steps, "archs": [str(a) for a in archs],
         "step_counts": step_counts, "capacity_n": cap_n, "t_probe": t_probe,
         "inference_batches": batches, "quick": args.quick, **provenance(),
