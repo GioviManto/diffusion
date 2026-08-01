@@ -1,0 +1,55 @@
+{
+  "n_sites": 33,
+  "t_train": [
+    0.1,
+    0.2,
+    0.4,
+    0.8,
+    1.6
+  ],
+  "grid_half_width": 8.0,
+  "quick": false,
+  "parts": [
+    "sweep",
+    "vs_global"
+  ],
+  "overrides": [],
+  "grid_size": 401,
+  "rho": 0.85,
+  "n_chains": 1024,
+  "n_test": 256,
+  "radii": [
+    0,
+    1,
+    2,
+    3,
+    4,
+    6,
+    8,
+    12,
+    16
+  ],
+  "hidden": [
+    64,
+    64
+  ],
+  "global_hidden": [
+    128,
+    128
+  ],
+  "n_steps": 20000,
+  "parameterizations": [
+    "eps",
+    "x0"
+  ],
+  "compare_radius": 6,
+  "timestamp": "2026-08-01 11:47:16",
+  "python": "3.11.15",
+  "numpy": "2.4.6",
+  "platform": "Linux-6.18.5-x86_64-with-glibc2.39",
+  "hostname": "vm",
+  "slurm_job_id": "",
+  "slurm_array_task_id": "",
+  "cpu_count": "4",
+  "blas_threads": "2"
+}

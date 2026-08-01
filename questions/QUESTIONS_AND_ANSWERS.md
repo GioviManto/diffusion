@@ -355,10 +355,51 @@ obvious experiment is reverse dynamics under the EM-learned kernel versus the
 network, which is also where BP's 211×–320× inference-cost penalty (§4.4) would
 actually bite, since the denoiser is called at every integration step.
 
-### F5. Non-Gaussian locality laws (basis-independent statement) — **OPEN**
+### F5. Non-Gaussian locality laws (basis-independent statement) — **ANSWERED**
 
-Untouched. The Gaussian locality law (`q^r` decay of the radius-r estimator
-error, ledger G12) has no non-Gaussian analogue yet.
+Measured in exp_11. The sharp version of "basis-independent" is: *is the
+locality decay rate a property of the second-order structure alone?*
+
+**The exponential law survives for every innovation family, but the rate is not
+second-order universal.** Six families at matched (ρ, q), so they differ only
+beyond second moments. Ratio of fitted rate to the Gaussian rate, averaged over
+families:
+
+| ρ | t=0.05 | t=0.10 | t=0.20 | t=0.40 | t=0.80 |
+|---|---|---|---|---|---|
+| 0.50 | **2.08** | 1.65 | 1.19 | 1.05 | 0.99 |
+| 0.85 | **1.47** | 1.19 | 1.06 | 1.02 | 1.00 |
+| 0.95 | 1.10 | 1.01 | 1.01 | 1.00 | 1.00 |
+
+Non-Gaussian chains are **less local** than their covariance-matched Gaussian,
+and the excess is governed by two knobs, vanishing in both limits: it is largest
+at **low noise and weak correlation**, and is gone by t ≳ 0.4 or ρ ≳ 0.95. The
+ρ-dependence is the same mechanism R2 found for the closure error — strong
+correlation concentrates the messages and makes them look Gaussian.
+
+**The architectural consequence, which is what B15 cares about.** Since
+r ~ log(1/ε)/log(1/q), a receptive field sized on Gaussian intuition is too
+small by:
+
+| family | worst case | factor |
+|---|---|---|
+| gauss_mix κ=0.9 | ρ=0.85, t=0.05 | **2.45×** |
+| gauss_mix κ=0.9 | ρ=0.50, t=0.05 | 2.32× |
+| uniform | ρ=0.10, t=0.10 | 1.27× |
+| laplace | ρ=0.50, t=0.05 | 1.21× |
+
+So B15's prescription is a *Gaussian* statement with a correction factor up to
+~2.5× for bimodal data at low noise. exp_12 tests whether a trained local head
+actually behaves this way.
+
+**And the governing scalar is not the one that governs closure.** The closure
+error tracked |excess kurtosis| so well it predicted the bounded-support case to
+within 14% (R3). The locality excess does not: Student-t with kurtosis **+6.0**
+sits at 1.09–1.25, while bimodal κ=0.9 with |kurtosis| **1.62** reaches 4.94 in
+rate (2.45× in radius). Bimodality specifically — not tail weight — is what
+destroys locality. Identifying the right scalar is open.
+
+*Evidence:* `outputs/exp_11_nongaussian_locality/`.
 
 ---
 
@@ -513,9 +554,13 @@ heavy tail need" claim needs the replicate machinery.
 
 ## Where this leaves the project
 
-**Closed:** R1, R2, **R3**, **R4 = F1**, **F2**, E1, E2, E3, E5, C-i–C-iv, L1–L4.
-**Partial, gap stated:** R5 (needs a hard prior), F3 (learned + low-rank), F4 (learned score), E4 (Overleaf, results section).
-**Open:** F5 (non-Gaussian locality).
+**Closed:** R1, R2, **R3**, **R4 = F1**, **F2**, **F5**, E1, E2, E3, E5,
+C-i–C-iv, L1–L4. Every question the project originally posed to itself now has
+an answer or a measured bound.
+**Partial, gap stated:** R5 (needs a hard prior), F3 (learned + low-rank),
+F4 (learned score), E4 (Overleaf, results section).
+**Open:** none of the original questions. Two *new* ones were opened by the
+answers, below.
 
 The most valuable remaining item is **F3 — a learned chain kernel carrying a
 learned rank-one correction.** It is the natural product of Layers 4 and 5, and
@@ -523,6 +568,21 @@ the one that turns "the prior is Markov" from an assumption into an
 approximation with a measured correction. F4 (reverse dynamics under a *learned*
 score) is now unblocked too, since Layer 5 produces such a score and exp_10
 provides a setting where the reference is exact.
+
+### New questions raised by the answers
+
+**N1. What scalar governs locality?** |excess kurtosis| predicts the Gaussian
+closure error well enough to extrapolate to an unseen family (R3), but it does
+*not* predict the locality excess (F5): Student-t at kurtosis +6.0 is nearly
+universal while bimodal κ=0.9 is 4.94× off. Bimodality specifically destroys
+locality. The right summary statistic is unidentified.
+
+**N2. Does a structured architecture close the EM-BP gap?** The compendium
+flagged this as the most important unasked question. exp_12 now builds the
+locality-respecting baseline (a weight-shared window predictor, i.e. a 1-D CNN);
+its smoke run already shows the local head beating the fully connected MLP by
+2–4× at *fewer* parameters, which means the exp_07 headline overstates the
+margin against a well-chosen architecture. The full run will say by how much.
 
 The most important *unasked* question, which a reviewer will ask: **does a
 structured architecture (temporal CNN / U-Net) close the gap in E3?** The email
