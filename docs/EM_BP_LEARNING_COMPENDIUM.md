@@ -442,26 +442,70 @@ less but that **the axis does not exist for it**.
 
 Measured as nearest-training-chain distance of generated samples, divided by
 the same quantity for a genuinely fresh draw from the true prior (1.0 = no
-memorization, 0 = full collapse), ρ = 0.85:
+memorization, 0 = full collapse), ρ = 0.85, complete sweep:
 
-| n | N | wall `e^{ns}` | empirical | DSM | EM-BP | true-prior BP |
+| n | N | wall `e^{ns}` | empirical | DSM (ε) | EM-BP | true-prior BP |
 |---|---|---|---|---|---|---|
 | 8 | 64 | 88.8 | **0.457** | 0.800 | 1.079 | 1.076 |
 | 8 | 256 | 88.8 | **0.540** | 0.929 | 1.058 | 1.044 |
 | 8 | 1024 | 88.8 | **0.660** | 0.980 | 1.015 | 1.012 |
-| 16 | 64 | 1.5e4 | **0.332** | — | — | — |
+| 16 | 64 | 1.5e4 | **0.332** | 0.751 | 0.972 | 0.992 |
 | 16 | 256 | 1.5e4 | **0.387** | 0.906 | 1.040 | 1.026 |
+| 16 | 1024 | 1.5e4 | **0.456** | 1.066 | 1.066 | 1.072 |
+| 32 | 64 | 4.3e8 | **0.268** | 0.790 | 1.021 | 1.024 |
+| 32 | 256 | 4.3e8 | **0.308** | 1.053 | 1.039 | 1.024 |
+| 32 | 1024 | 4.3e8 | **0.335** | 1.115 | 1.023 | 1.025 |
 
-The empirical score memorizes throughout, and **recovers monotonically as `N`
-crosses its wall** (0.457 → 0.540 → 0.660 as N goes 64 → 1024 past a wall at
-89) — the predicted direction. EM-BP sits at 1.01–1.08 at every `n` and `N`,
-tracking the true-prior BP reference to within 0.03. The network is
-consistently slightly *below* 1, i.e. mildly memorizing, and approaches 1 only
-where the empirical score does too.
+Both dependences come out in the predicted direction. At fixed `N` the
+empirical score memorizes *more* as the chain gets longer (0.457 → 0.332 →
+0.268 at N = 64), which is the curse of dimensionality; at fixed `n` it
+recovers as `N` grows (0.268 → 0.335 at n = 32). **EM-BP stays in
+[0.97, 1.08] in every one of the nine cells, agreeing with the true-prior BP
+reference to ≤ 0.03** — its behaviour does not depend on `n` or `N` at all,
+which is the claim.
+
+**The DSM column must be read with its standard deviation, not alone.** At
+n = 32 the network's sample std is 1.19–1.27, i.e. over-dispersed by 19–27%, so
+its ratios above 1 there are inflated by generating too broadly rather than by
+generalizing better; at n = 8 and 16, where its std is 0.90–1.15, its ratios
+(0.75–1.07) sit below BP's. This is exactly why `sample_std` and `lag1_corr`
+are logged in every row.
 
 The per-site excess entropy is exact for this family, `s = −½ log(1 − ρ²)`:
 **0.641 nats/site at ρ = 0.85**, so n = 33 already demands ~10⁹ chains. That is
 the quantitative form of the claim that Layer 5's data advantage is structural.
+
+### The closed-form collapse time works (exp_14 `time`)
+
+The criterion `n·s(t_C) = log N`, with `s(t) = −(1/2n) log det(α_t²C + Δ_t I)`
+and **no fitted constants**, was tested against the measured collapse of the
+empirical score's own weights (the time at which their entropy falls to
+½ log N), over `n ∈ {8,16,32}` × `N ∈ {32,128,512,2048}`:
+
+- **Pearson r = +0.990** over the 9 settings where the criterion predicts a
+  finite-time collapse (r = +0.995 against the same measurement made on fresh
+  rather than training chains).
+- The relation is **affine, not proportional**: `measured = 1.716 × predicted +
+  0.276`, residual sd **0.029**. Forcing it through the origin gives a residual
+  sd of 0.131, 4.5× worse.
+- Independently, `dt_C/d log N` is −0.039 predicted vs −0.061 measured at
+  n = 16 and −0.051 vs −0.079 at n = 32 — **the same 1.55× slope factor at both
+  chain lengths**, consistent with the affine fit.
+
+So the criterion gets the ordering, both dependences, and the `N`-scaling to
+within a constant factor; it does not get the absolute time. That is what
+should be expected — it is a leading-order statement, and the "half of log N"
+landmark is a choice with no claim to mark the exact transition. **The offset is
+reported, not absorbed into a fitted constant.**
+
+**Where it does not apply, stated plainly.** At n = 8 with N ≥ 128 the criterion
+returns *no finite-time collapse* (total excess entropy 4.487 nats against
+log 128 = 4.852), yet collapse is measured at t = 0.234, 0.170, 0.122 for
+N = 128, 512, 2048. There is no contradiction: the criterion is asymptotic in
+`n`, and a finite system always collapses eventually as `t → 0`. "No collapse"
+means "collapse only at vanishing `t`", and at n = 8 that is not a good
+approximation. Those three rows are excluded from the correlation above and
+listed here rather than dropped.
 
 ### Caveat carried with the collapse numbers
 
@@ -513,6 +557,18 @@ against 0.9) has nowhere else to appear.
 The x₀-network is genuinely intermediate (up to 12.6× at large `t`), which is
 worth stating because it is the better parameterization there; the "no
 structure at all" reading applies to ε-prediction, not to every network.
+
+### A non-monotonicity that is not a bug (exp_13 `ordering`)
+
+EM's *error against the truth* is non-monotone in the iteration count even
+though its log-likelihood is monotone: total relative error 0.0729 → 0.0083 →
+0.0162 at 32 → 64 → 128 iterations, with ρ̂ = 0.8708 → 0.9068 → 0.9158 against
+a true 0.9. There is nothing wrong. EM converges to the **maximum likelihood
+estimate**, which at N = 256 trees is ρ̂ = 0.9161, not to the true parameter;
+the trajectory happens to pass close to 0.9 on the way. Reading the minimum at
+64 iterations as "the right stopping point" would be fitting the answer.
+`monotone_violation` is exactly 0 throughout, which is the quantity that would
+actually signal a broken M-step.
 
 ### Tree EM converges, but slowly
 
