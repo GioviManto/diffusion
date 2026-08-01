@@ -1,11 +1,14 @@
-# Agent handoff — Layer 5 (EM + BP denoiser learning)
+# Agent handoff — Layers 5–6 (EM + BP denoiser learning; hierarchical priors)
 
 You are picking up work on `GioviManto/diffusion`, branch
 **`claude/em-bp-denoiser-learning-e07ike`**. Read this before touching anything;
 several of the traps below cost real time to find and are easy to reintroduce.
 
 For *what was done and what it showed*, read `docs/EM_BP_LEARNING_COMPENDIUM.md`
-first — this file is only about how to continue safely.
+first — this file is only about how to continue safely. Layer 6 (trees,
+speciation, memorization) has its own study note in `docs/PAPER_CONNECTIONS.md`;
+read its §0 before citing anything, because **the two source papers could not be
+opened from this environment** and that bounds how their content may be used.
 
 ---
 
@@ -21,7 +24,7 @@ first — this file is only about how to continue safely.
 cd /path/to/diffusion
 python3 -m venv .venv && .venv/bin/pip install -r research/nongaussian-bp/requirements.txt
 cd research/nongaussian-bp
-../../.venv/bin/python -m pytest tests/ -q          # expect 50 passed, ~2.5 min
+../../.venv/bin/python -m pytest tests/ -q          # expect 79 passed, ~3.7 min
 ```
 
 `.venv/` is gitignored — recreate it, don't look for it. Pure numpy/scipy; **no
@@ -33,10 +36,12 @@ the package on `sys.path`. `conftest.py` does the same for pytest.
 
 ## 2. Orientation, in reading order
 
-1. `docs/EM_BP_LEARNING_COMPENDIUM.md` — results and findings.
+1. `docs/EM_BP_LEARNING_COMPENDIUM.md` — results and findings (§4.13 is Layer 6).
 2. `research/nongaussian-bp/report/em_bp_learning.pdf` — the theory (14 pp, 5 propositions). §2 is the algorithm, §4 the kernel families, §5 the efficiency argument, §6 the limitations.
 3. `research/nongaussian-bp/src/em.py` — the module docstring explains the `Ξ` compression in full; that is the one idea the whole layer rests on.
-4. `research/nongaussian-bp/README.md` — package conventions, all layers.
+4. `docs/PAPER_CONNECTIONS.md` — Layer 6: what the two advisor papers imply here, what was derived from them, and (§0) the fact that neither PDF was readable from this environment.
+5. `research/nongaussian-bp/src/hierarchy.py` / `src/spectral.py` — the tree prior, exact tree BP, the tree E-step, and the two time scales.
+6. `research/nongaussian-bp/README.md` — package conventions, all layers.
 
 ## 3. Conventions you must not break
 
@@ -53,7 +58,9 @@ the package on `sys.path`. `conftest.py` does the same for pytest.
 4. **The score-network baseline must train both parameterizations.** ε-prediction and x₀-prediction share a minimizer but not a finite-sample loss (they differ by `α_t²/Δ_t`). ε wins at small `t`, x₀ at large `t`. Reporting only one is cherry-picking, in whichever direction.
 5. **Do not reseed the test set when adding replicates.** `exp_07` mixes `SEED_TAG` into training-data and model-init streams only; `make_test_set` deliberately uses a plain `rng_for("exp07-test")`. Replicates must differ in what they learn from and agree on what they are judged against. There is a check for this in §6.
 6. **The Laplace kernel has two discretization artifacts** (compendium §5.1, §5.2): its exact M-step is quantized onto the grid's ratio lattice, and its ρ-gradient loses accuracy to a `sign` discontinuity. **Never quote a Laplace-kernel ρ recovery as evidence of accuracy.** Measured (compendium §4.10): 4/5 is an *attractor* of the weighted-median M-step. For ρ\* = 0.7913, chosen deliberately off the simple lattice, the estimate is pinned at exactly 0.8000 across an 8× grid refinement (M = 201 → 1601) with a constant 0.0087 bias — refining the grid does not help, because this is a bias and not a resolution limit. At M=201 three distinct true values collapse onto 0.8000. And it contaminates `b`: where ρ is snapped away from the truth the scale error is 3–4× larger. Use the smooth kernels (Gaussian, mixture) for any rate or accuracy claim.
-7. **Grid adequacy.** `M=401, A=8` is the validated default. Grid error on the posterior mean is ~4e-6 there, far below any learning error. Below `t ≈ 0.05` the likelihood gets narrow relative to `dx` — check `noising.likelihood_resolution_ok` before trusting small-`t` results.
+7. **Tree EM converges much more slowly than chain EM, and it looks like a bug.** On a chain every site is observed; on a tree the internal nodes never are, so the missing-information fraction is far larger and EM's linear rate is correspondingly slower. Measured at depth 3 with 512 trees: `ρ̂ = 0.7360 / 0.7483 / 0.7487` at 50 / 100 / 150 iterations against a true 0.75, **with zero monotone violation throughout**. An estimate read at 40 iterations is off by 0.06 and reads exactly like a broken M-step. **Check `dL` at the last iteration before concluding anything about accuracy.** `tests/test_hierarchy.py::test_em_on_a_tree_ascends_and_converges_to_the_truth` asserts this as a rate property, at two budgets, for that reason.
+8. **A per-level error normalized within the level measures its own denominator.** Fine levels of a hierarchy have small eigenvalues, hence small reference magnitude, so a *relative* per-level error makes them look worse for every method — including a method whose absolute error is uniform. The first version of the exp_13 `levels` measurement showed a clean coarse-to-fine gradient that was entirely this effect. All three forms (relative, absolute, share of total squared error) are now written to the CSV; **quote the absolute or the share when comparing across levels**, the relative only within a level.
+9. **Grid adequacy.** `M=401, A=8` is the validated default. Grid error on the posterior mean is ~4e-6 there, far below any learning error. Below `t ≈ 0.05` the likelihood gets narrow relative to `dx` — check `noising.likelihood_resolution_ok` before trusting small-`t` results.
 
 ## 5. Running things
 
@@ -85,6 +92,21 @@ trace.monotone_violation < 1e-8                    # EM ascends
 row["identity_residual"] < 1e-10                   # score/mean identity holds
 ```
 
+For tree code (`src/hierarchy.py`) the equivalents, all asserted in
+`tests/test_hierarchy.py`:
+
+```python
+tree_bp_gaussian(...)   vs tree_posterior_mean_dense(...)      # < 1e-10
+tree_bp_grid(...)       vs tree_bp_gaussian(...)               # < 2e-6
+tree_e_step(...).log_evidence vs log N(x; 0, α²C + ΔI)         # rel < 1e-6
+level_eigenvalues()     vs eigh(leaf_covariance())             # < 1e-10
+spectral.commitment(t_S, Λ) == 1/sqrt(2)                       # exactly
+```
+
+The evidence check is the load-bearing one: it is what makes
+`monotone_violation` meaningful on a tree, since the messages are renormalized
+at every node and `log p(x)` is reassembled from the discarded log-scales.
+
 Test-set invariance across replicate seeds (trap 5) — reproduce with:
 
 ```python
@@ -111,6 +133,13 @@ replicates in the tens, not the units.
 4. **Inference-time cost.** BP is 211×–320× slower per evaluation than a forward pass, and reverse diffusion calls the denoiser at every step. Either distil the fitted BP denoiser into a network, or use Layer-2 Gaussian-projected BP at inference and measure what the closure costs. This is the weakest point of the whole story.
 5. **Hybrid non-Markov correction.** Layer 4 showed the score correction is exactly rank one for AR(1)+global-latent priors. Combining that with a *learned* chain kernel is the natural Layer 4 × Layer 5 product and is untouched.
 6. **The write-up (advice 2 in the original email).** `report/em_bp_learning.tex` is deliberately paper-shaped — context, propositions, detail in remarks — and is the natural seed for the shared Overleaf document. It has no results section yet; §4 of the compendium is the raw material.
+
+### Layer 6 specifically
+
+7. **Read the two PDFs.** `docs/PAPER_CONNECTIONS.md` §0 explains why they could not be read here. Everything in Layer 6 is self-contained and independently verified, so nothing needs revising on that account — but a write-up that *cites* them must use their notation, and the correspondence between their symbols and `t_S`, `Λ_d`, `s` here has not been checked against the source.
+8. **A non-Gaussian tree.** `tree_bp_grid` already handles any innovation law and `fit_em_tree` already feeds every kernel in `src/kernels.py`, so the Layer-3 question (recover an unknown innovation law from noisy data alone) transfers to trees with no new machinery. Untried.
+9. **A discrete-alphabet tree.** The closest thing to the actual data model of the hierarchical-filtering paper: symbols on a tree with transition tensors, exact vector messages, no closure. `src/discrete.py` does this for chains and `src/hierarchy.py` does trees for continuous variables; the two have not been crossed.
+10. **The cascade under a learned score.** exp_13 `cascade` runs the exact tree-BP score. Running the same measurement under the EM-BP and network scores would say *which levels of the ladder each method gets right dynamically*, rather than statically as `levels` does.
 
 ## 8. Things deliberately not done
 
