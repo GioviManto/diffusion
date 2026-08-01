@@ -96,17 +96,21 @@ assert np.array_equal(A0, A7) and np.array_equal(b0[0.2][1], b7[0.2][1])
 
 ## 7. What to do next
 
-In rough priority order. Item 1 repairs a result that did not come out clean;
-2–3 strengthen the headline; the rest are new work. (The exp_06 Part 5 seeding
-confound listed here previously has been fixed and re-run.)
+In rough priority order. Items 1–2 strengthen the headline; the rest are new
+work. Two items previously listed here are done: the exp_06 Part 5 seeding
+confound is fixed and re-run, and the `N^{−1/2}` rate is established at 12
+replicates (combined slope −0.500 ± 0.048).
 
-1. **Establish the `N^{−1/2}` rate — it is currently *not* established.** exp_06 Part 4 ran with 4 replicates and produced log-log slopes of −0.26, −0.69, −0.25, −0.41 against a predicted −0.50, with non-monotone RMSE sequences. That scatter is what ±35% RMSE error from 4 replicates looks like, so the data is *consistent* with the rate and is not evidence for it. `--set n_rep_rate=32` and a decade more range in `N`. Prop. 5's practical consequence rests on this.
-2. **Error bars on the headline curve.** `hpc/slurm_replicates.sbatch` + `tools/merge_replicates.py`. The current curve has one replicate per `N`, which is why the EM line wobbles. This is the single highest-value cluster run.
-3. **Extend the sample-efficiency sweep upward.** The network was still improving at `N = 2048`, so "EM-BP needs ≥64× less data" is a lower bound read off a truncated curve. Follow it until the network catches up or visibly plateaus — either outcome is publishable, and the honest version needs it.
-4. **A structured-architecture baseline** (temporal CNN / small U-Net). This is the most important open question for the paper's credibility: the current baseline is a vanilla MLP, as the email specified, and a reviewer will ask. Expect it to close part of the gap; it will not acquire the exactness or the uniformity in `t`.
-5. **Inference-time cost.** BP is 211×–320× slower per evaluation than a forward pass, and reverse diffusion calls the denoiser at every step. Either distil the fitted BP denoiser into a network, or use Layer-2 Gaussian-projected BP at inference and measure what the closure costs. This is the weakest point of the whole story.
-6. **Hybrid non-Markov correction.** Layer 4 showed the score correction is exactly rank one for AR(1)+global-latent priors. Combining that with a *learned* chain kernel is the natural Layer 4 × Layer 5 product and is untouched.
-7. **The write-up (advice 2 in the original email).** `report/em_bp_learning.tex` is deliberately paper-shaped — context, propositions, detail in remarks — and is the natural seed for the shared Overleaf document. It has no results section yet; §4 of the compendium is the raw material.
+Note the pattern behind both, since it will recur: a 4-replicate RMSE cannot
+resolve a log-log slope to better than about ±0.2, so any rate claim needs
+replicates in the tens, not the units.
+
+1. **Error bars on the headline curve.** `hpc/slurm_replicates.sbatch` + `tools/merge_replicates.py`. The current curve has one replicate per `N`, which is why the EM line wobbles. This is the single highest-value cluster run.
+2. **Extend the sample-efficiency sweep upward.** The network was still improving at `N = 2048`, so "EM-BP needs ≥64× less data" is a lower bound read off a truncated curve. Follow it until the network catches up or visibly plateaus — either outcome is publishable, and the honest version needs it.
+3. **A structured-architecture baseline** (temporal CNN / small U-Net). This is the most important open question for the paper's credibility: the current baseline is a vanilla MLP, as the email specified, and a reviewer will ask. Expect it to close part of the gap; it will not acquire the exactness or the uniformity in `t`.
+4. **Inference-time cost.** BP is 211×–320× slower per evaluation than a forward pass, and reverse diffusion calls the denoiser at every step. Either distil the fitted BP denoiser into a network, or use Layer-2 Gaussian-projected BP at inference and measure what the closure costs. This is the weakest point of the whole story.
+5. **Hybrid non-Markov correction.** Layer 4 showed the score correction is exactly rank one for AR(1)+global-latent priors. Combining that with a *learned* chain kernel is the natural Layer 4 × Layer 5 product and is untouched.
+6. **The write-up (advice 2 in the original email).** `report/em_bp_learning.tex` is deliberately paper-shaped — context, propositions, detail in remarks — and is the natural seed for the shared Overleaf document. It has no results section yet; §4 of the compendium is the raw material.
 
 ## 8. Things deliberately not done
 

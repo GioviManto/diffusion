@@ -241,29 +241,42 @@ matters, the denoiser error: 0.083, 0.080, 0.061, 0.060, 0.037. Any claim about
 
 ---
 
-### 4.9 The N^{−1/2} rate is *not* established (exp_06 Part 4)
+### 4.9 The N^{−1/2} rate (exp_06 Part 4, re-run at 12 replicates)
 
-Smooth kernels only (the Laplace kernel is disqualified by §5.1). RMSE over 4
-replicates:
+Smooth kernels only (the Laplace kernel is disqualified by §5.1). RMSE over
+**12** replicates — `outputs/exp_06_rate_highrep/`:
 
 | N | Gaussian ρ | Gaussian q | mixture ρ | mixture var |
 |---|---|---|---|---|
-| 64 | 0.0170 | 0.0493 | 0.0202 | 0.0234 |
-| 128 | 0.0058 | 0.0176 | 0.0057 | 0.0195 |
-| 256 | 0.0108 | 0.0174 | 0.0109 | 0.0103 |
-| 512 | 0.0118 | 0.0067 | 0.0102 | 0.0184 |
-| 1024 | 0.0048 | 0.0074 | 0.0063 | 0.0058 |
+| 64 | 0.0154 | 0.0390 | 0.0219 | 0.0399 |
+| 128 | 0.0126 | 0.0225 | 0.0068 | 0.0177 |
+| 256 | 0.0127 | 0.0208 | 0.0108 | 0.0119 |
+| 512 | 0.0098 | 0.0107 | 0.0070 | 0.0141 |
+| 1024 | 0.0052 | 0.0071 | 0.0050 | 0.0096 |
 
-Fitted log-log slopes: **−0.26, −0.69, −0.25, −0.41** against the predicted
-−0.50. The sequences are non-monotone in `N`.
+OLS log-log slopes with standard errors from the regression residuals:
 
-**This does not confirm the parametric rate, and should not be reported as
-though it did.** With 4 replicates an RMSE estimate carries roughly ±35%, which
-is more than enough to produce this scatter under a true −0.5 slope — the data
-is *consistent* with `N^{−1/2}` and provides no real evidence for it. Prop. 5's
-consequence remains a theoretical statement here. Confirming it needs the
-replicate runs (`hpc/slurm_replicates.sbatch`, and `--set n_rep_rate=32`), which
-is why that is ranked #2 in the handoff's next steps.
+| quantity | slope | distance from −0.5 |
+|---|---|---|
+| Gaussian ρ | −0.349 ± 0.094 | 1.6σ |
+| Gaussian q | −0.600 ± 0.066 | 1.5σ |
+| mixture ρ | −0.420 ± 0.179 | 0.45σ |
+| mixture var | −0.445 ± 0.136 | 0.41σ |
+| **combined** | **−0.500 ± 0.048** | **0.01σ** |
+
+**The parametric rate is now supported.** The combined estimate sits on −0.500,
+and −0.25 or −0.75 are excluded at 5.2σ. The four estimates are not fully
+independent — the two Gaussian quantities come from one set of fits and the two
+mixture quantities from another — so the honest combined error is closer to
+0.048·√2 ≈ 0.068, treating the effective count as two rather than four. Even
+then a rate of −0.25 or −0.75 is excluded at >3.5σ, and −0.5 is unrejected.
+
+⚠️ **This supersedes the 4-replicate run** (`outputs/…/em_rate.csv`), from which
+I reported slopes of −0.26, −0.69, −0.25, −0.41 and concluded the rate was *not*
+established. That conclusion was right for that data: tripling the replicates
+narrowed the spread from a range of 0.43 to 0.25 and moved every estimate toward
+−0.5. The lesson is about replicate counts, not about the estimator — an RMSE
+from 4 samples simply cannot resolve a slope to better than about ±0.2.
 
 ### 4.10 Lattice quantization, measured (exp_06 Part 5, re-run)
 
@@ -408,12 +421,13 @@ the information budget and its asymmetry between correlation and innovation
 scale (§4.6); the headline sample-efficiency advantage and its capacity control
 (§4.1–4.2); recovery of an unknown innovation law from noisy data alone (§4.8).
 
-**Measured but not established:** the `N^{−1/2}` rate (§4.9 — 4 replicates,
-slopes −0.26 to −0.69 against a predicted −0.50; consistent with the theory,
-evidence for it thin). This is the main gap.
+**Also established, after re-running at 12 replicates:** the `N^{−1/2}` rate
+(§4.9, combined slope −0.500 ± 0.048). The original 4-replicate run was too
+noisy to support it and said so; more replicates resolved it.
 
-**Known defect:** exp_06 Part 5 confounds grid size with the random seed
-(§4.10); its across-`M` trend and its `b`-error column need a re-run.
+**Repaired:** the exp_06 Part 5 seeding confound has been fixed and re-run
+(§4.10), which both sharpened the result and overturned a number I had reported
+from the confounded version.
 
 **Not started:** the items in §6.3, §6.4, and §6.1 — hybrid non-Markov
 correction, structured-architecture baseline, and distillation of the BP
