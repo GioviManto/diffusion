@@ -21,9 +21,14 @@
     "A": 8.0
   },
   "provenance": {
-    "timestamp": "2026-07-12 12:12:36",
-    "python": "3.12.5",
-    "numpy": "2.4.2",
-    "platform": "macOS-14.1.1-arm64-arm-64bit"
+    "timestamp": "2026-08-01 09:24:56",
+    "python": "3.11.15",
+    "numpy": "2.4.6",
+    "platform": "Linux-6.18.5-x86_64-with-glibc2.39",
+    "hostname": "vm",
+    "slurm_job_id": "",
+    "slurm_array_task_id": "",
+    "cpu_count": "4",
+    "blas_threads": "2"
   }
 }

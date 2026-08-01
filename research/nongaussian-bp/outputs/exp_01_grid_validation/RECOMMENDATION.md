@@ -1,25 +1,25 @@
 # Grid parameter recommendation (from exp_01 heatmap, rho = 0.95)
 
-M =  101, A = 4: worst rel. error = 1.018e-05
-M =  101, A = 5: worst rel. error = 9.551e-07
-M =  101, A = 6: worst rel. error = 1.368e-04
-M =  101, A = 7: worst rel. error = 2.564e-03
-M =  101, A = 8: worst rel. error = 1.711e-02
-M =  201, A = 4: worst rel. error = 9.958e-06
-M =  201, A = 5: worst rel. error = 9.604e-10
-M =  201, A = 6: worst rel. error = 9.278e-15
-M =  201, A = 7: worst rel. error = 3.693e-14
-M =  201, A = 8: worst rel. error = 9.294e-11
-M =  401, A = 4: worst rel. error = 9.903e-06
-M =  401, A = 5: worst rel. error = 9.429e-10
-M =  401, A = 6: worst rel. error = 8.909e-15
-M =  401, A = 7: worst rel. error = 9.326e-15
-M =  401, A = 8: worst rel. error = 9.862e-15
-M =  801, A = 4: worst rel. error = 9.889e-06
-M =  801, A = 5: worst rel. error = 9.385e-10
-M =  801, A = 6: worst rel. error = 9.204e-15
-M =  801, A = 7: worst rel. error = 9.435e-15
-M =  801, A = 8: worst rel. error = 9.233e-15
+M =  101, A = 4: worst rel. error = 1.144e-07
+M =  101, A = 5: worst rel. error = 8.828e-07
+M =  101, A = 6: worst rel. error = 1.266e-04
+M =  101, A = 7: worst rel. error = 2.398e-03
+M =  101, A = 8: worst rel. error = 1.565e-02
+M =  201, A = 4: worst rel. error = 1.084e-07
+M =  201, A = 5: worst rel. error = 4.169e-14
+M =  201, A = 6: worst rel. error = 8.975e-15
+M =  201, A = 7: worst rel. error = 3.468e-14
+M =  201, A = 8: worst rel. error = 8.626e-11
+M =  401, A = 4: worst rel. error = 1.069e-07
+M =  401, A = 5: worst rel. error = 3.990e-14
+M =  401, A = 6: worst rel. error = 8.526e-15
+M =  401, A = 7: worst rel. error = 9.677e-15
+M =  401, A = 8: worst rel. error = 9.237e-15
+M =  801, A = 4: worst rel. error = 1.066e-07
+M =  801, A = 5: worst rel. error = 3.944e-14
+M =  801, A = 6: worst rel. error = 8.730e-15
+M =  801, A = 7: worst rel. error = 9.934e-15
+M =  801, A = 8: worst rel. error = 8.762e-15
 
 Cheapest configuration with worst-case error < 1e-4 over tested t: M = 101, A = 4.
 

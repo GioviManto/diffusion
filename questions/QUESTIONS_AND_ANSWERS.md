@@ -11,6 +11,7 @@ Sources of the questions:
 - **[R]** `research/gaussian-ar1-bp/markov_gaussian_approx/report/bp_markov_diffusion_gaussian_approx.pdf`, §"Interpretation and next steps" — the five numbered next steps of the report we discussed.
 - **[F]** `docs/RESULT_LEDGER.md`, §"Explicitly future" — F1–F5.
 - **[E]** The Marc/Jérôme email of 2026-07-30 — the two suggestions.
+- **[C]** The 2026-07-29 call with Jérôme, preceding the email — concerns raised about the grid BP and the Gaussian BP.
 - **[L]** Questions that arose *during* the Layer-5 work itself.
 
 Status vocabulary, used strictly:
@@ -112,6 +113,97 @@ parametric family fits.
 
 *Evidence:* compendium §4.1–4.2, Remark "More expressive is not better here";
 ledger item 4.
+
+---
+
+## [C] From the call: "the grid BP and the Gaussian BP had problems"
+
+The concern, as stated: the Gaussian BP was *"not updating just the mean and
+variance, or information and precision, but doing something strange"*, there were
+problems in the definition of Gaussian BP as well, and both the grid BP and the
+Gaussian case should be tried again.
+
+**This was correct, it was diagnosed independently in the Layer-1 audit
+(`research/nongaussian-bp/audit/AUDIT_NOTE.md`), and it is fixed.** Both halves
+have now been re-run and re-verified.
+
+### C-i. "The Gaussian BP was doing something strange, not just mean/variance." — **ANSWERED: correct, and fixed**
+
+The old routine (`grid_projected_gaussian_bp`, audit finding **F1**) evaluated
+each Gaussian message *on the grid*, pushed it through the exact grid update,
+then moment-matched the result. At weakly informative `t` the outgoing message is
+a near-flat ramp whose maximizer lies outside `[−A, A]`; moment-matching that
+**truncated** function drags the mean toward the grid boundary, and the next
+update pushes it further — positive feedback, ending with the message pinned at
+the edge.
+
+The replacement (`gaussian_chain_bp`) does exactly what the call asked for:
+**analytic information form**, carrying only precision `λ` and information `h`,
+with closed-form updates and no grid anywhere. A flat message is `λ = 0` exactly,
+so nothing is ever truncated.
+
+Verified side by side on a Gaussian AR(1) prior, where Gaussian closure is exact
+so the true answer is known:
+
+| t | information form | legacy grid projection |
+|---|---|---|
+| 0.2 | 1.2e-15 | 3.9e-06 |
+| 0.6 | 1.0e-15 | 9.4e-03 |
+| 1.0 | 4.4e-16 | 1.1e-01 |
+| 1.3 | 6.7e-16 | 4.9e-01 |
+| 1.8 | 4.4e-16 | **9.1e-01** |
+
+(max absolute error in the posterior mean). The analytic form is **exact to
+machine precision at every noise level**; the legacy form is up to six orders of
+magnitude worse, and worsens precisely as the likelihood stops being informative
+— the signature of the mechanism above.
+
+The consequence in the experiment itself: the old package's large-`t` rows were
+contaminated (posterior-mean MSE 2.22 ± 7.47 at t=1.3). Re-run now, the Gaussian
+baseline is clean and monotone — median relative score error 0.370 at t=0.02
+falling smoothly to 7.6e-5 at t=2.4, with **no large-`t` blowup at all**.
+
+*Pinned by* `tests/test_gaussian_bp_equivalence.py::test_information_form_is_exact_where_grid_projection_collapses`, which asserts both halves: the analytic form stays exact, and the legacy form keeps failing. If someone repairs the legacy routine, that test fails and says to delete the routine and the assertion together.
+
+### C-ii. "There were problems in the definition of Gaussian BP as well." — **ANSWERED: correct, and it changes an interpretation**
+
+Audit finding **F2**. For *linear-transition* chains `a_i = ρ a_{i−1} + ε_i` with
+Gaussian OU likelihoods, moment-matched single-Gaussian BP is **mathematically
+identical** to exact Gaussian BP on the covariance-matched Gaussian AR(1) model.
+The reason: a Gaussian message times a Gaussian likelihood is exactly Gaussian,
+and the transition step maps `N(m, v)` to a density with first two moments
+`(ρm, ρ²v + q)` *regardless of the innovation shape*. The moment projection
+therefore discards every property of the innovation beyond its variance.
+
+So "Gaussian **message** approximation error" and "Gaussian **model**
+approximation error" are the same object at the single-Gaussian level. What the
+old package reported as a message-representation error was a model error. The
+values were right; the label was not.
+
+The distinction becomes real only for richer message families or nonlinear
+transitions — which is exactly why **R4/F1 (mixture-message closure) is the
+open question worth doing**, and why it must not be confused with Layer 5's
+mixture *kernel*.
+
+*Pinned by* the equivalence tests in `tests/test_gaussian_bp_equivalence.py`.
+
+### C-iii. "We should try it again — the grid BP and the Gaussian case." — **ANSWERED: both re-run**
+
+Re-run under the corrected code *and* the fixed seeding (their committed outputs
+predated the `rng_for` fix, so they had never been bit-reproducible).
+
+- **Grid BP** is spectrally accurate at the working default: worst relative error **9.2e-15** at M=401, A=8. The failure modes are visible and understood rather than hidden — M=101 with A=8 gives 1.6e-2 (too few points per unit length), while A=4 gives 1.1e-7 for *every* M (truncation-limited, so refining M cannot help).
+- **Gaussian BP** as above: clean, monotone, artifact-free, with the score/mean identity holding to ≤2.9e-12 on every row.
+
+Two further audit findings were fixed in the same package and are worth naming
+because both recurred later in this project: **F3** (grid sizes compared on
+different random trials — the identical confound I reintroduced in exp_06 Part 5
+and had to fix, see L3) and **F4** (linear-domain likelihood rows underflowing to
+all-zero, fixed by working in the log domain with per-row max subtraction).
+
+### C-iv. "Then do the learning Marc was asking, and address all the questions." — **ANSWERED**
+
+The learning is Layer 5 — see **E1**, **E3**. The questions are this document.
 
 ---
 
