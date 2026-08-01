@@ -1,0 +1,77 @@
+{
+  "rho": 0.85,
+  "budget_sizes": [
+    4,
+    8,
+    16,
+    24,
+    32,
+    48,
+    64
+  ],
+  "budget_rhos": [
+    0.5,
+    0.7,
+    0.85,
+    0.95
+  ],
+  "n_sites": [
+    8,
+    16,
+    32
+  ],
+  "train_sizes": [
+    64,
+    256,
+    1024
+  ],
+  "n_gen": 128,
+  "t_max": 3.0,
+  "t_min": 0.02,
+  "n_steps_sde": 120,
+  "grid_size": 301,
+  "grid_half_width": 8.0,
+  "t_train": [
+    0.1,
+    0.2,
+    0.4,
+    0.8,
+    1.6
+  ],
+  "em_iters": 60,
+  "hidden": [
+    128,
+    128
+  ],
+  "dsm_steps": 12000,
+  "time_sites": [
+    8,
+    16,
+    32
+  ],
+  "time_sizes": [
+    32,
+    128,
+    512,
+    2048
+  ],
+  "time_batch": 256,
+  "time_grid_points": 80,
+  "time_t_min": 0.0001,
+  "quick": false,
+  "parts": [
+    "budget",
+    "collapse",
+    "time"
+  ],
+  "overrides": [],
+  "timestamp": "2026-08-01 18:59:13",
+  "python": "3.11.15",
+  "numpy": "2.4.6",
+  "platform": "Linux-6.18.5-x86_64-with-glibc2.39",
+  "hostname": "vm",
+  "slurm_job_id": "",
+  "slurm_array_task_id": "",
+  "cpu_count": "4",
+  "blas_threads": "1"
+}
