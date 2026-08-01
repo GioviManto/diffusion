@@ -42,6 +42,8 @@ from src.local_head import (
 )
 from src.noising import alpha_delta
 from src.plotting import new_figure, save_figure
+from src.em import fit_em
+from src.kernels import MixtureInnovationKernel
 from src.priors import GaussianAR1, GaussianMixtureAR1, LaplaceAR1
 from src.utils import ensure_dir, rng_for, write_csv, write_json
 
@@ -175,6 +177,132 @@ def part2_vs_global(cfg, out):
     return rows
 
 
+def part3_efficiency(cfg, out):
+    """Replicated, oracle-fair three-way comparison across data budgets.
+
+    Three corrections to the earlier single-run comparison, all of which move
+    the result *against* the structured estimator and so belong in it:
+
+    1. **Replicates.** The 3.3x figure came from one seed. Everything else in
+       this project that rested on one replicate has needed revising, so this
+       sweeps seeds and reports a standard error.
+    2. **An oracle over the receptive field.** Fixing r = 6 handicapped the CNN
+       by 1.19x-1.29x, because the optimal radius grows with t (exp_12 Part 1).
+       Taking the best r per noise level bounds what a locality-respecting
+       architecture can achieve here.
+    3. **An oracle over the parameterization**, for both networks, matching the
+       treatment the vanilla baseline already gets.
+
+    EM-BP is fitted on the same chains, so the comparison is self-contained and
+    does not import numbers measured at a different chain length.
+    """
+    grid, weights = make_grid(GRID_A, cfg["grid_size"])
+    prior = LaplaceAR1(cfg["rho"])
+    rng_test = rng_for("exp12-eff-test")
+    A_test = np.stack([prior.sample(rng_test, N_SITES) for _ in range(cfg["n_test"])])
+    bundle = _reference(prior, grid, weights, A_test, T_TRAIN)
+
+    rows = []
+    for seed in range(cfg["eff_seeds"]):
+        for n_chains in cfg["eff_sizes"]:
+            rng = rng_for("exp12-eff", seed, n_chains)
+            A = np.stack([prior.sample(rng, N_SITES) for _ in range(n_chains)])
+
+            # --- EM-BP on the same chains -------------------------------------
+            parts_idx = np.array_split(rng.permutation(len(A)), len(T_TRAIN))
+            groups = []
+            for t, idx in zip(T_TRAIN, parts_idx):
+                al, de = alpha_delta(t)
+                sub = A[idx]
+                groups.append(
+                    (al * sub + np.sqrt(de) * rng.standard_normal(sub.shape), al, de)
+                )
+            kernel, _ = fit_em(
+                MixtureInnovationKernel.init(
+                    4, rho=0.3, var=0.8, rng=rng_for("exp12-eff-init", seed)
+                ),
+                grid, weights, groups, n_iters=120,
+            )
+
+            # --- networks: oracle over radius and parameterization ------------
+            heads = {}
+            for radius in cfg["eff_radii"]:
+                for mode in cfg["parameterizations"]:
+                    heads[(radius, mode)] = train_local_head(
+                        A, T_TRAIN, radius,
+                        rng_for("exp12-eff-head", seed, n_chains, radius, mode),
+                        hidden=cfg["hidden"], n_steps=cfg["eff_steps"],
+                        parameterization=mode,
+                    )
+            globals_ = {
+                mode: train_dsm_denoiser(
+                    A, T_TRAIN, rng_for("exp12-eff-glob", seed, n_chains, mode),
+                    hidden=cfg["global_hidden"], n_steps=cfg["eff_steps"],
+                    parameterization=mode,
+                )
+                for mode in cfg["parameterizations"]
+            }
+
+            sl = interior_slice(N_SITES, max(cfg["eff_radii"]))
+            for t in T_TRAIN:
+                X, m_ref = bundle[t]
+                al, de = alpha_delta(t)
+                m_em = np.stack([
+                    grid_bp_batch(grid, weights,
+                                  kernel.log_transition_matrix(grid),
+                                  X, al, de)[0]
+                ])[0]
+                rows.append({
+                    "seed": seed, "n_chains": n_chains, "t": t, "method": "em_bp",
+                    "n_params": int(len(kernel.theta)),
+                    "score_rel_l2": _score_error(m_em, m_ref, X, t, sl),
+                })
+                cnn = min(
+                    _score_error(local_posterior_mean(h, X, t), m_ref, X, t, sl)
+                    for h in heads.values()
+                )
+                rows.append({
+                    "seed": seed, "n_chains": n_chains, "t": t,
+                    "method": "local_cnn_oracle_r",
+                    "n_params": max(h.n_params for h in heads.values()),
+                    "score_rel_l2": cnn,
+                })
+                glob = min(
+                    _score_error(dsm_posterior_mean(g, X, t), m_ref, X, t, sl)
+                    for g in globals_.values()
+                )
+                rows.append({
+                    "seed": seed, "n_chains": n_chains, "t": t,
+                    "method": "global_mlp",
+                    "n_params": globals_["eps"].n_params,
+                    "score_rel_l2": glob,
+                })
+
+    fig, ax = new_figure()
+    for method, style in (("em_bp", "o-"), ("local_cnn_oracle_r", "s-"),
+                          ("global_mlp", "^-")):
+        means, ses = [], []
+        for n in cfg["eff_sizes"]:
+            per_seed = [
+                float(np.mean([r["score_rel_l2"] for r in rows
+                               if r["method"] == method and r["n_chains"] == n
+                               and r["seed"] == s_]))
+                for s_ in range(cfg["eff_seeds"])
+            ]
+            means.append(float(np.mean(per_seed)))
+            ses.append(float(np.std(per_seed, ddof=1) / np.sqrt(len(per_seed)))
+                       if len(per_seed) > 1 else 0.0)
+        means, ses = np.array(means), np.array(ses)
+        ax.loglog(cfg["eff_sizes"], means, style, label=method)
+        ax.fill_between(cfg["eff_sizes"], means - ses, means + ses, alpha=0.2)
+    ax.set_xlabel("number of training chains $N$")
+    ax.set_ylabel("relative score error (interior)")
+    ax.set_title("Oracle-fair comparison, Laplace chain, $\\pm$1 s.e. over seeds")
+    ax.legend()
+    save_figure(fig, out / "efficiency_three_way.png")
+    return rows
+
+
 def main() -> None:
     parser = experiment_parser(
         "exp_12_receptive_field",
@@ -186,12 +314,16 @@ def main() -> None:
         "grid_size": 301, "rho": 0.85, "n_chains": 256, "n_test": 128,
         "radii": (0, 1, 2, 4), "hidden": (64, 64), "global_hidden": (64, 64),
         "n_steps": 2000, "parameterizations": ("eps",), "compare_radius": 4,
+        "eff_seeds": 2, "eff_sizes": (128, 512), "eff_radii": (3, 6),
+        "eff_steps": 1500,
     }
     full = {
         "grid_size": GRID_M, "rho": 0.85, "n_chains": 1024, "n_test": N_TEST,
         "radii": (0, 1, 2, 3, 4, 6, 8, 12, 16),
         "hidden": (64, 64), "global_hidden": (128, 128),
         "n_steps": 20000, "parameterizations": ("eps", "x0"), "compare_radius": 6,
+        "eff_seeds": 4, "eff_sizes": (128, 512, 2048), "eff_radii": (3, 6, 12),
+        "eff_steps": 8000,
     }
     cfg = apply_overrides(quick if args.quick else full, args.set)
 
@@ -201,6 +333,9 @@ def main() -> None:
         "vs_global": ("local head vs fully connected MLP",
                       lambda o: write_csv(o / "local_vs_global.csv",
                                           part2_vs_global(cfg, o))),
+        "efficiency": ("replicated oracle-fair three-way comparison",
+                       lambda o: write_csv(o / "efficiency_three_way.csv",
+                                           part3_efficiency(cfg, o))),
     }
     if args.list_parts:
         print("\n".join(parts))
