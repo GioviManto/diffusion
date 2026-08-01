@@ -577,11 +577,53 @@ provides a setting where the reference is exact.
 
 ### New questions raised by the answers
 
-**N1. What scalar governs locality?** |excess kurtosis| predicts the Gaussian
-closure error well enough to extrapolate to an unseen family (R3), but it does
-*not* predict the locality excess (F5): Student-t at kurtosis +6.0 is nearly
-universal while bimodal κ=0.9 is 4.94× off. Bimodality specifically destroys
-locality. The right summary statistic is unidentified.
+**N1. What scalar governs locality?** — **ANSWERED: negentropy, not kurtosis.**
+
+The candidate screened against the measured locality excess: |excess kurtosis|,
+negentropy (`KL(f ‖ N(0,q))`, the KL divergence from the variance-matched
+Gaussian), L¹ and L^∞ distance to that Gaussian, and mode count. Negentropy wins
+decisively, and *within the cells where a locality effect exists at all*:
+
+| cell | negentropy | \|excess kurtosis\| |
+|---|---|---|
+| ρ=0.50, t=0.05 | **+0.962** | −0.055 |
+| ρ=0.50, t=0.10 | **+0.994** | −0.093 |
+| ρ=0.85, t=0.05 | **+0.980** | −0.067 |
+| ρ=0.85, t=0.10 | **+0.975** | −0.014 |
+| pooled (30 pts) | **+0.738** (Spearman +0.842) | −0.043 (Spearman +0.483) |
+
+(Pearson correlation with `rate_over_gaussian`.) Over the 60 points where the
+effect has already vanished — large t, or ρ=0.95 — negentropy correlates at
+−0.078, i.e. nothing, which is the correct behaviour when there is no signal to
+predict.
+
+**Why this resolves the puzzle.** Negentropy is scale-invariant, so it is a pure
+*shape* statistic, one number per family:
+
+| family | negentropy | \|excess kurtosis\| | locality excess (ρ=0.5, t=0.05) |
+|---|---|---|---|
+| gauss_mix κ=0.6 | 0.026 | 0.72 | 1.12 |
+| student-t ν=5 | 0.045 | **6.00** | 1.25 |
+| laplace | 0.072 | 3.00 | 1.62 |
+| uniform | 0.177 | 1.20 | 1.46 |
+| gauss_mix κ=0.9 | **0.462** | 1.62 | **4.94** |
+
+Student-t has the largest kurtosis of any family and the second-*smallest*
+negentropy: heavy tails carry huge fourth moments but very little probability
+mass, so they sit close to a Gaussian in KL. Bimodality moves mass, so κ=0.9 is
+10× further in KL than Student-t while having a quarter of its kurtosis. Ordering
+the families by negentropy orders them by locality damage; ordering by kurtosis
+does not.
+
+That locality — an information-flow property — is governed by an
+information-theoretic distance rather than a moment is the natural answer in
+hindsight, and it is a *different* scalar from the one that governs closure
+error, where kurtosis works well enough to extrapolate (R3). Two distinct
+mechanisms, two distinct summaries.
+
+**Scope, stated plainly:** six families, one chain model, correlation not a
+derivation. No functional form is claimed — the relationship is monotone and
+strongly correlated, not fitted.
 
 **N2. Does a structured architecture close the EM-BP gap?** — **ANSWERED: it
 closes most of it.** Measured in exp_12 at N=1024, interior sites:
