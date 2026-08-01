@@ -14,6 +14,7 @@ Gaussian belief propagation, AMP, and Gaussian-closure error beyond the Gaussian
 | `research/gaussian-ar1-bp/` | Gaussian AR(1) package (BP = precision-matrix score to machine precision) |
 | `research/nongaussian-bp/` | Laplace-innovation chain: exact grid BP vs Gaussian-projected BP |
 | `research/bp-generalization/` | General (non-Gaussian) BP formulation sketches + code |
+| `questions/` | Every open question the project posed, with status and evidence |
 | `research/session-summaries/` | Five session-summary PDFs + problem formulation |
 | `research/initial-experiments/` | Initial diffusion-setup experiments and early figures |
 | `research/notebook-scans/` | Handwritten derivation notebook scans |
