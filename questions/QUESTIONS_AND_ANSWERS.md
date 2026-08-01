@@ -3,7 +3,7 @@
 Last updated 2026-08-01. Branch `claude/em-bp-denoiser-learning-e07ike`.
 
 This document collects **every question the project has posed to itself**, from
-three sources, and answers each with evidence or says plainly that it is still
+five sources, and answers each with evidence or says plainly that it is still
 open.
 
 Sources of the questions:

@@ -4,13 +4,14 @@ One document lives here: **[`QUESTIONS_AND_ANSWERS.md`](QUESTIONS_AND_ANSWERS.md
 
 It collects every question this project has posed to itself and gives each a
 status — ANSWERED, PARTIAL, or OPEN — with the evidence named or the gap stated.
-Questions come from four places:
+Questions come from five places:
 
 | tag | source |
 |---|---|
 | **[R]** | `research/gaussian-ar1-bp/markov_gaussian_approx/report/bp_markov_diffusion_gaussian_approx.pdf`, §"Interpretation and next steps" |
 | **[F]** | `docs/RESULT_LEDGER.md`, §"Explicitly future" (F1–F5) |
 | **[E]** | The Marc/Jérôme email of 2026-07-30 |
+| **[C]** | The 2026-07-29 call with Jérôme — the grid-BP / Gaussian-BP concerns |
 | **[L]** | Questions that arose during the Layer-5 (EM + BP) work |
 
 ## Keeping it honest
