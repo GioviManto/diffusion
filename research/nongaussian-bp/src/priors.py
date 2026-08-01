@@ -176,6 +176,58 @@ class StudentTAR1:
 
 
 @dataclass(frozen=True)
+class UniformAR1:
+    """a_i = rho a_{i-1} + Uniform(-h, h),  h^2/3 = 1 - rho^2 (variance matched).
+
+    The bounded-support case (question R3). It is the interesting one because
+    its failure mode is different in kind from the others in this module: heavy
+    tails (Laplace, Student-t) and bimodality (Gaussian mixture) both fail a
+    Gaussian closure through *shape*, whereas a compactly supported innovation
+    fails through *support* -- the true posterior is exactly zero outside a
+    finite interval and no Gaussian message can represent that edge.
+
+    Excess kurtosis is -1.2, which places it between the kappa = 0.6 and
+    kappa = 0.9 mixtures. If |excess kurtosis| really is the one-number summary
+    of closure difficulty, this prior should land between them; if the support
+    mismatch matters independently, it should not.
+    """
+
+    rho: float
+
+    @property
+    def name(self) -> str:
+        return "uniform"
+
+    @property
+    def q(self) -> float:
+        return 1.0 - self.rho**2
+
+    @property
+    def half_width(self) -> float:
+        return float(np.sqrt(3.0 * self.q))
+
+    @property
+    def innovation_excess_kurtosis(self) -> float:
+        return -1.2
+
+    def sample(self, rng: np.random.Generator, n: int) -> np.ndarray:
+        a = np.empty(n)
+        a[0] = rng.standard_normal()
+        h = self.half_width
+        eps = rng.uniform(-h, h, size=n - 1)
+        for i in range(1, n):
+            a[i] = self.rho * a[i - 1] + eps[i - 1]
+        return a
+
+    def log_transition_matrix(self, grid: np.ndarray) -> np.ndarray:
+        e = _outer_residual(grid, self.rho)
+        h = self.half_width
+        with np.errstate(divide="ignore"):
+            out = np.where(np.abs(e) <= h, -np.log(2.0 * h), -np.inf)
+        return out
+
+
+@dataclass(frozen=True)
 class GaussianMixtureAR1:
     """a_i = rho a_{i-1} + eps,  eps ~ 1/2 N(+m, s^2) + 1/2 N(-m, s^2).
 
