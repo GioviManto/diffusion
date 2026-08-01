@@ -269,8 +269,69 @@ as a *rate* property in the tests rather than as a single-budget accuracy claim.
 
 ---
 
-## 5. Status of the experimental results
+## 5. What the experiments showed
 
-`exp_13` and `exp_14` were launched at full settings; §6 records what has
-already been measured and what is still running. **Numbers below the line in
-each section are from completed runs only**; anything provisional says so.
+Full tables are in `docs/EM_BP_LEARNING_COMPENDIUM.md` §4.13 and the CSVs under
+`research/nongaussian-bp/outputs/`. The four results, in the order they matter:
+
+**1. The speciation ladder exists and sits where predicted.** Depth-5 tree,
+ρ = 0.9: six distinct transitions spanning 16× in time within one dataset, each
+within 3.5% of `t_S = ½ log(1 + Λ)` along the forward process, and reproduced
+by the reverse SDE under the exact tree-BP score. The reverse dynamics resolves
+the hierarchy coarse-to-fine. **This is the question neither paper asks.**
+
+**2. The chain studied in Layers 1–5 is outside that regime.** Its top
+eigenvalue is bounded by `(1+ρ)/(1−ρ)` at any length, so `t_S` saturates and
+there is no cascade. This bounds how far the project generalizes and is the
+less comfortable of the two findings.
+
+**3. Memorization does not have a BP analogue.** The empirical score sits at
+0.33–0.66 on the nearest-training-neighbour ratio and recovers monotonically as
+`N` crosses its entropic wall; EM-BP sits at 0.97–1.08 at every `n` and `N`,
+tracking the true-prior reference within 0.03. This is the *mechanism* behind
+Layer 5's headline, which had been reported as an empirical fact.
+
+**4. The network's error is blind to the hierarchy; BP's is not.** Against the
+null of uniform per-mode error, the concentration ratio spreads by 1.6–2.2×
+across levels for the ε-network — flat, as if the levels did not exist — and by
+224–6957× for EM-BP, migrating from the finest levels at small `t` to the single
+coarsest mode at large `t`. The x₀-network is genuinely intermediate (up to
+12.6×) and is reported as such.
+
+### What did not come out
+
+**No sequential acquisition of levels by the network** (`exp_13 ordering`). The
+transformer result that motivated the measurement does not reproduce here: the
+MLP's per-level error is flat across levels *and* across training budget, and
+its total plateaus by roughly 2 000 gradient steps at N = 256 trees. The honest
+reading is that this is a data-limited regime rather than evidence against
+sequential acquisition — the network never gets far enough for an ordering to
+be visible. It is also a different architecture, task and loss from the paper's.
+`hpc/slurm_layer6.sbatch` scales this part up; it is the obvious thing to
+re-check on a cluster.
+
+**EM, by contrast, does show an ordering**, with a transparent mechanism: it
+starts with ρ̂ far too small, which destroys long-range structure first, so the
+coarsest level carries almost all the error early (level −1 error 1.29 against
+0.02 at level 1 after one iteration) and the levels equalize as ρ̂ climbs. That
+is a property of the estimator's parameterization, not an inductive bias worth
+generalizing.
+
+---
+
+## 6. Untried, in priority order
+
+1. **Read the PDFs** and reconcile notation before citing (see §0).
+2. **The nonparametric collapse test.** The obvious objection to result 3 is
+   that a two-parameter kernel *cannot* memorize. `exp_14 --set
+   include_mdn=True` runs the same comparison with a mixture-density kernel of
+   several hundred parameters and the same `n`-independent statistic, which
+   separates the mechanism from the parameter count.
+3. **A discrete-alphabet tree** — closest to the actual data model of the
+   hierarchical-filtering paper. `src/discrete.py` does chains,
+   `src/hierarchy.py` does continuous trees; the two have not been crossed.
+4. **The cascade under a learned score**, rather than the exact one: which
+   levels of the ladder each method gets right *dynamically*.
+5. **A non-Gaussian tree.** `tree_bp_grid` and `fit_em_tree` already support it
+   with no new machinery; the Layer-3 question (recover an unknown innovation
+   law from noisy data alone) transfers directly.
