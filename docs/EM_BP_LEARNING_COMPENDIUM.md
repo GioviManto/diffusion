@@ -471,6 +471,49 @@ it in every row. In the quick configuration the undertrained network reached
 ratios of 2–3.4 with sample std 2.3–3.3 — that is over-dispersion, not
 generalization, and would be a misreading if the ratio were quoted alone.
 
+### Where each method's error lives in the hierarchy (exp_13 `levels`)
+
+Depth-4 binary tree, ρ = 0.9, 16 leaves, N = 256 trees, both network
+parameterizations trained. First, the totals — relative error of the posterior
+mean against exact tree BP:
+
+| t | EM-BP | best network | ratio |
+|---|---|---|---|
+| 0.1 | 0.0098 | 0.1852 (ε) | 18.9× |
+| 0.2 | 0.0125 | 0.2245 (ε) | 18.0× |
+| 0.4 | 0.0167 | 0.2489 (x₀) | 14.9× |
+| 0.8 | 0.0334 | 0.2587 (x₀) | 7.8× |
+| 1.6 | 0.0815 | 0.3332 (x₀) | 4.1× |
+
+(`bp_exact_grid`, i.e. grid tree BP given the true kernel, is 0.0000 at every
+`t` — the validation that the grid path reproduces the information form.)
+
+Second, and more interesting: *where* the error sits. The natural null is a
+method whose per-mode error is uniform, which would put a share of the total
+squared error on each level proportional to its multiplicity — 1, 1, 2, 4, 8
+out of 16 here. Dividing the measured share by that null gives a concentration
+ratio, and its spread across levels says how much a method's error knows about
+the hierarchy:
+
+| method | spread of concentration ratio across levels (min → max over `t`) |
+|---|---|
+| network, ε-prediction | **1.6× – 2.2×** |
+| network, x₀-prediction | 2.8× – 12.6× |
+| EM-BP | **224× – 6957×** |
+
+**The ε-network distributes its error uniformly over the hierarchy at every
+noise level, as if the levels did not exist.** EM-BP's error is concentrated by
+two to four orders of magnitude, and it *migrates*: at t = 0.1 it sits on the
+finest levels (ratio 1.44 at level 3, 0.00 at level 0), and by t = 1.6 all of
+it is on the single coarsest mode (15.8 at level −1, ≤ 0.02 everywhere else).
+That is the estimator's structure showing up in its residual — at large `t`
+only the top mode survives the noise, so the kernel misestimate (ρ̂ = 0.9161
+against 0.9) has nowhere else to appear.
+
+The x₀-network is genuinely intermediate (up to 12.6× at large `t`), which is
+worth stating because it is the better parameterization there; the "no
+structure at all" reading applies to ε-prediction, not to every network.
+
 ### Tree EM converges, but slowly
 
 `ρ̂ = 0.7360 → 0.7483 → 0.7487` at 50/100/150 iterations (true 0.75), **zero

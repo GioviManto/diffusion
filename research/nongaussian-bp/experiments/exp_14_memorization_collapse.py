@@ -41,6 +41,11 @@ budget    Analytic. The exponential wall: dataset size needed to avoid
           memorization, versus chain length.
 collapse  Measured. Nearest-training-neighbour distance of generated samples
           for the empirical, EM-BP and DSM-network scores, swept over n and N.
+          `--set include_mdn=True` adds a mixture-density BP kernel with
+          hundreds of parameters, which is the answer to the obvious objection
+          that a two-parameter kernel *cannot* memorize so the result is
+          trivial. If the nonparametric rung also refuses, the mechanism is the
+          sufficient statistic and not the parameter count.
 time      Measured. Predicted vs observed collapse time for the empirical score.
 """
 
@@ -52,7 +57,7 @@ from common import apply_overrides, experiment_parser, provenance, select_parts
 from src import spectral
 from src.denoiser import bp_posterior_mean, dsm_posterior_mean, train_dsm_denoiser
 from src.em import fit_em
-from src.kernels import GaussianAR1Kernel
+from src.kernels import GaussianAR1Kernel, MDNKernel
 from src.noising import alpha_delta
 from src.plotting import save_figure
 from src.priors import GaussianAR1
@@ -79,6 +84,13 @@ def settings(quick: bool) -> dict:
         "em_iters": 60 if not quick else 10,
         "hidden": (128, 128),
         "dsm_steps": 12000 if not quick else 400,
+        # The nonparametric BP rung, off by default because it costs another EM
+        # run per cell. Turn it on to answer "a 2-parameter kernel cannot
+        # memorize, so of course it does not".
+        "include_mdn": False,
+        "mdn_components": 3,
+        "mdn_hidden": 24,
+        "mdn_iters": 40 if not quick else 8,
         # part `time`
         "time_sites": (8, 16, 32) if not quick else (8, 16),
         "time_sizes": (32, 128, 512, 2048) if not quick else (32, 128),
@@ -212,6 +224,23 @@ def part2_collapse(cfg, out_dir):
                 parameterization="eps",
             )
 
+            # The obvious objection to "BP does not memorize" is that a
+            # two-parameter kernel *cannot* memorize, so the result is trivial.
+            # The MDN rung answers it: a mixture-density kernel with hundreds of
+            # parameters, fitted by the same EM, still has a sufficient statistic
+            # that is an average over edges and still does not grow with n. If it
+            # also refuses to memorize, the mechanism is the statistic and not
+            # the parameter count.
+            mdn = None
+            if cfg["include_mdn"]:
+                mdn, mdn_trace = fit_em(
+                    MDNKernel.init(cfg["mdn_components"], cfg["mdn_hidden"],
+                                   rng_for(NAME, "mdn-init", n, n_train)),
+                    grid, w, groups, n_iters=cfg["mdn_iters"],
+                )
+                print(f"    MDN kernel: {mdn.net.n_params} params, "
+                      f"monotone violation {mdn_trace.monotone_violation:.2e}")
+
             scores = {
                 "empirical": lambda x, t: empirical_score(x, a_train, float(t)),
                 "bp_em": lambda x, t: -(
@@ -226,6 +255,11 @@ def part2_collapse(cfg, out_dir):
                     x - np.exp(-float(t)) * dsm_posterior_mean(net, x, float(t))
                 ) / (1.0 - np.exp(-2.0 * float(t))),
             }
+            if mdn is not None:
+                scores["bp_em_mdn"] = lambda x, t: -(
+                    x - np.exp(-float(t))
+                    * bp_posterior_mean(mdn, grid, w, x, float(t))
+                ) / (1.0 - np.exp(-2.0 * float(t)))
 
             times = time_grid(cfg["t_max"], cfg["t_min"], cfg["n_steps_sde"])
             # A held-out true sample is the no-memorization yardstick: whatever
@@ -269,7 +303,7 @@ def part2_collapse(cfg, out_dir):
 def _plot_collapse(rows, cfg, out_dir):
     import matplotlib.pyplot as plt
 
-    methods = ["empirical", "dsm_eps", "bp_em", "bp_true"]
+    methods = ["empirical", "dsm_eps", "bp_em", "bp_em_mdn", "bp_true"]
     fig, axes = plt.subplots(1, len(cfg["n_sites"]),
                              figsize=(3.4 * len(cfg["n_sites"]), 3.6), sharey=True)
     axes = np.atleast_1d(axes)
