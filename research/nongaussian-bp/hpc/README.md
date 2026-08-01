@@ -67,10 +67,30 @@ hour each. The parts that would genuinely benefit from a cluster, in order:
 5. **`exp_07 capacity`** — larger architectures and longer training, to push the
    "the network is not merely undertrained" argument as far as it will go.
 
+### Layer 6 (exp_13, exp_14)
+
+6. **`exp_14 collapse`** — the one that most needs a cluster, because the point
+   is to straddle the entropic wall and the wall is exponential in the chain
+   length. At `rho = 0.85` it sits at ~89 chains for `n = 8` and ~1e9 for
+   `n = 33`, so only the short chains can be taken past it at all. A sweep that
+   crosses the wall for `n = 8` and `n = 12`, and demonstrably cannot for
+   `n = 24` and `n = 32`, is the whole argument in one figure.
+7. **`exp_13 levels` / `ordering`** — these are gated by tree EM, which is
+   several times slower to converge than chain EM (internal nodes are never
+   observed). The committed runs use `em_iters = 150` at depth 4; depth 5-6
+   with `em_iters = 400` is what the cluster is for. **Do not economize here**:
+   an under-budgeted EM produces a plausible wrong answer rather than an
+   obvious failure.
+8. **`exp_13 cascade`** — cheap per path but the finest level of the ladder is
+   integrator-limited (measured 0.125 against a predicted 0.087 at `t_min =
+   0.02`). More steps and a smaller `t_min` should close that; if it does not,
+   that is itself worth knowing.
+
 ## Files
 
     slurm_exp06.sbatch   5-task array, one per part of exp_06
     slurm_exp07.sbatch   4-task array, one per part of exp_07
+    slurm_layer6.sbatch  8-task array: 5 parts of exp_13, 3 of exp_14
     slurm_replicates.sbatch
                          seed-replicated sample-efficiency sweep: one task per
                          seed, each writing to its own subdirectory, plus a
