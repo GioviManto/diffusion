@@ -406,11 +406,19 @@ score:
 | 3 | 0.498 | 0.202 | 0.208 | 0.222 |
 | 4 (sibling leaves) | 0.190 | 0.087 | 0.087 | 0.125 |
 
-Six distinct transitions spanning **16× in time within one dataset**, each at
-its predicted place. The forward column agrees to ≤ 3.5%. The reverse column
-drifts at the finest level (0.125 vs 0.087) where the Euler–Maruyama step and
-the `t_min = 0.02` floor bite; that is integrator error, not a failure of the
-prediction, and it is reported rather than trimmed.
+Six distinct transitions spanning **15.7× in time within one dataset**, each at
+its predicted place: Pearson r = **0.9998** for both columns, with the forward
+crossings agreeing to **≤ 3.5%** at every level.
+
+The reverse column's deviations are −2%, +3%, +1%, +4%, +10%, **+43%** from
+coarsest to finest. That the error grows monotonically toward the fine end is
+the signature of the integrator rather than of the prediction: the finest level
+speciates at t = 0.087, within a factor of four of the sampler's `t_min = 0.02`,
+where the geometric time grid is coarsest relative to the scale that matters and
+the drift stiffens as `α/Δ ~ 1/(2t)`. Four of the six levels agree to ≤ 4%.
+`hpc/slurm_layer6.sbatch` runs this part at `n_steps_sde = 800` and
+`t_min = 0.005`; if the finest level does not move, that is worth knowing and
+the diagnosis above is wrong.
 
 **The reverse diffusion resolves the hierarchy coarse-to-fine, one transition
 per level.**
