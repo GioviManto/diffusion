@@ -591,11 +591,139 @@ def _plot_ordering(rows, uniq, out_dir):
 
 # ----------------------------------------------------------------------------
 
+def part5_filtering(cfg, out_dir):
+    """Hierarchical filtering: sweep the *range* of correlations in the data.
+
+    This is P1's central device transplanted. Filtering a depth-L tree at level
+    k -- resampling everything above k independently -- leaves correlations only
+    inside blocks of b^k leaves, so the data is exactly `b^{L-k}` independent
+    depth-k trees laid end to end. The sequence length, the training budget and
+    the network are held fixed; only the correlation range moves.
+
+    The prediction being tested is the diffusion analogue of P1's sequential
+    acquisition: at fixed budget the network's deficit should grow with k,
+    because longer-range structure is what it acquires last, while EM-BP's
+    should not, because the object it estimates -- one transition kernel -- is
+    the same size whatever k is.
+
+    The asymmetry is deliberate and is the premise of the whole package, so it
+    is worth restating: BP is *given* the graph and learns only the kernel on
+    it, exactly as BP is the model-aware reference in P1. The network is given
+    the sequence. This measures how the difficulty of the learning problem
+    scales with correlation range for each, not who wins a fair fight.
+    """
+    b, rho = cfg["branching"], cfg["rho"]
+    depth = cfg["depth"]
+    n_leaves = b**depth
+    grid, w = _grid(cfg)
+    log_root = -0.5 * grid**2 - 0.5 * np.log(2 * np.pi)
+    print(f"[filtering] {n_leaves} leaves, filter level k = 1..{depth}")
+
+    rows = []
+    for k in range(1, depth + 1):
+        block = b**k
+        n_blocks = n_leaves // block
+        sub = GaussianTree(depth=k, branching=b, rho=rho)
+
+        rng = rng_for(NAME, "filter-train", k, cfg["n_train"])
+        a_train = sub.sample(rng, cfg["n_train"] * n_blocks).reshape(
+            cfg["n_train"], n_leaves
+        )
+        groups = []
+        for t in cfg["t_train"]:
+            alpha, delta = alpha_delta(float(t))
+            x = alpha * a_train + np.sqrt(delta) * rng.standard_normal(a_train.shape)
+            groups.append((x.reshape(-1, block), alpha, delta))
+
+        rng_t = rng_for(NAME, "filter-test", k)
+        a_test = sub.sample(rng_t, cfg["n_test"] * n_blocks).reshape(
+            cfg["n_test"], n_leaves
+        )
+
+        fitted, trace = fit_em_tree(
+            GaussianAR1Kernel(rho=0.3, q=0.8), grid, w, groups, b, k,
+            n_iters=cfg["em_iters"],
+        )
+        net = train_dsm_denoiser(
+            a_train, cfg["t_train"], rng_for(NAME, "filter-dsm", k),
+            hidden=tuple(cfg["hidden"]), n_steps=cfg["dsm_steps"],
+            parameterization="eps",
+        )
+
+        for t in cfg["t_train"]:
+            alpha, delta = alpha_delta(float(t))
+            x = alpha * a_test + np.sqrt(delta) * rng_t.standard_normal(a_test.shape)
+            flat = x.reshape(-1, block)
+            m_ref = tree_bp_gaussian(sub, flat, alpha, delta).reshape(x.shape)
+            m_em = tree_bp_grid(
+                fitted.log_transition_matrix(grid), grid, log_root, flat,
+                alpha, delta, b, k,
+            ).reshape(x.shape)
+            m_net = dsm_posterior_mean(net, x, float(t))
+
+            denom = np.linalg.norm(m_ref)
+            # Absolute RMS as well as relative: ||m_ref|| itself changes with k
+            # (weaker correlation means less shrinkage structure to recover), so
+            # a relative error compared *across* k is partly reading its own
+            # denominator. The ratio `advantage` is immune, sharing a reference.
+            rms = float(np.sqrt(m_ref.size))
+            rows.append({
+                "filter_level": k, "block_size": block, "n_blocks": n_blocks,
+                "t": t, "n_train": cfg["n_train"],
+                "rel_error_bp_em": float(np.linalg.norm(m_em - m_ref) / denom),
+                "rel_error_dsm": float(np.linalg.norm(m_net - m_ref) / denom),
+                "abs_error_bp_em": float(np.linalg.norm(m_em - m_ref) / rms),
+                "abs_error_dsm": float(np.linalg.norm(m_net - m_ref) / rms),
+                "reference_rms": float(denom / rms),
+                "advantage": float(
+                    np.linalg.norm(m_net - m_ref) / max(np.linalg.norm(m_em - m_ref), 1e-12)
+                ),
+                "top_eigenvalue": sub.level_eigenvalues()[0][1],
+                "t_speciation_top": float(
+                    spectral.speciation_time(sub.level_eigenvalues()[0][1])
+                ),
+                "rho_hat": float(fitted.rho),
+                "em_monotone_violation": float(trace.monotone_violation),
+            })
+        mid = [r for r in rows if r["filter_level"] == k]
+        print(f"  k={k} (blocks of {block:>2}): rho_hat={fitted.rho:.4f}  "
+              f"abs err  EM {np.mean([r['abs_error_bp_em'] for r in mid]):.4f}  "
+              f"DSM {np.mean([r['abs_error_dsm'] for r in mid]):.4f}  "
+              f"(ref rms {np.mean([r['reference_rms'] for r in mid]):.3f})  "
+              f"advantage {np.mean([r['advantage'] for r in mid]):.2f}x")
+
+    write_csv(out_dir / "filtering.csv", rows)
+
+    import matplotlib.pyplot as plt
+
+    fig, axes = plt.subplots(1, 2, figsize=(10.5, 4.2))
+    ks = sorted({r["filter_level"] for r in rows})
+    for t in cfg["t_train"]:
+        sub_rows = [r for r in rows if r["t"] == t]
+        axes[0].plot(ks, [r["rel_error_dsm"] for r in sub_rows], "o-", label=f"DSM t={t}")
+        axes[0].plot(ks, [r["rel_error_bp_em"] for r in sub_rows], "s--",
+                     label=f"EM-BP t={t}")
+        axes[1].plot(ks, [r["advantage"] for r in sub_rows], "o-", label=f"t={t}")
+    axes[0].set_yscale("log")
+    axes[0].set_xlabel("filter level k (correlation range)")
+    axes[0].set_ylabel("relative posterior-mean error")
+    axes[0].legend(fontsize=6, ncol=2)
+    axes[1].set_xlabel("filter level k (correlation range)")
+    axes[1].set_ylabel("DSM error / EM-BP error")
+    axes[1].axhline(1.0, color="k", ls="--", lw=0.8)
+    axes[1].legend(fontsize=7)
+    for ax in axes:
+        ax.grid(alpha=0.3)
+    fig.tight_layout()
+    save_figure(fig, out_dir / "filtering.png")
+
+
 PARTS = {
     "spectra": part1_spectra,
     "cascade": part2_cascade,
     "levels": part3_levels,
     "ordering": part4_ordering,
+    "filtering": part5_filtering,
 }
 
 

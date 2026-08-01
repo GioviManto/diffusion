@@ -379,6 +379,108 @@ number did not.
 
 ---
 
+## 4.13 Layer 6 — hierarchical priors and the two diffusion time scales
+
+Prompted by the two papers the project was pointed at (see
+`docs/PAPER_CONNECTIONS.md`, which records **up front that neither PDF could be
+opened from this environment** and that nothing mathematical is quoted from
+them). New code: `src/hierarchy.py`, `src/spectral.py`, `exp_13`, `exp_14`,
+29 new tests (suite now 79).
+
+### The speciation ladder (exp_13 `spectra`, `cascade`)
+
+A hierarchical prior has one covariance eigenvalue per level, so it has a
+*ladder* of speciation times rather than one. Derived in this package's
+convention, the crossover along a mode of variance `Λ` is
+`t_S = ½ log(1 + Λ)`. Measured on a depth-5 binary tree, ρ = 0.9, 32 leaves —
+predicted against the crossing of the commitment curve through `1/√2`, along
+the forward process and along the reverse SDE driven by the exact tree-BP
+score:
+
+| level | Λ | `t_S` predicted | forward | reverse SDE |
+|---|---|---|---|---|
+| −1 (whole tree) | 14.271 | 1.363 | 1.368 | 1.336 |
+| 0 | 3.113 | 0.707 | 0.732 | 0.725 |
+| 1 | 1.804 | 0.516 | 0.521 | 0.520 |
+| 2 | 0.996 | 0.346 | 0.340 | 0.358 |
+| 3 | 0.498 | 0.202 | 0.208 | 0.222 |
+| 4 (sibling leaves) | 0.190 | 0.087 | 0.087 | 0.125 |
+
+Six distinct transitions spanning **16× in time within one dataset**, each at
+its predicted place. The forward column agrees to ≤ 3.5%. The reverse column
+drifts at the finest level (0.125 vs 0.087) where the Euler–Maruyama step and
+the `t_min = 0.02` floor bite; that is integrator error, not a failure of the
+prediction, and it is reported rather than trimmed.
+
+**The reverse diffusion resolves the hierarchy coarse-to-fine, one transition
+per level.**
+
+### A chain has no cascade (exp_13 `spectra`)
+
+The same analysis says the chain this project has been studying is *outside*
+that regime, which is worth knowing before generalizing from it. The AR(1)
+spectrum is bounded by `(1+ρ)/(1−ρ)` at any length:
+
+| ρ | top eigenvalue, n = 8 → 512 | limit | `t_S` saturates at |
+|---|---|---|---|
+| 0.50 | 2.57 → 3.00 | 3.00 | 0.693 |
+| 0.85 | 5.49 → 12.32 | 12.33 | 1.295 |
+| 0.95 | 7.03 → 38.52 | 39.00 | 1.844 |
+
+64× the length moves the top mode by under 2×. A tree at ρ = 0.9 instead goes
+3.12 → 23.31 over depths 2–6, with its levels spanning `t_S ∈ [0.087, 1.595]`.
+**A stationary Markov chain has one saturating time scale; only the hierarchy
+produces the diverging speciation time and the coarse-to-fine cascade.**
+
+### Memorization: the axis BP does not have (exp_14 `collapse`)
+
+The collapse mechanism is a statement about the *empirical* score, whose
+sufficient statistic is the training set itself. A BP score's sufficient
+statistic is the fitted kernel — two numbers, independent of `n` — reached only
+through `Ξ`, which is an average. So the prediction is not that BP memorizes
+less but that **the axis does not exist for it**.
+
+Measured as nearest-training-chain distance of generated samples, divided by
+the same quantity for a genuinely fresh draw from the true prior (1.0 = no
+memorization, 0 = full collapse), ρ = 0.85:
+
+| n | N | wall `e^{ns}` | empirical | DSM | EM-BP | true-prior BP |
+|---|---|---|---|---|---|---|
+| 8 | 64 | 88.8 | **0.457** | 0.800 | 1.079 | 1.076 |
+| 8 | 256 | 88.8 | **0.540** | 0.929 | 1.058 | 1.044 |
+| 8 | 1024 | 88.8 | **0.660** | 0.980 | 1.015 | 1.012 |
+| 16 | 64 | 1.5e4 | **0.332** | — | — | — |
+| 16 | 256 | 1.5e4 | **0.387** | 0.906 | 1.040 | 1.026 |
+
+The empirical score memorizes throughout, and **recovers monotonically as `N`
+crosses its wall** (0.457 → 0.540 → 0.660 as N goes 64 → 1024 past a wall at
+89) — the predicted direction. EM-BP sits at 1.01–1.08 at every `n` and `N`,
+tracking the true-prior BP reference to within 0.03. The network is
+consistently slightly *below* 1, i.e. mildly memorizing, and approaches 1 only
+where the empirical score does too.
+
+The per-site excess entropy is exact for this family, `s = −½ log(1 − ρ²)`:
+**0.641 nats/site at ρ = 0.85**, so n = 33 already demands ~10⁹ chains. That is
+the quantitative form of the claim that Layer 5's data advantage is structural.
+
+### Caveat carried with the collapse numbers
+
+The ratio is only interpretable when the generated distribution is otherwise
+correct, so sample standard deviation and lag-1 correlation are logged beside
+it in every row. In the quick configuration the undertrained network reached
+ratios of 2–3.4 with sample std 2.3–3.3 — that is over-dispersion, not
+generalization, and would be a misreading if the ratio were quoted alone.
+
+### Tree EM converges, but slowly
+
+`ρ̂ = 0.7360 → 0.7483 → 0.7487` at 50/100/150 iterations (true 0.75), **zero
+monotone violation throughout**, and `q̂ = 0.4418` against 0.4375. Internal
+nodes are never observed, so the missing-information fraction is far larger
+than on a chain and EM's linear rate is correspondingly slower. An estimate
+read at 40 iterations looks like a broken M-step and is merely unconverged.
+
+---
+
 ## 5. Findings recorded rather than smoothed over
 
 ### 5.1 The Laplace M-step is exact but lattice-quantized
