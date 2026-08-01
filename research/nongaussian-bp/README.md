@@ -77,15 +77,51 @@ trained and reported. The baseline is a vanilla MLP, as specified — a
 temporal-convolution or U-Net baseline would carry a locality prior of its own
 and is the natural next comparison, not something settled here.
 
+## Layer 6: hierarchy, speciation, and memorization (exp_13, exp_14)
+
+Layers 1-5 all live on a *chain*, which has exactly one correlation length. The
+two papers this layer follows -- Garnier-Brun/Mezard/Moscato/Saglietti on
+hierarchical filtering (arXiv:2408.15138) and Biroli/Bonnaire/de Bortoli/Mezard
+on dynamical regimes (Nat. Commun. 15, 9957) -- between them supply a data model
+with a *ladder* of length scales and a theory of the time scales a diffusion
+passes through. `docs/PAPER_CONNECTIONS.md` is the study note; **read its section
+0 first**, because neither PDF could be opened from the environment this was
+built in and nothing mathematical here is quoted from them.
+
+What this adds:
+
+- **A balanced-tree prior** with a closed-form ultrametric spectrum: exactly
+  `L + 1` distinct eigenvalues, verified against `eigh` at 1e-10.
+- **Exact BP on the tree**, twice: information form `(h, lambda)` matching a
+  dense solve at 1e-10, and grid messages matching that at 2e-6 and working for
+  any innovation law.
+- **EM on the tree**, producing the *same* `Xi` as the chain E-step -- so every
+  M-step in `src/kernels.py` is reused unmodified. Evidence verified against the
+  closed-form Gaussian marginal likelihood at relative 1e-6, which keeps the
+  monotone-ascent check available.
+- **Two time scales in closed form** (`src/spectral.py`): the speciation
+  crossover `t_S = 1/2 log(1 + Lambda)`, checked against 40k sampled forward
+  trajectories, and the per-site excess entropy `s = -1/2 log(1 - rho^2)` that
+  fixes the dataset size below which a memorizing score must collapse.
+
+Two results worth stating here. **A hierarchical prior shows a ladder of
+speciation transitions, one per level, and the reverse diffusion resolves it
+coarse-to-fine** -- six measured on a depth-5 tree, each within 3.5% of its
+predicted time. And **the AR(1) chain that Layers 1-5 study has no such ladder**:
+its top eigenvalue is bounded by `(1+rho)/(1-rho)` at any length, so its
+speciation time saturates. That bounds how far this project generalizes toward
+image-like data, and is recorded rather than glossed.
+
 ## Layout
 
     src/          core library (priors, noising, grid BP, Gaussian BP, exact
                   scores, Markov approximations, numpy MLP, reverse samplers,
-                  EM + parameterized kernels + denoiser comparison)
-    experiments/  exp_01 ... exp_08, all with --quick smoke mode
+                  EM + parameterized kernels + denoiser comparison,
+                  tree priors + tree BP + tree EM, speciation/collapse scales)
+    experiments/  exp_01 ... exp_14, all with --quick smoke mode
     outputs/      CSV + JSON + PNG per experiment (committed results)
     notebooks/    executed analysis notebooks 01-04
-    tests/        pytest suite (50 tests)
+    tests/        pytest suite (79 tests)
     report/       updated_report.tex / .pdf   (Layers 1-4)
                   em_bp_learning.tex / .pdf   (Layer 5 theory)
     audit/        Layer-1 audit note
@@ -104,10 +140,22 @@ python experiments/exp_04_approx_markovianity.py
 python experiments/exp_05_reverse_dynamics.py
 python experiments/exp_06_em_parameter_recovery.py
 python experiments/exp_07_em_vs_score_network.py
+python experiments/exp_13_speciation_cascade.py
+python experiments/exp_14_memorization_collapse.py
 ```
 
-`tests/test_em_bp.py` runs many small EM fits; the whole suite takes ~80 s. Experiments 06 and 07 take roughly an hour each at full
-settings — use `--quick` for a minutes-scale smoke run.
+`tests/test_em_bp.py` runs many small EM fits and `tests/test_hierarchy.py` a
+few tree ones; the whole suite takes ~3.7 min. Experiments 06, 07, 13 and 14
+take roughly an hour each at full settings — use `--quick` for a minutes-scale
+smoke run.
+
+One caveat specific to the tree code: **EM on a tree needs several times more
+iterations than on a chain**, because the internal nodes are never observed and
+the missing-information fraction is correspondingly larger. At depth 3 with 512
+trees, `rho_hat` is 0.7360 / 0.7483 / 0.7487 at 50 / 100 / 150 iterations
+against a true 0.75, with zero monotone violation throughout. An estimate read
+too early looks like a broken M-step; check the last-iteration change in the
+log-evidence before concluding anything about accuracy.
 
 Every experiment: deterministic seeds via `src.utils.rng_for` (common random
 numbers across compared methods), full parameter dump to `params.json`,
