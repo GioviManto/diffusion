@@ -126,7 +126,13 @@ has to keep up with the model.
 
 *Evidence:* `outputs/exp_09_mixture_message_closure/`; `tests/test_bp_mixture.py`.
 
-### R5. "Do neural message approximators help only when they preserve the local BP update structure?" — **PARTIAL, with evidence on both sides**
+### R5. "Do neural message approximators help only when they preserve the local BP update structure?" — **PARTIAL, with evidence on three sides**
+
+*(Updated by exp_12: a network that preserves* locality *but not the BP update
+itself — a 1-D CNN — recovers 60% of the gap to EM-BP. So "preserving structure"
+admits degrees, and even a weak structural prior buys most of what is available.
+See N2.)*
+
 
 Two experiments bear on this and they point the same way.
 
@@ -577,12 +583,24 @@ closure error well enough to extrapolate to an unseen family (R3), but it does
 universal while bimodal κ=0.9 is 4.94× off. Bimodality specifically destroys
 locality. The right summary statistic is unidentified.
 
-**N2. Does a structured architecture close the EM-BP gap?** The compendium
-flagged this as the most important unasked question. exp_12 now builds the
-locality-respecting baseline (a weight-shared window predictor, i.e. a 1-D CNN);
-its smoke run already shows the local head beating the fully connected MLP by
-2–4× at *fewer* parameters, which means the exp_07 headline overstates the
-margin against a well-chosen architecture. The full run will say by how much.
+**N2. Does a structured architecture close the EM-BP gap?** — **ANSWERED: it
+closes most of it.** Measured in exp_12 at N=1024, interior sites:
+
+| | parameters | mean relative score error |
+|---|---|---|
+| fully connected MLP | 25,505 | 0.1535 |
+| local CNN (r=6) | 5,313 | 0.0595 |
+| EM-BP | 13 | 0.0182 |
+
+The CNN beats the MLP by **2.5×** with a fifth of the parameters. So the EM-BP
+margin against a well-chosen architecture is **3.3×, not 8.4×** — roughly 60% of
+the gap was the baseline's architecture rather than the estimator's structure.
+EM-BP still wins with 13 parameters against 5,313, but the order-of-magnitude
+framing belongs only to the vanilla comparison and should not be quoted
+otherwise.
+
+This was the most important unasked question in the project and the answer
+materially qualifies the headline. It is now recorded in compendium §4.11.
 
 The most important *unasked* question, which a reviewer will ask: **does a
 structured architecture (temporal CNN / U-Net) close the gap in E3?** The email

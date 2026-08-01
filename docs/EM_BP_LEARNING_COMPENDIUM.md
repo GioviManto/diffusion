@@ -76,34 +76,37 @@ Pure numpy, no autodiff, no new dependencies.
 
 ## 4. Results
 
-### 4.1 EM-BP vs a score network (exp_07 Part 1) — the headline
+### 4.1 EM-BP vs a score network — the headline, with error bars
 
-Relative score error, averaged over the noise schedule. EM-BP: **13 parameters**.
-Network: **25,248 parameters**, trained on paired `(a,x)` with a fresh noise
-draw every gradient step. EM sees one noisy realization per chain, at one noise
-level, and never sees a clean chain.
+Six independent training seeds, extended to N=4096. The test set and its
+exact-BP reference are held fixed across seeds, so replicates disagree on what
+they learn from and agree on what they are judged against. Relative score error
+averaged over the noise schedule, ±1 standard error over seeds:
 
-| N chains | ε-net | x₀-net | **EM-BP** | ratio (ε/EM) |
-|---|---|---|---|---|
-| 32 | 0.654 | 0.768 | **0.130** | 5.0× |
-| 64 | 0.588 | 0.677 | **0.034** | 17.5× |
-| 128 | 0.508 | 0.577 | **0.048** | 10.6× |
-| 256 | 0.403 | 0.488 | **0.031** | 13.0× |
-| 512 | 0.282 | 0.372 | **0.034** | 8.2× |
-| 1024 | 0.217 | 0.312 | **0.022** | 9.8× |
-| 2048 | 0.179 | 0.237 | **0.016** | 10.9× |
+| N chains | best network | **EM-BP** | ratio |
+|---|---|---|---|
+| 32 | 0.6363 ± 0.0043 | **0.0651 ± 0.0031** | 9.8× |
+| 128 | 0.5117 ± 0.0025 | **0.0333 ± 0.0035** | 15.4× |
+| 512 | 0.2813 ± 0.0013 | **0.0211 ± 0.0022** | 13.3× |
+| 1024 | 0.2154 ± 0.0009 | **0.0182 ± 0.0021** | 11.8× |
+| 2048 | 0.1756 ± 0.0009 | **0.0142 ± 0.0009** | 12.4× |
+| 4096 | 0.1643 ± 0.0009 | **0.0124 ± 0.0005** | 13.2× |
 
-**The sharpest reading is not the ratio at fixed N.** EM-BP on 32 chains
-(0.130) already beats the network on 2048 chains (0.179) — a **≥64× gap in the
-data each needs** for equal accuracy. That is a lower bound: 32 was the smallest
-budget tried, and the network was still improving at 2048.
+Both curves are now monotone; the wobble in the original single-replicate run
+was seed noise, as suspected. The ratio is stable at 10–15× across seven
+doublings of the data.
 
-Per noise level at N=2048, EM-BP wins at every `t`, and the margin is widest at
-low noise (0.041 vs 0.248 ε / 0.598 x₀) — where the score matters most for
-reverse-time integration, and where Layer 2 found the Gaussian closure failing.
+**The data-efficiency statement, now with non-overlapping error bars.** EM-BP on
+**32** chains (0.0651 ± 0.0031) beats the network on **4096** (0.1643 ± 0.0009)
+by a factor of 2.5. So the network needs **more than 128× the data** to match
+EM-BP, and that remains a lower bound — 32 was the smallest budget tried and the
+network never caught up. Fitted exponents are −0.35 (EM-BP) and −0.32 (network);
+extrapolating the network's own scaling puts the crossing near 10⁷ chains, but
+that is a four-decade extrapolation and is offered as an order of magnitude, not
+a claim.
 
-`identity_residual` max **5.1e-14** across all rows: the exact score/mean
-relation holds to machine precision throughout.
+⚠️ **This margin is against a *vanilla* MLP, and that matters — see §4.11.** A
+locality-respecting architecture closes most of it.
 
 ### 4.2 The gap is not undertraining or undersizing (exp_07 Part 2)
 
@@ -162,6 +165,63 @@ At M=401, grid BP is **211×–320× slower** per chain than a network forward p
 — larger than the ~100× seen at M=201 in smoke runs, since cost is `O(nM²)`.
 Reverse diffusion calls the denoiser at *every* integration step, so this is the
 weakest point of the whole story.
+
+### 4.11 A structured architecture closes most of the gap (exp_12)
+
+The compendium has flagged from the start that the exp_07 baseline is a fully
+connected MLP carrying no locality prior, and that a reviewer would ask what
+happens against an architecture that encodes sequence structure. Measured.
+
+A weight-shared window predictor — exactly a 1-D CNN with receptive-field radius
+r — trained by the same denoising score matching, at N=1024, interior sites:
+
+| | parameters | mean relative score error |
+|---|---|---|
+| fully connected MLP | 25,505 | 0.1535 |
+| **local CNN (r=6)** | **5,313** | **0.0595** |
+| **EM-BP** | **13** | **0.0182** |
+
+**The CNN beats the MLP by 2.5× on average with a fifth of the parameters** (up
+to 3.8× at t=0.4, converging at t=1.6 where the score is nearly −x and structure
+stops helping).
+
+So against a well-chosen architecture the EM-BP margin is **3.3×, not 8.4×**.
+The structured baseline closes roughly 60% of the gap. That is the honest
+number, and it should be the one quoted whenever the comparison is to anything
+better than a vanilla network. EM-BP still wins — 13 parameters against 5,313 —
+but the order-of-magnitude framing belongs only to the vanilla comparison.
+
+### 4.12 The optimal receptive field is finite, and exceeding it hurts (exp_12)
+
+B15 read the Gaussian locality law as "a local head is near-optimal once
+r ≳ ξ log(1/ε)" — a *lower* bound on the radius. The sweep says something
+sharper: the error is **U-shaped in r**, so there is an optimum and overshooting
+it is costly.
+
+Interior relative score error for the Gaussian chain at t=0.1:
+
+| r | 1 | 2 | **3** | 4 | 8 | 12 | 16 |
+|---|---|---|---|---|---|---|---|
+| error | 0.229 | 0.100 | **0.065** | 0.087 | 0.094 | 0.125 | 0.125 |
+
+Doubling the radius past the optimum roughly doubles the error. The mechanism is
+an ordinary bias-variance trade: too small a window truncates genuine
+dependence, too large a window spends the same data estimating more input
+dimensions. B15's prescription is therefore only half the story.
+
+**The optimum grows with noise level**, which the locality law predicts (the
+decay rate q rises with t, so the error falls off more slowly in r):
+
+| family | t=0.1 | t=0.2 | t=0.4 | t=0.8 | t=1.6 |
+|---|---|---|---|---|---|
+| gaussian | 3 | 3 | 6 | 12 | 16 |
+| laplace | 3 | 4 | 8 | 12 | 16 |
+| gauss_mix κ=0.9 | 3 | 4 | 8 | 12 | 12 |
+
+And the non-Gaussian families need a *wider* field than the Gaussian at matched
+(ρ, t) — 4 against 3 at t=0.2, 8 against 6 at t=0.4 — which is the direction
+exp_11's locality rates predicted, at roughly the predicted 1.1–1.3× magnitude.
+The sweep's granularity in r limits how sharply that can be confirmed.
 
 ### 4.5 EM behaves exactly as the theory says (exp_06 Part 1)
 
