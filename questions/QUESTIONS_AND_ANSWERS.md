@@ -273,9 +273,60 @@ M-step per kernel family — weighted Yule-Walker, a weighted median, an inner E
 line. Monotonicity violation is **exactly 0.0**, not "below 1e-8".
 
 **A confound-free retest of the headline.** With the reference denoiser exact
-rather than a fine-grid approximation, EM-BP still beats the score network by
-7.3–7.5× even at the smoke-test budget. Whatever the margin is, it is not a grid
-artifact.
+rather than a fine-grid approximation (S=5, 20 learned parameters against the
+network's 25,248):
+
+| N | best network | **EM-BP** | ratio |
+|---|---|---|---|
+| 32 | 0.761 | **0.184** | 4.1× |
+| 128 | 0.641 | **0.085** | 7.5× |
+| 512 | 0.398 | **0.052** | 7.7× |
+| 2048 | 0.263 | **0.032** | 8.3× |
+
+EM-BP on 32 chains (0.184) again beats the network on 2048 (0.263), reproducing
+the ≥64× data-efficiency gap with **zero grid error**. Monotonicity violation
+was exactly 0.0 in every run; identity residual ≤1.4e-13.
+
+**Two honest findings from the alphabet sweep**, both of which qualify the
+headline rather than support it.
+
+*The advantage erodes as the model grows.* At N=512:
+
+| S | EM params | ratio over best network |
+|---|---|---|
+| 3 | 6 | 15.4× |
+| 4 | 12 | 17.7× |
+| 6 | 30 | 8.0× |
+| 8 | 56 | 5.7× |
+| 12 | 132 | 4.4× |
+
+Still 4.4× ahead at 132 parameters, but the trend is unambiguous: the
+sample-efficiency advantage is tied to the parametric dimension being small,
+exactly as Prop. 5 would predict. Nothing here says a structured estimator wins
+once its parameter count approaches the network's.
+
+*The recovery rate degrades with S, and it is not a metric artifact.* Fitted
+slopes go −0.55 (S=3), −0.44 (S=4), −0.37 (S=6), −0.18 (S=8). Suspecting the
+max-norm over `S²` entries, I re-ran with a per-entry metric: at S=8 the slopes
+are −0.123 (max) and −0.107 (mean), so the degradation is real.
+
+The mechanism is **level crowding**. At fixed unit marginal variance the S
+levels are spaced ~1/S apart, while the OU channel resolves differences only
+down to `sqrt(Δ_t)/α_t`. The ratio spacing/resolution:
+
+| S | t=0.1 | t=0.2 | t=0.4 | t=0.8 |
+|---|---|---|---|---|
+| 4 | 1.90 | 1.28 | 0.81 | 0.45 |
+| 8 | **0.93** | 0.62 | 0.39 | 0.22 |
+| 12 | **0.62** | 0.41 | 0.26 | 0.15 |
+
+Below 1 the adjacent levels are not distinguishable through the channel at all.
+At S=8 they are already unresolvable at the *lowest* training noise level, so
+most of the schedule contributes almost no information about which of two
+neighbouring levels was visited. This is the same phenomenon as §4.6's
+information collapse, in a setting where it can be computed exactly rather than
+measured: it is an identifiability limit imposed by the channel, not a failure
+of the estimator.
 
 *Evidence:* `outputs/exp_10_discrete_alphabet/`; `tests/test_discrete.py`.
 
