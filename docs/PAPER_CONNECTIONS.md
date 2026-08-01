@@ -157,6 +157,22 @@ passes through `1/√2` exactly at `t_S`. Checked analytically
 40 000 sampled trajectories of the forward process, agreeing to < 0.02
 (`test_commitment_matches_the_forward_process_empirically`).
 
+**A distinction that must not be blurred.** In P2 speciation is a *symmetry
+breaking*: the dynamics chooses between data classes, and the phenomenon needs
+a multimodal distribution to have something to choose between. The prior used
+here is Gaussian, so there is no class to speciate into. What `commitment`
+measures is the **information crossover along an eigendirection** — the point
+at which that mode's value stops being determined by the data and starts being
+determined by the noise. This coincides with P2's *criterion* (it is the same
+signal-versus-noise balance, set by the same eigenvalue) but it is not the same
+*phenomenon*, and the results below should be read as locating the crossover,
+not as observing symmetry breaking.
+
+Making it a genuine speciation needs only a multimodal root: `tree_bp_grid`
+already accepts an arbitrary `log_root`, so a two-component root prior is a
+one-line change, and the level −1 transition would then be a real choice
+between classes. That is listed as untried work rather than claimed.
+
 ### 3.2 A chain has no speciation cascade; a tree does
 
 For a stationary AR(1) chain with `Cov = ρ^{|i−j|}`, the covariance spectrum is

@@ -124,10 +124,12 @@ class GaussianTree:
     depth: int
     branching: int = 2
     rho: float = 0.9
+    root_separation: float = 0.0
 
     @property
     def name(self) -> str:
-        return f"tree(L={self.depth},b={self.branching},rho={self.rho})"
+        tag = f",mu={self.root_separation}" if self.root_separation else ""
+        return f"tree(L={self.depth},b={self.branching},rho={self.rho}{tag})"
 
     @property
     def index(self) -> TreeIndex:
@@ -141,11 +143,41 @@ class GaussianTree:
     def q(self) -> float:
         return 1.0 - self.rho**2
 
+    def log_root_density(self, grid: np.ndarray) -> np.ndarray:
+        """Log prior of the root on `grid`.
+
+        With `root_separation = mu > 0` the root is the symmetric two-component
+        mixture `1/2 N(-mu, 1-mu^2) + 1/2 N(+mu, 1-mu^2)`, which keeps unit
+        variance and therefore leaves the leaf covariance -- and hence the whole
+        eigenvalue ladder and every speciation time -- **exactly unchanged**.
+        Only the modality changes. That is the point: it turns the coarsest
+        transition from an information cross-over into a genuine choice between
+        two classes, at the same predicted time, with nothing else moved.
+        """
+        mu = float(self.root_separation)
+        if mu <= 0.0:
+            return -0.5 * grid**2 - 0.5 * np.log(2.0 * np.pi)
+        var = 1.0 - mu**2
+        if var <= 0.0:
+            raise ValueError("root_separation must be < 1 to keep unit variance.")
+        a = -0.5 * (grid - mu) ** 2 / var
+        b = -0.5 * (grid + mu) ** 2 / var
+        hi = np.maximum(a, b)
+        return (
+            hi + np.log(np.exp(a - hi) + np.exp(b - hi))
+            - 0.5 * np.log(2.0 * np.pi * var) - np.log(2.0)
+        )
+
     def sample_nodes(self, rng: np.random.Generator, n: int) -> np.ndarray:
         """Sample `n` full trees; returns `(n, n_nodes)` including latents."""
         ti = self.index
         z = np.empty((n, ti.n_nodes))
-        z[:, 0] = rng.standard_normal(n)
+        mu = float(self.root_separation)
+        if mu > 0.0:
+            sign = rng.integers(0, 2, size=n) * 2.0 - 1.0
+            z[:, 0] = sign * mu + np.sqrt(1.0 - mu**2) * rng.standard_normal(n)
+        else:
+            z[:, 0] = rng.standard_normal(n)
         scale = np.sqrt(self.q)
         for d in range(self.depth):
             parents = ti.nodes_at(d)
@@ -269,6 +301,12 @@ def tree_bp_gaussian(
     """
     ti = tree.index
     b, L, q, rho = tree.branching, tree.depth, tree.q, tree.rho
+    if tree.root_separation:
+        raise ValueError(
+            "The information form assumes a Gaussian root; a mixture root has "
+            "no (h, lambda) representation. Use tree_bp_grid with "
+            "tree.log_root_density(grid)."
+        )
     x = np.atleast_2d(x)
     n_chains = x.shape[0]
     if x.shape[1] != tree.n_leaves:
@@ -418,6 +456,53 @@ def tree_bp_grid(
 
     belief = norm(belief_up[:, leaves] * down[:, leaves])
     return belief @ grid
+
+
+def tree_root_belief(
+    log_k: np.ndarray,
+    grid: np.ndarray,
+    log_root: np.ndarray,
+    x: np.ndarray,
+    alpha: float,
+    delta: float,
+    branching: int,
+    depth: int,
+) -> np.ndarray:
+    """Exact posterior of the *root* given the noisy leaves, `(n_chains, M)`.
+
+    Only the upward pass is needed: the root receives no downward message, so
+    its belief is its prior times the product of its children's messages. This
+    is the quantity that makes symmetry breaking measurable rather than
+    inferred -- with a two-component root prior, `P(root > 0 | x_t)` *is* the
+    class posterior, exactly, at every noise level.
+    """
+    from .noising import likelihood_matrix
+
+    ti = TreeIndex(depth, branching)
+    x = np.atleast_2d(x)
+    n_chains, n_leaves = x.shape
+    if n_leaves != ti.n_leaves:
+        raise ValueError(f"x has {n_leaves} leaves, tree has {ti.n_leaves}")
+    m = grid.size
+    k_mat = np.exp(log_k - log_k.max())
+    dx = float(grid[1] - grid[0])
+
+    def norm(v):
+        return v / np.maximum(v.sum(axis=-1, keepdims=True), 1e-300)
+
+    bu = np.ones((n_chains, ti.n_nodes, m))
+    leaves = ti.leaf_nodes()
+    for c in range(n_chains):
+        bu[c, leaves] = likelihood_matrix(grid, x[c], alpha, delta)
+
+    for d in range(depth, 0, -1):
+        nodes = ti.nodes_at(d)
+        msg = norm(np.einsum("cnk,kj->cnj", norm(bu[:, nodes]), k_mat) * dx)
+        parents = ti.nodes_at(d - 1)
+        prod = msg.reshape(n_chains, -1, branching, m).prod(axis=2)
+        bu[:, parents] = norm(bu[:, parents] * prod)
+
+    return norm(bu[:, 0] * np.exp(log_root - log_root.max()))
 
 
 def _leave_one_out_product(msgs: np.ndarray) -> np.ndarray:

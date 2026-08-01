@@ -192,6 +192,81 @@ def test_grid_tree_bp_runs_on_a_nongaussian_innovation():
 
 
 # ----------------------------------------------------------------------------
+# The bimodal root: modality without touching the covariance
+# ----------------------------------------------------------------------------
+
+def test_mixture_root_leaves_the_covariance_and_the_ladder_untouched():
+    """The controlled-experiment property the speciation part depends on.
+
+    A symmetric two-component root with unit variance changes the modality and
+    nothing else, so every eigenvalue -- and therefore every predicted
+    speciation time -- must be bit-identical to the Gaussian-root tree. If this
+    ever fails, the speciation experiment stops being a controlled comparison.
+    """
+    g = GaussianTree(depth=3, branching=2, rho=0.85)
+    m = GaussianTree(depth=3, branching=2, rho=0.85, root_separation=0.9)
+    assert np.array_equal(g.leaf_covariance(), m.leaf_covariance())
+    assert g.level_eigenvalues() == m.level_eigenvalues()
+
+    a = m.sample(rng_for("test-mixture-root"), 200_000)
+    assert abs(np.var(a[:, 0]) - 1.0) < 0.02          # still unit variance
+    assert abs(np.mean(a)) < 0.02                     # still symmetric
+    emp = np.cov(a, rowvar=False)
+    assert np.max(np.abs(emp - m.leaf_covariance())) < 0.02
+
+
+def test_mixture_root_density_normalizes_and_is_bimodal():
+    m = GaussianTree(depth=2, branching=2, rho=0.8, root_separation=0.9)
+    grid = np.linspace(-10.0, 10.0, 4001)
+    dens = np.exp(m.log_root_density(grid))
+    assert abs(np.trapezoid(dens, grid) - 1.0) < 1e-6
+    assert dens[np.argmin(np.abs(grid - 0.9))] > 2.0 * dens[np.argmin(np.abs(grid))]
+
+    g = GaussianTree(depth=2, branching=2, rho=0.8)
+    assert np.allclose(
+        np.exp(g.log_root_density(grid)),
+        np.exp(-0.5 * grid**2) / np.sqrt(2 * np.pi),
+    )
+
+
+def test_information_form_refuses_a_mixture_root():
+    """Better a loud error than a silently Gaussian answer."""
+    m = GaussianTree(depth=2, branching=2, rho=0.8, root_separation=0.9)
+    with pytest.raises(ValueError, match="information form"):
+        tree_bp_gaussian(m, np.zeros((1, m.n_leaves)), 0.9, 0.2)
+
+
+def test_root_belief_is_the_exact_posterior():
+    """Checked against the closed form for a Gaussian root.
+
+    `tree_root_belief` is the order parameter of the speciation experiment, so
+    it needs its own check rather than inheriting confidence from the leaf
+    posterior. For a Gaussian tree the root's posterior mean is available by
+    dense linear algebra: Cov(root, leaves) = rho^depth for every leaf.
+    """
+    from src.hierarchy import tree_root_belief
+
+    tree = GaussianTree(depth=3, branching=2, rho=0.8)
+    grid, _w = _grid_and_weights(m=801, half_width=9.0)
+    rng = rng_for("test-root-belief")
+    a = tree.sample(rng, 8)
+    alpha, delta = alpha_delta(0.4)
+    x = alpha * a + np.sqrt(delta) * rng.standard_normal(a.shape)
+
+    belief = tree_root_belief(
+        GaussianAR1(0.8).log_transition_matrix(grid), grid,
+        tree.log_root_density(grid), x, alpha, delta, 2, 3,
+    )
+    mean_bp = belief @ grid
+
+    n = tree.n_leaves
+    cov_rl = np.full(n, 0.8**3)                       # Cov(root, each leaf)
+    gram = alpha**2 * tree.leaf_covariance() + delta * np.eye(n)
+    mean_dense = x @ np.linalg.solve(gram, alpha * cov_rl)
+    assert np.max(np.abs(mean_bp - mean_dense)) < 1e-5
+
+
+# ----------------------------------------------------------------------------
 # EM on a tree
 # ----------------------------------------------------------------------------
 

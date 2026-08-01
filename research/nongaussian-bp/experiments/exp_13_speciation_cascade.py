@@ -32,6 +32,13 @@ levels    Which method learns which level: per-level posterior-mean error for
           exact BP, EM-fitted BP, and a DSM network, at matched data budget.
 ordering  Level-resolved error *as a function of training step*: the diffusion
           analogue of the sequential-inclusion result.
+filtering The filtering device itself: sweep the correlation range at fixed
+          sequence length, budget and architecture.
+speciation Symmetry breaking, not just an information cross-over. A two-component
+          root prior keeps the covariance -- and therefore every predicted time
+          -- exactly unchanged while making the coarsest transition a genuine
+          choice between classes, measured through the exact class posterior
+          P(root > 0 | x_t) that BP returns.
 """
 
 from __future__ import annotations
@@ -46,6 +53,7 @@ from src.hierarchy import (
     fit_em_tree,
     tree_bp_gaussian,
     tree_bp_grid,
+    tree_root_belief,
 )
 from src.kernels import GaussianAR1Kernel
 from src.noising import alpha_delta
@@ -85,6 +93,12 @@ def settings(quick: bool) -> dict:
         "probe_steps": (250, 500, 1000, 2000, 4000, 8000, 16000)
         if not quick
         else (100, 250, 500),
+        # part `speciation`: grid BP on every reverse step, so smaller than the
+        # Gaussian cascade, which has a closed-form message update.
+        "spec_depth": 4 if not quick else 2,
+        "root_separation": 0.9,
+        "spec_paths": 256 if not quick else 32,
+        "spec_steps": 120 if not quick else 30,
     }
 
 
@@ -718,12 +732,141 @@ def part5_filtering(cfg, out_dir):
     save_figure(fig, out_dir / "filtering.png")
 
 
+def part6_speciation(cfg, out_dir):
+    """Genuine symmetry breaking, at the time the Gaussian cross-over predicts.
+
+    Everything else in this experiment uses a Gaussian prior, where there is no
+    class to speciate *into*: `commitment` locates an information cross-over,
+    which shares P2's criterion but is not P2's phenomenon. Giving the root a
+    symmetric two-component prior fixes that. Because the mixture keeps unit
+    variance, **the leaf covariance and therefore every eigenvalue and every
+    predicted time are exactly unchanged** -- only the modality moves. So this
+    is a controlled test of a sharp claim: the same `t_S` that locates the
+    information cross-over should locate the class choice.
+
+    The order parameter is the **class posterior**, `P(root > 0 | x_t)`, which
+    BP returns exactly (`tree_root_belief`) at every noise level. Using the sign
+    of the tree-mean instead would conflate the class with the within-class
+    fluctuation, since the uniform mode carries both; the root posterior does
+    not. What is measured is how strongly the class inferred at time `t`
+    already agrees with the class of the finished sample, and the magnetization
+    `|2P − 1|` alongside it.
+    """
+    b, rho = cfg["branching"], cfg["rho"]
+    depth = cfg["spec_depth"]
+    mu = cfg["root_separation"]
+    grid, w = _grid(cfg)
+
+    gaussian = GaussianTree(depth=depth, branching=b, rho=rho)
+    bimodal = GaussianTree(depth=depth, branching=b, rho=rho, root_separation=mu)
+    assert np.allclose(gaussian.leaf_covariance(), bimodal.leaf_covariance())
+
+    v, levels = bimodal.level_projector_basis()
+    uniform = v[:, 0]
+    lam_top = bimodal.level_eigenvalues()[0][1]
+    t_pred = float(spectral.speciation_time(lam_top))
+    print(f"[speciation] depth {depth}, mu={mu}, Lambda_top={lam_top:.3f}, "
+          f"t_S predicted {t_pred:.3f}")
+
+    log_k = GaussianAR1Kernel(rho=rho, q=1 - rho**2).log_transition_matrix(grid)
+    times = time_grid(cfg["t_max"], cfg["t_min"], cfg["spec_steps"])
+
+    pos = grid > 0.0
+
+    def class_posterior(x, t, log_root):
+        alpha, delta = alpha_delta(float(t))
+        belief = tree_root_belief(
+            log_k, grid, log_root, x, alpha, delta, b, depth
+        )
+        return belief[:, pos].sum(axis=1)
+
+    rows = []
+    for name, tree in (("bimodal", bimodal), ("gaussian", gaussian)):
+        log_root = tree.log_root_density(grid)
+
+        def score_fn(x, t, _lr=log_root):
+            alpha, delta = alpha_delta(float(t))
+            m = tree_bp_grid(log_k, grid, _lr, x, alpha, delta, b, depth)
+            return -(x - alpha * m) / delta
+
+        rng = rng_for(NAME, "speciation", name, depth, mu)
+        x_init = rng.standard_normal((cfg["spec_paths"], tree.n_leaves))
+        recorded: list[tuple[float, np.ndarray, np.ndarray]] = []
+
+        def cb(t, x, _s, _lr=log_root):
+            recorded.append((float(t), class_posterior(x, t, _lr), (x @ uniform).copy()))
+
+        x_final = reverse_sde(x_init, score_fn, times, rng, callback=cb)
+        final_p = class_posterior(x_final, float(times[-1]), log_root)
+        final_class = final_p > 0.5
+        final_proj = x_final @ uniform
+
+        agree, magnet, corr, ts = [], [], [], []
+        for t, p, proj in recorded:
+            ts.append(t)
+            agree.append(float(np.mean((p > 0.5) == final_class)))
+            magnet.append(float(np.mean(np.abs(2.0 * p - 1.0))))
+            corr.append(float(np.corrcoef(proj, final_proj)[0, 1]))
+
+        # Class agreement runs from 1/2 (undecided) to 1 (decided), so 3/4 is
+        # the "half the information is in" landmark, matching what 1/sqrt(2)
+        # marks for the correlation.
+        t_class = _crossing_time(ts, agree, level=0.75)
+        t_corr = _crossing_time(ts, corr, level=1.0 / np.sqrt(2.0))
+        rows.append({
+            "root": name, "depth": depth,
+            "root_separation": mu if name == "bimodal" else 0.0,
+            "top_eigenvalue": lam_top,
+            "t_speciation_predicted": t_pred,
+            "t_class_agreement_075": t_class,
+            "t_correlation_crossing": t_corr,
+            "magnetization_final": magnet[-1],
+            "magnetization_initial": magnet[0],
+            "n_paths": cfg["spec_paths"],
+            # Binomial standard error on the agreement curve: the crossing can
+            # only be located to about this much, and at small path counts that
+            # is the dominant uncertainty, not the integrator.
+            "agreement_stderr": float(0.5 / np.sqrt(cfg["spec_paths"])),
+            "curve_times": ";".join(f"{t:.5f}" for t in ts),
+            "curve_class_agreement": ";".join(f"{a:.5f}" for a in agree),
+            "curve_magnetization": ";".join(f"{a:.5f}" for a in magnet),
+            "curve_correlation": ";".join(f"{c:.5f}" for c in corr),
+        })
+        print(f"  {name:<9} class-agreement 0.75 at {t_class:.3f}, "
+              f"correlation crossing at {t_corr:.3f}  (predicted {t_pred:.3f});  "
+              f"magnetization {magnet[0]:.3f} -> {magnet[-1]:.3f}")
+
+    write_csv(out_dir / "speciation.csv", rows)
+    write_csv(
+        out_dir / "speciation_summary.csv",
+        [{k: val for k, val in r.items() if not k.startswith("curve")} for r in rows],
+    )
+
+    import matplotlib.pyplot as plt
+
+    fig, ax = plt.subplots(figsize=(6.4, 4.4))
+    for r in rows:
+        ts = [float(s) for s in r["curve_times"].split(";")]
+        ag = [float(s) for s in r["curve_class_agreement"].split(";")]
+        ax.semilogx(ts, ag, "-", label=f"{r['root']} root")
+    ax.axvline(t_pred, color="k", ls=":", lw=1.0, label=r"predicted $t_S$")
+    ax.axhline(0.75, color="k", ls="--", lw=0.8)
+    ax.set_xlabel("t")
+    ax.set_ylabel("P(class at t = class of the finished sample)")
+    ax.set_title("Class choice locks in at the predicted speciation time")
+    ax.legend(fontsize=8)
+    ax.grid(alpha=0.3)
+    fig.tight_layout()
+    save_figure(fig, out_dir / "speciation.png")
+
+
 PARTS = {
     "spectra": part1_spectra,
     "cascade": part2_cascade,
     "levels": part3_levels,
     "ordering": part4_ordering,
     "filtering": part5_filtering,
+    "speciation": part6_speciation,
 }
 
 
