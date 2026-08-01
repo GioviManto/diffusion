@@ -648,3 +648,107 @@ The most important *unasked* question, which a reviewer will ask: **does a
 structured architecture (temporal CNN / U-Net) close the gap in E3?** The email
 specified a vanilla network and that is what was built, but the comparison is not
 complete until an architecture with its own locality prior has been tried.
+
+---
+
+## [P] Questions raised by the two papers (Layer 6)
+
+Context and the access caveat are in `docs/PAPER_CONNECTIONS.md`: **neither PDF
+could be opened from this environment** (gateway 403 on arxiv, nature, PMC, HAL,
+PMLR and every mirror tried), so the papers were identified and their content
+established through web search alone. Nothing mathematical below is quoted from
+them — every formula is derived in this package's conventions and verified in
+`tests/test_hierarchy.py`.
+
+### P1. Does a hierarchical prior show a *ladder* of speciation times, one per level? — **ANSWERED: yes, six of them, each at its predicted place**
+
+Neither paper asks this: one supplies the hierarchical data model, the other the
+speciation time scale, and the product is untouched. The balanced-tree prior has
+an ultrametric leaf covariance with exactly `L + 1` distinct eigenvalues (closed
+form in `GaussianTree.level_eigenvalues`, matched to `eigh` at 1e-10), so it has
+`L + 1` speciation times.
+
+Measured on a depth-5 binary tree, ρ = 0.9 (exp_13 `cascade`): predicted
+`t_S = ½ log(1 + Λ)` versus the measured crossing of the commitment curve
+through `1/√2` — **1.363/1.368, 0.707/0.732, 0.516/0.521, 0.346/0.340,
+0.202/0.208, 0.087/0.087** along the forward process, agreeing to ≤ 3.5% at
+every level. The reverse SDE driven by exact tree BP reproduces the same ladder
+and therefore **resolves the hierarchy coarse-to-fine**.
+
+Reported rather than trimmed: the reverse crossing at the finest level lands at
+0.125 against 0.087 predicted — the Euler–Maruyama step and the `t_min = 0.02`
+floor, which bite hardest exactly there.
+
+### P2. Does the chain this project has been studying sit in that regime? — **ANSWERED: no, and this bounds what Layers 1–5 can be generalized to**
+
+The AR(1) top eigenvalue is bounded by `(1 + ρ)/(1 − ρ)` at any length: 64× the
+chain length moves it under 2× (0.85: 5.49 → 12.32 against a limit of 12.33). So
+its speciation time **saturates**, and a stationary Markov chain has no diverging
+speciation time and no cascade. Only the hierarchy produces them. Any claim of
+this project transferred to image-like data has to cross that gap explicitly.
+
+### P3. Does the collapse/memorization mechanism apply to a BP score? — **ANSWERED: the axis does not exist for it**
+
+Not a matter of degree. The empirical score's sufficient statistic is the
+training set — `N × n` numbers — which is why it must collapse onto that set
+unless `N` is exponential in `n`. A BP score's sufficient statistic is the
+fitted kernel, reached only through `Ξ`, which is an average; its size does not
+depend on `n`, and there is no training point for a trajectory to be captured
+by.
+
+Measured as nearest-training-chain distance over the same quantity for a fresh
+true draw (1.0 = no memorization), ρ = 0.85, exp_14 `collapse`: the empirical
+score sits at **0.33–0.66** and recovers monotonically as `N` crosses its
+entropic wall, while EM-BP sits at **0.97–1.08** at every `n` and `N` measured,
+tracking the true-prior BP reference to within 0.03. The network is
+consistently slightly below 1.
+
+**This is the mechanism behind Layer 5's headline.** The ≥64× data advantage and
+the `N^{−1/2}` rate were reported in Layer 5 as empirical facts; this is why
+they hold. The per-site excess entropy is exact for this family,
+`s = −½ log(1 − ρ²) = 0.641` nats at ρ = 0.85, so n = 33 already demands ~10⁹
+chains for a memorizing score.
+
+**Caveat carried with the ratio:** it only means anything when the generated
+distribution is otherwise correct, so sample std and lag-1 correlation are
+logged in every row. An undertrained network reached ratios of 2–3.4 with std
+2.3–3.3 — over-dispersion, not generalization.
+
+### P4. Can EM through exact BP be run on a tree at all? — **ANSWERED: yes, and the M-step is literally unchanged**
+
+`tree_e_step` produces the **same `Ξ`** as the chain E-step. That is where the
+topology stops being visible, so every kernel in `src/kernels.py` consumes it
+without modification — a chain-trained M-step and a tree-trained M-step are the
+same code. Evidence verified against the closed-form Gaussian marginal
+likelihood to relative 1e-6, which is what keeps the monotone-ascent check
+available.
+
+**But the convergence rate is different, and this matters practically.**
+`ρ̂ = 0.7360 → 0.7483 → 0.7487` at 50/100/150 iterations (true 0.75), zero
+monotone violation throughout. Internal nodes are never observed, so the missing
+information fraction is far larger than on a chain. An estimate read at 40
+iterations looks like a broken M-step and is merely unconverged — this cost real
+time here.
+
+### P5. Does the network acquire hierarchy levels in an order, as it does in the transformer paper? — **RUNNING**
+
+exp_13 `ordering` probes the level-resolved posterior-mean error against
+training budget, and `levels` compares exact BP, EM-BP and the network per
+level. Results will be recorded here when the run completes; nothing is claimed
+yet.
+
+One methodological note already established from the smoke runs: **the
+per-level error must be reported absolutely, not only relatively.** A relative
+error divides by the reference magnitude in that subspace, which shrinks with
+the level's eigenvalue, so fine levels look worse for every method — including
+one with uniform absolute error. The first version of this measurement showed a
+clean coarse-to-fine gradient that was entirely the normalization. All three
+forms (relative, absolute, share of total squared error) are now written to the
+CSV.
+
+### P6. Does the EM-BP advantage grow with the range of correlations in the data? — **RUNNING**
+
+exp_13 `filtering` transplants the hierarchical-filtering device: truncating the
+tree at level `k` leaves correlations only inside blocks of `2^k` leaves, so the
+correlation range can be swept at fixed sequence length, fixed budget and fixed
+network. Quick-mode runs were far too undertrained to read and are not reported.
