@@ -185,8 +185,15 @@ r — trained by the same denoising score matching, at N=1024, interior sites:
 to 3.8× at t=0.4, converging at t=1.6 where the score is nearly −x and structure
 stops helping).
 
-So against a well-chosen architecture the EM-BP margin is **3.3×, not 8.4×**.
-The structured baseline closes roughly 60% of the gap. That is the honest
+⚠️ **The 3.3× figure is provisional and known to be too favourable.** It fixes
+r=6 for the CNN, but the optimal radius grows with t (§4.12), so that choice
+handicaps the CNN by 1.19×–1.29×. With an oracle over r the margin is **2.75×**.
+It is also a single seed. A replicated, oracle-fair comparison — oracle over
+both radius and parameterization, 4 seeds — is running and will replace both
+numbers.
+
+So against a well-chosen architecture the EM-BP margin is somewhere near
+**3×, not 8.4×**. The structured baseline closes roughly 60% of the gap. That is the honest
 number, and it should be the one quoted whenever the comparison is to anything
 better than a vanilla network. EM-BP still wins — 13 parameters against 5,313 —
 but the order-of-magnitude framing belongs only to the vanilla comparison.
