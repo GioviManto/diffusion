@@ -1,0 +1,55 @@
+{
+  "n_sites": 32,
+  "t_train": [
+    0.1,
+    0.2,
+    0.4,
+    0.8,
+    1.6
+  ],
+  "quick": false,
+  "parts": [
+    "recovery",
+    "headline",
+    "alphabet"
+  ],
+  "overrides": [],
+  "parameterizations": [
+    "eps",
+    "x0"
+  ],
+  "sizes": [
+    32,
+    64,
+    128,
+    256,
+    512,
+    1024,
+    2048
+  ],
+  "alphabet_sizes": [
+    3,
+    4,
+    6,
+    8,
+    12
+  ],
+  "n_rep": 8,
+  "headline_states": 5,
+  "alphabet_n_chains": 512,
+  "net_hidden": [
+    128,
+    128
+  ],
+  "net_steps": 20000,
+  "n_test": 256,
+  "timestamp": "2026-08-01 10:11:44",
+  "python": "3.11.15",
+  "numpy": "2.4.6",
+  "platform": "Linux-6.18.5-x86_64-with-glibc2.39",
+  "hostname": "vm",
+  "slurm_job_id": "",
+  "slurm_array_task_id": "",
+  "cpu_count": "4",
+  "blas_threads": "2"
+}

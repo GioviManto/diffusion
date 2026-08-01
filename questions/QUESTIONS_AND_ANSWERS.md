@@ -55,42 +55,76 @@ because it concentrates. Stronger correlation *helps* the Gaussian closure.
 
 *Evidence:* `outputs/exp_03_nongaussian_innovation_sweep/SUMMARY_TABLE.md`; ledger B13.
 
-### R3. "Compare Laplace, Student, Gaussian-mixture, and bounded-support innovations." — **PARTIAL**
+### R3. "Compare Laplace, Student, Gaussian-mixture, and bounded-support innovations." — **ANSWERED**
 
-Three of the four families are done and swept (Laplace; Student-t at ν=5,8;
-symmetric Gaussian mixture at κ=0.3,0.6,0.9), giving excess kurtosis from −1.62
-to +6.00. The organizing finding is that **|excess kurtosis| predicts the
-closure error and its sign does not matter much** — bimodal (negative) innovations
-are the *worst* case at κ=0.9, not the heavy tails.
+All four families are now covered. Laplace, Student-t (ν=5,8) and the symmetric
+Gaussian mixture (κ=0.3,0.6,0.9) were swept in exp_03, spanning excess kurtosis
+−1.62 to +6.00. The missing bounded-support case is now `UniformAR1`
+(excess kurtosis −1.20, verified to −1.200 on samples) and was run in exp_09.
 
-**Gap:** bounded-support innovations (e.g. uniform, triangular) were never
-implemented. They are the interesting missing case because the posterior then has
-hard edges that no Gaussian message can represent, and they would test whether
-excess kurtosis remains the right one-number summary when the failure is a
-support mismatch rather than a tail mismatch.
+The bounded case was the interesting one because it fails a Gaussian closure
+through **support** rather than shape: the true posterior is exactly zero
+outside a finite interval and no Gaussian message can represent that edge. The
+question was whether |excess kurtosis| survives as the one-number summary when
+the failure mode changes in kind.
 
-*Evidence:* `src/priors.py`; exp_03 outputs. **To close:** add a `UniformAR1`
-prior and re-run exp_03.
+**It does.** Fitting `log₁₀(error) = 0.801·|kurt| − 2.234` on the three mixtures
+alone and extrapolating to the uniform prior predicts 5.33e-2 at t=0.05; the
+measured value is **6.07e-2**, a factor of 1.14. So the support mismatch adds
+essentially nothing beyond what the kurtosis already accounts for — at least for
+the posterior mean, which is what the score depends on.
 
-### R4. "Add Gaussian-mixture *message* approximations — how many components to beat single-Gaussian closure?" — **OPEN** (and not to be confused with what Layer 5 did)
+That is a genuine negative result and worth stating as one: a qualitatively
+different failure mode did *not* produce a qualitatively different error.
 
-This is the same question as **F1** and it is genuinely untouched. It is worth
-being precise, because Layer 5 built something that sounds identical and is not:
+*Evidence:* `outputs/exp_09_mixture_message_closure/bounded_support.csv`; exp_03.
 
-| | object approximated | purpose |
+### R4. "Add Gaussian-mixture *message* approximations — how many components to beat single-Gaussian closure?" — **ANSWERED** (= F1)
+
+Implemented in `src/bp_mixture.py` and measured in exp_09. Messages are Gaussian
+mixtures; multiply, forward-push and backward-push are exact and closed; the
+component count multiplies at every step, so Runnalls' KL-based pairwise merge
+collapses back to C. **That merge is the only approximation in the recursion.**
+
+Note this is *not* Layer 5's `MixtureInnovationKernel`, which is a mixture
+**transition kernel** (a model family). Here the mixture is the **message**
+representation. The distinction is the whole point, per audit F2.
+
+**The direct answer.** With a kernel that is exactly a two-component mixture, so
+that the model is exactly representable and every error is pure representation
+error:
+
+| prior | C for 10× over single-Gaussian | C for 100× |
 |---|---|---|
-| **R4 / F1 (open)** | the BP **messages** `L_i(a)`, `R_i(a)` | a *representation* closure — make continuous BP finite-dimensional without a grid |
-| **Layer 5 (done)** | the transition **kernel** `K_θ(a'\|a)` | a *model* family — learn an unknown prior |
+| κ=0.3 (kurt −0.18) | 2 | 4 |
+| κ=0.6 (kurt −0.72) | 2 | 4 |
+| κ=0.9 (kurt −1.62) | 3 | 6 |
 
-Layer 5's `MixtureInnovationKernel` fits a mixture to the innovation law of the
-chain. R4 asks to propagate mixture-parameterized *messages* through the
-forward-backward recursion, with a component-collapsing step to stop the count
-exploding (a mixture of C components through a mixture kernel of C' components
-gives C·C'). Nothing in the current code does that.
+(at t=0.05; one to two more components at t=0.2.) **Two to three components buy
+an order of magnitude; four to twelve buy two.** The error decays roughly
+geometrically in C — at κ=0.3 it falls from 7.0e-3 (C=1) to 7.5e-10 (C=16).
 
-**To close:** implement mixture-message BP with collapsing, and measure the error
-against the grid reference as a function of component count — the answer to
-"how many components" is the deliverable.
+**And the separation the project has wanted since audit F2.** On a Laplace chain,
+which the mixture family *cannot* represent exactly, the curve flattens onto a
+floor. That floor is model error; everything above it is representation error:
+
+| kernel fitted with | C=1 | floor reached |
+|---|---|---|
+| 2 components | 5.28e-2 | 9.25e-3 |
+| 4 components | 5.44e-2 | 3.33e-3 |
+| 8 components | 5.76e-2 | 1.68e-3 |
+
+The floor roughly halves per doubling of kernel richness, while the decay down to
+it is bought with message components. This is the first place in the project
+where the two error sources are visible as separate quantities rather than the
+single conflated number audit F2 identified.
+
+One caveat worth carrying: with a richer kernel the true message is itself more
+structured, so C must grow with kernel richness to reach the floor. At 8 kernel
+components, C=2 barely improves on C=1 (4.59e-2 vs 5.76e-2) — the message budget
+has to keep up with the model.
+
+*Evidence:* `outputs/exp_09_mixture_message_closure/`; `tests/test_bp_mixture.py`.
 
 ### R5. "Do neural message approximators help only when they preserve the local BP update structure?" — **PARTIAL, with evidence on both sides**
 
@@ -209,22 +243,41 @@ The learning is Layer 5 — see **E1**, **E3**. The questions are this document.
 
 ## [F] From the result ledger's "explicitly future" list
 
-### F1. Mixture-of-Gaussians message closure — **OPEN**
+### F1. Mixture-of-Gaussians message closure — **ANSWERED**
 
-Identical to R4 above. See there for why it is not what Layer 5 did.
+Identical to R4 above; see there for the numbers and for why it is not what
+Layer 5 did.
 
-### F2. Discrete-alphabet chain (exact vector messages, no closure) — **OPEN**
+### F2. Discrete-alphabet chain (exact vector messages, no closure) — **ANSWERED**
 
-Untouched. Worth noting *why* it is attractive: on a finite alphabet the messages
-are vectors, BP is exact with no representation error at all, and every
-discretization caveat this project has accumulated — the grid, the trapezoidal
-quadrature, the ratio-lattice quantization of the Laplace M-step (§5.1) — simply
-disappears. It is the cleanest possible setting in which to state the EM result,
-and would make the Baum-Welch correspondence exact rather than analogical.
+Implemented in `src/discrete.py`, measured in exp_10. The clean chain takes
+values in a finite set of levels; the noising is still the continuous OU channel,
+so the observations are real-valued, but the latent alphabet is finite and the
+messages are S-vectors. **BP is exact up to roundoff** — verified against
+explicit enumeration of all `S^n` configurations: Ξ to 4.4e-15, posterior means
+to 2.9e-15, log-evidence to *exactly* zero difference.
 
-**To close:** a categorical chain prior + categorical EM. The `Ξ` machinery
-already works unchanged, since `Ξ` is a matrix of expected transition counts and
-that is *literally* what Baum-Welch uses.
+Every discretization caveat the project accumulated disappears simultaneously:
+no quadrature, no truncation, no resolution condition at small t, and in
+particular no ratio-lattice quantization (L3), which was a *bias* that no amount
+of grid refinement could remove.
+
+Two things this buys beyond cleanliness.
+
+**The Baum-Welch analogy becomes an identity.** In the continuous case Ξ is "the
+continuum analogue of the expected transition-count matrix". Here it *is* the
+expected transition-count matrix, and the M-step is exactly Baum-Welch's:
+normalize the counts. Where the continuous case needed a separately derived
+M-step per kernel family — weighted Yule-Walker, a weighted median, an inner ECM
+— the transition matrix is its own parameterization and the maximizer is one
+line. Monotonicity violation is **exactly 0.0**, not "below 1e-8".
+
+**A confound-free retest of the headline.** With the reference denoiser exact
+rather than a fine-grid approximation, EM-BP still beats the score network by
+7.3–7.5× even at the smoke-test budget. Whatever the margin is, it is not a grid
+artifact.
+
+*Evidence:* `outputs/exp_10_discrete_alphabet/`; `tests/test_discrete.py`.
 
 ### F3. Approximate Markovianity: chain + global latent; hybrid BP + learned residual — **PARTIAL**
 
@@ -409,14 +462,16 @@ heavy tail need" claim needs the replicate machinery.
 
 ## Where this leaves the project
 
-**Closed:** R1, R2, E1, E2, E3, E5, L1–L4.
-**Partial, gap stated:** R3 (bounded support), R5 (needs a hard prior), F3 (learned + low-rank), F4 (learned score), E4 (Overleaf, results section).
-**Open:** R4 = F1 (mixture *message* closure), F2 (discrete alphabet), F5 (non-Gaussian locality).
+**Closed:** R1, R2, **R3**, **R4 = F1**, **F2**, E1, E2, E3, E5, C-i–C-iv, L1–L4.
+**Partial, gap stated:** R5 (needs a hard prior), F3 (learned + low-rank), F4 (learned score), E4 (Overleaf, results section).
+**Open:** F5 (non-Gaussian locality).
 
-The two most valuable open items, in order:
-
-1. **F3 — learned chain kernel + learned rank-one correction.** The natural product of Layers 4 and 5, and the one that turns "the prior is Markov" from an assumption into an approximation with a measured correction.
-2. **F2 — discrete alphabet.** Cheap, and it removes every discretization caveat the project has accumulated at once, including L3.
+The most valuable remaining item is **F3 — a learned chain kernel carrying a
+learned rank-one correction.** It is the natural product of Layers 4 and 5, and
+the one that turns "the prior is Markov" from an assumption into an
+approximation with a measured correction. F4 (reverse dynamics under a *learned*
+score) is now unblocked too, since Layer 5 produces such a score and exp_10
+provides a setting where the reference is exact.
 
 The most important *unasked* question, which a reviewer will ask: **does a
 structured architecture (temporal CNN / U-Net) close the gap in E3?** The email
