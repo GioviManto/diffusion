@@ -62,7 +62,7 @@ Pure numpy, no autodiff, no new dependencies.
 | `experiments/exp_06_…` | Correctness: monotonicity, Fisher information, misspecification, rates, quantization |
 | `experiments/exp_07_…` | The headline: EM-BP vs a score network |
 | `experiments/exp_08_…` | The literal gradient route vs the exact M-step |
-| `tests/test_em_bp.py` | 23 tests (46 total in the package, all passing), including five independent cross-checks (§5.5) |
+| `tests/test_em_bp.py` | 23 tests, including five independent cross-checks (§5.5). Package total is now **83**, all passing (`tests/test_hierarchy.py` adds 33 for Layer 6). |
 | `hpc/`, `tools/merge_replicates.py` | Cluster templates and replicate merging |
 
 **The four rungs**, all consuming the same `Ξ`:
@@ -413,7 +413,7 @@ Prompted by the two papers the project was pointed at (see
 `docs/PAPER_CONNECTIONS.md`, which records **up front that neither PDF could be
 opened from this environment** and that nothing mathematical is quoted from
 them). New code: `src/hierarchy.py`, `src/spectral.py`, `exp_13`, `exp_14`,
-29 new tests (suite now 79).
+33 new tests (suite now 83).
 
 ### The speciation ladder (exp_13 `spectra`, `cascade`)
 
@@ -780,8 +780,8 @@ All five are permanent tests, not one-off scripts.
 
 ## 7. Status
 
-**Complete:** theory (14 pp), implementation, 30/30 tests, cluster support, and
-**all of exp_06, exp_07, exp_08**. Every experiment ran to completion and its
+**Complete:** theory (14 pp), implementation, **83/83 tests**, cluster support,
+and **all of exp_06 – exp_14**. Every experiment ran to completion and its
 outputs are committed.
 
 **Established:** the E-step exactness and the `Ξ` compression (Props. 1–2, and
@@ -799,6 +799,26 @@ noisy to support it and said so; more replicates resolved it.
 (§4.10), which both sharpened the result and overturned a number I had reported
 from the confounded version.
 
-**Not started:** the items in §6.3, §6.4, and §6.1 — hybrid non-Markov
-correction, structured-architecture baseline, and distillation of the BP
-denoiser for inference-time cost.
+**Settled since, and it moved a headline:** the structured-architecture baseline
+(§6.4) is done. Against a locality-respecting CNN with an oracle over radius and
+parameterization, over 4 seeds, the margin is 2.10 → 3.27 → **4.11 ± 0.32** at
+N = 128 → 512 → 2048, against ~10× for the vanilla MLP. About 60% of the vanilla
+deficit was the architecture — and the remainder *widens* with data rather than
+closing (§4.11).
+
+**Layer 6 (§4.13), following the two advisor papers:** a hierarchical prior has
+a ladder of speciation times, one per level, measured at r = 0.9998 against
+prediction; the AR(1) chain of Layers 1–5 has none, because its top eigenvalue
+is bounded — which bounds how far this project generalizes; the memorization
+axis does not exist for a BP score, which supplies the *mechanism* behind the
+Layer-5 headline; and the ε-network's error is flat across hierarchy levels
+while EM-BP's is concentrated by 2–4 orders of magnitude. `exp_13 ordering`
+returned a **negative** — no sequential acquisition of levels by the network —
+in a regime that is data-limited, and it is recorded as such.
+
+**Still not started:** §6.3 (hybrid non-Markov correction) and §6.1
+(distillation of the BP denoiser for inference-time cost). For Layer 6 the
+ranked list is in `docs/PAPER_CONNECTIONS.md` §6, headed by reading the two
+PDFs — which **could not be opened from this environment** — and by the
+nonparametric collapse test that answers the obvious objection to the
+memorization result.

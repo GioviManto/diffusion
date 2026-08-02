@@ -24,7 +24,7 @@ opened from this environment** and that bounds how their content may be used.
 cd /path/to/diffusion
 python3 -m venv .venv && .venv/bin/pip install -r research/nongaussian-bp/requirements.txt
 cd research/nongaussian-bp
-../../.venv/bin/python -m pytest tests/ -q          # expect 79 passed, ~3.7 min
+../../.venv/bin/python -m pytest tests/ -q          # expect 83 passed, ~3.5 min
 ```
 
 `.venv/` is gitignored — recreate it, don't look for it. Pure numpy/scipy; **no

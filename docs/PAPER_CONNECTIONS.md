@@ -265,7 +265,7 @@ as a *rate* property in the tests rather than as a single-budget accuracy claim.
 | `src/spectral.py` | Speciation time, commitment, chain spectrum and its limit, excess entropy, collapse dataset size |
 | `experiments/exp_13_speciation_cascade.py` | `spectra`, `cascade`, `levels`, `ordering` |
 | `experiments/exp_14_memorization_collapse.py` | `budget`, `collapse`, `time` |
-| `tests/test_hierarchy.py` | 25 tests |
+| `tests/test_hierarchy.py` | 33 tests (suite 50 -> 83) |
 
 ---
 
@@ -297,6 +297,25 @@ across levels for the ε-network — flat, as if the levels did not exist — an
 224–6957× for EM-BP, migrating from the finest levels at small `t` to the single
 coarsest mode at large `t`. The x₀-network is genuinely intermediate (up to
 12.6×) and is reported as such.
+
+**5. Symmetry breaking happens before the information crossover, and the
+crossover itself does not move.** A two-component root keeps the covariance and
+therefore every predicted time bit-identical — a controlled comparison, asserted
+in a test. The correlation crossing lands at 1.155 (bimodal) and 1.031
+(Gaussian) against a predicted 1.136, both inside the ±10% the integrator costs
+at this resolution; the *class choice* for the bimodal root locks in at 1.265,
+earlier in the generation and 35% earlier than the Gaussian root's. Two
+separated classes can be told apart while noise still swamps the within-class
+detail. This is the one measurement here that is speciation in P2's sense rather
+than a crossover sharing its criterion.
+
+**6. The advantage does not shrink as correlations reach further** (filtering,
+**PARTIAL**). Sweeping the filter level `k`, the network's error is flat
+(0.414 → 0.347) while EM-BP's advantage runs 29–99×. But fixing the number of
+sequences does not fix the number of edges — 16, 24, 28, 30 for k = 1…4 — so
+larger `k` hands EM more data at the same nominal budget and the sweep moves two
+things at once. The *rising* advantage is therefore not attributable to
+correlation range; only the negative is safe.
 
 ### What did not come out
 

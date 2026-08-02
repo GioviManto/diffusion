@@ -73,9 +73,16 @@ counted in *clean* chains, of which the network gets paired `(a, x)` with a
 fresh noise draw every gradient step while EM gets one noisy realization each
 and never sees a clean chain; width and training budget are swept; and both
 standard parameterizations (noise prediction and clean-signal prediction) are
-trained and reported. The baseline is a vanilla MLP, as specified — a
-temporal-convolution or U-Net baseline would carry a locality prior of its own
-and is the natural next comparison, not something settled here.
+trained and reported. The baseline is a vanilla MLP, as specified.
+
+A locality-respecting baseline has since been measured (exp_12) and it matters:
+against a weight-shared window predictor -- a 1-D CNN -- with an oracle over
+both receptive-field radius and parameterization, over 4 seeds, the EM-BP margin
+is 2.10 +- 0.39 / 3.27 +- 0.32 / 4.11 +- 0.32 at N = 128 / 512 / 2048, against
+~10x for the vanilla MLP. So roughly 60% of the vanilla deficit was the
+architecture. The margin against the CNN nevertheless *widens* with data,
+because EM-BP keeps paying down parametric error while the CNN flattens toward
+an approximation floor.
 
 ## Layer 6: hierarchy, speciation, and memorization (exp_13, exp_14)
 
@@ -121,7 +128,7 @@ image-like data, and is recorded rather than glossed.
     experiments/  exp_01 ... exp_14, all with --quick smoke mode
     outputs/      CSV + JSON + PNG per experiment (committed results)
     notebooks/    executed analysis notebooks 01-04
-    tests/        pytest suite (79 tests)
+    tests/        pytest suite (83 tests)
     report/       updated_report.tex / .pdf   (Layers 1-4)
                   em_bp_learning.tex / .pdf   (Layer 5 theory)
     audit/        Layer-1 audit note
