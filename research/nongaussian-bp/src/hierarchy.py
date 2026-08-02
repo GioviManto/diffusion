@@ -125,11 +125,67 @@ class GaussianTree:
     branching: int = 2
     rho: float = 0.9
     root_separation: float = 0.0
+    filter_level: int = 0
 
     @property
     def name(self) -> str:
         tag = f",mu={self.root_separation}" if self.root_separation else ""
+        tag += f",k={self.filter_level}" if self.filter_level else ""
         return f"tree(L={self.depth},b={self.branching},rho={self.rho}{tag})"
+
+    def __post_init__(self) -> None:
+        if not 0 <= self.filter_level <= self.depth:
+            raise ValueError("filter_level must satisfy 0 <= k <= depth.")
+
+    # -- hierarchical filtering (Garnier-Brun et al., arXiv:2408.15138 §2.2) --
+    #
+    # At filter level k the b^k nodes at depth k are drawn **conditionally
+    # independently given the root**, each with the marginal it would have in
+    # the unfiltered model -- for the Gaussian tree, correlation rho^k with the
+    # root and unit variance. Levels 1..k-1 are skipped entirely. Below depth k
+    # the ordinary recursion resumes, so correlations survive inside blocks of
+    # b^{L-k} leaves.
+    #
+    # The consequence for the covariance is exact and worth stating, because it
+    # is what makes the filtered model a clean experimental knob: two leaves in
+    # the *same* depth-k block keep the covariance they had, while every
+    # cross-block pair collapses to rho^{2L} -- the value the unfiltered model
+    # assigns to the most distant pair. Filtering flattens the top of the
+    # hierarchy without touching the marginals or the bottom of it.
+    #
+    # Note this is NOT "b^k independent subtrees": the blocks stay correlated
+    # through the root. At k = L the leaves become conditionally i.i.d. given
+    # the root, which is the regime where the paper notes a Naive Bayes
+    # classifier is optimal and attention is superfluous.
+
+    @property
+    def block_size(self) -> int:
+        """Leaves per depth-`k` block; the whole sequence when unfiltered."""
+        return self.branching ** (self.depth - self.filter_level)
+
+    @property
+    def n_blocks(self) -> int:
+        return self.branching**self.filter_level
+
+    @property
+    def subtree(self) -> "GaussianTree":
+        """The unfiltered depth-(L-k) tree that lives inside one block."""
+        return GaussianTree(
+            depth=self.depth - self.filter_level,
+            branching=self.branching,
+            rho=self.rho,
+        )
+
+    @property
+    def cross_block_covariance(self) -> float:
+        """`rho^{2L}`: what every cross-block leaf pair collapses to."""
+        return float(self.rho ** (2 * self.depth))
+
+    @property
+    def top_kernel(self) -> tuple[float, float]:
+        """`(rho^k, 1 - rho^{2k})` -- the root-to-block-root edge after filtering."""
+        r = float(self.rho**self.filter_level)
+        return r, float(1.0 - r**2)
 
     @property
     def index(self) -> TreeIndex:
@@ -179,14 +235,27 @@ class GaussianTree:
         else:
             z[:, 0] = rng.standard_normal(n)
         scale = np.sqrt(self.q)
+        k = self.filter_level
         for d in range(self.depth):
             parents = ti.nodes_at(d)
             kids = ti.nodes_at(d + 1)
-            # Children of parents[p] are kids[b*p : b*p+b]; repeat parent values.
-            z[:, kids] = (
-                self.rho * np.repeat(z[:, parents], self.branching, axis=1)
-                + scale * rng.standard_normal((n, kids.size))
-            )
+            if k > 0 and d < k:
+                # Filtered levels. Every node at depth d+1 <= k is drawn
+                # directly from the *root*, conditionally independently, with
+                # the marginal the unfiltered model would give it: correlation
+                # rho^{d+1} with the root and unit variance. Levels 1..k-1 are
+                # therefore placeholders carrying the right marginal but no
+                # sibling structure -- exactly the paper's construction.
+                r = self.rho ** (d + 1)
+                z[:, kids] = r * np.repeat(
+                    z[:, :1], kids.size, axis=1
+                ) + np.sqrt(1.0 - r**2) * rng.standard_normal((n, kids.size))
+            else:
+                # Children of parents[p] are kids[b*p : b*p+b].
+                z[:, kids] = (
+                    self.rho * np.repeat(z[:, parents], self.branching, axis=1)
+                    + scale * rng.standard_normal((n, kids.size))
+                )
         return z
 
     def sample(self, rng: np.random.Generator, n: int) -> np.ndarray:
@@ -194,9 +263,18 @@ class GaussianTree:
         return self.sample_nodes(rng, n)[:, self.index.leaf_nodes()]
 
     def leaf_covariance(self) -> np.ndarray:
-        """Dense `(n_leaves, n_leaves)` covariance -- reference, O(n^2) memory."""
+        """Dense `(n_leaves, n_leaves)` covariance -- reference, O(n^2) memory.
+
+        Unfiltered: `rho^{2(L - d_LCA)}`, the ultrametric form. Filtered at
+        level k: unchanged for pairs inside a depth-k block (`d_LCA >= k`), and
+        flattened to `rho^{2L}` for every cross-block pair, since those are
+        correlated only through the root.
+        """
         d = self.index.lca_depth_matrix()
-        return self.rho ** (2.0 * (self.depth - d))
+        cov = self.rho ** (2.0 * (self.depth - d))
+        if self.filter_level:
+            cov = np.where(d >= self.filter_level, cov, self.cross_block_covariance)
+        return cov
 
     # -- spectrum -----------------------------------------------------------
 
@@ -231,14 +309,50 @@ class GaussianTree:
         whole tree, level 0 splits it in half, level L-1 separates sibling
         leaves. Eigenvalues decrease monotonically in that order, which is what
         makes the speciation ladder well ordered.
+
+        Filtering collapses the top of the ladder. At filter level k the
+        covariance is block-diagonal-plus-constant: the depth-(L-k) subtree
+        covariance inside each of the b^k blocks, and `rho^{2L}` between them.
+        Its eigenvectors are (i) within-block contrasts, which are the
+        subtree's own non-uniform modes, each with multiplicity multiplied by
+        b^k; (ii) between-block contrasts, constant on each block and summing
+        to zero across blocks, with the single eigenvalue
+
+            S_0^{(L-k)} - b^{L-k} rho^{2L},   multiplicity b^k - 1;
+
+        and (iii) the uniform mode. So the k top rungs of the ladder merge into
+        **one**, and the number of distinct speciation times falls from L + 1
+        to L - k + 2 (and to 2 at k = L, where the leaves are conditionally
+        i.i.d. given the root and the covariance is equicorrelated). Filtering
+        is therefore a knob that removes rungs from the speciation ladder --
+        which is the point at which the two papers meet.
+
+        Filtered levels are labelled `-2` for the merged between-block mode;
+        within-block levels keep the depth label they have in the *full* tree,
+        i.e. `k + d'` for the subtree's level `d'`.
         """
-        b, L = self.branching, self.depth
-        out: list[tuple[int, float, int]] = [(-1, self.subtree_row_sum(0), 1)]
-        for d in range(L):
-            lam = self.subtree_row_sum(d + 1) - b ** (L - d - 1) * self.rho ** (
-                2.0 * (L - d)
-            )
-            out.append((d, float(lam), (b - 1) * b**d))
+        b, L, k = self.branching, self.depth, self.filter_level
+        if k == 0:
+            out: list[tuple[int, float, int]] = [(-1, self.subtree_row_sum(0), 1)]
+            for d in range(L):
+                lam = self.subtree_row_sum(d + 1) - b ** (L - d - 1) * self.rho ** (
+                    2.0 * (L - d)
+                )
+                out.append((d, float(lam), (b - 1) * b**d))
+            return out
+
+        sub = self.subtree
+        n_blocks, m = self.n_blocks, self.block_size
+        c0 = self.cross_block_covariance
+        s_sub = sub.subtree_row_sum(0)
+
+        out = [(-1, float(s_sub + (n_blocks - 1) * m * c0), 1)]
+        if n_blocks > 1:
+            out.append((-2, float(s_sub - m * c0), n_blocks - 1))
+        for level, lam, mult in sub.level_eigenvalues():
+            if level < 0:
+                continue                      # the subtree's uniform mode is (ii)
+            out.append((k + level, float(lam), mult * n_blocks))
         return out
 
     def level_projector_basis(self) -> tuple[np.ndarray, np.ndarray]:
@@ -257,6 +371,27 @@ class GaussianTree:
         uniform = np.full(n, 1.0 / np.sqrt(n))
         cols.append(uniform)
         levels.append(-1)
+
+        if self.filter_level:
+            # Between-block contrasts (label -2), then the subtree's own basis
+            # replicated per block with its levels shifted by k.
+            k, m, n_blocks = self.filter_level, self.block_size, self.n_blocks
+            for r in range(1, n_blocks):
+                v = np.zeros(n)
+                v[: r * m] = 1.0
+                v[r * m: (r + 1) * m] = -float(r)
+                cols.append(v / np.linalg.norm(v))
+                levels.append(-2)
+            v_sub, lev_sub = self.subtree.level_projector_basis()
+            for block in range(n_blocks):
+                for col in range(v_sub.shape[1]):
+                    if lev_sub[col] < 0:
+                        continue              # subtree uniform mode is spanned above
+                    v = np.zeros(n)
+                    v[block * m: (block + 1) * m] = v_sub[:, col]
+                    cols.append(v)
+                    levels.append(k + int(lev_sub[col]))
+            return np.stack(cols, axis=1), np.asarray(levels)
 
         for d in range(L):
             block = b ** (L - d)          # leaves under a depth-d node
@@ -348,6 +483,147 @@ def tree_bp_gaussian(
         lam_p = lam_tot[:, parents] + lam_down[:, parents]
         h_p = h_tot[:, parents] + h_down[:, parents]
         # Exclude each child's own upward message (repeat parent along children).
+        lam_excl = np.repeat(lam_p, b, axis=1) - lam_up[:, kids]
+        h_excl = np.repeat(h_p, b, axis=1) - h_up[:, kids]
+        lam_new = 1.0 / (rho**2 / lam_excl + q)
+        lam_down[:, kids] = lam_new
+        h_down[:, kids] = lam_new * rho * h_excl / lam_excl
+
+    lam_leaf = lam_tot[:, leaves] + lam_down[:, leaves]
+    h_leaf = h_tot[:, leaves] + h_down[:, leaves]
+    return h_leaf / lam_leaf
+
+
+def filtered_tree_bp_gaussian(
+    tree: GaussianTree, x: np.ndarray, alpha: float, delta: float
+) -> np.ndarray:
+    """Exact posterior mean of the leaves under a *filtered* tree prior.
+
+    This is `BP_k` in the language of Garnier-Brun et al.: the exact inference
+    algorithm for the hierarchy truncated at level `k`. Running it on data drawn
+    from a *different* filter level is exactly the mismatched-oracle comparison
+    their Figs. 1(c–d) and 2 are built on, and it is what makes "which
+    correlation range has this model learned" a question with a graded answer.
+
+    The filtered graph is still a tree, so BP is still exact: a root, `b^k`
+    block roots attached to it by the composed edge `(rho^k, 1 - rho^{2k})`, and
+    an ordinary depth-`(L-k)` tree under each. Only the top edge and the root's
+    degree differ from the unfiltered case, so the same information-form updates
+    apply throughout.
+    """
+    k = tree.filter_level
+    if k == 0:
+        return tree_bp_gaussian(tree, x, alpha, delta)
+    if tree.root_separation:
+        raise ValueError("Mixture root has no information form; use grid BP.")
+
+    x = np.atleast_2d(x)
+    n_chains = x.shape[0]
+    sub, m, n_blocks = tree.subtree, tree.block_size, tree.n_blocks
+    rho_top, q_top = tree.top_kernel
+
+    if k == tree.depth:
+        # Degenerate: each "block" is a single leaf, no subtree pass at all.
+        lam_up = np.full((n_chains, n_blocks), alpha**2 / delta)
+        h_up = alpha * x / delta
+        bu_lam, bu_h = lam_up, h_up
+    else:
+        blocks = x.reshape(n_chains * n_blocks, m)
+        bu_lam, bu_h = _subtree_upward(sub, blocks, alpha, delta)
+        bu_lam = bu_lam.reshape(n_chains, n_blocks)
+        bu_h = bu_h.reshape(n_chains, n_blocks)
+
+    # Block root -> root, through the composed top edge.
+    denom = 1.0 + q_top * bu_lam
+    lam_msg = rho_top**2 * bu_lam / denom
+    h_msg = rho_top * bu_h / denom
+
+    lam_root = 1.0 + lam_msg.sum(axis=1, keepdims=True)
+    h_root = h_msg.sum(axis=1, keepdims=True)
+
+    # Root -> block root, excluding each block's own upward message.
+    lam_excl = lam_root - lam_msg
+    h_excl = h_root - h_msg
+    lam_down = 1.0 / (rho_top**2 / lam_excl + q_top)
+    h_down = lam_down * rho_top * h_excl / lam_excl
+
+    if k == tree.depth:
+        lam_leaf = lam_down + alpha**2 / delta
+        h_leaf = h_down + alpha * x / delta
+        return h_leaf / lam_leaf
+
+    return _subtree_downward(
+        sub,
+        x.reshape(n_chains * n_blocks, m),
+        lam_down.reshape(-1),
+        h_down.reshape(-1),
+        alpha,
+        delta,
+    ).reshape(n_chains, tree.n_leaves)
+
+
+def _subtree_upward(tree: GaussianTree, x: np.ndarray, alpha: float, delta: float):
+    """Upward pass only; returns the `(lam, h)` the subtree root sends upward."""
+    ti = tree.index
+    b, L, q, rho = tree.branching, tree.depth, tree.q, tree.rho
+    n_chains = x.shape[0]
+    lam_tot = np.zeros((n_chains, ti.n_nodes))
+    h_tot = np.zeros((n_chains, ti.n_nodes))
+    leaves = ti.leaf_nodes()
+    lam_tot[:, leaves] = alpha**2 / delta
+    h_tot[:, leaves] = alpha * x / delta
+    for d in range(L, 0, -1):
+        nodes = ti.nodes_at(d)
+        denom = 1.0 + q * lam_tot[:, nodes]
+        lam_up = rho**2 * lam_tot[:, nodes] / denom
+        h_up = rho * h_tot[:, nodes] / denom
+        parents = ti.nodes_at(d - 1)
+        lam_tot[:, parents] += lam_up.reshape(n_chains, -1, b).sum(axis=2)
+        h_tot[:, parents] += h_up.reshape(n_chains, -1, b).sum(axis=2)
+    return lam_tot[:, 0], h_tot[:, 0]
+
+
+def _subtree_downward(
+    tree: GaussianTree, x: np.ndarray, lam_in: np.ndarray, h_in: np.ndarray,
+    alpha: float, delta: float,
+) -> np.ndarray:
+    """Full BP on a subtree whose root carries an external prior `(lam_in, h_in)`.
+
+    Reruns the upward pass rather than caching it: the subtrees here are tiny
+    and a second pass is far cheaper than the bookkeeping needed to thread
+    cached messages through a differently-rooted call.
+    """
+    ti = tree.index
+    b, L, q, rho = tree.branching, tree.depth, tree.q, tree.rho
+    n_chains = x.shape[0]
+    lam_up = np.zeros((n_chains, ti.n_nodes))
+    h_up = np.zeros((n_chains, ti.n_nodes))
+    lam_tot = np.zeros((n_chains, ti.n_nodes))
+    h_tot = np.zeros((n_chains, ti.n_nodes))
+    leaves = ti.leaf_nodes()
+    lam_tot[:, leaves] = alpha**2 / delta
+    h_tot[:, leaves] = alpha * x / delta
+
+    for d in range(L, 0, -1):
+        nodes = ti.nodes_at(d)
+        denom = 1.0 + q * lam_tot[:, nodes]
+        lam_up[:, nodes] = rho**2 * lam_tot[:, nodes] / denom
+        h_up[:, nodes] = rho * h_tot[:, nodes] / denom
+        parents = ti.nodes_at(d - 1)
+        lam_tot[:, parents] += lam_up[:, nodes].reshape(n_chains, -1, b).sum(axis=2)
+        h_tot[:, parents] += h_up[:, nodes].reshape(n_chains, -1, b).sum(axis=2)
+
+    # The subtree root's prior comes from above instead of N(0, 1).
+    lam_down = np.zeros((n_chains, ti.n_nodes))
+    h_down = np.zeros((n_chains, ti.n_nodes))
+    lam_down[:, 0] = lam_in
+    h_down[:, 0] = h_in
+
+    for d in range(L):
+        parents = ti.nodes_at(d)
+        kids = ti.nodes_at(d + 1)
+        lam_p = lam_tot[:, parents] + lam_down[:, parents]
+        h_p = h_tot[:, parents] + h_down[:, parents]
         lam_excl = np.repeat(lam_p, b, axis=1) - lam_up[:, kids]
         h_excl = np.repeat(h_p, b, axis=1) - h_up[:, kids]
         lam_new = 1.0 / (rho**2 / lam_excl + q)

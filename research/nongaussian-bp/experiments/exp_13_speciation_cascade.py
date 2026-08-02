@@ -1,7 +1,12 @@
 """Experiment 13 -- hierarchical priors: the speciation ladder and what learns it.
 
 This experiment sits at the intersection of two papers the project was pointed
-at, and answers a question neither of them asks on its own.
+at. Note that the intersection is *not* unoccupied: Sclocchi, Favero and Wyart
+(PNAS 122(1) e2408799121, 2025) study diffusion on hierarchical data and find a
+sharp transition for high-level features against a smooth evolution of
+low-level ones. What the Gaussian tree adds is that the whole ladder of
+crossover times is analytic, so the measurements below are calibration against
+a known answer rather than discovery. See docs/PAPER_CONNECTIONS.md.
 
 Biroli, Bonnaire, de Bortoli and Mezard (Nat. Commun. 15, 9957, 2024) show that
 the backward diffusion passes through a *speciation* cross-over set by the top
@@ -13,11 +18,10 @@ hierarchically generated sequences a transformer reconstructs correlations
 *sequentially*, shortest length scale first, and that the reference against
 which this is measured is exact BP inference.
 
-Put together they predict something specific and testable here: a hierarchical
+Put together they give something specific and checkable here: a hierarchical
 prior has a *ladder* of covariance eigenvalues, one per level, so the reverse
 diffusion should show not one speciation time but L + 1 of them, resolving the
-hierarchy coarse-to-fine; and a learned score should acquire the levels in some
-order, which we can measure against exact BP rather than guess at.
+hierarchy coarse-to-fine, at times computable in closed form.
 
 Parts
 -----
@@ -32,8 +36,9 @@ levels    Which method learns which level: per-level posterior-mean error for
           exact BP, EM-fitted BP, and a DSM network, at matched data budget.
 ordering  Level-resolved error *as a function of training step*: the diffusion
           analogue of the sequential-inclusion result.
-filtering The filtering device itself: sweep the correlation range at fixed
-          sequence length, budget and architecture.
+block_independent
+          Sweep the correlation range by making blocks independent. NOT the
+          paper's filtering -- see exp_15_bp_oracles.py for that.
 speciation Symmetry breaking, not just an information cross-over. A two-component
           root prior keeps the covariance -- and therefore every predicted time
           -- exactly unchanged while making the coarsest transition a genuine
@@ -605,14 +610,22 @@ def _plot_ordering(rows, uniq, out_dir):
 
 # ----------------------------------------------------------------------------
 
-def part5_filtering(cfg, out_dir):
-    """Hierarchical filtering: sweep the *range* of correlations in the data.
+def part5_block_independent(cfg, out_dir):
+    """Correlation range swept by making blocks INDEPENDENT.
 
-    This is P1's central device transplanted. Filtering a depth-L tree at level
-    k -- resampling everything above k independently -- leaves correlations only
-    inside blocks of b^k leaves, so the data is exactly `b^{L-k}` independent
-    depth-k trees laid end to end. The sequence length, the training budget and
-    the network are held fixed; only the correlation range moves.
+    **This is not the hierarchical filtering of arXiv:2408.15138, and an earlier
+    version of this docstring said it was.** That paper draws the depth-k nodes
+    conditionally independently *given the root*, so the blocks stay correlated
+    through it; here the blocks are made outright independent, which puts a zero
+    where the paper's construction puts rho^{2L}. The correct construction now
+    lives in `GaussianTree(filter_level=k)` and the experiment built on it is
+    `exp_15_bp_oracles.py`, which is also where the paper's actual probe --
+    comparison against the family of mismatched BP_k oracles -- is implemented.
+
+    What remains here is still a well-defined and separately interesting sweep:
+    block-independent truncation, i.e. the harsher cut in which nothing survives
+    between blocks at all. The sequence length, the training budget and the
+    network are held fixed; only the correlation range moves.
 
     The prediction being tested is the diffusion analogue of P1's sequential
     acquisition: at fixed budget the network's deficit should grow with k,
@@ -631,7 +644,7 @@ def part5_filtering(cfg, out_dir):
     n_leaves = b**depth
     grid, w = _grid(cfg)
     log_root = -0.5 * grid**2 - 0.5 * np.log(2 * np.pi)
-    print(f"[filtering] {n_leaves} leaves, filter level k = 1..{depth}")
+    print(f"[block_independent] {n_leaves} leaves, block level k = 1..{depth}")
 
     rows = []
     for k in range(1, depth + 1):
@@ -706,7 +719,7 @@ def part5_filtering(cfg, out_dir):
               f"(ref rms {np.mean([r['reference_rms'] for r in mid]):.3f})  "
               f"advantage {np.mean([r['advantage'] for r in mid]):.2f}x")
 
-    write_csv(out_dir / "filtering.csv", rows)
+    write_csv(out_dir / "block_independent.csv", rows)
 
     import matplotlib.pyplot as plt
 
@@ -729,7 +742,7 @@ def part5_filtering(cfg, out_dir):
     for ax in axes:
         ax.grid(alpha=0.3)
     fig.tight_layout()
-    save_figure(fig, out_dir / "filtering.png")
+    save_figure(fig, out_dir / "block_independent.png")
 
 
 def part6_speciation(cfg, out_dir):
@@ -865,7 +878,7 @@ PARTS = {
     "cascade": part2_cascade,
     "levels": part3_levels,
     "ordering": part4_ordering,
-    "filtering": part5_filtering,
+    "block_independent": part5_block_independent,
     "speciation": part6_speciation,
 }
 

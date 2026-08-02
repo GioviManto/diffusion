@@ -13,60 +13,105 @@ almost exactly the two axes this package has been measuring blind.
 
 ---
 
-## 0. How these papers were read, and what that means for what follows
+## 0. How these papers were read — and a correction
 
-**This has to be stated first, because it bounds everything below.** The
-execution environment blocks outbound HTTP at the gateway: `arxiv.org`,
-`www.nature.com`, `pmc.ncbi.nlm.nih.gov`, `hal.science`, `proceedings.mlr.press`
-and every mirror tried all return `403` on `CONNECT`, from both the fetch tool
-and `curl`. **Neither PDF could be opened.** What is recorded below came from
-web *search* (which routes server-side and does work), which returned titles,
-authors, abstracts and summaries of the papers' content.
+**P1 has now been read in full.** Direct HTTP is blocked at this environment's
+gateway (`arxiv.org`, `www.nature.com`, PMC, HAL, PMLR all 403 on `CONNECT`),
+but the Hugging Face Hub exposes `hf://papers/2408.15138/paper.md` through a
+server-side route, which returns the complete LaTeXML rendering including the
+appendices. Everything about P1 below is from the source.
 
-The consequences, stated plainly:
+**P2 has still not been read.** It is not on that route, and every direct route
+is blocked. What is said about P2 here comes from web search — abstract-level
+statements about the two cross-overs and the entropic criterion — and *nothing
+mathematical is quoted from it*. The speciation crossover used throughout is
+derived from scratch in §3.1 in this package's conventions and checked against
+40 000 sampled forward trajectories. (One search summary rendered the condition
+with a reciprocal, `t_S = ½ log(1/Λ)`, contradicting its own statement that
+`t_S` diverges with dimension; deriving it independently avoided importing that
+slip.) **Read P2 before citing it.**
 
-- **Titles, authors, venues and the substance of the abstracts are reliable** —
-  they were returned consistently across independent queries and cross-checked
-  against multiple indexes.
-- **No equation, constant, notation or figure below is quoted from either
-  paper.** Everything mathematical here is *derived from scratch in this
-  package's own conventions* and verified numerically in
-  `tests/test_hierarchy.py`. Where a result of theirs is described in words,
-  it is described as the mechanism, not as a formula.
-- One search summary rendered the speciation condition as
-  `t_S = ½ log(1/Λ)`. That is almost certainly a transcription slip: the same
-  summary states that `t_S` *diverges* when `Λ` grows with the dimension,
-  which requires `t_S = ½ log Λ`. **Rather than adopt either, §3.1 derives the
-  crossover independently** and checks it against the sampled process
-  (`test_commitment_matches_the_forward_process_empirically`). The derived
-  form is `t_S = ½ log(1 + Λ)`, which reduces to `½ log Λ` for large `Λ`.
-- **Anyone continuing this work should read both PDFs directly** and reconcile
-  notation. Nothing here depends on their notation — the code and the tests are
-  self-contained — but a write-up that cites them must use their symbols.
+### What reading P1 changed
+
+Two things in an earlier version of this note were wrong. Both are corrected in
+place below, and both were substantive rather than cosmetic:
+
+1. **I had the filtering construction wrong.** I implemented "filter at level
+   `k`" as *`b^k` independent subtrees*. P1 §2.2 instead draws the depth-`k`
+   nodes **conditionally independently given the root**, with the marginals the
+   unfiltered model gives them (their Eq. 1, obtained by tracing the transition
+   tensor along the unique root→node path). The blocks therefore stay
+   correlated *through the root*; at `k = L` the leaves become conditionally
+   i.i.d. given the root, which is the regime where P1 notes a Naive Bayes
+   classifier is optimal and attention is superfluous. Independent blocks would
+   have put a zero where the correct construction puts `ρ^{2L}`. The
+   implementation now follows the paper and a test pins the distinction
+   (`test_filtered_sampler_matches_the_analytic_covariance`).
+
+2. **I claimed the hierarchy × diffusion intersection was "untouched by either
+   paper". It is not.** Sclocchi, Favero and Wyart, *A phase transition in
+   diffusion models reveals the hierarchical nature of data*, PNAS 122(1)
+   e2408799121 (2025), arXiv:2402.16991 — **cited by P1 itself** — studies
+   exactly diffusion on hierarchically generated data and finds a phase
+   transition at which the probability of reconstructing high-level features
+   drops sharply, while low-level features evolve smoothly across the whole
+   process. §2(c) is rewritten accordingly. The measurements here turn out to
+   be *consistent* with that picture rather than novel against it, and saying
+   so is more useful than the claim it replaces (see §5).
+
+**A methodological correction that follows from (1).** P1's probe for
+sequential learning is not "resolve the error onto levels and watch it move" —
+which is what exp_13 `ordering` did, and it found nothing. It is to compare the
+model's predictions against the *family* of mismatched oracles `BP_k`, and ask
+which one it currently agrees with. `exp_15` implements that.
 
 ---
 
 ## 1. What the two papers say
 
-### P1 — hierarchical filtering
+### P1 — hierarchical filtering (read in full)
 
-Sequences are generated on a balanced tree: a root symbol, then children drawn
-from transition tensors, level after level, with the leaves forming the observed
-sequence. Correlations between two leaves are then controlled by their
-*hierarchical* distance — how far up you must go to find a common ancestor —
-rather than by their position in the sequence. A **filtering parameter `k`**
-truncates the hierarchy, so the range of positional correlations in the data can
-be dialled from none to the full depth.
+**The data model.** A root symbol `x_0` drawn from a vocabulary of size `q`,
+then a transition *tensor* `M ∈ ℝ_+^{q×q×q}` with `M_{abc} = P(children (b,c) |
+parent a)` applied for `ℓ` generations down a binary tree, yielding `2^ℓ`
+leaves. Entries are log-normally sampled and **non-overlapping** — if
+`M_{abc} > 0` then `M_{a'bc} = 0` for all `a' ≠ a` — so production rules are
+unambiguous and, at `k = 0`, the whole tree including the root is
+deterministically recoverable from the leaves. They call it a simplified PCFG,
+and relate it to the Random Hierarchy Model of Cagnetta et al. (uniform rates,
+layer-dependent rules) — the differences being log-normal versus uniform rates
+and a single tensor throughout.
 
-The model is exactly solvable at every filtering level: the graph is a tree, so
-**belief propagation gives exact inference in linear time**, and BP is therefore
-the reference against which a trained network is measured.
+**Filtering (§2.2), stated precisely because I first got it wrong.** At
+level `k`, the `2^k` nodes at depth `k` are drawn **conditionally independently
+given the root**, with the marginals the unfiltered model assigns them —
+Eq. 1, `P(x_j = b | x_0 = a) = (p_0 M^{σ_0(j)} ⋯ M^{σ_{k−1}(j)})_{ab}`, tracing
+the tensor along the unique root→`j` path with `σ_m ∈ {L,R}` recording the
+turns. Levels `1..k−1` are skipped. Below `k` the ordinary process resumes, so
+correlations survive inside blocks of `2^{ℓ−k}` leaves **and between blocks
+through the root**. At `k = ℓ` the leaves are conditionally i.i.d. given the
+root, and the paper notes that a Naive Bayes classifier is then optimal and
+every attention layer superfluous. Marginals are preserved at every `k`; what
+filtering removes is the intermediate ancestry, not the root.
 
-Findings: vanilla encoder-only transformers, trained on root classification and
-masked-token prediction, **approximate the exact inference algorithm**; and
-**correlations at increasing distance are acquired sequentially during
-training**, level by level up the hierarchy. Attention maps and layer-wise
-probes show a reconstruction of correlations on successive length scales.
+**Inference.** The graph is a tree at every `k`, so BP is exact and linear-time,
+converging in `2(ℓ − k + 1)` steps — an upward and a downward pass. `BP_k` is
+therefore a *family* of exact algorithms, one per filtering level, and running
+`BP_k` on data generated at a different level is a well-defined mismatched
+oracle. That family is the paper's measuring instrument.
+
+**Findings.** (i) Transformers match `BP_{k_train}`'s accuracy *and its
+calibrated probabilities*, in-sample and out-of-sample, including where `BP_k`
+is not optimal — evidence they implement the algorithm rather than merely
+scoring well. (ii) **Sequential acquisition**: during training the predictions
+align first with `BP_ℓ` (leaf-to-root only) and then with *decreasing* `k`, a
+clean "staircase" in the out-of-sample accuracy — shortest-range correlations
+first. (iii) Attention maps develop blocks of size `~2^{ℓ−k}`, organized
+hierarchically across layers; layer-wise probes recover ancestors up to the
+probed depth. (iv) Appendix F gives an explicit construction embedding BP in
+`ℓ` transformer layers, using `O(q²)` memory slots per token to fold the
+downward pass into the upward one. (v) MLM pre-training sharply reduces the
+labelled data needed for root classification.
 
 ### P2 — dynamical regimes
 
@@ -123,12 +168,37 @@ memorization axis does not exist for a BP score**, at any `n` and any `N`, while
 for the empirical score it is governed by an exactly computable entropy. That
 is falsifiable, and `exp_14` measures it.
 
-**(c) The two papers compose into a question neither asks.** P1's data model has
-a ladder of length scales; P2's speciation time is set by a covariance
-eigenvalue. A hierarchical prior has **one eigenvalue per level**, so it should
-show not one speciation time but `L + 1` of them, and the reverse diffusion
-should resolve the hierarchy **coarse-to-fine**, one transition per level. This
-appears to be untouched by either paper and is the subject of `exp_13`.
+**(c) The two devices compose — but the composition is not new, and an earlier
+version of this note wrongly said it was.** P1's data model has a ladder of
+length scales; P2's speciation time is set by a covariance eigenvalue. Putting
+them together suggests a hierarchical prior should show not one speciation time
+but `L + 1`, resolved coarse-to-fine.
+
+**Sclocchi, Favero and Wyart (PNAS 2025, arXiv:2402.16991) already study
+diffusion on hierarchical data**, and P1 cites them. They find a phase
+transition at which the probability of reconstructing *high-level* features
+drops sharply, while low-level features evolve *smoothly* across the whole
+process. So the intersection is occupied, and the correct question is not "does
+a hierarchy produce structure in diffusion time" — it does, and they showed it —
+but what the Gaussian setting adds. Three things, and they are modest:
+
+1. **The whole ladder is analytic.** The ultrametric covariance has a
+   closed-form spectrum, so every crossover time is known before any experiment
+   (§3.2), rather than located empirically. That is what makes `r = 0.9998`
+   against prediction a meaningful check.
+2. **Filtering acts on the ladder in a computable way** (§3.6): filtering at
+   level `k` merges the top `k` rungs into one. That is P1's knob and P2's time
+   scale in the same formula.
+3. **The sharp/smooth split of Sclocchi et al. is reproduced and localized.**
+   In a purely Gaussian tree every level gives a *smooth* crossover — there is
+   no class to speciate into. Making only the root bimodal, with the covariance
+   held bit-identical, produces genuine symmetry breaking at the coarsest level
+   and leaves the rest smooth (§5, result 5). That is their qualitative finding
+   in a setting where the control is exact.
+
+None of this is a novelty claim against them. It is a claim that the Gaussian
+tree is a useful calibration instrument for statements they make in a harder
+setting.
 
 ---
 

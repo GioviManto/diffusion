@@ -14,6 +14,7 @@ import pytest
 from src import spectral
 from src.hierarchy import (
     GaussianTree,
+    filtered_tree_bp_gaussian,
     TreeIndex,
     tree_bp_gaussian,
     tree_bp_grid,
@@ -189,6 +190,95 @@ def test_grid_tree_bp_runs_on_a_nongaussian_innovation():
     )
     assert np.all(np.isfinite(m_lap))
     assert np.max(np.abs(m_lap - m_gauss)) > 1e-3
+
+
+# ----------------------------------------------------------------------------
+# Hierarchical filtering (Garnier-Brun et al., arXiv:2408.15138 §2.2)
+# ----------------------------------------------------------------------------
+
+@pytest.mark.parametrize("depth,k", [(3, 0), (3, 1), (3, 2), (3, 3), (4, 2)])
+def test_filtered_sampler_matches_the_analytic_covariance(depth, k):
+    """The filtering must keep the marginals and only flatten the top.
+
+    This is the check that the construction is the paper's and not the easy
+    misreading of it. Drawing the depth-k nodes conditionally independently
+    *given the root* leaves every cross-block pair correlated at rho^{2L};
+    making the blocks outright independent -- which is what "truncate the
+    hierarchy" sounds like -- would put a 0 there instead.
+    """
+    tree = GaussianTree(depth=depth, branching=2, rho=0.85, filter_level=k)
+    a = tree.sample(rng_for("test-filter-cov", depth, k), 200_000)
+    assert np.max(np.abs(np.cov(a, rowvar=False) - tree.leaf_covariance())) < 0.02
+    assert abs(np.var(a) - 1.0) < 0.02              # marginals untouched
+    if 0 < k < depth:
+        cov = tree.leaf_covariance()
+        m = tree.block_size
+        assert np.all(cov[:m, m: 2 * m] == tree.cross_block_covariance)
+        assert cov[0, 1] > tree.cross_block_covariance   # within-block survives
+
+
+@pytest.mark.parametrize("depth,k", [(3, 0), (3, 1), (3, 2), (3, 3), (4, 1), (4, 2)])
+def test_filtered_spectrum_matches_dense_eigendecomposition(depth, k):
+    tree = GaussianTree(depth=depth, branching=2, rho=0.9, filter_level=k)
+    analytic = []
+    for _lev, lam, mult in tree.level_eigenvalues():
+        analytic.extend([lam] * mult)
+    analytic = np.sort(np.asarray(analytic))
+    assert analytic.size == tree.n_leaves
+    assert np.allclose(analytic, np.sort(np.linalg.eigvalsh(tree.leaf_covariance())))
+    assert np.isclose(analytic.sum(), tree.n_leaves)
+
+
+def test_filtering_removes_rungs_from_the_speciation_ladder():
+    """The headline consequence of composing the two papers' devices.
+
+    Filtering at level k merges the top k rungs into one, so the number of
+    distinct speciation times falls from L+1 to L-k+2. The k=0 and k=1 cases
+    coincide, independently reproducing the paper's remark that those two share
+    a tree topology and differ only in the top transition probabilities.
+    """
+    depth = 4
+    counts = {
+        k: len(GaussianTree(depth=depth, branching=2, rho=0.9, filter_level=k)
+               .level_eigenvalues())
+        for k in range(depth + 1)
+    }
+    assert counts == {0: 5, 1: 5, 2: 4, 3: 3, 4: 2}
+    for k in range(1, depth + 1):
+        assert counts[k] == max(depth - k + 2, 2)
+
+    # At k = L the covariance is equicorrelated: leaves conditionally i.i.d.
+    full = GaussianTree(depth=depth, branching=2, rho=0.9, filter_level=depth)
+    cov = full.leaf_covariance()
+    off = cov[~np.eye(full.n_leaves, dtype=bool)]
+    assert np.allclose(off, off[0])
+
+
+@pytest.mark.parametrize("depth,k,t", [(3, 0, 0.5), (3, 1, 0.3), (4, 2, 0.6),
+                                       (3, 3, 1.0), (4, 1, 0.2)])
+def test_filtered_bp_is_exact(depth, k, t):
+    """`BP_k` is exact on its own model -- the mismatched-oracle comparison
+    is only meaningful if each oracle is right about its own hierarchy."""
+    tree = GaussianTree(depth=depth, branching=2, rho=0.85, filter_level=k)
+    rng = rng_for("test-filtered-bp", depth, k, t)
+    a = tree.sample(rng, 12)
+    alpha, delta = alpha_delta(t)
+    x = alpha * a + np.sqrt(delta) * rng.standard_normal(a.shape)
+    assert np.max(
+        np.abs(filtered_tree_bp_gaussian(tree, x, alpha, delta)
+               - tree_posterior_mean_dense(tree, x, alpha, delta))
+    ) < 1e-10
+
+
+def test_filtered_basis_is_orthonormal_and_diagonalizes():
+    tree = GaussianTree(depth=4, branching=2, rho=0.9, filter_level=2)
+    v, levels = tree.level_projector_basis()
+    n = tree.n_leaves
+    assert np.allclose(v.T @ v, np.eye(n), atol=1e-12)
+    lam_of = {lev: lam for lev, lam, _ in tree.level_eigenvalues()}
+    c = tree.leaf_covariance()
+    for j in range(n):
+        assert np.allclose(c @ v[:, j], lam_of[int(levels[j])] * v[:, j], atol=1e-12)
 
 
 # ----------------------------------------------------------------------------

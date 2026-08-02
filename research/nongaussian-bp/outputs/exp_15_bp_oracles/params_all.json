@@ -1,0 +1,56 @@
+{
+  "depth": 4,
+  "branching": 2,
+  "rho": 0.9,
+  "n_train": 1024,
+  "n_test": 512,
+  "t_train": [
+    0.1,
+    0.2,
+    0.4,
+    0.8,
+    1.6
+  ],
+  "hidden": [
+    128,
+    128
+  ],
+  "budgets": [
+    250,
+    500,
+    1000,
+    2000,
+    4000,
+    8000,
+    16000,
+    32000
+  ],
+  "final_steps": 32000,
+  "parameterization": "eps",
+  "ladder_depths": [
+    3,
+    4,
+    5,
+    6
+  ],
+  "ladder_rhos": [
+    0.85,
+    0.9
+  ],
+  "quick": false,
+  "parts": [
+    "ladder",
+    "alignment",
+    "mismatch"
+  ],
+  "overrides": [],
+  "timestamp": "2026-08-02 09:11:21",
+  "python": "3.11.15",
+  "numpy": "2.4.6",
+  "platform": "Linux-6.18.5-x86_64-with-glibc2.39",
+  "hostname": "vm",
+  "slurm_job_id": "",
+  "slurm_array_task_id": "",
+  "cpu_count": "4",
+  "blas_threads": "2"
+}
