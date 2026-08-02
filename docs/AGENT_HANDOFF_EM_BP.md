@@ -7,8 +7,9 @@ several of the traps below cost real time to find and are easy to reintroduce.
 For *what was done and what it showed*, read `docs/EM_BP_LEARNING_COMPENDIUM.md`
 first — this file is only about how to continue safely. Layer 6 (trees,
 speciation, memorization) has its own study note in `docs/PAPER_CONNECTIONS.md`;
-read its §0 before citing anything, because **the two source papers could not be
-opened from this environment** and that bounds how their content may be used.
+read its §0 before citing anything: the transformer paper has been read in full,
+the Nature Communications one has **not**, and §0 records two substantive things
+that reading the first one corrected.
 
 ---
 
@@ -24,7 +25,7 @@ opened from this environment** and that bounds how their content may be used.
 cd /path/to/diffusion
 python3 -m venv .venv && .venv/bin/pip install -r research/nongaussian-bp/requirements.txt
 cd research/nongaussian-bp
-../../.venv/bin/python -m pytest tests/ -q          # expect 83 passed, ~3.5 min
+../../.venv/bin/python -m pytest tests/ -q          # expect 101 passed, ~4 min
 ```
 
 `.venv/` is gitignored — recreate it, don't look for it. Pure numpy/scipy; **no
@@ -39,7 +40,7 @@ the package on `sys.path`. `conftest.py` does the same for pytest.
 1. `docs/EM_BP_LEARNING_COMPENDIUM.md` — results and findings (§4.13 is Layer 6).
 2. `research/nongaussian-bp/report/em_bp_learning.pdf` — the theory (14 pp, 5 propositions). §2 is the algorithm, §4 the kernel families, §5 the efficiency argument, §6 the limitations.
 3. `research/nongaussian-bp/src/em.py` — the module docstring explains the `Ξ` compression in full; that is the one idea the whole layer rests on.
-4. `docs/PAPER_CONNECTIONS.md` — Layer 6: what the two advisor papers imply here, what was derived from them, and (§0) the fact that neither PDF was readable from this environment.
+4. `docs/PAPER_CONNECTIONS.md` — Layer 6: what the two advisor papers imply here, what was derived from them, and (§0) which of them has actually been read.
 5. `research/nongaussian-bp/src/hierarchy.py` / `src/spectral.py` — the tree prior, exact tree BP, the tree E-step, and the two time scales.
 6. `research/nongaussian-bp/README.md` — package conventions, all layers.
 
@@ -60,7 +61,8 @@ the package on `sys.path`. `conftest.py` does the same for pytest.
 6. **The Laplace kernel has two discretization artifacts** (compendium §5.1, §5.2): its exact M-step is quantized onto the grid's ratio lattice, and its ρ-gradient loses accuracy to a `sign` discontinuity. **Never quote a Laplace-kernel ρ recovery as evidence of accuracy.** Measured (compendium §4.10): 4/5 is an *attractor* of the weighted-median M-step. For ρ\* = 0.7913, chosen deliberately off the simple lattice, the estimate is pinned at exactly 0.8000 across an 8× grid refinement (M = 201 → 1601) with a constant 0.0087 bias — refining the grid does not help, because this is a bias and not a resolution limit. At M=201 three distinct true values collapse onto 0.8000. And it contaminates `b`: where ρ is snapped away from the truth the scale error is 3–4× larger. Use the smooth kernels (Gaussian, mixture) for any rate or accuracy claim.
 7. **Tree EM converges much more slowly than chain EM, and it looks like a bug.** On a chain every site is observed; on a tree the internal nodes never are, so the missing-information fraction is far larger and EM's linear rate is correspondingly slower. Measured at depth 3 with 512 trees: `ρ̂ = 0.7360 / 0.7483 / 0.7487` at 50 / 100 / 150 iterations against a true 0.75, **with zero monotone violation throughout**. An estimate read at 40 iterations is off by 0.06 and reads exactly like a broken M-step. **Check `dL` at the last iteration before concluding anything about accuracy.** `tests/test_hierarchy.py::test_em_on_a_tree_ascends_and_converges_to_the_truth` asserts this as a rate property, at two budgets, for that reason.
 8. **A per-level error normalized within the level measures its own denominator.** Fine levels of a hierarchy have small eigenvalues, hence small reference magnitude, so a *relative* per-level error makes them look worse for every method — including a method whose absolute error is uniform. The first version of the exp_13 `levels` measurement showed a clean coarse-to-fine gradient that was entirely this effect. All three forms (relative, absolute, share of total squared error) are now written to the CSV; **quote the absolute or the share when comparing across levels**, the relative only within a level.
-9. **Grid adequacy.** `M=401, A=8` is the validated default. Grid error on the posterior mean is ~4e-6 there, far below any learning error. Below `t ≈ 0.05` the likelihood gets narrow relative to `dx` — check `noising.likelihood_resolution_ok` before trusting small-`t` results.
+9. **Hierarchical filtering is not "independent blocks", and getting it wrong is easy.** arXiv:2408.15138 §2.2 draws the depth-`k` nodes conditionally independently *given the root*, so blocks stay correlated through it at `ρ^{2L}`. The intuitive reading — chop the tree into independent subtrees — puts a zero there instead, and I shipped that version before reading the paper. `GaussianTree(filter_level=k)` is now the paper's construction; the old one survives as exp_13 `block_independent` under a name that says what it is. Related: in a **Gaussian** tree `k=0` and `k=1` are *exactly* the same model, because a linear-Gaussian edge makes siblings conditionally independent given the parent while their transition tensor need not. Do not read a `k=0`/`k=1` null result as a failure.
+10. **Grid adequacy.** `M=401, A=8` is the validated default. Grid error on the posterior mean is ~4e-6 there, far below any learning error. Below `t ≈ 0.05` the likelihood gets narrow relative to `dx` — check `noising.likelihood_resolution_ok` before trusting small-`t` results.
 
 ## 5. Running things
 

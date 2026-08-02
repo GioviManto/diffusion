@@ -62,7 +62,7 @@ Pure numpy, no autodiff, no new dependencies.
 | `experiments/exp_06_…` | Correctness: monotonicity, Fisher information, misspecification, rates, quantization |
 | `experiments/exp_07_…` | The headline: EM-BP vs a score network |
 | `experiments/exp_08_…` | The literal gradient route vs the exact M-step |
-| `tests/test_em_bp.py` | 23 tests, including five independent cross-checks (§5.5). Package total is now **83**, all passing (`tests/test_hierarchy.py` adds 33 for Layer 6). |
+| `tests/test_em_bp.py` | 23 tests, including five independent cross-checks (§5.5). Package total is now **101**, all passing (`tests/test_hierarchy.py` adds 51 for Layer 6). |
 | `hpc/`, `tools/merge_replicates.py` | Cluster templates and replicate merging |
 
 **The four rungs**, all consuming the same `Ξ`:
@@ -413,7 +413,7 @@ Prompted by the two papers the project was pointed at (see
 `docs/PAPER_CONNECTIONS.md`, which records **up front that neither PDF could be
 opened from this environment** and that nothing mathematical is quoted from
 them). New code: `src/hierarchy.py`, `src/spectral.py`, `exp_13`, `exp_14`,
-33 new tests (suite now 83).
+51 new tests (suite now 101).
 
 ### The speciation ladder (exp_13 `spectra`, `cascade`)
 
@@ -630,10 +630,17 @@ agreement curve, and the integrator contributes the ±10% above. The 1.265 vs
 0.940 gap is far outside both; the +1.7% agreement of the bimodal correlation
 crossing is *inside* them and should not be read as better than the −9.2%.
 
-### Hierarchical filtering: the advantage does not shrink with correlation range (exp_13 `filtering`)
+### Block-independent truncation — NOT the paper's filtering (exp_13 `block_independent`)
 
-Truncating the tree at level `k` leaves correlations only inside blocks of `2^k`
-leaves, so the correlation range sweeps at fixed sequence length (16), fixed
+⚠️ **Reading arXiv:2408.15138 in full showed this part implements a different
+construction from the paper's.** Their filtering draws the depth-`k` nodes
+conditionally independently *given the root*, so blocks stay correlated through
+it; this sweep makes the blocks outright independent. The correct construction
+is now `GaussianTree(filter_level=k)` and the experiment built on it is
+`exp_15`. What follows is still a valid measurement of a harsher truncation,
+under its corrected name.
+
+Making blocks independent at level `k`, at fixed sequence length (16), fixed
 data budget (256 sequences), fixed network and fixed training budget:
 
 | k | block | ρ̂ | EM-BP abs err | network abs err | advantage |
@@ -659,6 +666,47 @@ the sequence count — not done. What the table does support without qualificati
 is the negative: **the advantage does not shrink as correlations reach further**,
 which is what one would have guessed if the network's locality were the
 binding constraint.
+
+### The network implements the oracle matched to its training data (exp_15)
+
+The measurement the transformer paper actually uses, transplanted: train a
+denoiser on data filtered at `k_train`, test it on *unfiltered* data, and ask
+which member of the exact-oracle family `BP_k` its posterior mean is closest to.
+
+| `k_train` | argmin `k` at t = 0.1 / 0.2 / 0.4 / 0.8 | margin over runner-up |
+|---|---|---|
+| 0 | 0 / 0 / 0 / 0 | — |
+| 1 | 0 / 0 / 0 / 0 | *exactly degenerate, see below* |
+| 2 | **2 / 2 / 2 / 2** | +1.8 / +4.1 / +4.3 / +1.6 % |
+| 3 | **3 / 3 / 3 / 3** | +17.8 / +29.0 / +24.3 / +5.9 % |
+| 4 | **4 / 4 / 4 / 4** | +63.3 / +60.4 / +35.3 / +6.2 % |
+
+**16 of 16 cells** pick the oracle matched to the training distribution rather
+than the one matched to the test data, and the margin grows with `k_train`.
+
+Two exclusions, both explained:
+
+- **`k_train = 1` is exactly degenerate with `k_train = 0` in a Gaussian tree** —
+  `dist_k0` and `dist_k1` agree to five decimals (gap 0.00%). This is a genuine
+  limitation of the Gaussian analogue: the paper's transition *tensor* can
+  correlate the two children given the parent, while a linear-Gaussian edge
+  cannot, so siblings are conditionally independent by construction and
+  filtering at `k = 1` changes nothing. **The one case where their filtering
+  alters probabilities without altering topology is unrepresentable here.**
+- **`t = 1.6` is excluded** because the network's distance to *every* oracle is
+  ~1.50 against an inter-oracle spread of 0.22 — the argmin is reading network
+  error, not implied correlation range. `oracle_spread` is in every row so this
+  is checkable rather than asserted.
+
+**Sequential acquisition (exp_15 `alignment`): a weak version, not a
+reproduction.** Training on unfiltered data, the argmin moves in the predicted
+direction at two of five noise levels — `2 → 2 → 0` at t = 0.4, `2 → 1 → 1` at
+t = 0.8 — over the first ~1000 gradient steps, then saturates for the remaining
+31 000. Nothing like the paper's staircase. The likely reasons are that the
+Gaussian oracles are far less distinguishable than their discrete ones, that a
+denoising regression loss converges far faster than MLM, and that the
+architecture differs. **This setting is probably too easy to resolve the
+phenomenon** — which is a different statement from the phenomenon being absent.
 
 ### A non-monotonicity that is not a bug (exp_13 `ordering`)
 
@@ -780,8 +828,8 @@ All five are permanent tests, not one-off scripts.
 
 ## 7. Status
 
-**Complete:** theory (14 pp), implementation, **83/83 tests**, cluster support,
-and **all of exp_06 – exp_14**. Every experiment ran to completion and its
+**Complete:** theory (14 pp), implementation, **101/101 tests**, cluster
+support, and **all of exp_06 – exp_15**. Every experiment ran to completion and its
 outputs are committed.
 
 **Established:** the E-step exactness and the `Ξ` compression (Props. 1–2, and

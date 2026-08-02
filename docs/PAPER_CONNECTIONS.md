@@ -327,6 +327,34 @@ as a *rate* property in the tests rather than as a single-budget accuracy claim.
 
 ---
 
+### 3.6 Filtering removes rungs from the speciation ladder
+
+This is where P1's knob and P2's time scale meet in one formula. Under the
+correct filtering (§0), the leaf covariance is block-diagonal-plus-constant: the
+depth-`(L−k)` subtree covariance inside each of the `b^k` blocks, and `ρ^{2L}`
+between them. Its eigenvectors are
+
+1. **within-block contrasts** — the subtree's own non-uniform modes, each
+   multiplicity multiplied by `b^k`;
+2. **between-block contrasts**, constant on each block and summing to zero
+   across blocks, with the single eigenvalue
+
+       Λ_between = S_0^{(L−k)} − b^{L−k} ρ^{2L},   multiplicity b^k − 1;
+
+3. the **uniform mode**, `Λ = S_0^{(L−k)} + (b^k − 1) b^{L−k} ρ^{2L}`.
+
+So **the top `k` rungs merge into one**, and the number of distinct speciation
+times falls from `L + 1` to `L − k + 2`, reaching 2 at `k = L` where the
+covariance is equicorrelated. Measured at `L = 4`: **5, 5, 4, 3, 2** rungs for
+`k = 0…4`.
+
+Two checks fall out of this for free. The analytic spectrum matches `eigh` of
+the dense covariance to **1e-15** at every `(L, k)` tried, and `BP_k` matches a
+dense linear solve to **1e-15**. And `k = 0` and `k = 1` giving the same count
+independently reproduces P1's remark that those two cases share a tree topology
+and differ only in the top transition probabilities — which in the Gaussian
+case means they do not differ at all (§5, result 7).
+
 ## 4. What was built
 
 | Added | Purpose |
@@ -335,7 +363,8 @@ as a *rate* property in the tests rather than as a single-budget accuracy claim.
 | `src/spectral.py` | Speciation time, commitment, chain spectrum and its limit, excess entropy, collapse dataset size |
 | `experiments/exp_13_speciation_cascade.py` | `spectra`, `cascade`, `levels`, `ordering` |
 | `experiments/exp_14_memorization_collapse.py` | `budget`, `collapse`, `time` |
-| `tests/test_hierarchy.py` | 33 tests (suite 50 -> 83) |
+| `experiments/exp_15_bp_oracles.py` | `ladder`, `alignment`, `mismatch` -- the mismatched-oracle probe |
+| `tests/test_hierarchy.py` | 51 tests (suite 50 -> 101) |
 
 ---
 
@@ -446,7 +475,15 @@ generalizing.
 
 ## 6. Untried, in priority order
 
-1. **Read the PDFs** and reconcile notation before citing (see §0).
+1. **Read P2.** P1 is now read in full; the Nature Communications paper is not,
+   and every route to it from this environment is blocked. Nothing here depends
+   on its notation — the derivations are self-contained and independently
+   verified — but a write-up that cites it must use its symbols, and the
+   correspondence has not been checked against the source.
+1b. **Read Sclocchi, Favero and Wyart (arXiv:2402.16991)** before writing
+   anything about hierarchy and diffusion. It is the closest prior work, P1
+   cites it, and an earlier version of this note claimed its territory was
+   empty.
 2. **The nonparametric collapse test.** The obvious objection to result 3 is
    that a two-parameter kernel *cannot* memorize. `exp_14 --set
    include_mdn=True` runs the same comparison with a mixture-density kernel of

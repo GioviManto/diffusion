@@ -84,7 +84,7 @@ architecture. The margin against the CNN nevertheless *widens* with data,
 because EM-BP keeps paying down parametric error while the CNN flattens toward
 an approximation floor.
 
-## Layer 6: hierarchy, speciation, and memorization (exp_13, exp_14)
+## Layer 6: hierarchy, speciation, and memorization (exp_13, exp_14, exp_15)
 
 Layers 1-5 all live on a *chain*, which has exactly one correlation length. The
 two papers this layer follows -- Garnier-Brun/Mezard/Moscato/Saglietti on
@@ -92,8 +92,13 @@ hierarchical filtering (arXiv:2408.15138) and Biroli/Bonnaire/de Bortoli/Mezard
 on dynamical regimes (Nat. Commun. 15, 9957) -- between them supply a data model
 with a *ladder* of length scales and a theory of the time scales a diffusion
 passes through. `docs/PAPER_CONNECTIONS.md` is the study note; **read its section
-0 first**, because neither PDF could be opened from the environment this was
-built in and nothing mathematical here is quoted from them.
+0 first**. The transformer paper has been read in full (via a server-side route
+that reaches arXiv's HTML when direct HTTP is blocked); the Nature
+Communications one has **not**, and nothing mathematical is quoted from it --
+the speciation crossover used here is derived from scratch and checked against
+sampled trajectories. Section 0 also records two things reading the first paper
+corrected: the filtering construction, which is *not* independent blocks, and a
+novelty claim that Sclocchi/Favero/Wyart (PNAS 2025) already occupy.
 
 What this adds:
 
@@ -111,7 +116,14 @@ What this adds:
   trajectories, and the per-site excess entropy `s = -1/2 log(1 - rho^2)` that
   fixes the dataset size below which a memorizing score must collapse.
 
-Two results worth stating here. **A hierarchical prior shows a ladder of
+Filtering, in the paper's sense, acts on the ladder in a computable way: at
+level `k` the top `k` rungs merge into one, so the number of distinct speciation
+times falls from `L+1` to `L-k+2` (measured 5,5,4,3,2 at L=4). And exp_15
+implements the paper's own probe -- comparison against the family of mismatched
+oracles `BP_k`: a denoiser trained on data filtered at `k_train` and tested on
+unfiltered data matches `BP_{k_train}` in 16 of 16 cells.
+
+Two further results worth stating here. **A hierarchical prior shows a ladder of
 speciation transitions, one per level, and the reverse diffusion resolves it
 coarse-to-fine** -- six measured on a depth-5 tree, each within 3.5% of its
 predicted time. And **the AR(1) chain that Layers 1-5 study has no such ladder**:
@@ -125,10 +137,10 @@ image-like data, and is recorded rather than glossed.
                   scores, Markov approximations, numpy MLP, reverse samplers,
                   EM + parameterized kernels + denoiser comparison,
                   tree priors + tree BP + tree EM, speciation/collapse scales)
-    experiments/  exp_01 ... exp_14, all with --quick smoke mode
+    experiments/  exp_01 ... exp_15, all with --quick smoke mode
     outputs/      CSV + JSON + PNG per experiment (committed results)
     notebooks/    executed analysis notebooks 01-04
-    tests/        pytest suite (83 tests)
+    tests/        pytest suite (101 tests)
     report/       updated_report.tex / .pdf   (Layers 1-4)
                   em_bp_learning.tex / .pdf   (Layer 5 theory)
     audit/        Layer-1 audit note
