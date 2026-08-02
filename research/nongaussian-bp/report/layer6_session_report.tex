@@ -1,0 +1,942 @@
+\documentclass[11pt]{article}
+
+\usepackage[margin=1in]{geometry}
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage{lmodern}
+\usepackage{amsmath,amssymb,amsthm,bm,mathtools}
+\usepackage{booktabs}
+\usepackage{graphicx}
+\usepackage{caption}
+\usepackage{xcolor}
+\usepackage{hyperref}
+\usepackage{enumitem}
+\usepackage{float}
+
+\hypersetup{colorlinks=true, linkcolor=blue!60!black, citecolor=blue!60!black,
+            urlcolor=blue!60!black}
+
+\newtheorem{proposition}{Proposition}
+\theoremstyle{remark}
+\newtheorem{remark}{Remark}
+
+\newcommand{\R}{\mathbb{R}}
+\newcommand{\E}{\mathbb{E}}
+\newcommand{\Var}{\operatorname{Var}}
+\newcommand{\Cov}{\operatorname{Cov}}
+\newcommand{\Xis}{\Xi}
+\newcommand{\code}[1]{\texttt{\small #1}}
+
+\title{\textbf{Layer 6: hierarchical priors, speciation, and memorization}\\[2mm]
+\large A session report on belief propagation for diffusion scores}
+\author{Session record --- branch \code{claude/em-bp-denoiser-learning-e07ike}}
+\date{2 August 2026}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+\noindent
+This report documents one working session on the \code{GioviManto/diffusion}
+project. The session was directed by a single instruction: study two papers and
+take inspiration from them. Both turned out to be by the project's advisors.
+The work that followed built a hierarchical (tree) prior with exact belief
+propagation and exact EM on it, derived the two diffusion time scales in closed
+form for that prior, and ran five experiments against them. It also produced two
+corrections to my own earlier claims, one of them substantive, and one negative
+result. Everything is on the feature branch; \code{main} is untouched. The test
+suite went from 50 to 101 tests, all passing.
+\end{abstract}
+
+\tableofcontents
+
+\section{Scope, and how to read this}
+
+\subsection{What the session was asked to do}
+
+The instruction was to study
+\begin{itemize}[nosep]
+  \item \textbf{P1} --- Garnier-Brun, M\'ezard, Moscato, Saglietti, \emph{How
+    transformers learn structured data: insights from hierarchical filtering},
+    arXiv:2408.15138; ICML 2025 (PMLR 267:18831--18847);
+  \item \textbf{P2} --- Biroli, Bonnaire, de Bortoli, M\'ezard, \emph{Dynamical
+    regimes of diffusion models}, Nature Communications \textbf{15}, 9957
+    (2024); arXiv:2402.18491,
+\end{itemize}
+and continue the research. Marc M\'ezard is an author of both; J\'er\^ome
+Garnier-Brun of the first.
+
+\subsection{Provenance of the source material --- read this before citing}
+
+This matters enough to state before any result.
+
+\paragraph{P1 has been read in full.} Direct HTTP is blocked at this
+environment's gateway: \code{arxiv.org}, \code{www.nature.com}, PMC, HAL and
+PMLR all return \code{403} on \code{CONNECT}, from both the fetch tool and
+\code{curl}. However the Hugging Face Hub exposes
+\code{hf://papers/2408.15138/paper.md} through a server-side route, which
+returns the complete \LaTeX ML rendering of the paper including all appendices.
+Every statement about P1 in this report is from that source.
+
+\paragraph{P2 has \emph{not} been read.} It is not available on that route and
+every direct route is blocked. What is said about P2 here comes from web search
+--- abstract-level statements about the two cross-overs and the entropic
+criterion --- and \textbf{nothing mathematical is quoted from it}. The
+speciation criterion used throughout is derived from scratch in
+Section~\ref{sec:speciation} in this package's own conventions and checked
+against sampled trajectories. One search summary rendered the condition with a
+reciprocal, $t_S = \tfrac12\log(1/\Lambda)$, contradicting its own statement
+that $t_S$ diverges with dimension; deriving it independently avoided importing
+that slip. \textbf{P2 should be read before it is cited.}
+
+\paragraph{A third paper matters and was not in the original list.}
+Sclocchi, Favero and Wyart, \emph{A phase transition in diffusion models reveals
+the hierarchical nature of data}, PNAS \textbf{122}(1) e2408799121 (2025),
+arXiv:2402.16991 --- \emph{cited by P1} --- studies diffusion on hierarchically
+generated data directly. It is the closest prior work to Section~\ref{sec:cascade}
+and is discussed in Section~\ref{sec:novelty}. It has not been read in full
+either; the account here is from search.
+
+\subsection{Structure}
+
+Section~\ref{sec:p1} summarises P1 as read. Section~\ref{sec:machinery}
+describes the new code. Section~\ref{sec:theory} gives the derivations, all of
+which are verified numerically. Section~\ref{sec:results} reports the
+experiments. Section~\ref{sec:corrections} records what I got wrong and what
+came out negative. Section~\ref{sec:limits} states the limitations and what
+should happen next.
+
+\section{P1, as read}
+\label{sec:p1}
+
+\subsection{The data model}
+
+A root symbol $x_0$ is drawn from a vocabulary of size $q$. A transition
+\emph{tensor} $\bm M \in \R_+^{q\times q\times q}$, with
+$M_{abc} = P(\text{children } (b,c) \mid \text{parent } a)$ and
+$\sum_{bc} M_{abc} = 1$, is applied for $\ell$ generations down a binary tree,
+producing $2^\ell$ leaves. Entries are log-normally sampled and
+\emph{non-overlapping}: if $M_{abc}>0$ then $M_{a'bc}=0$ for all $a'\neq a$. The
+production rules are therefore unambiguous, and at full hierarchy the whole
+tree including the root is deterministically recoverable from the leaves. The
+authors describe it as a simplified probabilistic context-free grammar with a
+fixed parse tree, and relate it to the Random Hierarchy Model of Cagnetta et
+al.\ (uniform rates, layer-dependent rules); the differences are log-normal
+versus uniform rates and a single tensor reused at every level.
+
+\subsection{Hierarchical filtering}
+\label{sec:filtering-def}
+
+This is P1's central device and the part I originally implemented incorrectly
+(Section~\ref{sec:correction-filtering}). At filter level $k$, the $2^k$ nodes
+at depth $k$ are drawn \textbf{conditionally independently given the root},
+each with the marginal the unfiltered model assigns it:
+\begin{equation}
+  P(x_j = b \mid x_0 = a)
+  \;=\;
+  \bigl(\bm p_0\, \bm M^{\sigma_0(j)} \bm M^{\sigma_1(j)} \cdots
+        \bm M^{\sigma_{k-1}(j)}\bigr)_{ab},
+\end{equation}
+tracing the tensor along the unique root-to-$j$ path, with
+$\sigma_m(j)\in\{L,R\}$ recording the branchings and $\bm M^{L},\bm M^{R}$ the
+two marginalisations of $\bm M$. Levels $1,\dots,k-1$ are skipped. Below level
+$k$ the ordinary process resumes.
+
+The consequences are worth spelling out because they are exactly what makes
+filtering a clean experimental knob:
+\begin{itemize}[nosep]
+  \item correlations survive inside blocks of $2^{\ell-k}$ leaves;
+  \item blocks remain correlated \textbf{through the root} --- they are not
+    independent;
+  \item all marginals are preserved at every $k$;
+  \item at $k=\ell$ the leaves are conditionally i.i.d.\ given the root, and P1
+    notes that a Naive Bayes classifier is then optimal and every attention
+    layer superfluous.
+\end{itemize}
+
+\subsection{Inference and what it is used for}
+
+The graph is a tree at every $k$, so BP is exact and linear-time, converging in
+$2(\ell-k+1)$ steps. This gives a \emph{family} of exact algorithms
+$\mathrm{BP}_k$, and running $\mathrm{BP}_k$ on data generated at a different
+filtering level is a well-defined \emph{mismatched oracle}. That family is P1's
+measuring instrument, and adopting it is the main methodological import of this
+session (Section~\ref{sec:exp15}).
+
+\subsection{Findings}
+
+\begin{enumerate}[nosep]
+  \item Transformers match $\mathrm{BP}_{k_{\mathrm{train}}}$'s accuracy
+    \emph{and its calibrated probabilities}, in-sample and out-of-sample,
+    including where that oracle is not optimal --- evidence they implement the
+    algorithm rather than merely scoring well.
+  \item \textbf{Sequential acquisition.} During training the predictions align
+    first with $\mathrm{BP}_\ell$ (leaf-to-root correlations only) and then with
+    \emph{decreasing} $k$: a clean staircase, shortest-range correlations first.
+  \item Attention maps develop blocks of size $\sim 2^{\ell-k}$, organised
+    hierarchically across layers; layer-wise probes recover ancestors up to the
+    depth of the probed layer.
+  \item Appendix F gives an explicit construction embedding BP in $\ell$
+    transformer layers, using $\mathcal O(q^2)$ memory slots per token to fold
+    the downward pass into the upward one.
+  \item MLM pre-training sharply reduces the labelled data needed for root
+    classification.
+\end{enumerate}
+
+\subsection{P2, as far as search reports it}
+
+The backward dynamics passes through two cross-overs. \emph{Speciation}, where
+the coarse structure of the sample is decided by a symmetry-breaking mechanism,
+with a time scale set by the top eigenvalue of the data covariance --- diverging
+logarithmically when that eigenvalue grows with dimension. \emph{Collapse},
+where trajectories are captured by a single training point through a mechanism
+analogous to glassy condensation, with a time scale set by an excess entropy,
+and the consequence that memorization is avoidable at finite times only if the
+dataset is exponentially large in the dimension. The collapse statement is about
+the \emph{empirical score}: the exact score of the measure placing mass $1/N$ on
+each training point.
+
+\section{What was built}
+\label{sec:machinery}
+
+Two new modules, three new experiments, 51 new tests. Everything is pure
+\code{numpy}; no autodiff anywhere, consistent with the rest of the package.
+
+\subsection{\code{src/hierarchy.py}}
+
+\paragraph{The prior.} \code{GaussianTree(depth, branching, rho,
+root\_separation, filter\_level)} is the continuous analogue of P1's model:
+\begin{equation}
+  z_{\text{root}} \sim \mathcal N(0,1), \qquad
+  z_{\text{child}} = \rho\, z_{\text{parent}} + \sqrt{1-\rho^2}\;\varepsilon,
+\end{equation}
+with the leaves observed and internal nodes latent. Every node has unit marginal
+variance, matching the normalisation the chain priors use, so tree and chain
+families are directly comparable at a fixed noise schedule. For Gaussian
+innovations the leaf covariance is ultrametric,
+\begin{equation}
+  \Cov(\text{leaf}_i,\text{leaf}_j) \;=\; \rho^{\,2(L - d_{ij})},
+\end{equation}
+where $d_{ij}$ is the depth of the lowest common ancestor.
+
+\paragraph{Exact BP, twice.}
+\begin{itemize}[nosep]
+  \item \code{tree\_bp\_gaussian} --- information form $(h,\lambda)$, exact,
+    $\mathcal O(n)$. Upward and downward updates touch only those two numbers
+    per message, with nowhere for a projection step to hide. This is deliberate:
+    the audit that preceded this work found the previous Gaussian BP was doing
+    ``something strange'' instead of updating mean and variance.
+  \item \code{tree\_bp\_grid} --- grid messages, valid for \emph{any} innovation
+    law, using the same two primitives as the chain ($\bm K^\top f$ upward,
+    $\bm K g$ downward) and the same \code{K[out, in]} convention. The
+    leave-one-out sibling product is computed by prefix/suffix scans rather than
+    by dividing out a message, since message entries are legitimately
+    $\sim 10^{-16}$ in the tails.
+\end{itemize}
+
+\paragraph{EM on a tree.} \code{tree\_e\_step} produces the \textbf{same
+$\Xis$ matrix} as the chain E-step: $\Xis[k,j]$ is the posterior mass on the
+transition $u_j \to u_k$ summed over all tree edges. That is where the topology
+stops being visible, so \emph{every} kernel in \code{src/kernels.py} consumes it
+unmodified --- a chain-trained M-step and a tree-trained M-step are literally the
+same code. The one genuinely new piece of bookkeeping is the evidence: messages
+are renormalised at every node for numerical range, so $\log p(x)$ is recovered
+by accumulating the discarded log-scales. That is what keeps the
+monotone-ascent check available on trees.
+
+\paragraph{Filtering.} \code{filter\_level=k} implements
+Section~\ref{sec:filtering-def} faithfully; \code{filtered\_tree\_bp\_gaussian}
+is the corresponding $\mathrm{BP}_k$.
+
+\paragraph{A bimodal root.} \code{root\_separation}~$=\mu$ makes the root a
+symmetric two-component mixture $\tfrac12\mathcal N(-\mu,1-\mu^2) +
+\tfrac12\mathcal N(+\mu,1-\mu^2)$. Because this keeps unit variance, the leaf
+covariance --- and therefore \emph{every eigenvalue and every predicted time} ---
+is bit-identical to the Gaussian-root tree. Only the modality changes.
+\code{tree\_root\_belief} returns the exact posterior of the root, which for a
+two-component prior \emph{is} the class posterior.
+
+\subsection{\code{src/spectral.py}}
+
+The two time scales, in closed form and in this package's conventions:
+the speciation crossover \code{speciation\_time}, the measurable
+\code{commitment}, the AR(1) spectrum and its limit, the per-site excess entropy
+and the collapse dataset size.
+
+\subsection{Experiments}
+
+\begin{center}\small
+\begin{tabular}{@{}lll@{}}
+\toprule
+File & Parts & Subject \\
+\midrule
+\code{exp\_13\_speciation\_cascade.py} &
+  \code{spectra}, \code{cascade}, \code{levels}, &
+  the ladder, and what learns it \\
+ & \code{ordering}, \code{block\_independent}, & \\
+ & \code{speciation} & \\
+\code{exp\_14\_memorization\_collapse.py} &
+  \code{budget}, \code{collapse}, \code{time} &
+  memorization and its time scale \\
+\code{exp\_15\_bp\_oracles.py} &
+  \code{ladder}, \code{alignment}, \code{mismatch} &
+  the mismatched-oracle probe \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\subsection{Validation}
+
+Every load-bearing object is computed twice, by independent routes:
+
+\begin{center}
+\begin{tabular}{@{}lll@{}}
+\toprule
+Quantity & Checked against & Agreement \\
+\midrule
+Analytic ultrametric spectrum & \code{eigh} of the dense covariance & $10^{-15}$ \\
+Information-form tree BP & dense linear solve & $10^{-10}$ \\
+Grid tree BP & information form & $2\times 10^{-6}$ \\
+Filtered BP ($\mathrm{BP}_k$) & dense linear solve & $10^{-15}$ \\
+Tree E-step evidence & closed-form Gaussian likelihood & rel.\ $10^{-6}$ \\
+Root belief & dense linear solve & $10^{-5}$ \\
+\code{commitment}$(t,\Lambda)$ & 40\,000 sampled trajectories & $<0.02$ \\
+$\Xis$ mass & edge count & exact \\
+EM monotonicity & --- & violation $=0$ \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\section{Derivations}
+\label{sec:theory}
+
+\subsection{The speciation crossover}
+\label{sec:speciation}
+
+Along an eigendirection of the clean covariance with eigenvalue $\Lambda$, the
+variance-preserving forward process splits into signal and noise:
+\begin{equation}
+  \Var\bigl(\langle v, x_t\rangle\bigr) = \alpha_t^2\Lambda + \Delta_t,
+  \qquad \alpha_t^2 = e^{-2t},\quad \Delta_t = 1-e^{-2t}.
+\end{equation}
+The mode is decided while signal dominates and undecided once noise does, so the
+crossover sits at $\alpha_t^2\Lambda = \Delta_t$:
+\begin{equation}
+  \boxed{\;t_S(\Lambda) = \tfrac12\log(1+\Lambda)\;}
+\end{equation}
+which reduces to the familiar $\tfrac12\log\Lambda$ for large $\Lambda$. The
+measurable form is the correlation between the projection at time $t$ and at
+time $0$,
+\begin{equation}
+  \mathrm{commitment}(t,\Lambda)
+  = \frac{\alpha_t\sqrt{\Lambda}}{\sqrt{\alpha_t^2\Lambda + \Delta_t}},
+\end{equation}
+which passes through $1/\sqrt2$ exactly at $t_S$. Verified analytically and
+against 40\,000 sampled forward trajectories (agreement $<0.02$).
+
+\begin{remark}[A distinction not to blur]
+In P2, speciation is a \emph{symmetry breaking} and needs a multimodal
+distribution to have something to choose between. A Gaussian prior has no class
+to speciate into, so what \code{commitment} locates is an \emph{information
+crossover} sharing the same criterion. Section~\ref{sec:symmetry} closes that
+gap by making only the root bimodal, with the covariance held bit-identical.
+\end{remark}
+
+\subsection{The chain has a bounded spectrum; the tree does not}
+
+For a stationary AR(1) chain with $\Cov = \rho^{|i-j|}$, the spectrum is bounded
+at every length by the spectral density at zero frequency:
+\begin{equation}
+  \Lambda_{\max} \;\longrightarrow\; \frac{1+\rho}{1-\rho}.
+\end{equation}
+So $t_S$ \emph{saturates}. This is not a technicality: it says the chain family
+studied in Layers 1--5 sits outside the regime P2 describes for image data,
+where $\Lambda$ grows with dimension and $t_S$ diverges logarithmically.
+
+For the balanced tree, writing $S_d$ for the sum of covariances over a depth-$d$
+subtree,
+\begin{equation}
+  S_d = 1 + (b-1)\sum_{m=1}^{L-d} b^{m-1}\rho^{2m},
+  \qquad
+  \Lambda_d = S_{d+1} - b^{L-d-1}\rho^{2(L-d)},
+\end{equation}
+the latter with multiplicity $(b-1)b^{d}$, plus the uniform mode at $S_0$.
+Exactly $L+1$ distinct eigenvalues, hence $L+1$ speciation times. When
+$b\rho^2>1$ the top eigenvalue grows geometrically in depth, i.e.\
+logarithmically in dimension.
+
+\subsection{Filtering removes rungs from the ladder}
+\label{sec:ladder-collapse}
+
+This is where P1's knob and P2's time scale meet in one formula. Under the
+correct filtering the leaf covariance is block-diagonal-plus-constant: the
+depth-$(L-k)$ subtree covariance inside each of the $b^k$ blocks, and
+$\rho^{2L}$ between them. Its eigenvectors are
+\begin{enumerate}[nosep,label=(\roman*)]
+  \item within-block contrasts --- the subtree's own non-uniform modes, each
+    multiplicity multiplied by $b^k$;
+  \item between-block contrasts, constant on each block and summing to zero
+    across blocks, with the single eigenvalue
+    $\Lambda_{\text{between}} = S_0^{(L-k)} - b^{L-k}\rho^{2L}$ and multiplicity
+    $b^k-1$;
+  \item the uniform mode,
+    $S_0^{(L-k)} + (b^k-1)b^{L-k}\rho^{2L}$.
+\end{enumerate}
+So the top $k$ rungs \textbf{merge into one}, and the number of distinct
+speciation times falls from $L+1$ to $L-k+2$, reaching 2 at $k=L$ where the
+covariance is equicorrelated. Measured rung counts confirm this exactly
+(Section~\ref{sec:exp15}).
+
+\subsection{A closed-form collapse criterion}
+
+For a Gaussian AR(1) chain the differential entropy is exactly extensive, so the
+per-site excess entropy relative to the terminal measure $\mathcal N(0,1)$ is
+\begin{equation}
+  s = -\tfrac12\log(1-\rho^2),
+\end{equation}
+exactly, with no fitting, and the dataset size below which memorization is
+forced is $e^{ns}$. At $\rho = 0.85$ that is $0.641$ nats per site. At finite
+$t$ the noised law is $\mathcal N(0,\alpha_t^2 C + \Delta_t I)$, so
+\begin{equation}
+  s(t) = -\frac{1}{2n}\log\det\bigl(\alpha_t^2 C + \Delta_t I\bigr),
+\end{equation}
+and $n\,s(t_C) = \log N$ gives a \textbf{predicted collapse time with no fitted
+constants}.
+
+\section{Results}
+\label{sec:results}
+
+\subsection{The speciation ladder, measured}
+\label{sec:cascade}
+
+Depth-5 binary tree, $\rho = 0.9$, 32 leaves. Predicted $t_S$ against the
+measured crossing of the commitment curve through $1/\sqrt2$, along the forward
+process and along the reverse SDE driven by the exact tree-BP score:
+
+\begin{center}
+\begin{tabular}{@{}lrrrr@{}}
+\toprule
+Level & $\Lambda$ & $t_S$ predicted & forward & reverse SDE \\
+\midrule
+$-1$ (whole tree) & 14.271 & 1.363 & 1.368 & 1.336 \\
+0 & 3.113 & 0.707 & 0.732 & 0.725 \\
+1 & 1.804 & 0.516 & 0.521 & 0.520 \\
+2 & 0.996 & 0.346 & 0.340 & 0.358 \\
+3 & 0.498 & 0.202 & 0.208 & 0.222 \\
+4 (sibling leaves) & 0.190 & 0.087 & 0.087 & 0.125 \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+Six distinct transitions spanning $15.7\times$ in time \emph{within one
+dataset}. Pearson $r = 0.9998$ for both columns; forward crossings agree to
+$\leq 3.5\%$ at every level. The reverse column's deviations are
+$-2, +3, +1, +4, +10, +43$ percent from coarsest to finest --- the monotone
+growth toward the fine end identifies this as integrator error rather than a
+failure of the prediction, since the finest level speciates at $t=0.087$, within
+a factor of four of the sampler's $t_{\min} = 0.02$. Four of six levels agree to
+$\leq 4\%$.
+
+\paragraph{The chain has no ladder.} Same analysis on the AR(1) chain:
+
+\begin{center}
+\begin{tabular}{@{}lrrr@{}}
+\toprule
+$\rho$ & top eigenvalue, $n = 8 \to 512$ & limit & $t_S$ saturates at \\
+\midrule
+0.50 & $2.57 \to 3.00$ & 3.00 & 0.693 \\
+0.85 & $5.49 \to 12.32$ & 12.33 & 1.295 \\
+0.95 & $7.03 \to 38.52$ & 39.00 & 1.844 \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+Sixty-four times the length moves the top mode by under $2\times$. A tree at
+$\rho=0.9$ instead runs $3.12 \to 23.31$ over depths 2--6, its levels spanning
+$t_S \in [0.087, 1.595]$. \textbf{This bounds how far Layers 1--5 generalise
+toward image-like data}, and is the least comfortable finding of the session.
+
+\subsection{Genuine symmetry breaking}
+\label{sec:symmetry}
+
+Depth-4 tree, $\rho=0.9$, $\mu=0.9$, 256 paths, $t_S$ predicted $1.136$. The
+order parameter is the exact class posterior $P(\text{root}>0 \mid x_t)$, which
+BP returns from the upward pass alone; using the sign of the tree-mean instead
+would conflate the class with the within-class fluctuation.
+
+\begin{center}
+\begin{tabular}{@{}lrrr@{}}
+\toprule
+Root & correlation crossing & class-choice time & final magnetization \\
+\midrule
+two-component & 1.155 ($+1.7\%$) & \textbf{1.265} & 0.828 \\
+Gaussian & 1.031 ($-9.2\%$) & 0.940 & 0.647 \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+Two readings. First, the covariance-set crossing is where it should be for both
+roots --- $1.155$ and $1.031$ bracket the predicted $1.136$, within the $\pm10\%$
+the integrator costs at this resolution. \textbf{Adding modality does not move
+it}, which is the control working. Second, the class choice for the
+two-component root happens at $t=1.265$, \emph{earlier in the generation} than
+the information crossover at $1.136$, and 35\% earlier than the corresponding
+time for the Gaussian root: two well-separated classes can be told apart while
+noise still swamps the within-class detail.
+
+\begin{remark}[Precision, stated against my own result]
+With 256 paths the binomial standard error on the agreement curve is $0.031$,
+and the integrator contributes the $\pm10\%$ above. The $1.265$ versus $0.940$
+gap is far outside both; the $+1.7\%$ agreement of the bimodal correlation
+crossing is \emph{inside} them and must not be read as better than the $-9.2\%$.
+\end{remark}
+
+\subsection{Where each method's error lives in the hierarchy}
+\label{sec:levels}
+
+Depth-4 tree, $\rho = 0.9$, $N = 256$ trees, both network parameterizations
+trained. EM recovered $\hat\rho = 0.9161$ (true $0.9$) and $\hat q = 0.1773$
+(true $0.19$) in 150 iterations with monotonicity violation exactly 0.
+
+\begin{center}
+\begin{tabular}{@{}lrrr@{}}
+\toprule
+$t$ & EM-BP & best network & ratio \\
+\midrule
+0.1 & 0.0098 & 0.1852 ($\varepsilon$) & 18.9$\times$ \\
+0.2 & 0.0125 & 0.2245 ($\varepsilon$) & 18.0$\times$ \\
+0.4 & 0.0167 & 0.2489 ($x_0$) & 14.9$\times$ \\
+0.8 & 0.0334 & 0.2587 ($x_0$) & 7.8$\times$ \\
+1.6 & 0.0815 & 0.3332 ($x_0$) & 4.1$\times$ \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+Grid tree BP given the true kernel scores $0.0000$ at every $t$, which is the
+validation the rest of the part rests on.
+
+More interesting is \emph{where} the error sits. The right null is a method
+whose per-mode error is uniform, which would put a share of the total squared
+error on each level proportional to its multiplicity ($1,1,2,4,8$ out of 16
+here). Dividing the measured share by that null gives a concentration ratio,
+whose spread across levels says how much a method's error knows about the
+hierarchy:
+
+\begin{center}
+\begin{tabular}{@{}lr@{}}
+\toprule
+Method & spread of concentration ratio (min $\to$ max over $t$) \\
+\midrule
+network, $\varepsilon$-prediction & $\mathbf{1.6\times} - \mathbf{2.2\times}$ \\
+network, $x_0$-prediction & $2.8\times - 12.6\times$ \\
+EM-BP & $\mathbf{224\times} - \mathbf{6957\times}$ \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\textbf{The $\varepsilon$-network distributes its error uniformly over the
+hierarchy at every noise level, as if the levels did not exist.} EM-BP's error
+is concentrated by two to four orders of magnitude, and it \emph{migrates}: at
+$t=0.1$ it sits on the finest levels, and by $t=1.6$ all of it is on the single
+coarsest mode --- at large $t$ only the top mode survives the noise, so the
+kernel misestimate has nowhere else to appear. The $x_0$-network is genuinely
+intermediate, and is reported as such because it is the better parameterization
+at large $t$.
+
+\subsection{Memorization: the axis a BP score does not have}
+
+The collapse mechanism is a statement about the \emph{empirical} score, whose
+sufficient statistic is the training set itself: $N\times n$ numbers, growing in
+both dataset size and dimension. A BP score's sufficient statistic is the fitted
+kernel --- two numbers for a Gaussian AR(1) --- reached only through $\Xis$,
+which is an average, and \emph{independent of $n$}. So the prediction is not
+that BP memorizes less but that \textbf{the axis does not exist for it}.
+
+Measured as nearest-training-chain distance of generated samples divided by the
+same quantity for a fresh draw from the true prior ($1.0$ = no memorization,
+$0$ = full collapse), $\rho = 0.85$:
+
+\begin{center}
+\begin{tabular}{@{}rrrrrrr@{}}
+\toprule
+$n$ & $N$ & wall $e^{ns}$ & empirical & DSM ($\varepsilon$) & EM-BP & true-prior BP \\
+\midrule
+8 & 64 & 88.8 & \textbf{0.457} & 0.800 & 1.079 & 1.076 \\
+8 & 256 & 88.8 & \textbf{0.540} & 0.929 & 1.058 & 1.044 \\
+8 & 1024 & 88.8 & \textbf{0.660} & 0.980 & 1.015 & 1.012 \\
+16 & 64 & $1.5\times10^4$ & \textbf{0.332} & 0.751 & 0.972 & 0.992 \\
+16 & 256 & $1.5\times10^4$ & \textbf{0.387} & 0.906 & 1.040 & 1.026 \\
+16 & 1024 & $1.5\times10^4$ & \textbf{0.456} & 1.066 & 1.066 & 1.072 \\
+32 & 64 & $4.3\times10^8$ & \textbf{0.268} & 0.790 & 1.021 & 1.024 \\
+32 & 256 & $4.3\times10^8$ & \textbf{0.308} & 1.053 & 1.039 & 1.024 \\
+32 & 1024 & $4.3\times10^8$ & \textbf{0.335} & 1.115 & 1.023 & 1.025 \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+Both dependences come out in the predicted direction. At fixed $N$ the empirical
+score memorizes \emph{more} as the chain gets longer ($0.457 \to 0.332 \to
+0.268$ at $N=64$) --- the curse of dimensionality; at fixed $n$ it recovers as
+$N$ grows. \textbf{EM-BP stays in $[0.97, 1.08]$ in every one of the nine
+cells}, agreeing with the true-prior reference to $\leq 0.03$: its behaviour
+does not depend on $n$ or $N$ at all.
+
+\begin{remark}[The DSM column must be read with its standard deviation]
+At $n=32$ the network's sample standard deviation is $1.19$--$1.27$, i.e.\
+over-dispersed by 19--27\%, so its ratios above 1 there are inflated by
+generating too broadly rather than by generalizing better. At $n=8$ and 16,
+where its dispersion is closer to correct, its ratios sit below BP's. This is
+why \code{sample\_std} and \code{lag1\_corr} are logged in every row.
+\end{remark}
+
+\paragraph{This is the mechanism behind Layer 5's headline.} The
+$\geq 64\times$ data advantage and the $N^{-1/2}$ rate had been reported as
+empirical facts. This is why they hold.
+
+\subsection{The collapse time, predicted}
+
+The criterion $n\,s(t_C) = \log N$, with no fitted constants, was tested over
+\[
+  n \in \{8,\,16,\,32\}
+  \quad\times\quad
+  N \in \{32,\,128,\,512,\,2048\}.
+\]
+\begin{itemize}[nosep]
+  \item \textbf{Pearson $r = +0.990$} over the 9 settings where a finite-time
+    collapse is predicted ($+0.995$ against the same measurement made on fresh
+    rather than training chains).
+  \item The relation is \textbf{affine, not proportional}:
+    $\text{measured} = 1.716\times\text{predicted} + 0.276$, residual
+    s.d.\ $0.029$. Forcing it through the origin gives residual s.d.\ $0.131$,
+    $4.5\times$ worse.
+  \item Independently, $\mathrm{d}t_C/\mathrm{d}\log N$ is $-0.039$ predicted
+    versus $-0.061$ measured at $n=16$, and $-0.051$ versus $-0.079$ at $n=32$
+    --- \emph{the same $1.55\times$ slope factor at both chain lengths}.
+\end{itemize}
+
+The criterion gets the ordering, both dependences, and the $N$-scaling to within
+a constant factor; it does not get the absolute time. That is what should be
+expected of a leading-order statement combined with an arbitrary ``half of
+$\log N$'' landmark, and the offset is reported rather than absorbed into a
+fitted constant.
+
+\paragraph{Where it does not apply.} At $n=8$ with $N \geq 128$ the criterion
+returns \emph{no finite-time collapse} (total excess entropy $4.487$ nats
+against $\log 128 = 4.852$), yet collapse is measured at $t = 0.234, 0.170,
+0.122$. There is no contradiction: the criterion is asymptotic in $n$, and a
+finite system always collapses eventually as $t\to0$. Those three rows are
+excluded from the correlation and listed rather than dropped.
+
+\subsection{The mismatched-oracle probe}
+\label{sec:exp15}
+
+This is P1's actual instrument, and adopting it is the main methodological
+result of the session.
+
+\paragraph{The ladder collapses as derived.} Rung counts at $\rho=0.9$:
+
+\begin{center}
+\begin{tabular}{@{}lrrrrrrr@{}}
+\toprule
+& $k=0$ & 1 & 2 & 3 & 4 & 5 & 6 \\
+\midrule
+$L=4$: distinct rungs & 5 & 5 & 4 & 3 & 2 & --- & --- \\
+$L=6$: distinct rungs & 7 & 7 & 6 & 5 & 4 & 3 & 2 \\
+$L=6$: ladder span & 18.3 & 18.3 & 18.1 & 17.8 & 17.5 & 17.3 & 5.5 \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+Exactly $L-k+2$, as derived in Section~\ref{sec:ladder-collapse}. That $k=0$ and
+$k=1$ coincide independently reproduces P1's remark that those two cases share a
+tree topology and differ only in the top transition probabilities.
+
+\paragraph{The network implements the oracle matched to its training data.}
+Train a denoiser on data filtered at $k_{\mathrm{train}}$, test on
+\emph{unfiltered} data, and ask which $\mathrm{BP}_k$ its posterior mean is
+closest to:
+
+\begin{center}
+\begin{tabular}{@{}lcr@{}}
+\toprule
+$k_{\mathrm{train}}$ & $\arg\min_k$ at $t = 0.1 / 0.2 / 0.4 / 0.8$ &
+  margin over runner-up \\
+\midrule
+0 & 0 / 0 / 0 / 0 & --- \\
+1 & 0 / 0 / 0 / 0 & \emph{exactly degenerate} \\
+2 & \textbf{2 / 2 / 2 / 2} & $+1.8 / +4.1 / +4.3 / +1.6\ \%$ \\
+3 & \textbf{3 / 3 / 3 / 3} & $+17.8 / +29.0 / +24.3 / +5.9\ \%$ \\
+4 & \textbf{4 / 4 / 4 / 4} & $+63.3 / +60.4 / +35.3 / +6.2\ \%$ \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\textbf{16 of 16 cells} pick the oracle matched to the \emph{training}
+distribution rather than the one matched to the test data, with the margin
+growing in $k_{\mathrm{train}}$. This is P1's Figure 2 finding, transplanted to
+diffusion. Two exclusions, both explained rather than hand-waved:
+
+\begin{itemize}[nosep]
+  \item \textbf{$k_{\mathrm{train}}=1$ is exactly degenerate with $0$ in a
+    Gaussian tree} --- the distances agree to five decimals, gap $0.00\%$. This
+    is a real limitation of the Gaussian analogue: P1's transition \emph{tensor}
+    can correlate the two children given the parent, whereas a linear-Gaussian
+    edge makes siblings conditionally independent by construction. The one case
+    where their filtering alters probabilities without altering topology is
+    \emph{unrepresentable here}.
+  \item \textbf{At $t=1.6$ the $\arg\min$ stops measuring alignment} --- not
+    because the oracles converge (their spread is still $0.22$) but because the
+    network's distance to \emph{every} oracle is $\sim1.50$, seven times that
+    spread. Every row carries \code{oracle\_spread} so this is checkable.
+\end{itemize}
+
+\subsection{The replicated architecture comparison}
+
+A job pending from before the session completed during it, and it moves a
+headline. Four seeds, oracle over both receptive-field radius and
+parameterization for both networks, mean relative score error over five noise
+levels, $\pm$ standard error over seeds:
+
+\begin{center}
+\begin{tabular}{@{}rrrr@{}}
+\toprule
+$N$ & EM-BP (13 params) & global MLP (25{,}505) & local CNN, oracle $r$ (6{,}081) \\
+\midrule
+128 & $\mathbf{0.0368 \pm 0.0067}$ & $0.3595 \pm 0.0044$ & $0.0774 \pm 0.0024$ \\
+512 & $\mathbf{0.0174 \pm 0.0017}$ & $0.1794 \pm 0.0035$ & $0.0570 \pm 0.0007$ \\
+2048 & $\mathbf{0.0123 \pm 0.0009}$ & $0.1246 \pm 0.0027$ & $0.0505 \pm 0.0015$ \\
+\midrule
+\multicolumn{4}{@{}l}{\emph{Ratio to EM-BP}} \\
+128 & --- & $9.76 \pm 1.79$ & $2.10 \pm 0.39$ \\
+512 & --- & $10.29 \pm 1.02$ & $3.27 \pm 0.32$ \\
+2048 & --- & $10.15 \pm 0.75$ & $\mathbf{4.11 \pm 0.32}$ \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+Two things, one in each direction. The structured architecture really does close
+most of the gap: against the vanilla MLP the margin is $\sim10\times$ and flat
+in $N$; against the locality-respecting CNN it is 2--4$\times$, so roughly 60\%
+of the vanilla deficit was the architecture rather than the estimator.
+\textbf{But the remaining margin grows with data rather than closing} ---
+$2.10 \to 3.27 \to 4.11$, well outside the standard errors --- because EM-BP
+keeps paying down parametric error (a factor 3.0 over $16\times$ data) while the
+CNN flattens toward an approximation floor (a factor 1.5). ``More data will
+close the gap'' is the natural guess and it is wrong here.
+
+This supersedes the single-seed figures previously recorded ($3.3\times$ at
+fixed $r=6$, $2.75\times$ with an oracle over $r$, both at $N=1024$).
+
+\section{Corrections, and what came out negative}
+\label{sec:corrections}
+
+A research record is worth less than nothing if it only contains what worked.
+
+\subsection{I had P1's filtering construction wrong}
+\label{sec:correction-filtering}
+
+Before reading the paper I implemented ``filter at level $k$'' as $b^k$
+\textbf{independent} subtrees. P1 draws the depth-$k$ nodes conditionally
+independently \emph{given the root}, so blocks remain correlated through it at
+$\rho^{2L}$; independent blocks put a zero there instead. The implementation now
+follows the paper, and a test pins the distinction rather than leaving it to a
+comment. The old sweep survives, renamed \code{block\_independent} in code,
+docs and output filenames, because it measures a harsher truncation that is
+still well-defined --- but calling it filtering was a misattribution, not a
+wording problem.
+
+\subsection{I claimed an intersection was empty when it is not}
+\label{sec:novelty}
+
+An earlier version of the study note said the hierarchy-$\times$-diffusion
+intersection was ``untouched by either paper''. Sclocchi, Favero and Wyart (PNAS
+2025), \emph{cited by P1}, study exactly that and find a phase transition at
+which reconstruction of high-level features drops sharply while low-level
+features evolve smoothly. The claim is withdrawn. What the Gaussian setting adds
+is more modest and more useful:
+\begin{enumerate}[nosep]
+  \item the whole ladder is analytic, so measurements are calibration against a
+    known answer rather than discovery;
+  \item filtering acts on the ladder in a computable way
+    (Section~\ref{sec:ladder-collapse});
+  \item their sharp/smooth split is \emph{reproduced} here --- smooth crossovers
+    at every Gaussian level, genuine symmetry breaking only once the root is
+    made bimodal, with the covariance held bit-identical
+    (Section~\ref{sec:symmetry}).
+\end{enumerate}
+
+\subsection{The negative result: no sequential acquisition}
+
+P1's headline dynamical finding does not reproduce here. Training on unfiltered
+data and tracking which $\mathrm{BP}_k$ the denoiser is closest to, the
+$\arg\min$ does move in the predicted direction at two of five noise levels ---
+$2\to2\to0$ at $t=0.4$ and $2\to1\to1$ at $t=0.8$ over the first $\sim$1000
+gradient steps --- and then \textbf{saturates for the remaining 31{,}000}. At
+$t=0.1$, $0.2$ and $1.6$ it never leaves $k=0$. Nothing like their staircase.
+
+Three plausible reasons, none verified: their oracles are far more
+distinguishable (a discrete non-overlapping tensor versus a Gaussian edge --- see
+the $k{=}0$/$k{=}1$ degeneracy); a denoising regression loss converges in far
+fewer steps than MLM, which needs $\sim10^3$ epochs; and the architecture and
+task differ. The honest summary is that \textbf{this setting is probably too easy
+to resolve the phenomenon}, which is a different statement from the phenomenon
+being absent.
+
+The earlier probe (\code{exp\_13 ordering}: resolve the error onto levels and
+watch it move) found nothing at all, and is retained only as a record of a
+measurement that could not have answered the question.
+
+\subsection{A non-monotonicity that is not a bug}
+
+EM's \emph{error against the truth} is non-monotone in iteration count even
+though its log-likelihood is monotone: total relative error $0.0729 \to 0.0083
+\to 0.0162$ at 32/64/128 iterations, with $\hat\rho = 0.8708 \to 0.9068 \to
+0.9158$ against a true $0.9$. Nothing is wrong. EM converges to the
+\emph{maximum likelihood estimate}, which at $N=256$ is $\hat\rho = 0.9161$, not
+to the true parameter; the trajectory merely passes close to $0.9$ on the way.
+Reading the minimum at 64 iterations as ``the right stopping point'' would be
+fitting the answer. The monotonicity violation is exactly 0 throughout, which is
+the quantity that would actually signal a broken M-step.
+
+\subsection{Tree EM converges, but slowly enough to look broken}
+
+$\hat\rho = 0.7360 \to 0.7483 \to 0.7487$ at 50/100/150 iterations (true
+$0.75$), with zero monotonicity violation throughout, and $\hat q = 0.4418$
+against $0.4375$. Internal nodes are never observed, so the missing-information
+fraction is far larger than on a chain and EM's linear rate is correspondingly
+slower. An estimate read at 40 iterations is off by 0.06 and reads exactly like
+a broken M-step. This cost real time to diagnose and is now asserted as a
+\emph{rate} property, at two budgets, in the test suite.
+
+\subsection{A confounded sweep, reported as confounded}
+
+The \code{block\_independent} sweep shows the EM-BP advantage running
+29--99$\times$ and not shrinking as correlations reach further, while the
+network's error is flat in $k$ ($0.414 \to 0.347$). But fixing the number of
+\emph{sequences} does not fix the number of \emph{edges} (16, 24, 28, 30 for
+$k=1\dots4$), so larger $k$ hands EM more data at the same nominal budget. The
+sweep moves two things at once, so the \emph{rising} advantage is not
+attributable to correlation range. Only the negative is safe.
+
+\section{Limitations and what should happen next}
+\label{sec:limits}
+
+\subsection{Limitations}
+
+\begin{enumerate}[nosep]
+  \item \textbf{P2 is unread.} Nothing here depends on its notation, but a
+    write-up that cites it must use its symbols, and that correspondence has not
+    been checked against the source.
+  \item \textbf{The Gaussian tree cannot represent sibling correlation given the
+    parent}, so P1's $k{=}0$ versus $k{=}1$ distinction is unrepresentable. A
+    discrete-tensor tree would be needed.
+  \item \textbf{The chain family is outside P2's regime.} Its top eigenvalue is
+    bounded, so nothing about diverging speciation times transfers from Layers
+    1--5 to image-like data without crossing that gap explicitly.
+  \item \textbf{The collapse result uses a two-parameter kernel.} The obvious
+    objection is that such a kernel \emph{cannot} memorize, so the result is
+    trivial. \code{exp\_14 --set include\_mdn=True} runs the same comparison
+    with a mixture-density kernel of several hundred parameters and the same
+    $n$-independent statistic; it has not been run.
+  \item \textbf{Inference cost remains the honest loss} of the whole programme:
+    grid BP is $\mathcal O(nM^2)$ per evaluation against a few matmuls for a
+    forward pass, and reverse diffusion calls the denoiser at every step.
+\end{enumerate}
+
+\subsection{Next, in priority order}
+
+\begin{enumerate}[nosep]
+  \item Read P2, and read Sclocchi/Favero/Wyart --- the closest prior work,
+    whose territory an earlier version of my notes claimed was empty.
+  \item The nonparametric collapse test (limitation 4), which separates the
+    mechanism from the parameter count.
+  \item A \textbf{discrete-alphabet tree}: closest to P1's actual data model,
+    with exact vector messages and no closure. \code{src/discrete.py} does
+    chains and \code{src/hierarchy.py} does continuous trees; the two have not
+    been crossed. This would also make the $k{=}0$/$k{=}1$ case measurable.
+  \item The speciation cascade under a \emph{learned} score rather than the
+    exact one: which levels of the ladder each method gets right dynamically.
+  \item A non-Gaussian tree. \code{tree\_bp\_grid} and \code{fit\_em\_tree}
+    already support it with no new machinery.
+\end{enumerate}
+
+\section{Reproducibility}
+
+\subsection{Running it}
+
+\begin{verbatim}
+cd research/nongaussian-bp
+../../.venv/bin/python -m pytest tests/ -q      # 101 passed, ~3.3 min
+
+python experiments/exp_13_speciation_cascade.py --list-parts
+python experiments/exp_13_speciation_cascade.py --only cascade
+python experiments/exp_14_memorization_collapse.py --only collapse
+python experiments/exp_15_bp_oracles.py
+\end{verbatim}
+
+Add \code{--quick} to any experiment for a minutes-scale smoke run.
+\code{--set KEY=VALUE} overrides any key printed in \code{params\_*.json};
+unknown keys are rejected, so a typo in a job script fails immediately rather
+than silently running defaults. \code{hpc/slurm\_layer6.sbatch} is an 8-task
+SLURM array covering the parts worth a cluster.
+
+\subsection{Where things are}
+
+\begin{center}
+\begin{tabular}{@{}ll@{}}
+\toprule
+Path & Contents \\
+\midrule
+\code{docs/PAPER\_CONNECTIONS.md} & the study note; \S0 records provenance \\
+\code{docs/EM\_BP\_LEARNING\_COMPENDIUM.md} & all results, \S4.13 is Layer 6 \\
+\code{docs/AGENT\_HANDOFF\_EM\_BP.md} & how to continue safely; 10 traps \\
+\code{questions/QUESTIONS\_AND\_ANSWERS.md} & the question ledger, \S[P] is Layer 6 \\
+\code{research/nongaussian-bp/src/hierarchy.py} & tree prior, tree BP, tree EM \\
+\code{research/nongaussian-bp/src/spectral.py} & the two time scales \\
+\code{research/nongaussian-bp/experiments/exp\_1\{3,4,5\}*.py} & the experiments \\
+\code{research/nongaussian-bp/outputs/} & committed CSV + JSON + PNG \\
+\code{research/nongaussian-bp/tests/test\_hierarchy.py} & 51 tests \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\subsection{Conventions that must not be broken}
+
+Forward process $\mathrm dX = -X\,\mathrm dt + \sqrt2\,\mathrm dW$, so
+$\alpha_t = e^{-t}$ and $\Delta_t = 1-e^{-2t}$. Score identity
+$s(x,t) = -(x-\alpha_t\,\E[a\mid x])/\Delta_t$; every estimator goes through it,
+which is why \code{identity\_residual} appears in every results CSV and must sit
+at machine precision. All randomness flows through \code{src.utils.rng\_for},
+which is reproducible \emph{across processes} --- it previously was not, and no
+experiment in the package was bit-reproducible as a result. $\Xis$ uses
+\code{K[out, in]} and sums to the edge count.
+
+\section*{Summary of the session}
+\addcontentsline{toc}{section}{Summary of the session}
+
+\begin{enumerate}[nosep]
+  \item Identified both papers as the advisors' own; read P1 in full through a
+    server-side route after direct access was blocked.
+  \item Built a hierarchical tree prior with a closed-form ultrametric spectrum,
+    exact BP twice over, exact EM producing the same $\Xis$ as the chain, and
+    the two diffusion time scales in closed form.
+  \item Measured a ladder of six speciation transitions spanning $15.7\times$ in
+    time, each within $3.5\%$ of prediction ($r = 0.9998$).
+  \item Established that the AR(1) chain of Layers 1--5 has no such ladder,
+    bounding how far the project generalises.
+  \item Showed the memorization axis does not exist for a BP score, supplying
+    the \emph{mechanism} behind Layer 5's headline sample-efficiency result.
+  \item Verified a closed-form collapse time at $r = 0.990$, reporting the
+    affine offset rather than absorbing it.
+  \item Showed the $\varepsilon$-network's error is flat across hierarchy levels
+    while EM-BP's is concentrated by 2--4 orders of magnitude.
+  \item Reproduced P1's mismatched-oracle result in diffusion: 16 of 16 cells.
+  \item Corrected two of my own claims --- the filtering construction and a false
+    novelty claim --- and recorded one clean negative and one confound.
+  \item Completed the replicated architecture comparison, which qualifies the
+    Layer-5 headline and then partly un-qualifies it.
+\end{enumerate}
+
+Test suite: 50 $\to$ 101, all passing. \code{main} untouched at \code{cca0018}.
+
+\end{document}
