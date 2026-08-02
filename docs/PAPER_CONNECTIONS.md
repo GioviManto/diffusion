@@ -387,17 +387,53 @@ larger `k` hands EM more data at the same nominal budget and the sweep moves two
 things at once. The *rising* advantage is therefore not attributable to
 correlation range; only the negative is safe.
 
+**7. A diffusion denoiser trained on filtered data implements the oracle matched
+to its training distribution** (`exp_15 mismatch`) — P1's Fig. 2 finding,
+transplanted. Train a DSM network on data filtered at `k_train`, test on
+*unfiltered* data, and ask which `BP_k` its posterior mean is closest to. It
+picks `BP_{k_train}`, not `BP_0`, in **16 of 16** cells once two degeneracies
+are set aside, and the margin over the runner-up grows with `k_train`: +1.6–4.3%
+at `k=2`, +5.9–29% at `k=3`, **+6.2–63%** at `k=4`.
+
+The two set-aside cases are both explained rather than excluded by hand:
+
+- **`k_train = 1` is exactly degenerate with `k_train = 0` in a Gaussian tree.**
+  Measured `dist_k0` and `dist_k1` agree to five decimals, gap 0.00%. This is a
+  real limitation of the Gaussian analogue, not noise: P1's transition *tensor*
+  `M_{abc}` can correlate the two children given the parent, whereas a
+  linear-Gaussian edge makes siblings conditionally independent given the
+  parent by construction. So the `k = 0` versus `k = 1` distinction — the one
+  place their filtering changes probabilities without changing topology —
+  **cannot be represented here at all.** Reproducing it needs the discrete
+  tensor model.
+- **At `t = 1.6` the argmin stops measuring alignment.** Not because the oracles
+  converge (their spread is still 0.22) but because the network's distance to
+  *every* oracle is ~1.50, seven times that spread. The argmin is then reading
+  network error, not implied correlation range. Every row carries
+  `oracle_spread` so this is checkable rather than assumed.
+
 ### What did not come out
 
-**No sequential acquisition of levels by the network** (`exp_13 ordering`). The
-transformer result that motivated the measurement does not reproduce here: the
-MLP's per-level error is flat across levels *and* across training budget, and
-its total plateaus by roughly 2 000 gradient steps at N = 256 trees. The honest
-reading is that this is a data-limited regime rather than evidence against
-sequential acquisition — the network never gets far enough for an ordering to
-be visible. It is also a different architecture, task and loss from the paper's.
-`hpc/slurm_layer6.sbatch` scales this part up; it is the obvious thing to
-re-check on a cluster.
+**Sequential acquisition: a weak version, not the staircase** (`exp_15
+alignment`; supersedes the wrong probe in `exp_13 ordering`). Training a
+denoiser on unfiltered data and tracking which `BP_k` it is closest to, the
+argmin does move in the predicted direction at the two intermediate noise
+levels — `2 → 2 → 0` at `t = 0.4` and `2 → 1 → 1` at `t = 0.8` over the first
+~1000 gradient steps — and then **saturates for the remaining 31 000 steps**.
+At `t = 0.1`, `0.2` and `1.6` it never leaves `k = 0`.
+
+So: the direction is right, the effect is early and small, and nothing like the
+clean staircase P1 reports. Three reasons, all plausible and none verified
+here: their oracles are far more distinguishable (a discrete non-overlapping
+transition tensor versus a Gaussian edge — see the `k=0`/`k=1` degeneracy
+above); a denoising regression loss converges in far fewer steps than their
+MLM, which needs ~10³ epochs; and the architecture and task are different. The
+honest summary is that **this setting is too easy to resolve the phenomenon**,
+not that the phenomenon is absent.
+
+The earlier `exp_13 ordering` probe — resolve the error onto hierarchy levels
+and watch it move — found nothing at all, and is retained only as a record of a
+measurement that could not have answered the question.
 
 **EM, by contrast, does show an ordering**, with a transparent mechanism: it
 starts with ρ̂ far too small, which destroys long-range structure first, so the
