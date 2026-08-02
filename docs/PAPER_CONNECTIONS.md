@@ -36,7 +36,7 @@ The consequences, stated plainly:
 - One search summary rendered the speciation condition as
   `t_S = ½ log(1/Λ)`. That is almost certainly a transcription slip: the same
   summary states that `t_S` *diverges* when `Λ` grows with the dimension,
-  which requires `t_S = ½ log Λ`. **Rather than adopt either, §2 derives the
+  which requires `t_S = ½ log Λ`. **Rather than adopt either, §3.1 derives the
   crossover independently** and checks it against the sampled process
   (`test_commitment_matches_the_forward_process_empirically`). The derived
   form is `t_S = ½ log(1 + Λ)`, which reduces to `½ log Λ` for large `Λ`.

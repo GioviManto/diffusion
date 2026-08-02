@@ -185,18 +185,46 @@ r — trained by the same denoising score matching, at N=1024, interior sites:
 to 3.8× at t=0.4, converging at t=1.6 where the score is nearly −x and structure
 stops helping).
 
-⚠️ **The 3.3× figure is provisional and known to be too favourable.** It fixes
-r=6 for the CNN, but the optimal radius grows with t (§4.12), so that choice
-handicaps the CNN by 1.19×–1.29×. With an oracle over r the margin is **2.75×**.
-It is also a single seed. A replicated, oracle-fair comparison — oracle over
-both radius and parameterization, 4 seeds — is running and will replace both
-numbers.
+#### The replicated, oracle-fair version — this is the number to quote
 
-So against a well-chosen architecture the EM-BP margin is somewhere near
-**3×, not 8.4×**. The structured baseline closes roughly 60% of the gap. That is the honest
-number, and it should be the one quoted whenever the comparison is to anything
-better than a vanilla network. EM-BP still wins — 13 parameters against 5,313 —
-but the order-of-magnitude framing belongs only to the vanilla comparison.
+The single-seed figures above (3.3× at fixed r=6, 2.75× with an oracle over r)
+were flagged as provisional. They have been replaced. **4 seeds, oracle over
+both the receptive-field radius and the parameterization for both networks**,
+mean relative score error over five noise levels, ± standard error over seeds:
+
+| N | EM-BP (13 params) | global MLP (25,505) | local CNN, oracle r (6,081) |
+|---|---|---|---|
+| 128 | **0.0368 ± 0.0067** | 0.3595 ± 0.0044 | 0.0774 ± 0.0024 |
+| 512 | **0.0174 ± 0.0017** | 0.1794 ± 0.0035 | 0.0570 ± 0.0007 |
+| 2048 | **0.0123 ± 0.0009** | 0.1246 ± 0.0027 | 0.0505 ± 0.0015 |
+
+As ratios to EM-BP:
+
+| N | vs global MLP | vs local CNN |
+|---|---|---|
+| 128 | 9.76 ± 1.79 | 2.10 ± 0.39 |
+| 512 | 10.29 ± 1.02 | 3.27 ± 0.32 |
+| 2048 | 10.15 ± 0.75 | **4.11 ± 0.32** |
+
+Two things this settles, one in each direction.
+
+**The structured architecture really does close most of the gap.** Against the
+vanilla MLP the margin is ~10× and flat in `N`; against the locality-respecting
+CNN it is 2–4×. Roughly 60% of the vanilla deficit was the architecture, not the
+estimator, exactly as the provisional run suggested.
+
+**But the remaining margin *grows* with data rather than closing.** 2.10 → 3.27
+→ 4.11 as `N` goes 128 → 512 → 2048, a trend well outside the standard errors.
+The mechanism is visible in the columns: EM-BP falls 0.0368 → 0.0123 (a factor
+3.0 over 16× data) while the CNN falls 0.0774 → 0.0505 (a factor 1.5) and is
+visibly flattening. The structured network converges to a floor set by its
+approximation error; the estimator keeps paying down parametric error. **"More
+data will close the gap" is the natural guess and it is wrong here.**
+
+So the honest headline against a well-chosen architecture is **4.1× at
+N = 2048 and rising**, not the 8.4× of the vanilla comparison and not the 2.75×
+the single-seed oracle run suggested. Both earlier numbers were quoted at
+N = 1024, between the second and third rows above.
 
 ### 4.12 The optimal receptive field is finite, and exceeding it hurts (exp_12)
 
@@ -565,6 +593,72 @@ against 0.9) has nowhere else to appear.
 The x₀-network is genuinely intermediate (up to 12.6× at large `t`), which is
 worth stating because it is the better parameterization there; the "no
 structure at all" reading applies to ε-prediction, not to every network.
+
+### Genuine symmetry breaking, and where it sits (exp_13 `speciation`)
+
+Everything above uses a Gaussian prior, which has no class to speciate *into* —
+`commitment` locates an information crossover, sharing the criterion but not the
+phenomenon. Giving the root a symmetric two-component prior with the same unit
+variance fixes that as a **controlled comparison**: the leaf covariance, every
+eigenvalue and every predicted time are bit-identical (asserted in
+`test_mixture_root_leaves_the_covariance_and_the_ladder_untouched`), and only
+the modality moves. The order parameter is the exact class posterior
+`P(root > 0 | x_t)`, which BP returns from the upward pass alone.
+
+Depth-4 tree, ρ = 0.9, μ = 0.9, 256 paths, `t_S` predicted 1.136:
+
+| root | correlation crossing | class-choice time | final magnetization |
+|---|---|---|---|
+| two-component | 1.155 (+1.7%) | **1.265** | 0.828 |
+| Gaussian | 1.031 (−9.2%) | 0.940 | 0.647 |
+
+Two things. First, the covariance-set crossing is where it should be for both
+roots — 1.155 and 1.031 bracket the predicted 1.136, within the ±10% that the
+integrator costs at this resolution (this part runs grid BP at 120 SDE steps
+against the `cascade` part's 200, and the −9% is the same integrator signature
+seen there). **Adding modality does not move it**, which is the control working.
+
+Second, the class choice for the two-component root happens at **t = 1.265,
+i.e. earlier in the generation than the information crossover at 1.136**, and
+35% earlier than the corresponding time for the Gaussian root. That is the
+expected physics — two well-separated classes can be told apart while noise
+still swamps the within-class detail — and it is what makes this speciation
+rather than a crossover.
+
+**Precision, stated:** 256 paths give a binomial standard error of 0.031 on the
+agreement curve, and the integrator contributes the ±10% above. The 1.265 vs
+0.940 gap is far outside both; the +1.7% agreement of the bimodal correlation
+crossing is *inside* them and should not be read as better than the −9.2%.
+
+### Hierarchical filtering: the advantage does not shrink with correlation range (exp_13 `filtering`)
+
+Truncating the tree at level `k` leaves correlations only inside blocks of `2^k`
+leaves, so the correlation range sweeps at fixed sequence length (16), fixed
+data budget (256 sequences), fixed network and fixed training budget:
+
+| k | block | ρ̂ | EM-BP abs err | network abs err | advantage |
+|---|---|---|---|---|---|
+| 1 | 2 | 0.8796 | 0.0154 | 0.4143 | 28.7× |
+| 2 | 4 | 0.8926 | 0.0085 | 0.3702 | 49.2× |
+| 3 | 8 | 0.9010 | 0.0038 | 0.3640 | **99.0×** |
+| 4 | 16 | 0.9041 | 0.0084 | 0.3470 | 39.4× |
+
+**The network's error is essentially flat in `k`** (0.414 → 0.347, mildly
+*decreasing*): more long-range structure in the data neither helps nor hurts
+it, which is another reading of the same blindness §4.13's level analysis found.
+The EM-BP advantage is 29–99× throughout and does not decay with range.
+
+**A confound, which is the honest limit of this design.** Holding the number of
+*sequences* fixed does not hold the number of *edges* fixed: a k-filtered
+depth-4 tree has `32 − 32/2^k` edges per sequence, i.e. 16, 24, 28, 30 for
+k = 1…4. So larger `k` hands EM more data for the same nominal budget, and ρ̂
+duly improves monotonically (0.8796 → 0.9041). The sweep therefore moves two
+things at once, and the rising advantage cannot be attributed to correlation
+range alone. Isolating it needs a version that fixes the edge count rather than
+the sequence count — not done. What the table does support without qualification
+is the negative: **the advantage does not shrink as correlations reach further**,
+which is what one would have guessed if the network's locality were the
+binding constraint.
 
 ### A non-monotonicity that is not a bug (exp_13 `ordering`)
 

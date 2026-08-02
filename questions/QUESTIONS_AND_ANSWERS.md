@@ -625,24 +625,31 @@ mechanisms, two distinct summaries.
 derivation. No functional form is claimed — the relationship is monotone and
 strongly correlated, not fitted.
 
-**N2. Does a structured architecture close the EM-BP gap?** — **ANSWERED: it
-closes most of it.** Measured in exp_12 at N=1024, interior sites:
+**N2. Does a structured architecture close the EM-BP gap?** — **ANSWERED: most
+of it, but the remainder grows with data rather than closing.** Replicated and
+oracle-fair: 4 seeds, oracle over both receptive-field radius and
+parameterization for both networks, mean relative score error over five noise
+levels (± standard error over seeds).
 
-| | parameters | mean relative score error |
-|---|---|---|
-| fully connected MLP | 25,505 | 0.1535 |
-| local CNN (r=6) | 5,313 | 0.0595 |
-| EM-BP | 13 | 0.0182 |
+| N | EM-BP (13 params) | global MLP (25,505) | local CNN, oracle r (6,081) |
+|---|---|---|---|
+| 128 | **0.0368 ± 0.0067** | 0.3595 ± 0.0044 | 0.0774 ± 0.0024 |
+| 512 | **0.0174 ± 0.0017** | 0.1794 ± 0.0035 | 0.0570 ± 0.0007 |
+| 2048 | **0.0123 ± 0.0009** | 0.1246 ± 0.0027 | 0.0505 ± 0.0015 |
 
-The CNN beats the MLP by **2.5×** with a fifth of the parameters. So the EM-BP
-margin against a well-chosen architecture is **3.3×, not 8.4×** — roughly 60% of
-the gap was the baseline's architecture rather than the estimator's structure.
-EM-BP still wins with 13 parameters against 5,313, but the order-of-magnitude
-framing belongs only to the vanilla comparison and should not be quoted
-otherwise.
+Against the vanilla MLP the margin is ~10× and flat in N. Against the
+locality-respecting CNN it is 2.10 ± 0.39 → 3.27 ± 0.32 → **4.11 ± 0.32** as N
+goes 128 → 512 → 2048. So roughly 60% of the vanilla deficit was the
+architecture rather than the estimator — but **the remaining margin widens with
+data**, because EM-BP keeps paying down parametric error (0.0368 → 0.0123 over
+16× data) while the CNN flattens toward an approximation floor (0.0774 →
+0.0505). "More data will close the gap" is the natural guess and it is wrong
+here.
 
-This was the most important unasked question in the project and the answer
-materially qualifies the headline. It is now recorded in compendium §4.11.
+This supersedes the single-seed figures previously recorded here (3.3× at fixed
+r = 6, 2.75× with an oracle over r, both at N = 1024, which lies between the
+second and third rows). It was the most important unasked question in the
+project; the answer qualifies the headline and then partly un-qualifies it.
 
 The most important *unasked* question, which a reviewer will ask: **does a
 structured architecture (temporal CNN / U-Net) close the gap in E3?** The email
@@ -730,12 +737,29 @@ information fraction is far larger than on a chain. An estimate read at 40
 iterations looks like a broken M-step and is merely unconverged — this cost real
 time here.
 
-### P5. Does the network acquire hierarchy levels in an order, as it does in the transformer paper? — **RUNNING**
+### P5. Does the network acquire hierarchy levels in an order, as it does in the transformer paper? — **ANSWERED: no, and the more interesting statement is about *where* its error sits**
 
-exp_13 `ordering` probes the level-resolved posterior-mean error against
-training budget, and `levels` compares exact BP, EM-BP and the network per
-level. Results will be recorded here when the run completes; nothing is claimed
-yet.
+**No sequential acquisition.** The MLP denoiser's per-level error is flat across
+levels *and* across training budget (250 → 16 000 gradient steps), and its total
+plateaus by roughly 2 000 steps at N = 256 trees. The reading is that this is a
+data-limited regime, not evidence against sequential acquisition — the network
+never gets far enough for an ordering to become visible — and it is a different
+architecture, task and loss from the paper's. The cluster script scales this up.
+
+**But the level-resolved error is decisive about something else.** Against the
+right null — a method with uniform per-mode error, whose share of total squared
+error would be proportional to each level's multiplicity — the concentration
+ratio spreads across levels by **1.6–2.2× for the ε-network** (flat: as if the
+hierarchy did not exist), 2.8–12.6× for the x₀-network, and **224–6957× for
+EM-BP**, migrating from the finest levels at small `t` to the single coarsest
+mode at large `t`. That is a quantitative sense in which BP inherits the
+hierarchy from the graph and the network does not.
+
+EM *does* show an ordering, with a transparent mechanism that is worth not
+over-reading: ρ̂ starts far too small, which destroys long-range structure
+first, so the coarsest level carries nearly all the error early (1.29 against
+0.02 at level 1 after one iteration) and the levels equalize as ρ̂ climbs. That
+is the parameterization, not an inductive bias.
 
 One methodological note already established from the smoke runs: **the
 per-level error must be reported absolutely, not only relatively.** A relative
@@ -746,9 +770,29 @@ clean coarse-to-fine gradient that was entirely the normalization. All three
 forms (relative, absolute, share of total squared error) are now written to the
 CSV.
 
-### P6. Does the EM-BP advantage grow with the range of correlations in the data? — **RUNNING**
+### P6. Does the EM-BP advantage grow with the range of correlations in the data? — **PARTIAL: it does not shrink, and the design cannot cleanly say more**
 
-exp_13 `filtering` transplants the hierarchical-filtering device: truncating the
-tree at level `k` leaves correlations only inside blocks of `2^k` leaves, so the
-correlation range can be swept at fixed sequence length, fixed budget and fixed
-network. Quick-mode runs were far too undertrained to read and are not reported.
+Filtering a depth-4 tree at level `k` leaves correlations only inside blocks of
+`2^k` leaves. At fixed sequence length, data budget, network and training
+budget:
+
+| k | block | ρ̂ | EM-BP abs err | network abs err | advantage |
+|---|---|---|---|---|---|
+| 1 | 2 | 0.8796 | 0.0154 | 0.4143 | 28.7× |
+| 2 | 4 | 0.8926 | 0.0085 | 0.3702 | 49.2× |
+| 3 | 8 | 0.9010 | 0.0038 | 0.3640 | 99.0× |
+| 4 | 16 | 0.9041 | 0.0084 | 0.3470 | 39.4× |
+
+The network's error is essentially flat in `k` (0.414 → 0.347, mildly
+*decreasing*): more long-range structure neither helps nor hurts it, which is
+the same blindness P5 quantifies. The advantage is 29–99× throughout.
+
+**The confound, which is why this is PARTIAL.** Fixing the number of *sequences*
+does not fix the number of *edges*: a k-filtered depth-4 tree has `32 − 32/2^k`
+edges, i.e. 16, 24, 28, 30 for k = 1…4. Larger `k` therefore hands EM more data
+at the same nominal budget, and ρ̂ improves monotonically as a result. The sweep
+moves two things at once, so the *rising* advantage cannot be attributed to
+correlation range. What the table supports without qualification is the
+negative: the advantage does not shrink as correlations reach further, which is
+what one would expect if the network's locality were the binding constraint.
+Isolating the effect needs a version that fixes the edge count — not done.
