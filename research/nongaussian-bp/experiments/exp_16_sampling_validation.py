@@ -170,29 +170,60 @@ def _score(X: np.ndarray, means: np.ndarray, t: float) -> np.ndarray:
 
 
 
-def _finish(x: np.ndarray, score_fn, t_min: float) -> np.ndarray:
-    """Denoising readout at the stopping time -- NOT an optional refinement.
+def reference_at(prior, rng, n_chains, n_sites, t_min):
+    """A sample of ``p_{t_min}``, built the honest way: draw from ``p_0`` and noise forward.
 
-    The reverse integration halts at ``t_min > 0`` because the score diverges as
-    ``Delta_t -> 0``. The state there is still ``alpha_t a + sqrt(Delta_t) z``, so reporting
-    it as a sample of ``p_0`` reports the truth convolved with Gaussian noise of variance
-    ``Delta_t``. For a distributional metric that is not a small bias, it is the whole
-    measurement: independent Gaussian noise of variance ``v`` added to an innovation of
-    variance ``q`` multiplies the excess kurtosis by ``(q / (q + v))^2``.
+    This replaces two earlier designs, both wrong, and the reason is worth stating because it
+    is the whole methodology of the experiment.
 
-    At the settings here (``rho=0.85``, ``t_min=0.02``) that factor predicts an excess
-    kurtosis of **1.910** against a true 3.0 -- and the calibration run measured 1.99, 1.82
-    and 1.91 at 100, 200 and 400 integration steps. The plateau is exact agreement with the
-    readout bias, not a failure of the integrator, and without this correction every arm
-    would have appeared to destroy heavy tails by roughly the same factor.
+    The reverse integration stops at ``t_min > 0`` -- it must, because the score diverges as
+    ``Delta_t -> 0``. So what an arm produces is a sample of ``p_{t_min}``, *not* of ``p_0``.
+    Comparing it against clean data therefore measures the stopping floor, not the score:
+    independent Gaussian noise of variance ``v`` on an innovation of variance ``q`` scales
+    excess kurtosis by ``(q/(q+v))^2``, which at ``rho=0.85``, ``t_min=0.02`` predicts
+    **1.910**. The calibration array measured **1.91** for the exact arm. It was reproducing
+    its own distribution correctly the whole time; the target was wrong.
 
-    The remedy is the standard final denoising step: report ``E[a | x, t_min]``, recovered
-    from the score by the Tweedie identity, rather than ``x`` itself.
+    Applying a final denoising readout ``E[a | x, t_min]`` does not fix this, it inverts it.
+    The posterior mean of a heavy-tailed prior is a shrinkage operator -- it pulls small
+    values toward zero harder than large ones -- so the law of the posterior mean is *more*
+    peaked than ``p_0``. Measured overshoot: 3.73, 4.34, 4.74 at ``t_min`` = 0.02, 0.05, 0.10,
+    against a true 3.0, and identical at ``M=401`` and ``M=801``, which rules out grid
+    resolution as the cause.
+
+    Comparing like with like removes the problem instead of correcting for it: both sides are
+    samples of ``p_{t_min}``, no estimator sits between the sampler and the metric, and the
+    target moments are available in closed form (``target_innovation_moments``).
     """
-    s = score_fn(x, float(t_min))
-    alpha = float(np.exp(-t_min))
-    delta = float(1.0 - np.exp(-2.0 * t_min))
-    return (x + delta * s) / alpha
+    a = sample_chains(prior, rng, n_chains, n_sites)
+    alpha, delta = float(np.exp(-t_min)), float(1.0 - np.exp(-2.0 * t_min))
+    return alpha * a + np.sqrt(delta) * rng.standard_normal(a.shape)
+
+
+def target_innovation_moments(prior, t_min: float) -> tuple[float, float]:
+    """Closed-form ``(excess_kurtosis, variance)`` of the innovation under ``p_{t_min}``.
+
+    Writing ``e_i = x_i - rho x_{i-1}`` for the noised chain,
+    ``e = alpha * eps + sqrt(Delta) (z_i - rho z_{i-1})`` with the two terms independent, so
+    the variance adds and the fourth cumulant is carried by the innovation alone:
+
+        Var  = alpha^2 q + Delta (1 + rho^2)
+        kurt = kurt_eps * (alpha^2 q)^2 / Var^2
+
+    No simulation and no fitting: this is the number every arm is judged against.
+    """
+    alpha, delta = float(np.exp(-t_min)), float(1.0 - np.exp(-2.0 * t_min))
+    v_sig = alpha ** 2 * prior.q
+    v_noise = delta * (1.0 + prior.rho ** 2)
+    total = v_sig + v_noise
+    return float(prior.innovation_excess_kurtosis * v_sig ** 2 / total ** 2), float(total)
+
+
+def noised_covariance(prior, n: int, t_min: float) -> np.ndarray:
+    """``Cov`` of the chain under ``p_{t_min}``: ``alpha^2 Sigma_0 + Delta I``."""
+    alpha, delta = float(np.exp(-t_min)), float(1.0 - np.exp(-2.0 * t_min))
+    sigma0 = prior.rho ** np.abs(np.subtract.outer(np.arange(n), np.arange(n)))
+    return alpha ** 2 * sigma0 + delta * np.eye(n)
 
 
 def make_exact_arm(prior, grid, weights):
@@ -324,7 +355,10 @@ def run_generate(prior, grid, weights, cfg, out_dir):
     rows = []
     times = time_grid(cfg["t_max"], cfg["t_min"], cfg["n_steps"])
     n = cfg["n_sites"]
-    sigma_true = prior.rho ** np.abs(np.subtract.outer(np.arange(n), np.arange(n)))
+    sigma_true = noised_covariance(prior, n, cfg["t_min"])
+    kurt_target, var_target = target_innovation_moments(prior, cfg["t_min"])
+    print(f"  target for p_t at t_min={cfg['t_min']}: excess kurtosis {kurt_target:.4f}, "
+          f"innovation variance {var_target:.4f}", flush=True)
 
     for n_chains in cfg["sizes"]:
         for seed in range(cfg["seed_offset"], cfg["seed_offset"] + cfg["n_seed"]):
@@ -342,19 +376,20 @@ def run_generate(prior, grid, weights, cfg, out_dir):
 
             # A reference sample from the forward model -- the yardstick. Never a
             # reverse-generated one, which would fold the integrator's error into the target.
-            a_ref = sample_chains(prior, rng_for("exp16-ref", seed), cfg["n_generate"], n)
+            a_ref = reference_at(prior, rng_for("exp16-ref", seed),
+                                 cfg["n_generate"], n, cfg["t_min"])
 
             for name, fn in arms.items():
                 # Common random numbers: identical initial noise and identical Brownian
                 # increments across arms, so differences are the score and nothing else.
                 rng = rng_for("exp16-gen", seed, n_chains)
                 x_init = rng.standard_normal((cfg["n_generate"], n))
-                a_gen = _finish(reverse_sde(x_init, fn, times, rng), fn, cfg["t_min"])
+                a_gen = reverse_sde(x_init, fn, times, rng)
 
                 c = compare_distributions(
                     a_gen, a_ref, prior.rho, sigma_true,
-                    innov_kurtosis_true=prior.innovation_excess_kurtosis,
-                    innov_variance_true=prior.q, name=name, seed=seed,
+                    innov_kurtosis_true=kurt_target,
+                    innov_variance_true=var_target, name=name, seed=seed,
                 )
                 rows.append({
                     "n_chains": n_chains, "seed": seed, "arm": name,
@@ -414,7 +449,8 @@ def run_steps(prior, grid, weights, cfg, out_dir):
     """
     rows = []
     n = cfg["n_sites"]
-    sigma_true = prior.rho ** np.abs(np.subtract.outer(np.arange(n), np.arange(n)))
+    sigma_true = noised_covariance(prior, n, cfg["t_min"])
+    kurt_target, var_target = target_innovation_moments(prior, cfg["t_min"])
     n_chains = cfg["sizes"][-1]
 
     kernel, nets, _ = fit_arms(prior, grid, weights, n_chains, 0, cfg)
@@ -427,18 +463,18 @@ def run_steps(prior, grid, weights, cfg, out_dir):
         "cnn": make_cnn_arm(nets[("cnn", "eps")], nets[("cnn", "x0")],
                             _selector(best, "cnn", cfg["t_probe"])),
     }
-    a_ref = sample_chains(prior, rng_for("exp16-ref", 0), cfg["n_generate"], n)
+    a_ref = reference_at(prior, rng_for("exp16-ref", 0), cfg["n_generate"], n, cfg["t_min"])
 
     for n_steps in cfg["steps_ladder"]:
         times = time_grid(cfg["t_max"], cfg["t_min"], n_steps)
         for name, fn in arms.items():
             rng = rng_for("exp16-steps", n_steps)
             x_init = rng.standard_normal((cfg["n_generate"], n))
-            a_gen = _finish(reverse_sde(x_init, fn, times, rng), fn, cfg["t_min"])
+            a_gen = reverse_sde(x_init, fn, times, rng)
             c = compare_distributions(
                 a_gen, a_ref, prior.rho, sigma_true,
-                innov_kurtosis_true=prior.innovation_excess_kurtosis,
-                innov_variance_true=prior.q, name=name, seed=0,
+                innov_kurtosis_true=kurt_target,
+                innov_variance_true=var_target, name=name, seed=0,
             )
             rows.append({"n_steps": n_steps, "arm": name,
                          "innov_kurtosis": c.innov_kurtosis,
