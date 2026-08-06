@@ -1,12 +1,37 @@
 # Questions for Marc and Jérôme
 
-Drafted 6 August 2026, alongside the internal note. These are the decisions I could not
+Drafted 6 August 2026, alongside the internal note. **Updated after the cluster sweeps
+returned: questions 1 and 2 are now answered by evidence and are recorded here as resolved
+rather than asked.** These are the decisions I could not
 resolve from the code or from the two guidance documents, ordered by how much they change
 the write-up. Each states what I would do absent an answer, so nothing is blocked.
 
 ---
 
-## 1. The headline no longer survives the sampling test — how should the note be framed?
+## 1. ~~How should the note be framed?~~ — RESOLVED BY MEASUREMENT
+
+**Answer: option (c) was right, and the sweep settles it.** The dissociation is real but it is
+a *capacity* effect of the innovation model, not an information limit of noised data.
+
+| $C$ | EM–BP | local CNN | target |
+|---|---|---|---|
+| 2 | −0.034 | 1.273 | 1.910 |
+| 4 | 0.812 | 1.273 | |
+| 8 | **1.319** | 1.273 | |
+| 16 | **1.487** | 1.273 | |
+
+Monotone in $C$, still climbing at 16, and it overtakes the network between $C=4$ and $C=8$.
+Three controls say the effect is not an artefact: it holds across four non-Gaussian families
+at matched covariance, at $n\in\{32,64,128\}$, and is *identical to three decimals* under
+grid refinement $M\in\{401,801,1601\}$.
+
+The note is now framed as (a) with the mechanism attached, not (b). One measurement is
+outstanding — whether the richer kernel keeps its pointwise advantage — and until it returns
+we do not claim simultaneous dominance on both axes.
+
+<details><summary>original question, kept for the record</summary>
+
+### The headline no longer survives the sampling test — how should the note be framed?
 
 This is the substantive one, and it follows directly from Jérôme's point in the 29 July call
 that score error and generated-data quality are different quantities.
@@ -46,18 +71,25 @@ components) or an *information* limit (not fixable — the channel destroys inno
 information far faster than correlation, measured at 142× against 26× across the schedule).
 If it is capacity, framing (a) survives with a fix. If it is information, (b) is the result.
 
-*Default if no answer:* write (b), and add the `C` sweep when it lands.
+</details>
 
 ---
 
-## 2. Should the note claim anything about generation at all?
+## 2. ~~Should the note claim anything about generation at all?~~ — RESOLVED
+
+Yes. The comparison now covers five innovation families, three chain lengths and three grid
+resolutions, so it is no longer a single-family result. It is §8 of the note.
+
+<details><summary>original question</summary>
+
+### Should the note claim anything about generation at all?
 
 Related but separable. The reverse-diffusion comparison is complete for one chain family
 (Laplace) and running for the other four. If you would rather the note stay strictly on
 denoising and defer all generation claims to the thesis, say so — it would shorten the note
 considerably and remove its most contestable section.
 
-*Default:* include it, clearly marked as one family with four more in flight.
+</details>
 
 ---
 

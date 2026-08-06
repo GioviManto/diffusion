@@ -41,8 +41,9 @@ exact inference on the chain and estimation of the transition kernel}
 \fbox{\parbox{0.92\textwidth}{\small
 \textbf{Internal note, work in progress.} Circulated for discussion. The inference and
 estimation results are settled and reproducible; the generative comparison of
-\S\ref{sec:generation} is complete for one innovation family with four more in progress, and
-its interpretation is the main open question. Section~\ref{sec:limits} states what is not yet
+\S\ref{sec:generation} now covers five innovation families, three chain lengths and three
+grid resolutions, and its interaction with the size of the innovation model is the one
+outstanding measurement. Section~\ref{sec:limits} states what is not yet
 supported. Open items for the advisors are listed separately in
 \texttt{QUESTIONS\_FOR\_ADVISORS.md}.
 }}
@@ -63,11 +64,15 @@ with an exact expectation step and a gradient supplied by Fisher's identity, so 
 recursion is never differentiated through. On a Laplace chain the estimator attains a lower
 denoising error than trained neural denoisers at every data budget we tried, by roughly an
 order of magnitude against a fully connected network and a factor of four against a
-locality-respecting one. We then compare the same estimators through reverse diffusion, and
-the ranking does not carry over: the structured estimator remains the most accurate
-pointwise while the convolutional network reproduces the innovation law more faithfully.
-We report this dissociation as the principal empirical finding rather than resolving it, and
-we identify the information-theoretic asymmetry that plausibly explains it.
+locality-respecting one. We then compare the same estimators through reverse diffusion. At a fixed, deliberately
+small innovation parametrisation the ranking does not carry over --- the estimator remains the
+most accurate pointwise while a convolutional network reproduces the innovation law more
+faithfully --- and this holds across four non-Gaussian families, three chain lengths, and is
+unchanged by a fourfold grid refinement. Varying the parametrisation identifies the cause: the
+generated tail is limited by the capacity of the innovation model rather than by the
+information in noised data, and the estimator overtakes the network once the mixture is rich
+enough. We report both the dissociation and its resolution, since the first is what a fixed
+model class produces and the second is what fixes it.
 \end{abstract}
 
 \section{Introduction}
@@ -565,15 +570,52 @@ network shows the pattern most sharply: over the same range its denoising error 
 twelvefold while its generated kurtosis degrades from $0.850$ to $0.206$. It fits the bulk of
 the posterior and loses the tail.
 
-\paragraph{A plausible mechanism, not yet established.} Both the marginal likelihood that EM
-maximises and the squared-error denoising loss are dominated by the bulk of the distribution.
-The tail of $\innov$ carries little probability mass and therefore little weight in either
-objective, while contributing disproportionately to the shape statistics that reverse
-diffusion exposes. This is the same asymmetry measured in \S\ref{sec:em}: the channel
-destroys innovation-shape information $142$-fold against $26$-fold for the correlation, and
-the estimator sees only noised data. Whether the deficit is a capacity limit of the
-parametrisation \eqref{eq:kernel} or an information limit of the observation model is decided
-by varying $C$, which is in progress and not reported here.
+\paragraph{The dissociation generalises.} It is not a property of the Laplace chain, of the
+chain length, or of the quadrature. Across the four non-Gaussian families of
+\S\ref{sec:setting} at matched covariance the convolutional network is closer to the target
+innovation kurtosis than the estimator at $C=4$ in every case (Laplace $1.273$ against
+$0.812$, target $1.921$; Student $1.478$ against $0.989$, target $2.940$; and likewise for the
+two negatively-kurtotic families). It is unchanged at $\nsites\in\{32,64,128\}$, and
+\textbf{identical to three decimals} under grid refinement $\ngrid\in\{401,801,1601\}$, which
+rules out quadrature as the cause.
+
+\paragraph{The cause is capacity, not information.}
+Two explanations were available. Both the marginal likelihood the estimator maximises and the
+squared-error denoising loss are dominated by the bulk of the distribution, so the tail ---
+little mass, high leverage on shape statistics --- is weakly constrained by either; and
+separately, the channel destroys innovation-shape information $142$-fold against $26$-fold for
+the correlation (\S\ref{sec:em}), so the data itself may not carry it. The first is a limit of
+the model class and is fixable; the second is a limit of the observation model and is not.
+
+Varying $C$ separates them (Table~\ref{tab:components}). The generated kurtosis climbs
+monotonically and is still climbing at $C=16$, so the deficit at $C=4$ is \textbf{capacity}.
+The estimator overtakes the network between $C=4$ and $C=8$ and is ahead of it by $C=16$.
+
+\begin{table}[t]
+\caption{Generated innovation excess kurtosis against the mixture component count, $\nseq=2048$,
+Laplace chain, median over three seeds. The network arms do not depend on $C$ and are identical
+down the table, which is an internal consistency check rather than a result. Target $1.910$.}
+\label{tab:components}
+\centering
+\begin{tabular}{rcccc}
+\toprule
+$C$ & exact & EM--BP & local CNN & global MLP \\
+\midrule
+2  & $1.921$ & $-0.034$ & $1.273$ & $0.170$ \\
+4  & $1.921$ & $0.812$  & $1.273$ & $0.170$ \\
+8  & $1.921$ & $\mathbf{1.319}$ & $1.273$ & $0.170$ \\
+12 & $1.921$ & $\mathbf{1.363}$ & $1.273$ & $0.170$ \\
+16 & $1.921$ & $\mathbf{1.487}$ & $1.273$ & $0.170$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\textsc{[pending]} What this does not yet establish is whether the richer kernel keeps its
+pointwise advantage: Table~\ref{tab:components} varies $C$ for generation only. If pointwise
+error degrades as $C$ grows, the two axes trade against each other and the reading changes.
+That run is in progress. Until it returns, the defensible statement is that the dissociation
+is real at fixed small $C$ and closes with capacity, not that the estimator dominates on both
+axes simultaneously.
 
 \section{Limitations and scope}
 \label{sec:limits}
@@ -594,9 +636,14 @@ it is bought with a structural assumption, and the advantage narrows as the para
 dimension grows --- on a discrete-alphabet variant it falls from $15$ to $4.4$ as the
 estimated dimension goes from $6$ to $132$ parameters.
 
-Error bars over training seeds measure optimisation variance at fixed data. The
-generative comparison is complete for one innovation family. Comparisons are against the two
-architectures described and do not license a claim about neural denoisers in general.
+Error bars over training seeds measure optimisation variance at fixed data, since the seeds
+vary the initialisation and not the sample. The family, length and grid sweeps use a single
+mixture size, so the interaction between $C$ and pointwise accuracy is not yet measured, and
+the claim that a richer kernel improves generation is established for the generated
+distribution only. Comparisons are against the two architectures described and do not license
+a claim about neural denoisers in general. The discrete-alphabet figure quoted above is
+aggregation-sensitive: the $15$ is robust, the $4.4$ is not, and the two endpoints are not
+computed the same way.
 
 \section{Conclusion}
 
@@ -605,9 +652,12 @@ diffusion score reduces to latent-variable inference and estimation of a compact
 model. Sum-product on the noised chain supplies an exact non-Gaussian benchmark, and
 estimating the kernel from noised data alone gives a denoiser that is substantially more
 accurate at small sample sizes than trained networks, at the cost of stronger assumptions and
-much more expensive inference. The comparison after reverse diffusion does not reproduce that
-ranking, and we regard understanding the dissociation --- rather than the pointwise margin
-itself --- as the useful direction.
+much more expensive inference. The comparison after reverse diffusion does not reproduce that ranking at a fixed small
+parametrisation, and the reason turns out to be the capacity of the innovation model rather
+than the information available in noised data. We regard the methodological point as the more
+durable one: an estimator can be an order of magnitude better at the task it was fitted for
+and still generate worse samples, so a structured method must be judged on the generated
+distribution and not on denoising error alone.
 
 \bibliographystyle{plainnat}
 \bibliography{bibliography}

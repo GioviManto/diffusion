@@ -65,21 +65,65 @@ asymmetry measured in \S\ref{ch:estimation}: the channel destroys innovation-sha
 $142$-fold against $26$-fold for the correlation, and the estimator sees only noised data.
 \end{intuition}
 
-\section{In progress}
+\section{Resolved since: the dissociation is a capacity effect}
+\label{sec:resolved}
+
+Four sweeps have since returned, and together they settle what the dissociation is.
+
+\paragraph{It is not an artefact of the setting.} Across the four non-Gaussian families of
+\S\ref{sec:matched-covariance} at matched covariance, the convolutional network is closer to
+the target innovation kurtosis than the estimator at $C=4$ in every case. It persists at
+$\nsites\in\{32,64,128\}$. And it is \emph{identical to three decimals} under grid refinement
+$\ngrid\in\{401,801,1601\}$ --- the strongest of the three controls, since it removes
+quadrature as an explanation outright.
+
+\paragraph{It is a limit of the model class, not of the data.} Two explanations were
+available and they differ in consequence. Both the marginal likelihood and the squared-error
+loss are bulk-dominated, so the tail --- little mass, high leverage on shape --- is weakly
+constrained by either; that is a capacity limit and is fixable. Separately, the channel
+destroys innovation-shape information $142$-fold against $26$-fold for the correlation
+(\S\ref{ch:estimation}), so the data might simply not carry it; that is not fixable.
+
+Varying $C$ separates them:
+
+\begin{center}\small
+\begin{tabular}{@{}rcccc@{}}
+\toprule
+$C$ & exact & EM--BP & local CNN & global MLP \\
+\midrule
+2  & $1.921$ & $-0.034$ & $1.273$ & $0.170$ \\
+4  & $1.921$ & $0.812$  & $1.273$ & $0.170$ \\
+8  & $1.921$ & $\mathbf{1.319}$ & $1.273$ & $0.170$ \\
+12 & $1.921$ & $\mathbf{1.363}$ & $1.273$ & $0.170$ \\
+16 & $1.921$ & $\mathbf{1.487}$ & $1.273$ & $0.170$ \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\noindent
+(Generated innovation excess kurtosis, $\nseq=2048$, Laplace chain, median over three seeds,
+target $1.910$.) The estimator climbs monotonically, is still climbing at $C=16$, and
+overtakes the network between $C=4$ and $C=8$. So the deficit is \textbf{capacity}. The
+network columns are constant down the table because they do not depend on $C$ --- an internal
+consistency check rather than a finding.
+
+\begin{intuition}
+The reading that survives is methodological rather than about which method wins. An estimator
+can be an order of magnitude better at the task it was fitted for and still generate worse
+samples, because the objective it optimises and the statistic the generated distribution
+exposes weight the distribution differently. A structured method therefore has to be judged on
+what it generates, which is exactly the objection that prompted this experiment.
+\end{intuition}
+
+\section{Still in progress}
 \label{sec:pending}
 
-\textsc{[pending]} None of the following is relied on anywhere above.
+\textsc{[pending]} Nothing above relies on this.
 
 \begin{itemize}
-\item \textbf{Capacity or information?} A sweep over the mixture component count
-$C\in\{2,4,8,12,16\}$ decides whether the under-dispersed generated tail is a limit of the
-parametrisation (fixable) or of the observation model (not). This is the single most
-informative outstanding run.
-\item \textbf{Does the dissociation hold beyond the Laplace chain?} The five innovation
-families of \S\ref{sec:matched-covariance}, at matched covariance.
-\item \textbf{Is the generated-law ranking quadrature-limited?} Grid refinement
-$\ngrid\in\{401,801,1601\}$.
-\item \textbf{Longer chains}, $\nsites\in\{32,64,128\}$.
+\item \textbf{Does the richer kernel keep its pointwise advantage?} The component sweep varied
+$C$ for generation only. If pointwise error degrades as $C$ grows, the two axes trade against
+each other and the reading changes; if it does not, the estimator dominates on both. Running.
 \end{itemize}
 
 \section{Known deficiencies in the current measurements}
