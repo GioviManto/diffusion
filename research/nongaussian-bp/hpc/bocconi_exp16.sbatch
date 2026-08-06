@@ -93,8 +93,37 @@ case "$MODE" in
         --set seed_offset="$SEED"
     ;;
 
+  components)
+    # Does EM-BP's under-dispersed generated tail come from the ESTIMATOR'S CAPACITY or from
+    # the INFORMATION in noisy data? The main sweep fits a 4-component innovation mixture and
+    # generates samples with excess kurtosis 0.897 against a target of 1.910, while its
+    # pointwise error is the best of every arm by 10x. Two readings, and they differ:
+    #
+    #   capacity-limited  -> kurtosis should climb toward 1.910 as C grows, since exp_06
+    #                        showed the FITTED innovation law improves monotonically with C
+    #                        (2.71 at C=8 against 1.95 at C=2).
+    #   information-limited -> it should plateau, because the Fisher information for the
+    #                        innovation SCALE falls 142x between t=0.05 and t=1.6 while that
+    #                        for the correlation falls only 26x. Non-Gaussianity is the first
+    #                        thing the channel destroys, and EM never sees a clean sample.
+    #
+    # One task per component count, at the largest data budget so capacity is the only
+    # binding constraint.
+    CS=(2 4 8 12 16)
+    C=${CS[$TASK]}
+    OUT=$ROOT/outputs/exp_16/components_C${C}
+    echo "components: C=$C -> $OUT"
+    "$PYTHON" experiments/exp_16_sampling_validation.py \
+        --only generate \
+        --output-dir "$OUT" \
+        --set sizes="(2048,)" \
+        --set em_components="$C" \
+        --set n_seed=3 \
+        --set n_steps=400
+    ;;
+
   *)
-    echo "unknown MODE=$MODE (expected calibrate or generate)" >&2
+    echo "unknown MODE=$MODE (expected calibrate, generate or components)" >&2
     exit 2
     ;;
 esac

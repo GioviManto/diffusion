@@ -1,0 +1,73 @@
+{
+  "settings": {
+    "n_sites": 32,
+    "rho": 0.85,
+    "t_probe": [
+      0.1,
+      0.2,
+      0.4,
+      0.8,
+      1.6
+    ],
+    "radii": [
+      0,
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9,
+      10,
+      11,
+      12
+    ],
+    "depths": [
+      10
+    ],
+    "n_train": 4096,
+    "n_test": 2048,
+    "width": 24,
+    "n_steps": 4000,
+    "batch_size": 128,
+    "lr": 0.002,
+    "n_seed": 3,
+    "seed_offset": 0,
+    "budget_pairs": [
+      [
+        2,
+        58
+      ],
+      [
+        4,
+        40
+      ],
+      [
+        6,
+        32
+      ],
+      [
+        8,
+        28
+      ],
+      [
+        12,
+        22
+      ]
+    ]
+  },
+  "parts": [
+    "depth"
+  ],
+  "timestamp": "2026-08-06 11:32:53",
+  "python": "3.13.11",
+  "numpy": "2.5.1",
+  "platform": "Linux-5.14.0-687.5.3.el9_8.x86_64-x86_64-with-glibc2.34",
+  "hostname": "cnode07",
+  "slurm_job_id": "616981",
+  "slurm_array_task_id": "6",
+  "cpu_count": "40",
+  "blas_threads": "1"
+}
