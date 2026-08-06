@@ -131,9 +131,12 @@ each other and the reading changes; if it does not, the estimator dominates on b
 Recorded rather than deferred, because each affects how a number should be read.
 
 \begin{itemize}
-\item \textbf{Error bars measure the wrong variance.} Seeds vary the initialisation at fixed
-data, so the intervals reflect optimisation variance, not sampling variance. A fresh draw per
-seed is the honest protocol and has not been run.
+\item \textbf{Error bars: corrected.} An earlier version of this document stated that seeds
+varied only the initialisation. That was wrong, and checking rather than assuming is what
+caught it: the replicate index is mixed into every seed that draws training data, so each
+replicate uses a fresh training set as well as a fresh initialisation. The held-out test set
+and its exact reference are deliberately common to all replicates. The intervals therefore
+cover both sampling and optimisation variance, which is the protocol one wants.
 \item \textbf{One hyperparameter was selected on the evaluation set.} The convolutional
 network's receptive field in \codefile{exp\_12} was chosen by an oracle over the same held-out
 set the number is reported on. The bias favours the \emph{baseline}, so the quoted margin is
