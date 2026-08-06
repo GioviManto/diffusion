@@ -192,7 +192,8 @@ dominated convergence with the Gaussian kernel and its derivative. Equation~\eqr
 is a change of variables, not an approximation: computing the score and computing the
 posterior mean are the same problem.
 
-\paragraph{The Bayes-optimal denoiser.} For squared loss, and for any $u$,
+\paragraph{The Bayes-optimal denoiser.} For squared loss and any $u$ that is a function of
+$x$ alone,
 \begin{equation}
 \label{eq:orthogonal}
 \E\!\left[\|a-u\|^2 \,\middle|\, x\right]
@@ -227,7 +228,9 @@ potentials and add no edges, and the posterior factor graph is the prior's chain
 \rmsg_{i}(a_i) &\propto \int \mathrm{d}a_{i+1}\;
 \kernel(a_{i+1}\mid a_i)\,\like(x_{i+1}\mid a_{i+1})\,\rmsg_{i+1}(a_{i+1}),
 \end{align}
-the single-site marginal is $P(a_i\mid x,t) \propto \lmsg_i(a_i)\like(x_i\mid a_i)\rmsg_i(a_i)$
+initialised by $\lmsg_1 = \mu$ and $\rmsg_{\nsites}\equiv 1$ --- without which the initial law
+would enter no marginal --- the single-site marginal is
+$P(a_i\mid x,t) \propto \lmsg_i(a_i)\like(x_i\mid a_i)\rmsg_i(a_i)$
 and the pairwise marginal on edge $(i-1,i)$ is
 $\propto \lmsg_{i-1}(a_{i-1})\,\like(x_{i-1}\mid a_{i-1})\,\kernel(a_i\mid a_{i-1})\,
 \like(x_i\mid a_i)\,\rmsg_i(a_i)$. In
@@ -281,8 +284,8 @@ for (ii), and never abbreviate either to ``exact''.
 \label{sec:numerics}
 
 Two error sources are separated by construction. \emph{Truncation}: probability mass outside
-the grid $[-A,A]$ is discarded, monitored by the mass in the boundary cells, which stays below
-$2\times10^{-5}$ across all reported runs at $A=8$. \emph{Quadrature}: the trapezoidal rule is
+the grid $[-A,A]$ is discarded, monitored by the mass in the boundary cells. \textsc{[pending]} The diagnostic is computed
+inside the recursion but not persisted, so no aggregate figure is quoted. \emph{Quadrature}: the trapezoidal rule is
 second order in the spacing for integrands with a bounded second derivative. For the Gaussian
 kernel the integrand is smooth and convergence is fast; \textbf{for the Laplace kernel it is
 not}, since $\innov(e)\propto e^{-|e|/b}$ has a discontinuous derivative at the origin, and we
@@ -292,31 +295,34 @@ Against the closed-form Gaussian posterior mean, the discretised recursion agree
 $9.2\times10^{-15}$ relative at $\ngrid=401$, $A=8$. That number measures the discretisation
 of the Gaussian model only. It is not comparable with the independent Monte Carlo check
 below, which measures something else: on the Laplace chain, where no closed form exists,
-importance sampling with $6\times10^6$ samples agrees with the discretised posterior mean to
-$1.1\times10^{-3}$ relative --- a figure limited by the Monte Carlo standard error, not by the
-grid. Both are reported because they validate different things; neither is the accuracy of
+an independent importance-sampling estimate agrees with the discretised recursion: the
+evidence to within five Monte Carlo standard errors at $10^6$ samples, and the posterior mean
+to $10^{-2}$ relative at $2\times10^6$ (\codefile{tests/test\_em\_bp.py}). These are assertions
+in the test suite rather than recorded measurements, and their tolerances are set by the Monte
+Carlo error rather than by the grid. Both are reported because they validate different things; neither is the accuracy of
 the other.
 
 \section{Gaussian closure and the LMMSE estimator}
 \label{sec:closure}
 
 A standard approximation propagates only the first two moments of each message. Under the
-transition $a_i = \corr a_{i-1} + \varepsilon_i$, a message with mean $m$ and variance $v$
-maps to one with
+transition $a_i = \corr a_{i-1} + \varepsilon_i$, a message with mean $m$ and variance $v$ transforms as
 \begin{equation}
 \label{eq:closure}
-m \;\mapsto\; \corr m,
+\text{forward:}\quad m \mapsto \corr m,\;\; v \mapsto \corr^2 v + \ivar ;
 \qquad
-v \;\mapsto\; \corr^2 v + \ivar ,
+\text{backward:}\quad m \mapsto m/\corr,\;\; v \mapsto (v+\ivar)/\corr^2 ,
 \end{equation}
+the backward map being the forward one inverted because that recursion integrates over the
+\emph{output} variable (it requires $\corr\neq0$),
 and a Gaussian message times a Gaussian likelihood is Gaussian. The propagation therefore
 uses only the mean and variance of $\innov$ and discards everything else about its shape.
 
 \begin{proposition}
 \label{prop:lmmse}
-For the chain \eqref{eq:prior} with linear transitions and Gaussian unary likelihoods,
-moment-projected sum-product returns the LMMSE estimator of the covariance-matched Gaussian
-model,
+For the chain \eqref{eq:prior} with linear transitions, Gaussian unary likelihoods and
+$\E[a]=0$, moment-projected sum-product returns the LMMSE estimator of the covariance-matched
+Gaussian model,
 \begin{equation}
 \label{eq:lmmse}
 \lmmse
@@ -326,10 +332,23 @@ model,
 for every innovation law with mean zero and variance $\ivar$.
 \end{proposition}
 
-The proof is the observation that \eqref{eq:closure} depends on $\innov$ only through
-$(0,\ivar)$, so the whole recursion is a function of $\Sigma_0$; the resulting estimator is
-linear in $x$ and matches the two moments, which characterises LMMSE. We verify it
-numerically to $6\times10^{-16}$ across five innovation families.
+\begin{proof}
+Both maps in \eqref{eq:closure} depend on $\innov$ only through its mean and variance, so the
+recursion returns the same function of $x$ for every innovation law with moments $(0,\ivar)$
+--- in particular the same as on the covariance-matched \emph{Gaussian} chain. On that chain
+every message is exactly Gaussian, so the moment projection is the identity and the recursion
+is exact; exact inference returns the posterior mean, which for jointly Gaussian zero-mean
+$(a,x)$ coincides with the LMMSE estimator by Proposition~\ref{prop:orthogonality} restricted
+to linear estimators.
+\end{proof}
+\noindent
+On the Laplace chain the information-form recursion is verified against the closed-form
+Gaussian posterior mean to $10^{-12}$ (\codefile{tests/test\_gaussian\_bp\_equivalence.py}).
+\textsc{[pending]} The corresponding check across the full set of innovation families is not
+currently recorded as an output. The zero-mean
+hypothesis is not cosmetic: with a prior mean $\E[a]=1.3$ the estimator \eqref{eq:lmmse}
+departs from the true LMMSE by $0.65$ in maximum absolute value, since the general form
+carries $\E[a] + \Cov(a,x)\Cov(x)^{-1}(x-\E[x])$.
 
 \begin{remark}
 Proposition~\ref{prop:lmmse} is a statement about \emph{this} closure --- single-Gaussian
@@ -343,7 +362,7 @@ separate again for richer message families.
 The gap between \eqref{eq:lmmse} and exact inference locates where non-Gaussianity matters.
 It is largest at \emph{small} $t$ and decays monotonically: on a Laplace chain at
 $\corr=0.85$, the relative deviation of the closure's score from the exact one falls from
-$0.20$ at $t=0.08$ to $9.2\times10^{-5}$ at $t=2.4$. Large $t$ Gaussianises the posterior, so
+$0.198$ at $t=0.08$ to $9.9\times10^{-5}$ at $t=2.4$. Large $t$ Gaussianises the posterior, so
 the shape of $\innov$ survives only where the likelihood is weak.
 
 \section{Estimating the transition kernel}
@@ -358,7 +377,7 @@ $\Lik(\params)=\sum_\mu \log P_{t,\params}(x^\mu)$.
 \begin{equation}
 \label{eq:kernel}
 \kernel_\params(a'\mid a) \;=\; \sum_{c=1}^{C} \pi_c \,
-\normal{a' - \corr a - \nu_c}{s_c^2},
+\mathcal{N}\!\left(a' - \corr a;\; \nu_c,\, s_c^2\right),
 \end{equation}
 which keeps the linear autoregression and leaves the innovation law essentially free. At
 $C=4$ this has $\corr$, four weights $\pi_c$, four locations $\nu_c$ and four scales $s_c^2$:
@@ -368,17 +387,21 @@ never given the density it is asked to recover.
 \paragraph{Exact expectation step.} Many latent-variable models require an approximate or
 variational E-step; this one does not, because the posterior is a tree
 (\S\ref{sec:bp}) and sum-product returns exact single-site \emph{and pairwise} marginals. The
-complete-data log-likelihood is a sum over edges, so the auxiliary function
-$\Qfun(\params\mid\params^{(r)})$ depends on the data only through
+complete-data log-likelihood is a sum over edges, so the \emph{$\params$-dependent part} of the
+auxiliary function $\Qfun(\params\mid\params^{(r)})$ --- it also contains a site-one term and a
+likelihood term, both $\params$-free and therefore additive constants --- depends on the data
+only through
 \begin{equation}
 \label{eq:xi}
 \Xis_{kl} \;=\; \sum_{\mu=1}^{\nseq}\sum_{i=2}^{\nsites}
 P\!\left(a_{i-1}=u_k,\; a_i=u_l \;\middle|\; x^\mu\right),
 \end{equation}
 the expected transition mass between grid points $u_k$ and $u_l$ --- the continuum analogue of
-the expected transition counts of Baum--Welch \citep{baum1970}. Sufficiency of the single
-matrix \eqref{eq:xi} requires a \emph{homogeneous} kernel shared across sites and sequences,
-a fixed grid, and an initial law excluded from $\params$; it fails if any of these is relaxed.
+the expected transition counts of Baum--Welch \citep{baum1970}. Sufficiency of
+\eqref{eq:xi} in that sense requires a \emph{homogeneous} kernel shared across sites and
+sequences, a fixed grid, an initial law excluded from $\params$, and $\params$-free likelihood
+factors --- the last being what licenses observations at several noise levels to add into one
+$\Xis$. It fails if any of these is relaxed.
 Given those, the maximisation step never revisits the data and costs $O(P\ngrid^2)$ for $P$
 parameters, independently of $\nseq$; observations at different noise levels add into one
 $\Xis$. Forming $\Xis$ costs $O(\nseq\nsites\ngrid^2)$ per iteration and $O(\ngrid^2)$
@@ -388,11 +411,12 @@ storage, so ``one matrix'' is a statement about sufficiency, not about inference
 \citep{fisher1925,cappe2005} gives
 \begin{equation}
 \label{eq:fisher}
-\nabla_\params \log P_\params(x)
-= \E_\params\!\left[\nabla_\params \log P_\params(a,x)\,\middle|\,x\right]
+\nabla_\params \Lik(\params)
+= \sum_{\mu}\E_\params\!\left[\nabla_\params \log P_\params(a,x^\mu)\,\middle|\,x^\mu\right]
 = \big\langle \Xis(\params),\; \nabla_\params \log \kernel_\params \big\rangle ,
 \end{equation}
-the exact gradient of the \emph{marginal} log-likelihood from one sum-product pass. Sum-product
+the exact gradient of the \emph{marginal} log-likelihood from one sum-product pass. Both
+sides are summed over the $\nseq$ observed sequences, matching the definition of $\Xis$. Sum-product
 is not a computation graph to backpropagate through; it supplies the conditional expectation.
 We verify \eqref{eq:fisher} against finite differences of the exact evidence to $\sim10^{-9}$.
 
@@ -402,15 +426,27 @@ $\Qfun$ at each step. Both are implemented and they do not dominate one another:
 smooth Gaussian kernel gradient ascent reaches EM's optimum to $2\times10^{-9}$ nats while
 requiring a tuned step size, and on the Laplace kernel it attains a higher likelihood than
 EM, because there the exact maximiser of $\Qfun$ is a lattice artefact of the discretisation.
-Results below use EM with the exact maximisation step unless stated.
+Results below use EM. For the mixture kernel \eqref{eq:kernel} the maximisation step is
+itself iterative --- the complete-data problem carries a second latent variable, the mixture
+label, and we run four inner conditional-maximisation sweeps --- so it is \emph{generalised}
+EM: each step increases $\Qfun$ without exactly maximising it, which preserves monotone ascent
+but not the exact-maximiser property.
 
 \paragraph{Identifiability.} Two claims must be separated. Gaussian convolution at finite $t$
 is injective on distributions --- the characteristic function acquires a factor
 $e^{-\Dt\|\xi\|^2/2}$, which has no zeros, and $e^{-t}>0$ --- so $\Pt$ determines $\Pz$.
 \emph{Kernel} identifiability does not follow: it additionally requires the initial law to be
-fixed or separately identifiable, the transition family to be identifiable as a parametric
-family, and the mixture \eqref{eq:kernel} to be treated modulo label permutation. We assume
-these rather than prove them.
+fixed or separately identifiable, the transition family to be identifiable as a parametric family, and the mixture
+\eqref{eq:kernel} to be treated modulo label permutation. Two further conditions are easy to
+overlook. Finite-mixture identifiability holds only on the interior of the parameter set ---
+all $\pi_c>0$ and the pairs $(\nu_c,s_c)$ distinct --- which is exactly where an
+over-specified $C$ need not stay; and $\kernel$ is pinned down only on the support of $\mu$,
+so a full-support initial law is required. We assume these rather than prove them. We also
+note that the fitted innovation is not constrained to have zero mean: imposing
+$\sum_c\pi_c\nu_c=0$ by reprojection is not a maximisation step and broke monotone ascent in
+testing, so the condition is monitored as a diagnostic (it lands at the $10^{-3}$ level) rather
+than enforced. Proposition~\ref{prop:lmmse} therefore applies to the true kernel, not
+automatically to the estimated one.
 
 What noising does destroy is \emph{information}, and unevenly. Measured per sequence from
 exact single-chain passes, the Fisher information for the innovation scale falls by a factor
@@ -426,7 +462,9 @@ exact-BP denoising under the true kernel on held-out sequences, at five noise le
 baselines are trained by denoising score matching in both standard parametrisations
 (predicting the noise, and predicting the clean signal); we report the better of the two at
 each noise level, since they win in different regimes and reporting one alone would mislead.
-Full architectural and optimisation details are in Appendix~A.
+\textsc{[pending]} Architectural and optimisation details are being written up as an
+appendix; they are currently read off \coderef{src/denoiser.py}{train\_dsm\_denoiser} and
+\coderef{src/local\_head.py}{train\_local\_head}.
 
 \begin{table}[t]
 \caption{Relative denoising error against exact inference under the true kernel, averaged
@@ -439,35 +477,42 @@ sampling variance.}
 \toprule
 sequences $\nseq$ & network ($25{,}248$ params) & EM--BP ($12$ free) & ratio \\
 \midrule
-32   & $0.6363 \pm 0.0043$ & $\mathbf{0.0651 \pm 0.0031}$ & $9.8$ \\
-128  & $0.5117 \pm 0.0025$ & $\mathbf{0.0333 \pm 0.0035}$ & $15.4$ \\
-512  & $0.2813 \pm 0.0013$ & $\mathbf{0.0211 \pm 0.0022}$ & $13.3$ \\
-1024 & $0.2154 \pm 0.0009$ & $\mathbf{0.0182 \pm 0.0021}$ & $11.8$ \\
-2048 & $0.1756 \pm 0.0009$ & $\mathbf{0.0142 \pm 0.0009}$ & $12.4$ \\
-4096 & $0.1643 \pm 0.0009$ & $\mathbf{0.0124 \pm 0.0005}$ & $13.2$ \\
+32   & $0.6070 \pm 0.0040$ & $\mathbf{0.0651 \pm 0.0031}$ & $9.3$ \\
+128  & $0.4700 \pm 0.0023$ & $\mathbf{0.0333 \pm 0.0035}$ & $14.1$ \\
+512  & $0.2361 \pm 0.0016$ & $\mathbf{0.0211 \pm 0.0022}$ & $11.2$ \\
+1024 & $0.1736 \pm 0.0009$ & $\mathbf{0.0182 \pm 0.0021}$ & $9.5$ \\
+2048 & $0.1372 \pm 0.0010$ & $\mathbf{0.0142 \pm 0.0009}$ & $9.7$ \\
+4096 & $0.1240 \pm 0.0003$ & $\mathbf{0.0124 \pm 0.0005}$ & $10.0$ \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-Table~\ref{tab:pointwise} shows a ratio between $10$ and $15$ across seven doublings of the
-data. The comparison at equal budget is the meaningful one. We note that the network at
+Table~\ref{tab:pointwise} shows a ratio between $9$ and $14$ across seven doublings of the
+data, with no trend in the budget. The network column takes, at each noise level, the better
+of the two parametrisations, as the protocol above states; reporting the noise-predicting
+parametrisation alone --- as an earlier version of this table did --- would overstate the
+network's deficit by $15$ to $30\%$, since predicting the clean signal is the better choice at
+$t\in\{0.8,1.6\}$ at every budget. The comparison at equal budget is the meaningful one. We note that the network at
 $\nseq=4096$ did not reach the error the estimator attains at $\nseq=32$; \textbf{we did not
 observe a crossing}, so we do not quantify a data-equivalence factor, and the extrapolation
 that would be required to do so spans several decades.
 
 \paragraph{Controls.} Capacity is not the explanation: over $24$ configurations from $3.2$k
 to $297$k parameters the best network reaches $0.208$ against the estimator's $0.022$ at
-$\nseq=1024$, and error degrades for the largest models. The baseline is competent: trained
-on a Gaussian chain where the optimal denoiser is linear and closed-form, given four times
-the data and twice the steps, it reaches $0.099$.
+$\nseq=1024$, and error degrades for the largest models. The baseline is competent: trained on a Gaussian chain where the optimal denoiser is linear
+and closed-form, with $3000$ sequences and $12000$ steps, it passes the competence threshold
+asserted in \codefile{tests/test\_em\_bp.py}. The achieved value is not persisted, so it is
+not quoted.
 
 \paragraph{A locality-respecting baseline.} A fully connected network carries no sequential
 prior. Against a weight-shared window predictor --- a one-dimensional convolution --- the
 margin narrows substantially, from roughly $10$ to between $2$ and $4$ over
-$\nseq\in\{128,512,2048\}$. Roughly $60\%$ of the fully connected network's deficit was
-therefore its architecture rather than the estimator. The margin against the convolution
-increases over the three budgets we ran ($2.10\pm0.39$, $3.27\pm0.32$, $4.11\pm0.32$); three
-points do not establish a trend, and we report them as measured. \textbf{These particular
+$\nseq\in\{128,512,2048\}$. Between $58\%$ and $73\%$ of the fully connected network's deficit was therefore its
+architecture rather than the estimator, depending on the budget. The margin against the convolution
+increases over the three budgets we ran --- $2.31\pm0.39$, $3.36\pm0.30$, $4.16\pm0.24$ as
+ratios of seed-averaged errors, or $2.72$, $3.78$, $5.04$ if per-noise-level ratios are formed
+first. Three points do not establish a trend, and the aggregation choice moves the value, so we
+report the range. \textbf{These particular
 numbers used a receptive field selected on the evaluation set} and are exploratory pending a
 rerun with a validation split; the bias favours the baseline, so the margin quoted is if
 anything conservative.
@@ -478,7 +523,7 @@ anything conservative.
 Denoising accuracy is not what a generative model is judged on. Errors enter the reverse
 integration at every step and accumulate unevenly across the schedule, so a pointwise ranking
 need not survive. We therefore integrate the reverse process
-$\mathrm{d}x/\mathrm{d}\tau = x + 2\score(x,\tau) + \gwn$ under each estimator, with common
+$\mathrm{d}x/\mathrm{d}\tau = x + 2\score(x,\tau) + \sqrt{2}\,\gwn$ under each estimator (the noise $\gwn$ is standardised throughout, so the $\sqrt{2}$ is explicit on both the forward and the reverse process), with common
 random numbers across estimators.
 
 \paragraph{Comparing like with like.} Integration must stop at $t_{\min}>0$, since
@@ -488,12 +533,15 @@ rather than the score: independent Gaussian noise of variance $v$ on an innovati
 $\ivar$ multiplies the excess kurtosis by $(\ivar/(\ivar+v))^2$. We instead draw a reference
 from $\Pz$ and noise it forward to the same $t_{\min}$, so both sides are samples of the same
 law and the target moments follow in closed form. Run with the \emph{true} kernel, the sampler
-reproduces that target at every budget ($1.897$--$1.914$ against $1.9098$), which validates
-the integrator and the statistics before any estimator is compared.
+reproduces that target to within $1.4\%$ across budgets --- medians $1.897$, $1.883$, $1.914$,
+$1.908$ at $\nseq=32,128,512,2048$ against a closed-form $1.9098$ --- which validates the
+integrator and the statistics before any estimator is compared. The spread is sampling noise
+and is not systematic in $\nseq$.
 
 \begin{table}[t]
-\caption{Generated-sequence statistics at $\nseq=2048$, Laplace chain, median over four
-seeds, against closed-form targets for $P_{t_{\min}}$. The denoising column repeats the
+\caption{Generated-sequence statistics at $\nseq=2048$, Laplace chain, against closed-form
+targets for $P_{t_{\min}}$. Distributional rows are medians over four seeds; the denoising row
+is a median over seeds \emph{and} the five probed noise levels. The denoising column repeats the
 ranking of \S\ref{sec:pointwise}; the distributional columns do not agree with it.}
 \label{tab:generation}
 \centering

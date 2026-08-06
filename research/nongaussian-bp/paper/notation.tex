@@ -23,7 +23,11 @@
 \newcommand{\Pt}{P_t}                       % noised distribution at time t
 \newcommand{\Dt}{\Delta_t}                  % 1 - e^{-2t}
 \newcommand{\score}{S}                      % S(x,t) = grad log P_t(x)
-\newcommand{\gwn}{\eta}                     % Gaussian white noise, variance 2
+% Standardised Gaussian white noise: <eta(t)eta(t')> = delta(t-t'). The source's section 2
+% uses this convention in its Eq (3) but a variance-2 convention in its Eqs (1) and (18); we
+% fix the standardised one everywhere and carry the sqrt(2) explicitly in both the forward
+% and the reverse SDE, so that Delta_t = 1 - e^{-2t} is consistent throughout.
+\newcommand{\gwn}{\eta}
 
 % Posterior mean, in the source's bracket notation rather than E[a|x].
 \newcommand{\pmean}[1]{\langle #1 \rangle_{x,t}}
@@ -59,3 +63,7 @@
 % --- Estimators ------------------------------------------------------------
 \newcommand{\mmse}{\widehat{a}_{\mathrm{MMSE}}}
 \newcommand{\lmmse}{\widehat{a}_{\mathrm{LMMSE}}}
+
+% --- Repository pointers (shared by the note and the compendium) ------------
+\providecommand{\coderef}[2]{\texttt{\small #1}\,$\rightarrow$\,\texttt{\small #2}}
+\providecommand{\codefile}[1]{\texttt{\small #1}}
