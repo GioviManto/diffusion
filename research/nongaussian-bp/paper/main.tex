@@ -343,8 +343,8 @@ recursion returns the same function of $x$ for every innovation law with moments
 --- in particular the same as on the covariance-matched \emph{Gaussian} chain. On that chain
 every message is exactly Gaussian, so the moment projection is the identity and the recursion
 is exact; exact inference returns the posterior mean, which for jointly Gaussian zero-mean
-$(a,x)$ coincides with the LMMSE estimator by Proposition~\ref{prop:orthogonality} restricted
-to linear estimators.
+$(a,x)$ the posterior mean is linear in $x$ and therefore coincides with the LMMSE estimator,
+which is the best \emph{linear} estimator under squared loss.
 \end{proof}
 \noindent
 On the Laplace chain the information-form recursion is verified against the closed-form
@@ -473,9 +473,9 @@ appendix; they are currently read off \coderef{src/denoiser.py}{train\_dsm\_deno
 
 \begin{table}[t]
 \caption{Relative denoising error against exact inference under the true kernel, averaged
-over the noise schedule. Mean over six training seeds, $\pm$ one standard error. The seeds
-vary initialisation at fixed data, so these intervals measure optimisation variance and not
-sampling variance.}
+over the noise schedule. Mean over six replicates, $\pm$ one standard error. Each replicate
+draws a fresh training set and a fresh initialisation, so the intervals cover both sampling and
+optimisation variance; the held-out test set and its exact reference are common to all six.}
 \label{tab:pointwise}
 \centering
 \begin{tabular}{rccc}
@@ -562,13 +562,16 @@ worst covariance-lag error & $\mathbf{0.0292}$ & $0.0973$ & $0.0518$ & $0$ \\
 \end{tabular}
 \end{table}
 
-Table~\ref{tab:generation} is the paper's main empirical finding, and it is a dissociation.
-The structured estimator is an order of magnitude more accurate pointwise and three times
-better on second-order structure, and yet the convolutional network reproduces the
-\emph{innovation law} more faithfully, by both kurtosis and divergence. The fully connected
-network shows the pattern most sharply: over the same range its denoising error improves
-twelvefold while its generated kurtosis degrades from $0.850$ to $0.206$. It fits the bulk of
-the posterior and loses the tail.
+At the mixture size used for Table~\ref{tab:generation} the two rankings disagree. The
+estimator is an order of magnitude more accurate pointwise and three times better on
+second-order structure, and yet the convolutional network reproduces the \emph{innovation law}
+more faithfully, by both kurtosis and divergence. The fully connected network shows the pattern
+most sharply: over the same range its denoising error improves twelvefold while its generated
+kurtosis degrades from $0.850$ to $0.206$. It fits the bulk of the posterior and loses the
+tail.
+
+Two questions follow, and we answer both: whether this is an artefact of the setting, and what
+causes it.
 
 \paragraph{The dissociation generalises.} It is not a property of the Laplace chain, of the
 chain length, or of the quadrature. Across the four non-Gaussian families of
@@ -594,7 +597,10 @@ The estimator overtakes the network between $C=4$ and $C=8$ and is ahead of it b
 \begin{table}[t]
 \caption{Generated innovation excess kurtosis against the mixture component count, $\nseq=2048$,
 Laplace chain, median over three seeds. The network arms do not depend on $C$ and are identical
-down the table, which is an internal consistency check rather than a result. Target $1.910$.}
+down the table, which is an internal consistency check rather than a result. Target $1.910$.
+The $C=4$ row differs slightly from Table~\ref{tab:generation} ($0.812$ against $0.897$)
+because it comes from an independent three-replicate run rather than the four-replicate run
+used there; the gap is about two standard errors and is replicate noise, not a discrepancy.}
 \label{tab:components}
 \centering
 \begin{tabular}{rcccc}
@@ -622,8 +628,8 @@ axes simultaneously.
 
 The model assumes exact first-order Markov structure; under a non-Markov prior the estimator
 is misspecified in a way more data does not repair. The transition family
-\eqref{eq:kernel} may additionally be misspecified, and \S\ref{sec:generation} suggests it is,
-for the tails. The initial law is fixed rather than estimated. Sum-product is exact on the
+\eqref{eq:kernel} is additionally misspecified for the tails at small $C$, which
+\S\ref{sec:generation} measures and shows is relieved by enlarging $C$. The initial law is fixed rather than estimated. Sum-product is exact on the
 posterior chain but the implementation is a discretisation whose error, for the Laplace
 family, is second order rather than spectral.
 
@@ -633,16 +639,15 @@ calls the denoiser at every step, this is the practical weak point. Training is 
 and the estimator's cost grows linearly in $\nseq$ while the network's is fixed by its step
 count, so the advantage is in data and not in wall-clock. The low parameter count is not free:
 it is bought with a structural assumption, and the advantage narrows as the parametric
-dimension grows --- on a discrete-alphabet variant it falls from $15$ to $4.4$ as the
-estimated dimension goes from $6$ to $132$ parameters.
+dimension grows --- on a discrete-alphabet variant it falls from about $15$ at six estimated
+parameters to between $3.6$ and $6.1$ at $132$, the spread reflecting how the ratio is
+aggregated across noise levels.
 
 The family, length and grid sweeps use a single
 mixture size, so the interaction between $C$ and pointwise accuracy is not yet measured, and
 the claim that a richer kernel improves generation is established for the generated
 distribution only. Comparisons are against the two architectures described and do not license
-a claim about neural denoisers in general. The discrete-alphabet figure quoted above is
-aggregation-sensitive: the $15$ is robust, the $4.4$ is not, and the two endpoints are not
-computed the same way.
+a claim about neural denoisers in general.
 
 \section{Conclusion}
 

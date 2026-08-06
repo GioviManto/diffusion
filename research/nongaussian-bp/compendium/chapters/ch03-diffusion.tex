@@ -66,7 +66,7 @@ Noising is applied wherever an experiment needs it, always as
 \texttt{alpha * a + sqrt(delta) * rng.standard\_normal(...)} with
 \texttt{alpha = exp(-t)}, \texttt{delta = 1 - exp(-2t)}. See for instance
 \coderef{experiments/exp\_16\_sampling\_validation.py}{fit\_arms}, and
-\coderef{src/denoiser.py}{alpha\_delta} for the coefficient pair.
+\coderef{src/noising.py}{alpha\_delta} for the coefficient pair.
 \end{codebox}
 
 \section{The noised distribution \texorpdfstring{$\Pt$}{Pt}}

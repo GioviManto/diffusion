@@ -44,6 +44,7 @@ is not the representational constraint. \\
 \end{center}
 
 \section{The result that changed the framing}
+\label{sec:dissociation}
 
 \codefile{exp\_16} compares the same estimators \emph{through reverse diffusion} rather than
 pointwise. The validation passes first: run with the true kernel, the sampler reproduces the
@@ -56,14 +57,10 @@ faithfully by both kurtosis and divergence. The fully connected network shows it
 over the same range its denoising error improves twelvefold while its generated kurtosis
 degrades from $0.850$ to $0.206$.
 
-\begin{intuition}
-A plausible mechanism, not established. Both the marginal likelihood that EM maximises and the
-squared-error denoising loss are dominated by the bulk of the distribution. The tail of
-$\innov$ carries little mass and so little weight in either objective, while contributing
-disproportionately to the shape statistics that reverse diffusion exposes. This is the same
-asymmetry measured in \S\ref{ch:estimation}: the channel destroys innovation-shape information
-$142$-fold against $26$-fold for the correlation, and the estimator sees only noised data.
-\end{intuition}
+That is the observation. It raises two questions --- whether it is an artefact of this
+particular setting, and what causes it --- and \S\ref{sec:resolved} answers both. The reader
+who wants the conclusion rather than the sequence can skip there directly; what follows is
+worth reading only for how the two candidate explanations were separated.
 
 \section{Resolved since: the dissociation is a capacity effect}
 \label{sec:resolved}
@@ -102,7 +99,9 @@ $C$ & exact & EM--BP & local CNN & global MLP \\
 
 \noindent
 (Generated innovation excess kurtosis, $\nseq=2048$, Laplace chain, median over three seeds,
-target $1.910$.) The estimator climbs monotonically, is still climbing at $C=16$, and
+target $1.910$. The $C=4$ entry reads $0.812$ here against $0.897$ in the four-replicate run
+quoted earlier; both are the same configuration and the gap is about two standard errors of
+replicate noise.) The estimator climbs monotonically, is still climbing at $C=16$, and
 overtakes the network between $C=4$ and $C=8$. So the deficit is \textbf{capacity}. The
 network columns are constant down the table because they do not depend on $C$ --- an internal
 consistency check rather than a finding.
