@@ -68,10 +68,10 @@ locality-respecting one. We then compare the same estimators through reverse dif
 small innovation parametrisation the ranking does not carry over --- the estimator remains the
 most accurate pointwise while a convolutional network reproduces the innovation law more
 faithfully --- and this holds across four non-Gaussian families, three chain lengths, and is
-unchanged by a fourfold grid refinement. Varying the parametrisation identifies the cause: the
-generated tail is limited by the capacity of the innovation model rather than by the
-information in noised data, and the estimator overtakes the network once the mixture is rich
-enough. We report both the dissociation and its resolution, since the first is what a fixed
+unchanged by a fourfold grid refinement. It vanishes on a Gaussian chain, where the innovation
+model is exact. Varying the parametrisation identifies the cause: the generated tail is limited
+by the capacity of the innovation model rather than by the information in noised data, and the
+estimator overtakes the network once the mixture is rich enough. We report both the dissociation and its resolution, since the first is what a fixed
 model class produces and the second is what fixes it.
 \end{abstract}
 
@@ -260,8 +260,8 @@ throughout.
   \node[fac] (w\i) at (2.1*\i+1.05, 0) {};
   \draw (a\i) -- (w\i) -- (a\j);
 }
-\node[right=1mm of w3, yshift=3.5mm] {\small $\kernel(a_{i}\mid a_{i-1})$};
-\node[right=1mm of f4] {\small $\like(x_i\mid a_i)$};
+\node[above=1mm of w2] {\small $\kernel(a_{i}\mid a_{i-1})$};
+\node[right=2mm of f4] {\small $\like(x_i\mid a_i)$};
 \draw[-{Stealth}, thick] (1.2,0.6) -- (2.6,0.6) node[midway,above] {\small $\lmsg$};
 \draw[-{Stealth}, thick] (9.3,0.6) -- (7.9,0.6) node[midway,above] {\small $\rmsg$};
 \end{tikzpicture}
@@ -306,6 +306,48 @@ to $10^{-2}$ relative at $2\times10^6$ (\codefile{tests/test\_em\_bp.py}). These
 in the test suite rather than recorded measurements, and their tolerances are set by the Monte
 Carlo error rather than by the grid. Both are reported because they validate different things; neither is the accuracy of
 the other.
+
+\section{The Gaussian chain as a warm-up and a control}
+\label{sec:gaussian}
+
+Before anything non-Gaussian, it is worth setting out the case where every quantity is
+available in closed form. It serves three purposes: it fixes intuition, it validates the
+implementation, and it later acts as a negative control.
+
+Take $\innov = \normal{0}{\ivar}$. Then $a$ is jointly Gaussian with
+$(\Sigma_0)_{ij}=\corr^{|i-j|}$, and so is $x$, with $\Sigma_t = e^{-2t}\Sigma_0 + \Dt I$. The posterior
+mean is linear and the score follows immediately:
+\begin{equation}
+\label{eq:gaussian-closed}
+\pmean{a} = e^{-t}\Sigma_0\Sigma_t^{-1}x,
+\qquad
+\score(x,t) = -\Sigma_t^{-1}x .
+\end{equation}
+The clean precision $\Sigma_0^{-1}$ is tridiagonal --- expanding
+$\Pz(a)\propto\exp[-\tfrac{1}{2\ivar}\sum_i(a_i-\corr a_{i-1})^2]$ produces only $a_i^2$ and
+$a_ia_{i-1}$ terms --- and the posterior precision $(e^{-2t}/\Dt)I + \Sigma_0^{-1}$ stays
+tridiagonal at every $t$. Being Markov is a statement about the precision, not the covariance,
+which is dense.
+
+\paragraph{What it buys.} Three things.
+
+\emph{Intuition.} The score is a fixed linear map, so the denoising problem is linear
+regression. This is exactly why a Gaussian prior is a poor probe of structure --- every method
+capable of linear regression is optimal --- and it makes precise what the non-Gaussian case
+adds.
+
+\emph{Validation.} Because \eqref{eq:gaussian-closed} is exact, it is the reference against
+which the general recursion of \S\ref{sec:bp} is checked. At the working resolution the
+discretised recursion reproduces it to $9.2\times10^{-15}$ relative. Independently, the
+recursion agrees with brute-force enumeration of the discretised posterior --- summing over all
+$\ngrid^{\nsites}$ configurations, sharing no code with the message passing --- to
+$1.6\times10^{-14}$ on posterior means and $1.8\times10^{-15}$ on the log-evidence. Neither
+check involves any non-Gaussian machinery, which is the point: the pipeline is verified where
+the answer is known before it is used where it is not.
+
+\emph{A control.} Since the moment closure of \S\ref{sec:closure} is exact here, the Gaussian
+chain is the case in which the approximation costs nothing. Any effect that persists on it is
+not attributable to non-Gaussianity, and \S\ref{sec:generation} uses this.
 
 \section{Gaussian closure and the LMMSE estimator}
 \label{sec:closure}
@@ -573,12 +615,40 @@ tail.
 Two questions follow, and we answer both: whether this is an artefact of the setting, and what
 causes it.
 
+\begin{table}[t]
+\caption{Generated innovation excess kurtosis by innovation family, $\nseq=2048$, $C=4$,
+median over three seeds. Families are variance-matched, so they share the covariance
+$\corr^{|i-j|}$ exactly and differ only beyond second moments. The final column is
+$|\text{EM--BP}-\text{exact}| - |\text{CNN}-\text{exact}|$: positive means the network is
+closer to the truth, which is the dissociation.}
+\label{tab:families}
+\centering
+\begin{tabular}{lccccr}
+\toprule
+family & exact & EM--BP & local CNN & global MLP & dissociation \\
+\midrule
+Gaussian & $-0.022$ & $0.019$ & $0.047$ & $0.053$ & $\mathbf{-0.028}$ \\
+mixture  & $-0.467$ & $-0.040$ & $-0.133$ & $0.030$ & $0.094$ \\
+uniform  & $-0.766$ & $-0.056$ & $-0.302$ & $0.018$ & $0.245$ \\
+Laplace  & $1.921$ & $0.812$ & $1.273$ & $0.170$ & $0.462$ \\
+Student  & $2.940$ & $0.989$ & $1.478$ & $0.191$ & $0.489$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Table~\ref{tab:families} adds a control that the capacity explanation predicts and that a
+purely information-theoretic one would not. \textbf{On the Gaussian chain the dissociation
+disappears} --- the final column is $-0.028$, i.e.\ within noise of zero and if anything
+favouring the estimator. That is what should happen if the cause is capacity: a four-component
+mixture represents a Gaussian innovation exactly, so there is no deficit to expose. Across the
+remaining families the size of the dissociation orders with how badly that mixture
+misrepresents the innovation, from $0.094$ for the mildly bimodal case to $0.489$ for the
+heaviest tail.
+
 \paragraph{The dissociation generalises.} It is not a property of the Laplace chain, of the
-chain length, or of the quadrature. Across the four non-Gaussian families of
-\S\ref{sec:setting} at matched covariance the convolutional network is closer to the target
-innovation kurtosis than the estimator at $C=4$ in every case (Laplace $1.273$ against
-$0.812$, target $1.921$; Student $1.478$ against $0.989$, target $2.940$; and likewise for the
-two negatively-kurtotic families). It is unchanged at $\nsites\in\{32,64,128\}$, and
+chain length, or of the quadrature. It holds across all four non-Gaussian
+families at matched covariance (Table~\ref{tab:families}), is unchanged at
+$\nsites\in\{32,64,128\}$, and is
 \textbf{identical to three decimals} under grid refinement $\ngrid\in\{401,801,1601\}$, which
 rules out quadrature as the cause.
 
