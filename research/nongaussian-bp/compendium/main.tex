@@ -1,0 +1,108 @@
+\documentclass[11pt,a4paper]{report}
+
+\usepackage[margin=2.6cm]{geometry}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{amsmath,amssymb,amsthm,amsfonts}
+\usepackage{empheq}
+\usepackage[round]{natbib}
+\usepackage{booktabs}
+\usepackage{graphicx}
+\usepackage{microtype}
+\usepackage{tikz}
+\usetikzlibrary{positioning, arrows.meta, fit, calc, decorations.pathreplacing}
+\usepackage[hidelinks,colorlinks=true,linkcolor=blue!45!black,citecolor=blue!45!black]{hyperref}
+\usepackage{fancyhdr}
+\usepackage{tcolorbox}
+\tcbuselibrary{skins,breakable}
+\usepackage{enumitem}
+
+\input{../paper/notation}
+
+\theoremstyle{plain}
+\newtheorem{proposition}{Proposition}[chapter]
+\newtheorem{lemma}[proposition]{Lemma}
+\newtheorem{theorem}[proposition]{Theorem}
+\theoremstyle{definition}
+\newtheorem{definition}[proposition]{Definition}
+\newtheorem{example}[proposition]{Example}
+\theoremstyle{remark}
+\newtheorem{remark}[proposition]{Remark}
+
+\newtcolorbox{intuition}[1][]{breakable, colback=blue!3, colframe=blue!25,
+  boxrule=0.5pt, left=6pt, right=6pt, top=5pt, bottom=5pt,
+  title=\textbf{Intuition}, fonttitle=\small\bfseries, #1}
+\newtcolorbox{pitfall}[1][]{breakable, colback=red!3, colframe=red!25,
+  boxrule=0.5pt, left=6pt, right=6pt, top=5pt, bottom=5pt,
+  title=\textbf{What goes wrong without this}, fonttitle=\small\bfseries, #1}
+\newtcolorbox{codebox}[1][]{breakable, colback=black!3, colframe=black!25,
+  boxrule=0.5pt, left=6pt, right=6pt, top=5pt, bottom=5pt,
+  title=\textbf{In the code}, fonttitle=\small\bfseries, #1}
+
+% Exact pointer into the repository. Every mathematical object in this document that is
+% realised in code carries one of these. Paths are relative to research/nongaussian-bp/.
+% (defined in ../paper/notation.tex, shared with the note)
+
+\pagestyle{fancy}
+\fancyhf{}
+\lhead{\small\leftmark}
+\rhead{\small\thepage}
+\renewcommand{\headrulewidth}{0.4pt}
+
+\title{\vspace{-2cm}\textbf{Diffusion Scores for Markov Data}\\[0.4em]
+\Large A technical compendium\\[1.2em]
+\large\normalfont Exact inference on the noised chain, estimation of the transition
+kernel, and comparison with neural denoisers}
+
+\author{Giovanni Mantovani\\
+\small Department of Computing Sciences, Bocconi University\\
+\small \texttt{giovanni.mantovani@studbocconi.it}}
+
+\date{\today}
+
+\begin{document}
+
+\maketitle
+
+\begin{center}
+\begin{tcolorbox}[width=0.9\textwidth, colback=black!3, colframe=black!30]
+\textbf{Status.} Work in progress, circulated internally. This document is the long-form
+companion to the internal note \emph{Diffusion scores for Markov data}. Where the note states
+a result, this document derives it. Chapters covering experiments still running are marked
+\textsc{[pending]} and will be completed as those results land; nothing marked pending is
+relied on elsewhere.
+\end{tcolorbox}
+\end{center}
+
+\vspace{1em}
+
+\begin{center}
+\begin{minipage}{0.86\textwidth}
+\small
+\textbf{Who this is for.} A reader who knows undergraduate probability and linear algebra and
+nothing about diffusion models, graphical models, or expectation maximisation. Every concept
+used anywhere in the project is built here from its definition. Nothing is cited in place of
+an explanation. Where a step is standard but non-obvious, it is done in full rather than
+asserted, and where an assumption is doing real work, there is a box saying what breaks
+without it.
+\end{minipage}
+\end{center}
+
+\tableofcontents
+
+\input{chapters/ch01-orientation}
+\input{chapters/ch02-probability}
+\input{chapters/ch03-diffusion}
+\input{chapters/ch04-score}
+\input{chapters/ch05-markov}
+\input{chapters/ch06-graphical}
+\input{chapters/ch07-bp}
+\input{chapters/ch08-gaussian}
+\input{chapters/ch09-numerics}
+\input{chapters/ch10-estimation}
+\input{chapters/ch11-status}
+
+\bibliographystyle{plainnat}
+\bibliography{../paper/bibliography}
+
+\end{document}

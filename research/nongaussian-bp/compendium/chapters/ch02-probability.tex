@@ -1,0 +1,180 @@
+\chapter{Probability, conditioning, and estimation}
+\label{ch:probability}
+
+This chapter fixes the small amount of probability the rest of the document uses. A reader
+comfortable with conditional expectation and the orthogonality principle can skip to
+Chapter~\ref{ch:diffusion}, pausing only at \S\ref{sec:bayesopt}, whose result is used
+constantly.
+
+\section{Densities, joints, conditionals}
+
+We work with random vectors on $\Reals^{\nsites}$ with densities. Write $P(a)$ for the density
+of $a$, $P(a,x)$ for a joint density, and
+\begin{equation}
+P(a\mid x) \;=\; \frac{P(a,x)}{P(x)},
+\qquad
+P(x) \;=\; \int \mathrm{d}a\; P(a,x),
+\end{equation}
+for the conditional. The second equation --- integrating out what one does not care about ---
+is called \emph{marginalisation}, and it is the operation that will turn out to be expensive
+and that all the machinery in Chapter~\ref{ch:bp} exists to make cheap.
+
+Bayes' rule is the same statement rearranged:
+\begin{equation}
+\label{eq:bayes}
+P(a \mid x) \;=\; \frac{P(x\mid a)\,P(a)}{P(x)} \;\propto\; \underbrace{P(x\mid a)}_{\text{likelihood}}\;\underbrace{P(a)}_{\text{prior}} .
+\end{equation}
+The proportionality is in $a$: the denominator $P(x)$ does not depend on $a$ and serves only
+to normalise. Almost every calculation in this document works with the unnormalised product
+and restores the constant at the end, because the constant is usually the expensive part.
+
+\begin{intuition}
+The prior says what clean data look like before seeing anything. The likelihood says how
+plausible the observation is for each candidate clean value. Their product, renormalised, is
+what one should believe after seeing the observation. In our setting the prior is the Markov
+chain and the likelihood is the noise model.
+\end{intuition}
+
+\section{Expectation and conditional expectation}
+
+The expectation of $g(a)$ is $\E[g(a)] = \int \mathrm{d}a\, P(a) g(a)$. The
+\emph{conditional} expectation given $x$ is the same integral against the conditional density,
+\begin{equation}
+\E[g(a)\mid x] \;=\; \int \mathrm{d}a\; P(a\mid x)\, g(a).
+\end{equation}
+Following the notation of the diffusion literature we are matching, we write the conditional
+mean of the clean signal with angle brackets,
+\begin{equation}
+\pmean{a} \;:=\; \E[a \mid x, t] \;=\; \int \mathrm{d}a\; P(a\mid x,t)\, a ,
+\end{equation}
+where the subscript records that the conditioning is on the observation $x$ at noise level
+$t$. Componentwise, $\pmeansite{i}$ is the posterior mean at site $i$.
+
+A fact used repeatedly: conditional expectation is a \emph{function of $x$}, not a number. It
+is the function that will be estimated, whether by exact computation or by a neural network.
+
+\section{The Bayes-optimal estimator under squared loss}
+\label{sec:bayesopt}
+
+This is the single most-used result in the document, so it is proved rather than quoted.
+
+\begin{proposition}[Orthogonality]
+\label{prop:orthogonality}
+Let $a$ have finite second moment. For any $u$ that is a function of $x$ alone,
+\begin{equation}
+\label{eq:orth}
+\E\!\left[\|a-u\|^2 \,\middle|\, x\right]
+\;=\;
+\E\!\left[\|a-\pmean{a}\|^2 \,\middle|\, x\right]
+\;+\;
+\|u-\pmean{a}\|^2 .
+\end{equation}
+Consequently $\pmean{a}$ minimises the conditional mean squared error, and hence also the
+unconditional one.
+\end{proposition}
+
+\begin{proof}
+Insert and subtract $\pmean{a}$:
+\[
+\|a-u\|^2 = \|(a - \pmean{a}) + (\pmean{a} - u)\|^2
+= \|a-\pmean{a}\|^2 + 2\langle a - \pmean{a},\, \pmean{a}-u\rangle + \|\pmean{a}-u\|^2 .
+\]
+Take $\E[\cdot\mid x]$. In the cross term, $\pmean{a}-u$ is a function of $x$ only, so it is
+constant under the conditional expectation and can be pulled out:
+\[
+\E\!\left[\langle a - \pmean{a},\, \pmean{a}-u\rangle \,\middle|\, x\right]
+= \big\langle \E[a\mid x] - \pmean{a},\; \pmean{a}-u \big\rangle = 0 ,
+\]
+since $\E[a\mid x] = \pmean{a}$ by definition. The remaining two terms give \eqref{eq:orth}.
+The first is independent of $u$ and the second is non-negative and vanishes only at
+$u = \pmean{a}$. Taking a further expectation over $x$ preserves the minimiser.
+\end{proof}
+
+Two consequences deserve emphasis.
+
+\paragraph{There is an irreducible floor.} The first term of \eqref{eq:orth} does not depend
+on the estimator. It is the posterior variance, and no denoiser --- exact, learned, or
+otherwise --- can go below it. A reported denoising loss is therefore uninterpretable without
+knowing that floor.
+
+\begin{pitfall}
+Early in this project a test asserted that a network should achieve a $40\%$ reduction in
+denoising loss. That target was arithmetically impossible: with the floor at $7.4$ and the
+loss of the trivial predictor $f\equiv0$ at $12.06$, the largest achievable reduction was
+$39\%$. The test could never pass however well the network trained. The fix was to report the
+\emph{fraction of the achievable reduction} rather than the raw one.
+\begin{codebox}
+\coderef{src/sample\_metrics.py}{bayes\_risk} computes the floor;
+\coderef{src/sample\_metrics.py}{pointwise\_ladder} returns
+\texttt{fraction\_achievable\_captured} alongside the raw loss for exactly this reason.
+\end{codebox}
+\end{pitfall}
+
+\paragraph{Optimality is loss-specific.} Proposition~\ref{prop:orthogonality} is about squared
+error. Under absolute error the optimal estimator is the posterior median; under $0$--$1$ loss
+it is the mode. Diffusion training uses squared error, which is why the posterior \emph{mean}
+is the relevant functional --- not because it is intrinsically the right summary of a
+posterior.
+
+\section{Linear estimators and LMMSE}
+\label{sec:lmmse-intro}
+
+Sometimes one restricts to estimators of the form $\widehat{a} = Bx$ for a matrix $B$. The
+best such estimator under squared loss is the \emph{linear minimum mean squared error}
+estimator, and it depends on the joint distribution only through second moments.
+
+\begin{proposition}
+\label{prop:lmmse-general}
+Let $a, x$ have zero mean and finite second moments, with $\Cov(x)$ invertible. Then
+\begin{equation}
+\label{eq:lmmse-general}
+\lmmse \;=\; \Cov(a,x)\,\Cov(x)^{-1} x
+\end{equation}
+minimises $\E\|a - Bx\|^2$ over matrices $B$.
+\end{proposition}
+
+\begin{proof}
+Expand $\E\|a-Bx\|^2 = \operatorname{tr}\!\big(\Cov(a) - 2B\Cov(x,a) + B\Cov(x)B^{\!\top}\big)$
+and differentiate with respect to $B$:
+$-2\Cov(a,x) + 2B\Cov(x) = 0$, so $B = \Cov(a,x)\Cov(x)^{-1}$. The objective is convex in $B$
+because $\Cov(x)\succ0$, so the stationary point is the minimum.
+\end{proof}
+
+\begin{intuition}
+LMMSE is what one gets from knowing only the covariance structure. If the joint distribution
+happens to be Gaussian, the conditional mean is already linear and LMMSE coincides with the
+Bayes-optimal estimator. Otherwise LMMSE is strictly worse, and the gap is exactly the value
+of the higher-order structure. Chapter~\ref{ch:gaussian} shows that a natural and widely used
+approximation to exact inference silently computes LMMSE, which is why the distinction
+matters so much here.
+\end{intuition}
+
+\section{Two ways a distribution can be ``the data''}
+\label{sec:empirical}
+
+This distinction causes a common error, so it is fixed now.
+
+The \emph{population} distribution $\Pz$ is the true source of the data. One never has it ---
+one has $\nseq$ samples $a^1,\dots,a^{\nseq}$ drawn from it. Those samples define the
+\emph{empirical} distribution
+\begin{equation}
+\label{eq:empirical}
+\widehat{P}_0 \;=\; \frac{1}{\nseq}\sum_{\mu=1}^{\nseq} \delta_{a^\mu},
+\end{equation}
+a sum of point masses. It is a perfectly good probability distribution, and it is not the
+population one.
+
+Correspondingly there are two versions of any quantity defined from a distribution: the
+population posterior mean, computed under $\Pz$, and the empirical posterior mean, computed
+under $\widehat{P}_0$. A training procedure that minimises an average over the observed
+samples is minimising the \emph{empirical} objective, and its unrestricted optimum is the
+\emph{empirical} posterior mean.
+
+\begin{pitfall}
+It is tempting --- and wrong --- to say that the population objective is minimised by the
+empirical score. The population objective is minimised by the population posterior mean, by
+Proposition~\ref{prop:orthogonality}; it is the \emph{empirical} objective whose optimum is
+the empirical posterior mean. The distinction is the whole content of the memorisation
+discussion in \S\ref{sec:memorisation}, and conflating the two makes that discussion
+incoherent. An earlier draft of the accompanying note contained exactly this error.
+\end{pitfall}

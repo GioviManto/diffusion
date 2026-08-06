@@ -1,0 +1,188 @@
+\chapter{The score is the posterior mean}
+\label{ch:score}
+
+This chapter proves the identity that makes the whole project possible: the score, which is
+what the reverse process needs, is a rescaling of the posterior mean, which is what inference
+computes. They are the same problem.
+
+\section{The derivation}
+
+Start from \eqref{eq:pt-def} and differentiate with respect to $x$. The only $x$-dependence is
+in the Gaussian factor, and
+\[
+\nabla_x \exp\!\left[-\frac{\|x-e^{-t}a\|^2}{2\Dt}\right]
+= -\,\frac{x - e^{-t}a}{\Dt}\,
+\exp\!\left[-\frac{\|x-e^{-t}a\|^2}{2\Dt}\right],
+\]
+so
+\begin{equation}
+\label{eq:grad-pt}
+\nabla_x \Pt(x)
+= \int \mathrm{d}a\; \Pz(a)\;
+\left(-\frac{x - e^{-t}a}{\Dt}\right)
+\frac{1}{(2\pi\Dt)^{\nsites/2}}
+\exp\!\left[-\frac{\|x - e^{-t}a\|^2}{2\Dt}\right].
+\end{equation}
+
+Now divide by $\Pt(x)$. By Bayes' rule \eqref{eq:bayes}, the quantity
+\[
+\frac{
+\Pz(a)\,(2\pi\Dt)^{-\nsites/2}\exp\!\left[-\|x-e^{-t}a\|^2/2\Dt\right]
+}{\Pt(x)}
+\]
+is exactly the posterior density $P(a\mid x,t)$: numerator is prior times likelihood,
+denominator is the evidence. So \eqref{eq:grad-pt} becomes
+\[
+\score(x,t) = \frac{\nabla_x\Pt(x)}{\Pt(x)}
+= \int \mathrm{d}a\; P(a\mid x,t)\left(-\frac{x-e^{-t}a}{\Dt}\right)
+= -\frac{x}{\Dt} + \frac{e^{-t}}{\Dt}\int \mathrm{d}a\; P(a\mid x,t)\,a ,
+\]
+and the remaining integral is the posterior mean. Hence
+
+\begin{empheq}[box=\fbox]{equation}
+\label{eq:score-final}
+\score(x,t) \;=\; \nabla_x\log\Pt(x)
+\;=\; -\,\frac{x - e^{-t}\,\pmean{a}}{\Dt}.
+\end{empheq}
+
+\paragraph{When is the differentiation legitimate?} Interchanging $\nabla_x$ and $\int
+\mathrm{d}a$ requires a dominating function. The integrand's gradient is bounded in absolute
+value by
+\[
+\Pz(a)\,\frac{|x-e^{-t}a|}{\Dt}\,\frac{e^{-\|x-e^{-t}a\|^2/2\Dt}}{(2\pi\Dt)^{\nsites/2}},
+\]
+and for $x$ in a neighbourhood of any fixed point this is dominated by
+$C(1+\|a\|)\Pz(a)$ for a constant $C$ depending on $\Dt$ and the neighbourhood, since the
+Gaussian factor is bounded and decays. That dominating function is integrable exactly when
+$\Pz$ has a finite first moment. Dominated convergence then applies. All the priors used here
+have moments of every order, so the condition is not restrictive.
+
+\begin{intuition}
+The formula says something concrete. Rearranged,
+$\pmean{a} = e^{t}\!\left(x + \Dt\,\score(x,t)\right)$: to guess the clean signal, take the
+observation, step along the score by an amount proportional to how noisy things are, and undo
+the shrinkage. At small $t$, $\Dt$ is small and the correction is tiny --- the observation is
+already almost the answer. At large $t$, $\Dt\to1$ and the correction does all the work.
+\end{intuition}
+
+\begin{codebox}
+\coderef{src/bp\_grid.py}{score\_from\_posterior\_mean} and
+\coderef{src/denoiser.py}{score\_from\_mean} both implement \eqref{eq:score-final}. Every arm
+in every comparison converts a posterior mean to a score through one of these, so no arm can
+gain an advantage from a different convention.
+\end{codebox}
+
+\section{Consequences worth stating}
+
+\subsection{Estimating the score and denoising are one problem}
+
+There is no separate ``score model''. A denoiser and a score model are the same object in two
+coordinate systems. This is why diffusion models can be trained by a regression loss on clean
+signals and then used to drive a differential equation --- the training target and the
+sampling requirement are related by \eqref{eq:score-final}.
+
+\subsection{The two error measures differ by a known factor}
+\label{sec:reweighting}
+
+Applying \eqref{eq:score-final} to two different denoisers $\widehat{m}$ and $m^\star$ and
+subtracting, the $x$ terms cancel:
+\begin{equation}
+\label{eq:reweight}
+\widehat{\score} - \score^\star
+= \frac{e^{-t}}{\Dt}\left(\widehat{m} - m^\star\right),
+\qquad\text{so}\qquad
+\big\|\widehat{\score} - \score^\star\big\|
+= \frac{e^{-t}}{\Dt}\,\big\|\widehat{m} - m^\star\big\| .
+\end{equation}
+
+Score error and posterior-mean error are therefore \emph{the same measurement} up to the
+factor $e^{-t}/\Dt$. That factor is not mild: it runs from about $6.0$ at $t=0.08$ to about
+$0.09$ at $t=2.4$, a spread of roughly $65$.
+
+\begin{pitfall}
+Reporting only a score error silently weights the low-noise end of the schedule about
+sixty-five times more heavily than the high-noise end, relative to reporting a posterior-mean
+error. Two methods can therefore be ranked differently by the two metrics without either
+metric being wrong. This project reports both, and states the factor, so that a reader can
+convert. Earlier work here reported score error alone.
+\begin{codebox}
+\coderef{src/metrics.py}{score\_mean\_identity\_residual} checks \eqref{eq:reweight} holds to
+machine precision for any pair of denoisers --- a large residual means an implementation bug,
+not a modelling difference. \coderef{src/sample\_metrics.py}{pointwise\_ladder} emits
+\texttt{score\_reweighting} next to every error it reports.
+Verified in \coderef{tests/test\_sample\_metrics.py}{test\_score\_reweighting\_matches\_the\_tweedie\_factor}
+and \texttt{test\_reweighting\_spans\_the\_claimed\_range\_across\_the\_schedule}.
+\end{codebox}
+\end{pitfall}
+
+\subsection{The Gaussian case, as a check}
+
+If $\Pz = \normal{0}{\Sigma_0}$ then $x$ is Gaussian with covariance
+$\Sigma_t = e^{-2t}\Sigma_0 + \Dt I$, and the posterior mean is linear:
+\begin{equation}
+\label{eq:gaussian-mean}
+\pmean{a} = e^{-t}\Sigma_0 \Sigma_t^{-1} x ,
+\qquad
+\score(x,t) = -\Sigma_t^{-1}x .
+\end{equation}
+The second follows by differentiating $\log \Pt(x) = -\tfrac12 x^\top\Sigma_t^{-1}x + \text{const}$
+directly, and consistency with \eqref{eq:score-final} is a one-line check that we use as a
+test of the whole pipeline.
+
+\begin{codebox}
+\coderef{src/exact\_scores.py}{exact\_gaussian\_posterior\_mean} and
+\coderef{src/exact\_scores.py}{precision\_matrix\_score} implement \eqref{eq:gaussian-mean}.
+These are the ground truth against which the general machinery of Chapter~\ref{ch:bp} is
+validated; see \codefile{tests/test\_score\_mean\_error\_identity.py}.
+\end{codebox}
+
+\section{Three scores, not one}
+\label{sec:memorisation}
+
+Equation~\eqref{eq:score-final} defines the score of \emph{a} distribution. Which
+distribution one has in mind changes what the object is, and three different choices appear in
+the literature under the same word.
+
+\paragraph{The population score.} Take $\Pz$ to be the true data distribution. This is the
+score that the reverse process would need in order to generate genuinely new data
+distributed as $\Pz$. Nobody has it, because nobody has $\Pz$.
+
+\paragraph{The empirical score.} Take $\widehat{P}_0$ from \eqref{eq:empirical}, the sum of
+point masses at the training examples. Its noised version is a Gaussian mixture centred on
+those examples, and its posterior mean is a softmax-weighted average of them:
+\begin{equation}
+\label{eq:empirical-mean}
+\widehat{m}(x,t)
+= \frac{\sum_{\mu} a^\mu \exp\!\left[-\|x-e^{-t}a^\mu\|^2/2\Dt\right]}
+       {\sum_{\nu} \exp\!\left[-\|x-e^{-t}a^\nu\|^2/2\Dt\right]} .
+\end{equation}
+Note what this returns as $t\to0$: the nearest training example. Exact reversal under this
+score reproduces the training set and nothing else.
+
+\paragraph{The learned score.} What a network with finite capacity, finite data and a
+particular optimiser actually produces.
+
+\begin{pitfall}
+The chain of reasoning that matters, stated carefully:
+\begin{enumerate}[nosep]
+\item Training minimises an average over the observed samples --- the \emph{empirical}
+objective.
+\item Its unrestricted minimiser over all measurable functions is the \emph{empirical}
+posterior mean \eqref{eq:empirical-mean}, by Proposition~\ref{prop:orthogonality} applied
+under $\widehat{P}_0$.
+\item Exact reversal under that score returns $\widehat{P}_0$ --- the training set.
+\item Therefore a model that perfectly attained the optimum of its own training objective
+would be useless as a generative model.
+\end{enumerate}
+That trained models nonetheless generalise is a statement about what stops them from
+attaining that optimum --- capacity, architecture, optimisation, regularisation --- not about
+the objective. It is \emph{not} correct to say the population objective is minimised by the
+empirical score; the population objective is minimised by the population posterior mean.
+\end{pitfall}
+
+\begin{intuition}
+This is the tension that motivates wanting a setting where the \emph{population} score is
+computable. If one can compute it, one can ask how far a trained network is from it, and
+separate ``the network is bad'' from ``this target is hard''. That is what the Markov chain
+of Chapter~\ref{ch:markov} provides.
+\end{intuition}

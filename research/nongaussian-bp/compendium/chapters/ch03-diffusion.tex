@@ -1,0 +1,151 @@
+\chapter{The forward diffusion}
+\label{ch:diffusion}
+
+\section{Destroying data on purpose}
+
+A diffusion model is built around a process that takes a data point and gradually turns it
+into noise. The requirements are modest: the process should be easy to simulate, its
+end-state should be easy to sample from, and --- crucially --- the distribution at every
+intermediate time should be something we can reason about.
+
+The Ornstein--Uhlenbeck (OU) process satisfies all three. Following the convention of the
+notes we are matching \citep{mezard2025notes}, it is the stochastic differential equation
+\begin{equation}
+\label{eq:ou}
+\frac{\mathrm{d}x}{\mathrm{d}t} \;=\; -x + \sqrt{2}\,\gwn(t),
+\qquad x(0) = a ,
+\end{equation}
+where $\gwn$ is Gaussian white noise with $\langle \gwn(t)\rangle=0$ and
+$\langle \gwn_i(t)\gwn_j(t')\rangle = \delta_{ij}\delta(t-t')$.
+
+Two forces act. The term $-x$ pulls towards the origin; the noise pushes outwards. At long
+times they balance and the process forgets where it started.
+
+\section{Solving it}
+
+Equation \eqref{eq:ou} is linear, so it can be integrated explicitly. Multiply by the
+integrating factor $e^{t}$:
+\[
+\frac{\mathrm{d}}{\mathrm{d}t}\!\left(e^{t}x\right)
+= e^{t}\!\left(\frac{\mathrm{d}x}{\mathrm{d}t} + x\right)
+= \sqrt{2}\,e^{t}\gwn(t).
+\]
+Integrating from $0$ to $t$ and using $x(0)=a$,
+\begin{equation}
+x(t) \;=\; e^{-t} a + \sqrt{2}\int_0^t \mathrm{d}\tau\; e^{-(t-\tau)}\gwn(\tau).
+\end{equation}
+The remaining integral is a sum of independent Gaussian contributions, hence Gaussian, with
+mean zero and variance
+\[
+2\int_0^t \mathrm{d}\tau\; e^{-2(t-\tau)}
+= 2\,e^{-2t}\!\int_0^t\! \mathrm{d}\tau\, e^{2\tau}
+= 1 - e^{-2t}.
+\]
+So the whole solution can be written with a single standard Gaussian $z$:
+\begin{empheq}[box=\fbox]{equation}
+\label{eq:forward-solution}
+x(t) \;=\; e^{-t} a + \sqrt{\Dt}\, z ,
+\qquad
+\Dt \;=\; 1 - e^{-2t},
+\qquad z\sim\normal{0}{I}.
+\end{empheq}
+
+This one equation is used everywhere below. Read it as: \emph{the signal is scaled down by
+$e^{-t}$ and independent Gaussian noise of variance $\Dt$ is added}.
+
+\begin{intuition}
+The two coefficients move in opposite directions and are tied together. At $t=0$ we have
+$e^{-t}=1$, $\Dt=0$: the data, untouched. As $t\to\infty$, $e^{-t}\to0$ and $\Dt\to1$: pure
+standard Gaussian noise, with the data completely gone. The tie
+$e^{-2t}+\Dt=1$ means the total variance is preserved when the data has unit variance, so
+nothing blows up or collapses along the way.
+\end{intuition}
+
+\begin{codebox}
+Noising is applied wherever an experiment needs it, always as
+\texttt{alpha * a + sqrt(delta) * rng.standard\_normal(...)} with
+\texttt{alpha = exp(-t)}, \texttt{delta = 1 - exp(-2t)}. See for instance
+\coderef{experiments/exp\_16\_sampling\_validation.py}{fit\_arms}, and
+\coderef{src/denoiser.py}{alpha\_delta} for the coefficient pair.
+\end{codebox}
+
+\section{The noised distribution \texorpdfstring{$\Pt$}{Pt}}
+
+Equation~\eqref{eq:forward-solution} describes one trajectory. What matters is the
+distribution of $x(t)$ when $a$ is drawn from $\Pz$. Since $x$ given $a$ is Gaussian with mean
+$e^{-t}a$ and covariance $\Dt I$, marginalising over $a$ gives
+\begin{empheq}[box=\fbox]{equation}
+\label{eq:pt-def}
+\Pt(x) \;=\; \int \mathrm{d}a\; \Pz(a)\,
+\frac{1}{(2\pi\Dt)^{\nsites/2}}
+\exp\!\left[-\frac{\|x - e^{-t}a\|^2}{2\Dt}\right].
+\end{empheq}
+
+That is: $\Pt$ is $\Pz$ convolved with a Gaussian, after a rescaling. Everything about the
+forward process is contained in this formula.
+
+\begin{intuition}
+Convolution with a Gaussian is smoothing. Whatever sharp features $\Pz$ has --- spikes,
+edges, corners --- get blurred, and blurred more as $t$ grows. This is why the problem gets
+easier at large $t$ (everything looks Gaussian) and why the interesting behaviour is at small
+and intermediate $t$, where the original structure is still partly visible.
+\end{intuition}
+
+\section{Why the coordinatewise structure of the noise matters}
+\label{sec:coordinatewise}
+
+One feature of \eqref{eq:forward-solution} is so important to this project that it deserves
+isolating now, even though its consequence only becomes visible in Chapter~\ref{ch:bp}.
+
+The noise added to coordinate $i$ is independent of the noise added to coordinate $j$. So the
+conditional density of the whole observation factorises over sites:
+\begin{equation}
+\label{eq:likelihood-factorises}
+P(x \mid a, t)
+= \prod_{i=1}^{\nsites}
+\frac{1}{\sqrt{2\pi\Dt}}
+\exp\!\left[-\frac{(x_i - e^{-t}a_i)^2}{2\Dt}\right]
+\;=\;\prod_{i=1}^{\nsites} \like(x_i \mid a_i).
+\end{equation}
+Each factor $\like(x_i\mid a_i)$ involves \emph{one} clean coordinate and \emph{one}
+observation.
+
+\begin{pitfall}
+If the forward noise were correlated across coordinates --- say with covariance $\Sigma_z$
+instead of $I$ --- then \eqref{eq:likelihood-factorises} would not factorise, the likelihood
+would couple different $a_i$ directly, and the graphical structure exploited in
+Chapter~\ref{ch:bp} would be destroyed. Everything in this project depends on the noise being
+coordinatewise. It is not a cosmetic modelling choice.
+\end{pitfall}
+
+\section{Reversing the process}
+\label{sec:reverse}
+
+Generation runs the process backwards: start from noise at a large time and integrate towards
+$t=0$. The reverse-time dynamics of \eqref{eq:ou} are
+\begin{equation}
+\label{eq:reverse}
+\frac{\mathrm{d}x}{\mathrm{d}\tau} \;=\; x + 2\,\score(x,\tau) + \gwn(\tau),
+\qquad \score(x,t) := \nabla_x \log \Pt(x),
+\end{equation}
+where $\tau$ runs backwards in $t$. The field $\score$ is the \emph{score}, and it is the only
+part of \eqref{eq:reverse} that depends on the data distribution. Everything else is known.
+
+So the entire modelling problem is: \emph{estimate the score}. Chapter~\ref{ch:score} shows
+that this is the same as estimating the posterior mean.
+
+\begin{codebox}
+\coderef{src/reverse.py}{reverse\_sde} integrates \eqref{eq:reverse} by Euler--Maruyama;
+\coderef{src/reverse.py}{probability\_flow\_ode} integrates the deterministic counterpart
+with Heun's method. Both accept any score function with signature \texttt{(X, t) -> S}, which
+is how the different estimators are compared on equal footing.
+\coderef{src/reverse.py}{time\_grid} builds the geometric time discretisation.
+\end{codebox}
+
+\begin{pitfall}
+Integration cannot be carried to $t=0$. As $\Dt\to0$ the score \eqref{eq:score-final} carries
+a factor $1/\Dt$ and diverges. Every implementation stops at some $t_{\min}>0$, and what it
+produces is therefore a sample of $P_{t_{\min}}$, \emph{not} of $\Pz$. Chapter~\ref{ch:numerics}
+returns to this; it caused two successive errors in this project's own measurements before it
+was handled correctly.
+\end{pitfall}

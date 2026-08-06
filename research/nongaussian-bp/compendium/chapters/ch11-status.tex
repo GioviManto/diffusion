@@ -1,0 +1,114 @@
+\chapter{Experiments: status and what is settled}
+\label{ch:experiments}
+
+This chapter is the current state of the empirical work. It is deliberately explicit about
+what is finished, what is running, and what has not been started, because several results here
+are recent and one of them changed the framing of the accompanying note.
+
+\section{Settled}
+
+\begin{center}\small
+\begin{tabular}{@{}llp{7.4cm}@{}}
+\toprule
+question & where & finding \\
+\midrule
+Is the recursion right? & \codefile{exp\_01}, tests &
+Agrees with brute-force enumeration to $1.6\times10^{-14}$ and with the closed-form Gaussian
+score to $9.2\times10^{-15}$. \\
+\addlinespace
+What does the Gaussian closure cost? & \codefile{exp\_02}, \codefile{exp\_03} &
+Relative score deviation $0.198$ at $t=0.08$ falling to $9.9\times10^{-5}$ at $t=2.4$;
+largest at \emph{low} noise. \\
+\addlinespace
+Can an unknown innovation law be recovered from noised data? & \codefile{exp\_06} &
+Yes. A mixture kernel that has never seen a Laplace density recovers its variance essentially
+exactly and its excess kurtosis monotonically in $C$, reaching $2.71$ against a true $3.0$ at
+$C=8$. \\
+\addlinespace
+Gradient ascent or EM? & \codefile{exp\_08} &
+Neither dominates; see \S\ref{ch:estimation}. \\
+\addlinespace
+Denoising accuracy against networks & \codefile{exp\_07}, \codefile{replicates} &
+Ratio $9$--$14$ across seven doublings of the data, six seeds. \\
+\addlinespace
+Does a locality-respecting architecture close the gap? & \codefile{exp\_12} &
+Most of it. Margin falls from ${\sim}10$ to $2.3$--$4.2$; between $58\%$ and $73\%$ of the
+fully connected network's deficit was its architecture. \\
+\addlinespace
+How deep must a network be to run BP on a chain? & \codefile{exp\_17} &
+A chain-local network implements one or two message steps to within $1$--$6\%$ of its exact
+information horizon, then plateaus; absolute error bottoms at depth $6$ and rises after. Depth
+is not the representational constraint. \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\section{The result that changed the framing}
+
+\codefile{exp\_16} compares the same estimators \emph{through reverse diffusion} rather than
+pointwise. The validation passes first: run with the true kernel, the sampler reproduces the
+closed-form target for $P_{t_{\min}}$ to within $1.4\%$ across budgets.
+
+At $\nseq=2048$ on a Laplace chain, the pointwise and distributional rankings \emph{disagree}.
+The estimator is an order of magnitude better at denoising and three times better on the
+covariance profile, while the convolutional network reproduces the innovation law more
+faithfully by both kurtosis and divergence. The fully connected network shows it most sharply:
+over the same range its denoising error improves twelvefold while its generated kurtosis
+degrades from $0.850$ to $0.206$.
+
+\begin{intuition}
+A plausible mechanism, not established. Both the marginal likelihood that EM maximises and the
+squared-error denoising loss are dominated by the bulk of the distribution. The tail of
+$\innov$ carries little mass and so little weight in either objective, while contributing
+disproportionately to the shape statistics that reverse diffusion exposes. This is the same
+asymmetry measured in \S\ref{ch:estimation}: the channel destroys innovation-shape information
+$142$-fold against $26$-fold for the correlation, and the estimator sees only noised data.
+\end{intuition}
+
+\section{In progress}
+\label{sec:pending}
+
+\textsc{[pending]} None of the following is relied on anywhere above.
+
+\begin{itemize}
+\item \textbf{Capacity or information?} A sweep over the mixture component count
+$C\in\{2,4,8,12,16\}$ decides whether the under-dispersed generated tail is a limit of the
+parametrisation (fixable) or of the observation model (not). This is the single most
+informative outstanding run.
+\item \textbf{Does the dissociation hold beyond the Laplace chain?} The five innovation
+families of \S\ref{sec:matched-covariance}, at matched covariance.
+\item \textbf{Is the generated-law ranking quadrature-limited?} Grid refinement
+$\ngrid\in\{401,801,1601\}$.
+\item \textbf{Longer chains}, $\nsites\in\{32,64,128\}$.
+\end{itemize}
+
+\section{Known deficiencies in the current measurements}
+
+Recorded rather than deferred, because each affects how a number should be read.
+
+\begin{itemize}
+\item \textbf{Error bars measure the wrong variance.} Seeds vary the initialisation at fixed
+data, so the intervals reflect optimisation variance, not sampling variance. A fresh draw per
+seed is the honest protocol and has not been run.
+\item \textbf{One hyperparameter was selected on the evaluation set.} The convolutional
+network's receptive field in \codefile{exp\_12} was chosen by an oracle over the same held-out
+set the number is reported on. The bias favours the \emph{baseline}, so the quoted margin is
+conservative, but the protocol is improper and the run should be repeated with a validation
+split.
+\item \textbf{Four quantities are asserted only in tests.} The importance-sampling validation,
+the cross-family closure check, the boundary-mass diagnostic and the baseline-competence figure
+are checked by the test suite but never written to an output file, so they cannot be
+independently recomputed from committed data. They are marked as such wherever they appear.
+\item \textbf{The generative comparison covers one family.} Four more are running.
+\end{itemize}
+
+\section{Not started}
+
+\begin{itemize}
+\item A hybrid estimator combining a learned chain kernel with a learned low-rank correction,
+which is the natural next step for relaxing the Markov assumption.
+\item Distillation of the fitted inference-based denoiser into a network, which is the obvious
+remedy for its two-to-three-hundred-fold inference cost.
+\item Anything about non-Markov priors. The misspecification limitation of
+\S\ref{ch:markov} is stated and not addressed.
+\end{itemize}

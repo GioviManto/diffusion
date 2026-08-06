@@ -1,0 +1,174 @@
+\chapter{Representing messages: the numerical layer}
+\label{ch:numerics}
+
+Chapter~\ref{ch:bp} gave an exact algorithm on functions. A computer cannot store a function,
+so an implementation must choose a representation --- and that choice is the \emph{only}
+approximation in the whole scheme. This chapter is about it, because conflating this
+approximation with the exactness of the previous chapter is the easiest way to overstate what
+the method does.
+
+\section{Three statements that must be kept apart}
+\label{sec:three-statements}
+
+\begin{enumerate}
+\item \textbf{Sum-product on the posterior chain is exact}, as a theorem about tree-structured
+factorisations (Proposition~\ref{prop:bp-exact}). This is a mathematical statement about
+functional messages and involves no computer.
+\item \textbf{The discretised recursion is exact for the discretised model.} Restricting
+messages to a grid defines a different, finite-state model; on that model the recursion is
+exact up to floating-point arithmetic.
+\item \textbf{The discretised model approximates the continuous one}, with an error that must
+be \emph{measured}.
+\end{enumerate}
+
+\begin{pitfall}
+Writing simply ``our method is exact'' collapses (1) and (3) and claims something false.
+Throughout this project we write \emph{exact tree inference} for (1) and \emph{exact for the
+discretised model} for (2), and never abbreviate. The distinction is not pedantry: (1) holds
+for any innovation law whatsoever, while the error in (3) depends strongly on the smoothness
+of that law --- as \S\ref{sec:quadrature} shows.
+\end{pitfall}
+
+\section{The grid}
+
+Messages are represented by their values on $\ngrid$ equally spaced points on $[-A,A]$, and
+integrals become composite trapezoidal sums,
+\begin{equation}
+\int\!\mathrm{d}a\, f(a) \;\approx\; \sum_{k=1}^{\ngrid} w_k f(u_k),
+\qquad
+w_k = \Delta u \ \text{(interior)},\quad \tfrac{1}{2}\Delta u \ \text{(endpoints)} .
+\end{equation}
+Each message update \eqref{eq:fwd} becomes a matrix--vector product with the matrix
+$\kernel(u_l\mid u_k)$, which is formed once per model and reused at every site and every
+sequence.
+
+\begin{codebox}
+\coderef{src/bp\_grid.py}{make\_grid} builds the points and trapezoidal weights.
+The transition matrix comes from each prior's \texttt{log\_transition\_matrix(grid)}
+(\codefile{src/priors.py}) or each estimated kernel's (\codefile{src/kernels.py}) --- the same
+interface, which is why the true and learned models are interchangeable in every experiment.
+\end{codebox}
+
+\section{Two error sources}
+
+\subsection{Truncation}
+
+Probability mass outside $[-A,A]$ is discarded. The diagnostic is the mass in the boundary
+cells: if it is not negligible, $A$ is too small and refining $\ngrid$ will not help, because
+the error is in the domain rather than the resolution.
+
+\begin{pitfall}
+This failure is invisible unless one looks for it. An earlier package in this project ran at
+$A=8$ with a boundary mass of $7.4\times10^{-7}$, above its own tolerance, and the symptom was
+not an error message but a slow drift in the posterior means at large $t$. Widening the domain
+at preserved spacing reduced it to $5.3\times10^{-10}$.
+\end{pitfall}
+
+\subsection{Quadrature}
+\label{sec:quadrature}
+
+The trapezoidal rule has error $O(\Delta u^2)$ for integrands with a bounded second
+derivative. Whether that bound applies depends on the innovation.
+
+\begin{itemize}
+\item \textbf{Gaussian innovation.} The integrand is smooth and convergence is fast.
+\item \textbf{Laplace innovation.} $\innov(e)\propto e^{-|e|/b}$ has a discontinuous derivative
+at $e=0$. The second derivative is not bounded there, the standard estimate does not apply, and
+convergence is second order at best.
+\end{itemize}
+
+\begin{pitfall}
+It is tempting --- and this project did it in an earlier draft --- to describe the
+discretisation as ``spectrally accurate'' on the strength of the Gaussian measurements. That
+generalisation is not available: spectral accuracy requires smoothness the Laplace kernel does
+not have. The accompanying note now claims second-order behaviour for that family and nothing
+more.
+\end{pitfall}
+
+\subsection{A resolution condition}
+
+At small $t$ the likelihood $\like(x_i\mid a_i)$ is a narrow Gaussian of width
+$\sqrt{\Dt}/e^{-t}$. If that width is comparable to the grid spacing, the integrand is
+under-resolved and the quadrature is meaningless however fine the rest looks. The working
+condition used here is $\sqrt{2t} \gtrsim 3\Delta u$.
+
+\begin{intuition}
+Everything gets harder as $t\to0$, from two directions at once: the likelihood narrows, and the
+score \eqref{eq:score-final} carries a $1/\Dt$ that diverges. This is why reverse integration
+must stop at some $t_{\min}>0$ and why the small-$t$ end of every table deserves the most
+suspicion.
+\end{intuition}
+
+\section{Stability}
+
+Messages are products of many small numbers and underflow quickly. Two standard devices:
+work in the log domain where possible with per-row maximum subtraction, and renormalise each
+message to unit quadrature mass after every step, accumulating the discarded constants so the
+evidence is recovered exactly.
+
+\begin{codebox}
+Both appear in \coderef{src/bp\_grid.py}{grid\_bp}: \texttt{log\_ell -= log\_ell.max(...)}
+before exponentiating, and an explicit mass check that raises \texttt{FloatingPointError} if a
+message loses all its mass rather than silently returning garbage.
+\end{codebox}
+
+\section{The stopping-time problem}
+\label{sec:tmin}
+
+Because integration stops at $t_{\min}>0$, what a sampler produces is a draw from
+$P_{t_{\min}}$, not from $\Pz$. This sounds like a technicality and is not.
+
+Independent Gaussian noise of variance $v$ added to a quantity of variance $\ivar$ multiplies
+its excess kurtosis by $(\ivar/(\ivar+v))^2$. At $\corr=0.85$ and $t_{\min}=0.02$ this predicts
+a generated excess kurtosis of $1.910$ where the clean chain has $3.0$.
+
+\begin{pitfall}
+This project measured exactly $1.91$ for the reference sampler and initially read it as a
+failure of the integrator to converge. It was not: the sampler was reproducing
+$P_{t_{\min}}$ correctly and being compared against the wrong target.
+
+The obvious repair --- apply a final denoising step and report $\pmean{a}$ instead of $x$ ---
+\emph{inverts} the bias rather than removing it. The posterior mean of a heavy-tailed prior is
+a shrinkage operator: it pulls small values towards zero harder than large ones, so the law of
+the posterior mean is \emph{more} peaked than $\Pz$. Measured overshoot: $3.73$, $4.34$, $4.74$
+at $t_{\min}=0.02,0.05,0.10$ against a true $3.0$ --- and identical at $\ngrid=401$ and
+$\ngrid=801$, which rules out grid resolution as the cause.
+
+The correct treatment is to compare like with like: draw from $\Pz$, noise it forward to the
+same $t_{\min}$, and compare. Both sides are then samples of the same law, no estimator sits
+between the sampler and the metric, and the target moments follow in closed form.
+\end{pitfall}
+
+\begin{codebox}
+\coderef{experiments/exp\_16\_sampling\_validation.py}{reference\_at} builds the forward-noised
+reference; \texttt{target\_innovation\_moments} gives the closed-form target. The docstrings
+there record both failed designs, since the reasoning is easier to follow than to rediscover.
+\end{codebox}
+
+\section{Running on a GPU}
+
+The recursion is a sequence of dense matrix products, which suits a GPU. Rather than write a
+second implementation, \codefile{src/backend.py} parameterises the existing one by its array
+module, so CPU and GPU execute the same code.
+
+\begin{intuition}
+Two implementations of an exact algorithm is a bad trade. They agree on the easy cases and
+drift where nobody is looking, and the exactness claims of \S\ref{sec:bp-validation} would then
+hold for one device and be assumed for the other.
+\end{intuition}
+
+\begin{codebox}
+\codefile{tests/test\_backend\_parity.py} gates every GPU number: device agreement, the
+closed-form Gaussian check re-run on device, float64 preservation, and invariance to batch
+width. Measured on an NVIDIA H200: posterior means agree to $1.8\times10^{-16}$--$8.0\times10^{-16}$,
+variances to $9.3\times10^{-15}$, and the GPU reproduces the closed-form Gaussian score to
+$4.2\times10^{-16}$. \coderef{hpc/bocconi\_gpu.sbatch}{} runs that suite before any sweep and
+exits if it fails.
+\end{codebox}
+
+\begin{pitfall}
+The availability probe originally tested that a GPU array could be \emph{allocated}. Allocation
+succeeds without cuBLAS loaded, so on a misconfigured node the check passed and every matrix
+product then failed inside the recursion. It now probes an actual matrix product. A capability
+check must exercise the operation that will be used, not a cheaper proxy.
+\end{pitfall}

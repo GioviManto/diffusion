@@ -1,0 +1,137 @@
+\chapter{Orientation}
+\label{ch:orientation}
+
+\section{What problem is being solved}
+
+A generative model is a machine that, having seen a finite collection of examples, produces
+new ones that look like they came from the same source. Diffusion models do this by a
+two-stage trick: first destroy the data by adding noise gradually until nothing is left but
+pure noise, then learn to run that destruction backwards.
+
+Running it backwards requires knowing, at every intermediate noise level, which direction
+points back towards plausible data. That direction is called the \emph{score}, and it turns
+out to be equivalent to answering a question that sounds much more ordinary:
+
+\begin{quote}
+\emph{Given a corrupted example, what was the clean one, on average?}
+\end{quote}
+
+That average --- the posterior mean --- is the object everything in this project is about.
+A trained diffusion model is, in the end, a machine that estimates it.
+
+\section{The difficulty this project addresses}
+
+For almost every interesting distribution of data, nobody can compute that posterior mean.
+There is no formula. So when a neural network is trained to estimate it and makes errors,
+there is no way to tell whether the network was bad or the target was hard. The two are
+confounded, and that confound blocks a lot of questions one would like to ask about why
+diffusion models work.
+
+The few distributions where the posterior mean \emph{is} computable are mostly Gaussians, and
+Gaussians are unhelpful here: for them the posterior mean is a linear function of the
+observation, so every question about how a model exploits structure has a trivial answer.
+
+This project takes a distribution that is
+\begin{itemize}
+\item structured enough to be interesting --- the coordinates are correlated;
+\item non-Gaussian, so the posterior mean is genuinely nonlinear;
+\item and yet exactly computable.
+\end{itemize}
+
+The distribution is a \textbf{Markov chain}: a sequence in which each entry depends on the
+previous one and, given that, on nothing earlier. Chapter~\ref{ch:markov} defines this
+properly. The reason the posterior mean is computable is a structural accident that
+Chapter~\ref{ch:bp} explains in full, and which can be previewed in one sentence: noising each
+coordinate independently does not create any new dependencies between the clean coordinates,
+so the machinery that makes chains tractable survives the noising intact.
+
+\section{The three questions}
+
+\begin{enumerate}
+\item \textbf{What does exact inference buy?} If one has the true Markov chain, one can
+compute the posterior mean exactly. How much better is that than the standard Gaussian
+approximation, and at which noise levels does the difference live?
+(Chapters~\ref{ch:bp}, \ref{ch:gaussian}.)
+
+\item \textbf{Can the chain be learned?} In reality the chain is unknown. Can its transition
+rule be estimated from noisy observations alone --- never seeing a clean example --- and how
+expensive is that? (Later chapters, in progress.)
+
+\item \textbf{How does this compare with a neural network?} Given the same data, does a
+structured estimator beat a trained denoiser, and does any advantage in estimating the
+posterior mean translate into better generated samples? (Later chapters, in progress.)
+\end{enumerate}
+
+The third question has an answer that surprised us, and it is the reason the accompanying note
+is framed the way it is. It is stated in the note and derived here once the supporting
+machinery is in place.
+
+\section{How to read this document}
+
+Chapters~\ref{ch:probability}--\ref{ch:score} build the diffusion setting from probability
+first principles. Chapters~\ref{ch:markov}--\ref{ch:bp} build the graphical-model machinery
+and prove the exactness result. Chapter~\ref{ch:gaussian} treats the Gaussian case, which is
+both the sanity check and the baseline. Chapter~\ref{ch:numerics} explains what an actual
+implementation has to do and where its errors come from.
+
+Three kinds of box appear throughout:
+
+\begin{intuition}
+Explains why a result is what it is, in words, before or after the algebra. Skippable if the
+algebra was enough.
+\end{intuition}
+
+\begin{pitfall}
+Names the concrete failure that occurs if an assumption is dropped. These are not
+hypothetical --- most of them describe mistakes actually made during this project and caught
+later.
+\end{pitfall}
+
+\begin{codebox}
+Points at the exact file and function implementing the object just defined. Paths are relative
+to \codefile{research/nongaussian-bp/} in the repository.
+\end{codebox}
+
+\section{Map of the code}
+\label{sec:codemap}
+
+Everything referenced in this document lives under \codefile{research/nongaussian-bp/}.
+
+\begin{center}
+\small
+\begin{tabular}{@{}p{4.4cm}p{10.2cm}@{}}
+\toprule
+\textbf{Path} & \textbf{Contents} \\
+\midrule
+\codefile{src/priors.py} & The data-generating models: \texttt{GaussianAR1},
+\texttt{LaplaceAR1}, \texttt{StudentTAR1}, \texttt{UniformAR1},
+\texttt{GaussianMixtureAR1}. Each provides \texttt{sample} and
+\texttt{log\_transition\_matrix}. \\
+\codefile{src/bp\_grid.py} & The inference recursion. \texttt{make\_grid},
+\texttt{grid\_bp} (one sequence, with evidence), \texttt{grid\_bp\_batch} (many sequences,
+device-parameterised). \\
+\codefile{src/bp\_gaussian.py} & The closed-form Gaussian recursion in information form. \\
+\codefile{src/exact\_scores.py} & Closed-form Gaussian posterior mean and score, used as
+ground truth. \\
+\codefile{src/em.py} & The expectation step, the sufficient statistic, and the estimation
+driver. \\
+\codefile{src/kernels.py} & Parametrised transition families and their maximisation steps. \\
+\codefile{src/denoiser.py} & A common interface over inference-based and network-based
+denoisers, plus the network training loop. \\
+\codefile{src/reverse.py} & Reverse-time integration: SDE and probability-flow ODE. \\
+\codefile{src/sample\_metrics.py} & Statistics for comparing generated data against the
+truth. \\
+\codefile{src/backend.py} & CPU/GPU array-module dispatch for the recursion. \\
+\codefile{experiments/} & \texttt{exp\_01}--\texttt{exp\_17}, one file per experiment, each
+self-describing. \\
+\codefile{tests/} & Validation. Several tests here are the evidence for claims made in this
+document and are cited as such. \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\begin{codebox}
+Nothing in this document is stated without a pointer to where it is realised. If a derivation
+here has no corresponding \textbf{In the code} box, that is deliberate and means the result is
+used only on paper.
+\end{codebox}
