@@ -90,7 +90,8 @@ from src.denoiser import bp_posterior_mean, dsm_posterior_mean, train_dsm_denois
 from src.em import fit_em
 from src.kernels import MixtureInnovationKernel
 from src.local_head import local_posterior_mean, train_local_head
-from src.priors import LaplaceAR1
+from src.priors import (GaussianAR1, GaussianMixtureAR1, LaplaceAR1, StudentTAR1,
+                        UniformAR1)
 from src.reverse import reverse_sde, time_grid
 from src.sample_metrics import compare_distributions, pointwise_ladder
 from src.utils import ensure_dir, rng_for, write_csv, write_json
@@ -104,6 +105,10 @@ SETTINGS = {
     # Data model. n=32 and rho=0.85 match exp_07 so the pointwise numbers line up.
     "n_sites": 32,
     "rho": 0.85,
+    # Innovation family. All are variance-matched, so they share the covariance rho^|i-j|
+    # exactly and differ only beyond second moments -- which is what makes a difference in
+    # the *generated* law attributable to shape rather than to correlation.
+    "family": "laplace",
     # Training budgets. The interesting region is the small end, where exp_07 finds
     # EM-BP on 32 chains beating the network on 4096.
     "sizes": (32, 128, 512, 2048),
@@ -509,7 +514,11 @@ def main() -> None:
 
     out_dir = ensure_dir(args.output_dir)
     grid, weights = make_grid(cfg["grid_a"], cfg["grid_m"])
-    prior = LaplaceAR1(cfg["rho"])
+    priors = {"laplace": LaplaceAR1, "student": StudentTAR1, "uniform": UniformAR1,
+              "mixture": GaussianMixtureAR1, "gaussian": GaussianAR1}
+    if cfg["family"] not in priors:
+        raise SystemExit(f"unknown family {cfg['family']!r}; choose from {sorted(priors)}")
+    prior = priors[cfg["family"]](cfg["rho"])
 
     for part in parts:
         print(f"\n=== part: {part} ===", flush=True)

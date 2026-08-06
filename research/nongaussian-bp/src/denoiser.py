@@ -30,6 +30,7 @@ from dataclasses import dataclass
 
 import numpy as np
 
+from src.backend import get_xp, to_host
 from src.bp_grid import grid_bp_batch
 from src.nnet import MLP, time_features
 from src.noising import alpha_delta
@@ -46,16 +47,26 @@ def bp_posterior_mean(
     X: np.ndarray,
     t: float,
     log_mu: np.ndarray | None = None,
+    xp=None,
 ) -> np.ndarray:
     """E[a | x] under the chain prior defined by `kernel`, by exact grid BP.
 
     `kernel` is anything with `log_transition_matrix(grid)`, which covers both
     the ground-truth priors in `priors` and the learned ones in `kernels`.
+
+    ``xp`` selects the device; ``None`` reads ``BP_DEVICE`` from the environment, so a batch
+    script chooses once and no call site changes. **The result is always returned on the
+    host**, which keeps every downstream caller device-agnostic. That transfer is cheap by
+    construction: the returned array is ``(B, n)`` while the intermediate messages it is
+    computed from are ``(B, n, M)``, larger by the grid size -- so the expensive object never
+    leaves the device.
     """
+    if xp is None:
+        xp = get_xp()
     alpha, delta = alpha_delta(t)
     log_k = kernel.log_transition_matrix(grid)
-    means, _ = grid_bp_batch(grid, weights, log_k, X, alpha, delta, log_mu)
-    return means
+    means, _ = grid_bp_batch(grid, weights, log_k, X, alpha, delta, log_mu, xp=xp)
+    return to_host(means)
 
 
 def score_from_mean(

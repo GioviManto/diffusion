@@ -28,6 +28,8 @@ from dataclasses import dataclass
 
 import numpy as np
 
+from src.backend import to_device
+
 
 def make_grid(half_width: float, size: int) -> tuple[np.ndarray, np.ndarray]:
     """Equally spaced grid on [-A, A] with composite trapezoidal weights."""
@@ -161,6 +163,7 @@ def grid_bp_batch(
     alpha: float,
     delta: float,
     log_mu: np.ndarray | None = None,
+    xp=None,
 ) -> tuple[np.ndarray, np.ndarray]:
     """Vectorized grid BP over a batch of observations X of shape (B, n).
 
@@ -169,28 +172,45 @@ def grid_bp_batch(
     Used by the reverse-dynamics experiments, where BP must run at every
     integration step for every trajectory. Returns (means, variances), each of
     shape (B, n). Evidence is not accumulated here.
+
+    ``xp`` selects the array module (numpy, or cupy for GPU execution). This is the *same*
+    recursion either way -- there is deliberately no second implementation, because a
+    separately written GPU version would put the exactness guarantees at risk in the least
+    visible way possible. ``tests/test_backend_parity.py`` asserts the two devices agree to
+    machine precision on identical inputs. Inputs are moved to the device here, and the
+    result is returned in ``xp``'s own array type; callers that need numpy should use
+    ``backend.to_host``.
     """
+    if xp is None:
+        xp = np
+    grid = to_device(grid, xp)
+    weights = to_device(weights, xp)
+    log_K = to_device(log_K, xp)
+    X = to_device(X, xp)
+
     b_size, n = X.shape
     m = len(grid)
     if log_mu is None:
-        log_mu = -0.5 * grid**2 - 0.5 * np.log(2.0 * np.pi)
-    K = np.exp(log_K)
+        log_mu = -0.5 * grid**2 - 0.5 * xp.log(2.0 * xp.pi)
+    else:
+        log_mu = to_device(log_mu, xp)
+    K = xp.exp(log_K)
 
     # ell[i] has shape (B, M): row-shifted per (batch, site).
     z = X[:, :, None] - alpha * grid[None, None, :]
     log_ell = -0.5 * z**2 / delta
     log_ell -= log_ell.max(axis=2, keepdims=True)
-    ell = np.exp(log_ell)  # (B, n, M)
+    ell = xp.exp(log_ell)  # (B, n, M)
 
-    L = np.empty((n, b_size, m))
-    R = np.empty((n, b_size, m))
-    L[0] = np.exp(log_mu)[None, :]
+    L = xp.empty((n, b_size, m))
+    R = xp.empty((n, b_size, m))
+    L[0] = xp.exp(log_mu)[None, :]
 
     for i in range(n - 1):
         incoming = L[i] * ell[:, i, :] * weights[None, :]  # (B, M)
         out = (K @ incoming.T).T
         mass = out @ weights
-        if not np.all(np.isfinite(mass)) or np.any(mass <= 0.0):
+        if not bool(xp.all(xp.isfinite(mass))) or bool(xp.any(mass <= 0.0)):
             raise FloatingPointError(f"Batched forward message {i + 1} lost mass.")
         L[i + 1] = out / mass[:, None]
 
@@ -199,16 +219,16 @@ def grid_bp_batch(
         incoming = R[i] * ell[:, i, :] * weights[None, :]
         out = (K.T @ incoming.T).T
         mass = out @ weights
-        if not np.all(np.isfinite(mass)) or np.any(mass <= 0.0):
+        if not bool(xp.all(xp.isfinite(mass))) or bool(xp.any(mass <= 0.0)):
             raise FloatingPointError(f"Batched backward message {i - 1} lost mass.")
         R[i - 1] = out / mass[:, None]
 
-    means = np.empty((b_size, n))
-    variances = np.empty((b_size, n))
+    means = xp.empty((b_size, n))
+    variances = xp.empty((b_size, n))
     for i in range(n):
         raw = L[i] * ell[:, i, :] * R[i]
         mass = raw @ weights
-        if not np.all(np.isfinite(mass)) or np.any(mass <= 0.0):
+        if not bool(xp.all(xp.isfinite(mass))) or bool(xp.any(mass <= 0.0)):
             raise FloatingPointError(f"Batched belief {i} lost mass.")
         bel = raw / mass[:, None]
         means[:, i] = bel @ (grid * weights)

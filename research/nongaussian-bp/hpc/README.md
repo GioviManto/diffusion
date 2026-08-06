@@ -95,3 +95,39 @@ hour each. The parts that would genuinely benefit from a cluster, in order:
                          seed-replicated sample-efficiency sweep: one task per
                          seed, each writing to its own subdirectory, plus a
                          merge helper for producing error bars
+
+---
+
+## GPU execution (added August 2026)
+
+Grid BP runs on GPU through `src/backend.py`. There is **one** implementation of the
+recursion, parameterised by its array module -- not a CPU version and a GPU version. A
+separately written device kernel would put the exactness guarantees (9.2e-15 against the
+closed-form Gaussian score, 1.0e-14 against brute-force enumeration) at risk in the least
+visible way possible.
+
+`tests/test_backend_parity.py` gates every GPU number and `hpc/bocconi_gpu.sbatch` runs it
+before the sweep, exiting rather than proceeding if it fails. Verified on an NVIDIA H200:
+
+| check | result |
+|---|---|
+| CPU/GPU posterior means, 2 families x 3 noise levels | 1.8e-16 to 8.0e-16 relative |
+| CPU/GPU posterior variances | 3.5e-16 to 9.3e-15 |
+| GPU vs closed-form Gaussian score | 4.2e-16 to 1.3e-13 |
+| dtype preserved | float64 |
+| result independent of batch width | 12/12 tests pass |
+
+### The version pin is load-bearing
+
+**`cupy-cuda12x<14`.** CuPy 14.x JIT-compiles its cub segmented-reduction kernels against
+headers this cluster's toolkit cannot build -- 42 errors inside `cuda_fp4.hpp`. The failure
+mode is what makes it dangerous rather than merely annoying: cuBLAS matmuls have no JIT step
+and keep working, so the device looks healthy until the first `.max(axis=...)` inside the
+recursion. `cupy 13.6.0` compiles every operation the recursion needs; an operation-by-
+operation probe is in `diag/probe.py`.
+
+Environment is pinned by `gpu_env.sh`: `CUDA_PATH=/software/cuda/12.4` (the module's
+`lib64`, not `lib`), *not* the system default at `/usr/local/cuda-13.3`.
+
+Also note `/tmp` is **not** shared between login and compute nodes -- scripts must live under
+`$HOME`.
