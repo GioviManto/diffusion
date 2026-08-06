@@ -1,0 +1,61 @@
+% ===========================================================================
+% Shared notation for the internal note and the compendium.
+%
+% Conventions follow Mezard, "Generative diffusion updated notes" (Dec 2025),
+% sections 2-3.1.1, and the statistical-physics usage of the surrounding
+% literature. Where that source and the project's earlier code disagreed, the
+% source wins and the code is translated in the text rather than the reverse.
+%
+% Two deliberate departures from the source, both noted where they occur:
+%
+%   1. The source uses n for the number of data samples and d for the ambient
+%      dimension. Here the ambient dimension IS the chain length and is the
+%      quantity every graphical-model statement is indexed by, so it is written
+%      n, and the number of observed sequences is M. A translation sentence
+%      appears at first use.
+%
+%   2. The source writes the decay factor as e^{-t} throughout. We keep e^{-t}
+%      in displayed equations and never abbreviate it to alpha_t.
+% ===========================================================================
+
+% --- Diffusion -------------------------------------------------------------
+\newcommand{\Pz}{P_0}                       % clean distribution
+\newcommand{\Pt}{P_t}                       % noised distribution at time t
+\newcommand{\Dt}{\Delta_t}                  % 1 - e^{-2t}
+\newcommand{\score}{S}                      % S(x,t) = grad log P_t(x)
+\newcommand{\gwn}{\eta}                     % Gaussian white noise, variance 2
+
+% Posterior mean, in the source's bracket notation rather than E[a|x].
+\newcommand{\pmean}[1]{\langle #1 \rangle_{x,t}}
+\newcommand{\pmeansite}[1]{\langle a_{#1} \rangle_{x,t}}
+
+% --- Chain and graphical model --------------------------------------------
+\newcommand{\nsites}{n}                     % chain length = ambient dimension
+\newcommand{\nseq}{M}                       % number of observed sequences
+\newcommand{\ngrid}{K}                      % quadrature grid points
+\newcommand{\kernel}{W}                     % transition kernel W(a'|a)
+\newcommand{\like}{\ell_t}                  % unary likelihood factor
+\newcommand{\lmsg}{\overrightarrow{m}}      % forward (left) message
+\newcommand{\rmsg}{\overleftarrow{m}}       % backward (right) message
+\newcommand{\innov}{\varphi}                % innovation density
+\newcommand{\corr}{\rho}                    % autoregression coefficient
+\newcommand{\ivar}{q}                       % innovation variance
+
+% --- Estimation ------------------------------------------------------------
+\newcommand{\params}{\theta}
+\newcommand{\Qfun}{\mathcal{Q}}             % EM auxiliary function
+\newcommand{\Xis}{\Xi}                      % expected transition statistic
+\newcommand{\Lik}{\mathcal{L}}              % marginal log-likelihood
+
+% --- Operators -------------------------------------------------------------
+\newcommand{\E}{\mathbb{E}}
+\newcommand{\Prob}{\mathbb{P}}
+\newcommand{\Reals}{\mathbb{R}}
+\newcommand{\Cov}{\operatorname{Cov}}
+\newcommand{\Var}{\operatorname{Var}}
+\newcommand{\KL}{D_{\mathrm{KL}}}
+\newcommand{\normal}[2]{\mathcal{N}\!\left(#1,#2\right)}
+
+% --- Estimators ------------------------------------------------------------
+\newcommand{\mmse}{\widehat{a}_{\mathrm{MMSE}}}
+\newcommand{\lmmse}{\widehat{a}_{\mathrm{LMMSE}}}

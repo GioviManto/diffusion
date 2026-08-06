@@ -1,0 +1,567 @@
+\documentclass{article}
+
+% `final` reveals the author block. The style's submission notice is then blanked: this is
+% an internal note, not a submission, and the template footer would assert otherwise.
+\usepackage[final]{neurips_2023}
+\makeatletter\renewcommand{\@noticestring}{}\makeatother
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{hyperref}
+\usepackage{url}
+\usepackage{booktabs}
+\usepackage{amsfonts}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{amsthm}
+\usepackage{microtype}
+\usepackage{graphicx}
+\usepackage{tikz}
+\usetikzlibrary{positioning, arrows.meta, fit}
+
+\input{notation}
+
+\newtheorem{proposition}{Proposition}
+\newtheorem{remark}{Remark}
+
+\title{Diffusion scores for Markov data:\\
+exact inference on the chain and estimation of the transition kernel}
+
+\author{%
+  Giovanni Mantovani \\
+  Department of Computing Sciences \\
+  Bocconi University \\
+  \texttt{giovanni.mantovani@studbocconi.it}
+}
+
+\begin{document}
+
+\maketitle
+
+\begin{center}
+\fbox{\parbox{0.92\textwidth}{\small
+\textbf{Internal note, work in progress.} Circulated for discussion. The inference and
+estimation results are settled and reproducible; the generative comparison of
+\S\ref{sec:generation} is complete for one innovation family with four more in progress, and
+its interpretation is the main open question. Section~\ref{sec:limits} states what is not yet
+supported. Open items for the advisors are listed separately in
+\texttt{QUESTIONS\_FOR\_ADVISORS.md}.
+}}
+\end{center}
+
+\begin{abstract}
+Score-based generative models are trained by denoising regression, and the function they
+approximate --- the posterior mean of the clean signal given its noised version --- is
+unavailable in closed form for essentially every distribution of interest. This makes it hard
+to separate the error a network makes from the difficulty of the object it approximates. We
+study a setting where the posterior mean is computable and non-trivial: a first-order Markov
+chain on $\Reals^{\nsites}$ with continuous, non-Gaussian transitions. Coordinatewise
+Ornstein--Uhlenbeck noising multiplies the prior by unary factors, so the posterior remains a
+chain, and sum-product inference on it is exact at the level of functional messages. We use
+this to obtain a controlled benchmark, and then remove the assumption that the transition
+kernel is known: it is estimated from noised sequences alone by maximum marginal likelihood,
+with an exact expectation step and a gradient supplied by Fisher's identity, so the inference
+recursion is never differentiated through. On a Laplace chain the estimator attains a lower
+denoising error than trained neural denoisers at every data budget we tried, by roughly an
+order of magnitude against a fully connected network and a factor of four against a
+locality-respecting one. We then compare the same estimators through reverse diffusion, and
+the ranking does not carry over: the structured estimator remains the most accurate
+pointwise while the convolutional network reproduces the innovation law more faithfully.
+We report this dissociation as the principal empirical finding rather than resolving it, and
+we identify the information-theoretic asymmetry that plausibly explains it.
+\end{abstract}
+
+\section{Introduction}
+\label{sec:intro}
+
+Generative diffusion generates data $a\in\Reals^{\nsites}$ from a distribution $\Pz$ known
+only through samples, by noising and then reversing \citep{sohl2015,ho2020,song2021}. In the
+Ornstein--Uhlenbeck convention we follow throughout \citep{mezard2025notes}, the forward
+process is
+\begin{equation}
+\label{eq:forward}
+\frac{\mathrm{d}x}{\mathrm{d}t} \;=\; -x + \sqrt{2}\,\gwn(t),
+\qquad\text{so}\qquad
+x(t) \;=\; e^{-t} a + \sqrt{\Dt}\, z(t),
+\qquad
+\Dt = 1 - e^{-2t},
+\end{equation}
+with $z$ standard Gaussian. Reversal is driven by the score
+$\score(x,t) = \nabla_x \log \Pt(x)$, and the central quantity is the posterior mean
+$\pmean{a}$ of the clean signal.
+
+\paragraph{Three distinct score objects.}
+Confusing them is the source of a common misstatement, so we fix them at the outset.
+
+The \emph{population score} is $\nabla_x\log\Pt(x)$ for the true $\Pz$. The
+\emph{empirical score} replaces $\Pz$ by the empirical measure
+$\widehat{P}_0 = \nseq^{-1}\sum_\mu \delta_{a^\mu}$ of the training set; after noising this is
+a Gaussian mixture centred on the training points. The \emph{learned score} is what a
+network with finite capacity, finite data and a particular optimiser actually produces.
+
+The population denoising objective $\E\|f(x,t)-a\|^2$ is minimised over all measurable $f$ by
+the population posterior mean. The \emph{empirical} objective, which is what is computed in
+practice, is minimised by the \emph{empirical} posterior mean. Since exact reversal under the
+empirical score returns the empirical distribution, a model that attained the unrestricted
+optimum of its own training objective would reproduce its training set. That trained models
+generalise is therefore a statement about the restrictions --- architecture, capacity,
+optimisation, regularisation --- and not about the objective
+\citep{biroli2024dynamical,kamb2024analytic}. We do not claim this is a complete account of
+neural generalisation; we note it because it motivates wanting settings where the population
+score is available for comparison.
+
+\paragraph{Why a Markov chain.}
+Distributions with tractable population scores are scarce, which is why the analytical
+literature leans on Gaussians and Gaussian mixtures. Those are poor probes of structure: the
+score is linear, so any question about how a model exploits correlation has a degenerate
+answer. Hierarchical and discrete graphical models supply further tractable families
+\citep{sclocchi2025phase,garnierbrun2024transformers,mei2024unet}, and the model here is a
+continuous, non-Gaussian member of the same class.
+
+A first-order Markov chain gives a genuinely nonlinear score while remaining exactly
+computable, for a structural reason: coordinatewise noising contributes one unary factor per
+site, which reweights node potentials without creating edges between latent variables, so the
+posterior factor graph is the same chain as the prior's.
+
+\paragraph{Questions.} We ask: (i) what does exact inference on the chain buy over the
+Gaussian approximation, and where in the noise schedule does it matter; (ii) can the
+transition kernel be estimated from noised data alone, and at what cost; (iii) how does the
+resulting estimator compare with trained denoisers, both pointwise and after reverse
+diffusion.
+
+\paragraph{Contributions.}
+\begin{itemize}
+\item An exact denoising benchmark for a continuous non-Gaussian correlated model
+      (\S\ref{sec:bp}), with the discretisation error separated from the model error and
+      measured (\S\ref{sec:numerics}).
+\item An identification of what the single-Gaussian message closure computes: exactly the
+      LMMSE estimator of the covariance-matched Gaussian model (\S\ref{sec:closure}).
+\item Estimation of the unknown kernel from noised sequences, with an exact expectation step
+      and no differentiation through the recursion (\S\ref{sec:em}).
+\item A denoising comparison against neural baselines (\S\ref{sec:pointwise}) and a
+      generative comparison (\S\ref{sec:generation}) which do not agree, together with the
+      information asymmetry that plausibly explains the disagreement.
+\end{itemize}
+
+\section{Setting}
+\label{sec:setting}
+
+\paragraph{Notation.} We write $\nsites$ for the chain length, which is also the ambient
+dimension, and $\nseq$ for the number of observed sequences. (The source we follow for
+diffusion notation uses $n$ for the number of samples and $d$ for the dimension; we index by
+the chain because every graphical-model statement below is indexed by sites.) Sequences are
+$a = (a_1,\dots,a_{\nsites})$, and $\Pz$ factorises as
+\begin{equation}
+\label{eq:prior}
+\Pz(a) \;=\; \mu(a_1)\prod_{i=2}^{\nsites} \kernel(a_i \mid a_{i-1}),
+\qquad
+\kernel(a'\mid a) \;=\; \innov(a' - \corr a),
+\end{equation}
+with $\innov$ an innovation density of mean zero and variance $\ivar$, and
+$|\corr| < 1$. Choosing $\ivar = 1-\corr^2$ makes the chain stationary with unit marginal
+variance and $\Cov(a_i,a_j) = \corr^{|i-j|}$ \emph{independently of the shape of $\innov$}.
+This is what makes the family a controlled probe: Gaussian, Laplace, Student, uniform and
+bimodal innovations can be arranged to share a covariance exactly and differ only beyond
+second moments.
+
+\paragraph{The score and the posterior mean.}
+From \eqref{eq:forward}, $\Pt$ is the Gaussian convolution
+\begin{equation}
+\label{eq:pt}
+\Pt(x) \;=\; \int \mathrm{d}a \; \Pz(a) \,
+\frac{1}{(2\pi\Dt)^{\nsites/2}}
+\exp\!\left[-\frac{\|x - e^{-t}a\|^2}{2\Dt}\right].
+\end{equation}
+Differentiating under the integral,
+\[
+\nabla_x \Pt(x)
+= \int \mathrm{d}a\; \Pz(a)\,
+\frac{e^{-t}a - x}{\Dt}\,
+\frac{e^{-\|x-e^{-t}a\|^2/2\Dt}}{(2\pi\Dt)^{\nsites/2}},
+\]
+and dividing by $\Pt(x)$, the Gaussian factor over $\Pt(x)$ is exactly the posterior density
+$P(a\mid x,t)$, so
+\begin{equation}
+\label{eq:score}
+\score(x,t) \;=\; \nabla_x\log \Pt(x)
+\;=\; -\,\frac{x - e^{-t}\,\pmean{a}}{\Dt},
+\qquad
+\pmean{a} = \int \mathrm{d}a\; a\, P(a\mid x,t).
+\end{equation}
+Differentiation under the integral is justified whenever $\Pz$ has a finite first moment, by
+dominated convergence with the Gaussian kernel and its derivative. Equation~\eqref{eq:score}
+is a change of variables, not an approximation: computing the score and computing the
+posterior mean are the same problem.
+
+\paragraph{The Bayes-optimal denoiser.} For squared loss, and for any $u$,
+\begin{equation}
+\label{eq:orthogonal}
+\E\!\left[\|a-u\|^2 \,\middle|\, x\right]
+=
+\E\!\left[\|a - \pmean{a}\|^2 \,\middle|\, x\right] + \|u - \pmean{a}\|^2 ,
+\end{equation}
+so $\pmean{a}$ minimises the conditional risk, with an irreducible floor given by the first
+term. Optimality is with respect to squared error specifically; a different loss selects a
+different functional of the posterior.
+
+\section{Exact inference on the noised chain}
+\label{sec:bp}
+
+Conditioning \eqref{eq:prior} on $x$ gives
+\begin{equation}
+\label{eq:posterior}
+P(a \mid x,t) \;\propto\;
+\mu(a_1)\prod_{i=2}^{\nsites} \kernel(a_i\mid a_{i-1})
+\prod_{i=1}^{\nsites} \like(x_i \mid a_i),
+\qquad
+\like(x_i\mid a_i) \propto \exp\!\left[-\frac{(x_i - e^{-t}a_i)^2}{2\Dt}\right].
+\end{equation}
+The likelihood factors are \emph{unary}: because the forward noise is independent across
+coordinates, each observation touches one latent variable. They therefore reweight node
+potentials and add no edges, and the posterior factor graph is the prior's chain
+(Figure~\ref{fig:factorgraph}). A chain is a tree, so sum-product is exact
+\citep{pearl1988,mezard2009}: with
+\begin{align}
+\label{eq:messages}
+\lmsg_{i}(a_i) &\propto \int \mathrm{d}a_{i-1}\;
+\kernel(a_i\mid a_{i-1})\,\like(x_{i-1}\mid a_{i-1})\,\lmsg_{i-1}(a_{i-1}), \nonumber\\[-2pt]
+\rmsg_{i}(a_i) &\propto \int \mathrm{d}a_{i+1}\;
+\kernel(a_{i+1}\mid a_i)\,\like(x_{i+1}\mid a_{i+1})\,\rmsg_{i+1}(a_{i+1}),
+\end{align}
+the single-site marginal is $P(a_i\mid x,t) \propto \lmsg_i(a_i)\like(x_i\mid a_i)\rmsg_i(a_i)$
+and the pairwise marginal on edge $(i-1,i)$ is
+$\propto \lmsg_{i-1}(a_{i-1})\,\like(x_{i-1}\mid a_{i-1})\,\kernel(a_i\mid a_{i-1})\,
+\like(x_i\mid a_i)\,\rmsg_i(a_i)$. In
+\eqref{eq:messages} the local likelihood is absorbed \emph{before} propagation, so
+$\like(x_i\mid a_i)$ appears exactly once in each marginal; this convention is fixed
+throughout.
+
+\begin{figure}[t]
+\centering
+\begin{tikzpicture}[
+  latent/.style={circle, draw, minimum size=7mm, inner sep=1pt},
+  obs/.style={circle, draw, fill=black!10, minimum size=7mm, inner sep=1pt},
+  fac/.style={rectangle, draw, fill=black, minimum size=2.2mm, inner sep=0pt},
+  node distance=9mm]
+\foreach \i in {1,2,3,4}{
+  \node[latent] (a\i) at (2.1*\i, 0) {$a_{\i}$};
+  \node[fac] (f\i) at (2.1*\i, -1.0) {};
+  \node[obs] (x\i) at (2.1*\i, -2.0) {$x_{\i}$};
+  \draw (a\i) -- (f\i) -- (x\i);
+}
+\foreach \i/\j in {1/2,2/3,3/4}{
+  \node[fac] (w\i) at (2.1*\i+1.05, 0) {};
+  \draw (a\i) -- (w\i) -- (a\j);
+}
+\node[right=1mm of w3, yshift=3.5mm] {\small $\kernel(a_{i}\mid a_{i-1})$};
+\node[right=1mm of f4] {\small $\like(x_i\mid a_i)$};
+\draw[-{Stealth}, thick] (1.2,0.6) -- (2.6,0.6) node[midway,above] {\small $\lmsg$};
+\draw[-{Stealth}, thick] (9.3,0.6) -- (7.9,0.6) node[midway,above] {\small $\rmsg$};
+\end{tikzpicture}
+\caption{Factor graph of the posterior \eqref{eq:posterior}. Latent variables $a_i$ (open)
+carry binary transition factors along the chain; each observation $x_i$ (shaded) enters
+through a \emph{unary} factor $\like$ attached to a single latent variable. Conditioning
+therefore reweights node potentials without creating edges among the $a_i$, and the posterior
+graph remains a chain. Sum-product with the messages \eqref{eq:messages} is exact on it.}
+\label{fig:factorgraph}
+\end{figure}
+
+\begin{remark}[What ``exact'' means here]
+\label{rem:exact}
+Three statements must be kept apart. (i) Sum-product on the posterior \eqref{eq:posterior} is
+exact at the level of functional messages, as a consequence of the graph being a tree. (ii)
+Messages are functions on $\Reals$, so an implementation must represent them; we use a
+truncated uniform grid with composite trapezoidal weights, which defines a finite-state model
+for which the recursion is exact up to floating-point arithmetic. (iii) That finite-state
+model approximates the continuous one, with an error that must be measured rather than
+assumed. We write ``exact tree inference'' for (i) and ``exact for the discretised model''
+for (ii), and never abbreviate either to ``exact''.
+\end{remark}
+
+\section{Numerical control}
+\label{sec:numerics}
+
+Two error sources are separated by construction. \emph{Truncation}: probability mass outside
+the grid $[-A,A]$ is discarded, monitored by the mass in the boundary cells, which stays below
+$2\times10^{-5}$ across all reported runs at $A=8$. \emph{Quadrature}: the trapezoidal rule is
+second order in the spacing for integrands with a bounded second derivative. For the Gaussian
+kernel the integrand is smooth and convergence is fast; \textbf{for the Laplace kernel it is
+not}, since $\innov(e)\propto e^{-|e|/b}$ has a discontinuous derivative at the origin, and we
+therefore make no claim of spectral accuracy for that family.
+
+Against the closed-form Gaussian posterior mean, the discretised recursion agrees to
+$9.2\times10^{-15}$ relative at $\ngrid=401$, $A=8$. That number measures the discretisation
+of the Gaussian model only. It is not comparable with the independent Monte Carlo check
+below, which measures something else: on the Laplace chain, where no closed form exists,
+importance sampling with $6\times10^6$ samples agrees with the discretised posterior mean to
+$1.1\times10^{-3}$ relative --- a figure limited by the Monte Carlo standard error, not by the
+grid. Both are reported because they validate different things; neither is the accuracy of
+the other.
+
+\section{Gaussian closure and the LMMSE estimator}
+\label{sec:closure}
+
+A standard approximation propagates only the first two moments of each message. Under the
+transition $a_i = \corr a_{i-1} + \varepsilon_i$, a message with mean $m$ and variance $v$
+maps to one with
+\begin{equation}
+\label{eq:closure}
+m \;\mapsto\; \corr m,
+\qquad
+v \;\mapsto\; \corr^2 v + \ivar ,
+\end{equation}
+and a Gaussian message times a Gaussian likelihood is Gaussian. The propagation therefore
+uses only the mean and variance of $\innov$ and discards everything else about its shape.
+
+\begin{proposition}
+\label{prop:lmmse}
+For the chain \eqref{eq:prior} with linear transitions and Gaussian unary likelihoods,
+moment-projected sum-product returns the LMMSE estimator of the covariance-matched Gaussian
+model,
+\begin{equation}
+\label{eq:lmmse}
+\lmmse
+= \Cov(a,x)\,\Cov(x)^{-1} x
+= e^{-t}\Sigma_0\left(e^{-2t}\Sigma_0 + \Dt I\right)^{-1} x ,
+\end{equation}
+for every innovation law with mean zero and variance $\ivar$.
+\end{proposition}
+
+The proof is the observation that \eqref{eq:closure} depends on $\innov$ only through
+$(0,\ivar)$, so the whole recursion is a function of $\Sigma_0$; the resulting estimator is
+linear in $x$ and matches the two moments, which characterises LMMSE. We verify it
+numerically to $6\times10^{-16}$ across five innovation families.
+
+\begin{remark}
+Proposition~\ref{prop:lmmse} is a statement about \emph{this} closure --- single-Gaussian
+moment projection with linear transitions --- and not about Gaussian approximations in
+general. Within its scope it has a consequence worth stating: what one might call the
+message-representation error and the model error coincide, because projecting the messages
+and replacing the model by its covariance-matched Gaussian give the same estimator. The two
+separate again for richer message families.
+\end{remark}
+
+The gap between \eqref{eq:lmmse} and exact inference locates where non-Gaussianity matters.
+It is largest at \emph{small} $t$ and decays monotonically: on a Laplace chain at
+$\corr=0.85$, the relative deviation of the closure's score from the exact one falls from
+$0.20$ at $t=0.08$ to $9.2\times10^{-5}$ at $t=2.4$. Large $t$ Gaussianises the posterior, so
+the shape of $\innov$ survives only where the likelihood is weak.
+
+\section{Estimating the transition kernel}
+\label{sec:em}
+
+We now treat $\kernel$ as unknown and observe only noised sequences $x^\mu$, $\mu=1,\dots,\nseq$,
+possibly at several noise levels. The initial law $\mu(a_1)$ is held fixed (see
+\S\ref{sec:limits}). Write $\params$ for the kernel parameters and
+$\Lik(\params)=\sum_\mu \log P_{t,\params}(x^\mu)$.
+
+\paragraph{Parametrisation.} We use a mixture-innovation kernel
+\begin{equation}
+\label{eq:kernel}
+\kernel_\params(a'\mid a) \;=\; \sum_{c=1}^{C} \pi_c \,
+\normal{a' - \corr a - \nu_c}{s_c^2},
+\end{equation}
+which keeps the linear autoregression and leaves the innovation law essentially free. At
+$C=4$ this has $\corr$, four weights $\pi_c$, four locations $\nu_c$ and four scales $s_c^2$:
+thirteen numbers subject to $\sum_c\pi_c=1$, hence \textbf{twelve free parameters}. It is
+never given the density it is asked to recover.
+
+\paragraph{Exact expectation step.} Many latent-variable models require an approximate or
+variational E-step; this one does not, because the posterior is a tree
+(\S\ref{sec:bp}) and sum-product returns exact single-site \emph{and pairwise} marginals. The
+complete-data log-likelihood is a sum over edges, so the auxiliary function
+$\Qfun(\params\mid\params^{(r)})$ depends on the data only through
+\begin{equation}
+\label{eq:xi}
+\Xis_{kl} \;=\; \sum_{\mu=1}^{\nseq}\sum_{i=2}^{\nsites}
+P\!\left(a_{i-1}=u_k,\; a_i=u_l \;\middle|\; x^\mu\right),
+\end{equation}
+the expected transition mass between grid points $u_k$ and $u_l$ --- the continuum analogue of
+the expected transition counts of Baum--Welch \citep{baum1970}. Sufficiency of the single
+matrix \eqref{eq:xi} requires a \emph{homogeneous} kernel shared across sites and sequences,
+a fixed grid, and an initial law excluded from $\params$; it fails if any of these is relaxed.
+Given those, the maximisation step never revisits the data and costs $O(P\ngrid^2)$ for $P$
+parameters, independently of $\nseq$; observations at different noise levels add into one
+$\Xis$. Forming $\Xis$ costs $O(\nseq\nsites\ngrid^2)$ per iteration and $O(\ngrid^2)$
+storage, so ``one matrix'' is a statement about sufficiency, not about inference being cheap.
+
+\paragraph{Gradient without differentiating the recursion.} Fisher's identity
+\citep{fisher1925,cappe2005} gives
+\begin{equation}
+\label{eq:fisher}
+\nabla_\params \log P_\params(x)
+= \E_\params\!\left[\nabla_\params \log P_\params(a,x)\,\middle|\,x\right]
+= \big\langle \Xis(\params),\; \nabla_\params \log \kernel_\params \big\rangle ,
+\end{equation}
+the exact gradient of the \emph{marginal} log-likelihood from one sum-product pass. Sum-product
+is not a computation graph to backpropagate through; it supplies the conditional expectation.
+We verify \eqref{eq:fisher} against finite differences of the exact evidence to $\sim10^{-9}$.
+
+Equation~\eqref{eq:fisher} is not EM. It licenses \emph{gradient ascent} on $\Lik$, which is
+the procedure described in the guidance we were given, whereas EM maximises
+$\Qfun$ at each step. Both are implemented and they do not dominate one another: on the
+smooth Gaussian kernel gradient ascent reaches EM's optimum to $2\times10^{-9}$ nats while
+requiring a tuned step size, and on the Laplace kernel it attains a higher likelihood than
+EM, because there the exact maximiser of $\Qfun$ is a lattice artefact of the discretisation.
+Results below use EM with the exact maximisation step unless stated.
+
+\paragraph{Identifiability.} Two claims must be separated. Gaussian convolution at finite $t$
+is injective on distributions --- the characteristic function acquires a factor
+$e^{-\Dt\|\xi\|^2/2}$, which has no zeros, and $e^{-t}>0$ --- so $\Pt$ determines $\Pz$.
+\emph{Kernel} identifiability does not follow: it additionally requires the initial law to be
+fixed or separately identifiable, the transition family to be identifiable as a parametric
+family, and the mixture \eqref{eq:kernel} to be treated modulo label permutation. We assume
+these rather than prove them.
+
+What noising does destroy is \emph{information}, and unevenly. Measured per sequence from
+exact single-chain passes, the Fisher information for the innovation scale falls by a factor
+$142$ between $t=0.05$ and $t=1.6$, while that for the correlation falls by $26$. The
+higher-order structure of $\innov$ is thus far more fragile under the channel than its
+second-order structure --- a fact we return to in \S\ref{sec:generation}.
+
+\section{Denoising accuracy}
+\label{sec:pointwise}
+
+\paragraph{Protocol.} Laplace chain, $\nsites=32$, $\corr=0.85$. Estimators are scored against
+exact-BP denoising under the true kernel on held-out sequences, at five noise levels. Neural
+baselines are trained by denoising score matching in both standard parametrisations
+(predicting the noise, and predicting the clean signal); we report the better of the two at
+each noise level, since they win in different regimes and reporting one alone would mislead.
+Full architectural and optimisation details are in Appendix~A.
+
+\begin{table}[t]
+\caption{Relative denoising error against exact inference under the true kernel, averaged
+over the noise schedule. Mean over six training seeds, $\pm$ one standard error. The seeds
+vary initialisation at fixed data, so these intervals measure optimisation variance and not
+sampling variance.}
+\label{tab:pointwise}
+\centering
+\begin{tabular}{rccc}
+\toprule
+sequences $\nseq$ & network ($25{,}248$ params) & EM--BP ($12$ free) & ratio \\
+\midrule
+32   & $0.6363 \pm 0.0043$ & $\mathbf{0.0651 \pm 0.0031}$ & $9.8$ \\
+128  & $0.5117 \pm 0.0025$ & $\mathbf{0.0333 \pm 0.0035}$ & $15.4$ \\
+512  & $0.2813 \pm 0.0013$ & $\mathbf{0.0211 \pm 0.0022}$ & $13.3$ \\
+1024 & $0.2154 \pm 0.0009$ & $\mathbf{0.0182 \pm 0.0021}$ & $11.8$ \\
+2048 & $0.1756 \pm 0.0009$ & $\mathbf{0.0142 \pm 0.0009}$ & $12.4$ \\
+4096 & $0.1643 \pm 0.0009$ & $\mathbf{0.0124 \pm 0.0005}$ & $13.2$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Table~\ref{tab:pointwise} shows a ratio between $10$ and $15$ across seven doublings of the
+data. The comparison at equal budget is the meaningful one. We note that the network at
+$\nseq=4096$ did not reach the error the estimator attains at $\nseq=32$; \textbf{we did not
+observe a crossing}, so we do not quantify a data-equivalence factor, and the extrapolation
+that would be required to do so spans several decades.
+
+\paragraph{Controls.} Capacity is not the explanation: over $24$ configurations from $3.2$k
+to $297$k parameters the best network reaches $0.208$ against the estimator's $0.022$ at
+$\nseq=1024$, and error degrades for the largest models. The baseline is competent: trained
+on a Gaussian chain where the optimal denoiser is linear and closed-form, given four times
+the data and twice the steps, it reaches $0.099$.
+
+\paragraph{A locality-respecting baseline.} A fully connected network carries no sequential
+prior. Against a weight-shared window predictor --- a one-dimensional convolution --- the
+margin narrows substantially, from roughly $10$ to between $2$ and $4$ over
+$\nseq\in\{128,512,2048\}$. Roughly $60\%$ of the fully connected network's deficit was
+therefore its architecture rather than the estimator. The margin against the convolution
+increases over the three budgets we ran ($2.10\pm0.39$, $3.27\pm0.32$, $4.11\pm0.32$); three
+points do not establish a trend, and we report them as measured. \textbf{These particular
+numbers used a receptive field selected on the evaluation set} and are exploratory pending a
+rerun with a validation split; the bias favours the baseline, so the margin quoted is if
+anything conservative.
+
+\section{Generation}
+\label{sec:generation}
+
+Denoising accuracy is not what a generative model is judged on. Errors enter the reverse
+integration at every step and accumulate unevenly across the schedule, so a pointwise ranking
+need not survive. We therefore integrate the reverse process
+$\mathrm{d}x/\mathrm{d}\tau = x + 2\score(x,\tau) + \gwn$ under each estimator, with common
+random numbers across estimators.
+
+\paragraph{Comparing like with like.} Integration must stop at $t_{\min}>0$, since
+$\score$ diverges as $\Dt\to0$. What each estimator produces is therefore a sample of
+$P_{t_{\min}}$, not of $\Pz$, and comparing it against clean data measures the stopping point
+rather than the score: independent Gaussian noise of variance $v$ on an innovation of variance
+$\ivar$ multiplies the excess kurtosis by $(\ivar/(\ivar+v))^2$. We instead draw a reference
+from $\Pz$ and noise it forward to the same $t_{\min}$, so both sides are samples of the same
+law and the target moments follow in closed form. Run with the \emph{true} kernel, the sampler
+reproduces that target at every budget ($1.897$--$1.914$ against $1.9098$), which validates
+the integrator and the statistics before any estimator is compared.
+
+\begin{table}[t]
+\caption{Generated-sequence statistics at $\nseq=2048$, Laplace chain, median over four
+seeds, against closed-form targets for $P_{t_{\min}}$. The denoising column repeats the
+ranking of \S\ref{sec:pointwise}; the distributional columns do not agree with it.}
+\label{tab:generation}
+\centering
+\begin{tabular}{lcccc}
+\toprule
+& EM--BP & local CNN & global MLP & target \\
+\midrule
+denoising MSE against exact & $\mathbf{0.00052}$ & $0.00525$ & $0.01330$ & $0$ \\
+innovation excess kurtosis & $0.897$ & $\mathbf{1.357}$ & $0.206$ & $1.910$ \\
+$\KL(\text{true}\,\|\,\text{generated})$ & $0.0055$ & $\mathbf{0.0028}$ & $0.0165$ & $0$ \\
+worst covariance-lag error & $\mathbf{0.0292}$ & $0.0973$ & $0.0518$ & $0$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Table~\ref{tab:generation} is the paper's main empirical finding, and it is a dissociation.
+The structured estimator is an order of magnitude more accurate pointwise and three times
+better on second-order structure, and yet the convolutional network reproduces the
+\emph{innovation law} more faithfully, by both kurtosis and divergence. The fully connected
+network shows the pattern most sharply: over the same range its denoising error improves
+twelvefold while its generated kurtosis degrades from $0.850$ to $0.206$. It fits the bulk of
+the posterior and loses the tail.
+
+\paragraph{A plausible mechanism, not yet established.} Both the marginal likelihood that EM
+maximises and the squared-error denoising loss are dominated by the bulk of the distribution.
+The tail of $\innov$ carries little probability mass and therefore little weight in either
+objective, while contributing disproportionately to the shape statistics that reverse
+diffusion exposes. This is the same asymmetry measured in \S\ref{sec:em}: the channel
+destroys innovation-shape information $142$-fold against $26$-fold for the correlation, and
+the estimator sees only noised data. Whether the deficit is a capacity limit of the
+parametrisation \eqref{eq:kernel} or an information limit of the observation model is decided
+by varying $C$, which is in progress and not reported here.
+
+\section{Limitations and scope}
+\label{sec:limits}
+
+The model assumes exact first-order Markov structure; under a non-Markov prior the estimator
+is misspecified in a way more data does not repair. The transition family
+\eqref{eq:kernel} may additionally be misspecified, and \S\ref{sec:generation} suggests it is,
+for the tails. The initial law is fixed rather than estimated. Sum-product is exact on the
+posterior chain but the implementation is a discretisation whose error, for the Laplace
+family, is second order rather than spectral.
+
+Inference costs $O(\nsites\ngrid^2)$ per sequence per evaluation against a few matrix products
+for a network, measured here at two to three hundred times slower; since reverse diffusion
+calls the denoiser at every step, this is the practical weak point. Training is also slower,
+and the estimator's cost grows linearly in $\nseq$ while the network's is fixed by its step
+count, so the advantage is in data and not in wall-clock. The low parameter count is not free:
+it is bought with a structural assumption, and the advantage narrows as the parametric
+dimension grows --- on a discrete-alphabet variant it falls from $15$ to $4.4$ as the
+estimated dimension goes from $6$ to $132$ parameters.
+
+Error bars over training seeds measure optimisation variance at fixed data. The
+generative comparison is complete for one innovation family. Comparisons are against the two
+architectures described and do not license a claim about neural denoisers in general.
+
+\section{Conclusion}
+
+When a sequential distribution is known to have low-dimensional Markov structure, learning a
+diffusion score reduces to latent-variable inference and estimation of a compact transition
+model. Sum-product on the noised chain supplies an exact non-Gaussian benchmark, and
+estimating the kernel from noised data alone gives a denoiser that is substantially more
+accurate at small sample sizes than trained networks, at the cost of stronger assumptions and
+much more expensive inference. The comparison after reverse diffusion does not reproduce that
+ranking, and we regard understanding the dissociation --- rather than the pointwise margin
+itself --- as the useful direction.
+
+\bibliographystyle{plainnat}
+\bibliography{bibliography}
+
+\end{document}
