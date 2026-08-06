@@ -169,6 +169,32 @@ def _score(X: np.ndarray, means: np.ndarray, t: float) -> np.ndarray:
     return -(X - alpha * means) / delta
 
 
+
+def _finish(x: np.ndarray, score_fn, t_min: float) -> np.ndarray:
+    """Denoising readout at the stopping time -- NOT an optional refinement.
+
+    The reverse integration halts at ``t_min > 0`` because the score diverges as
+    ``Delta_t -> 0``. The state there is still ``alpha_t a + sqrt(Delta_t) z``, so reporting
+    it as a sample of ``p_0`` reports the truth convolved with Gaussian noise of variance
+    ``Delta_t``. For a distributional metric that is not a small bias, it is the whole
+    measurement: independent Gaussian noise of variance ``v`` added to an innovation of
+    variance ``q`` multiplies the excess kurtosis by ``(q / (q + v))^2``.
+
+    At the settings here (``rho=0.85``, ``t_min=0.02``) that factor predicts an excess
+    kurtosis of **1.910** against a true 3.0 -- and the calibration run measured 1.99, 1.82
+    and 1.91 at 100, 200 and 400 integration steps. The plateau is exact agreement with the
+    readout bias, not a failure of the integrator, and without this correction every arm
+    would have appeared to destroy heavy tails by roughly the same factor.
+
+    The remedy is the standard final denoising step: report ``E[a | x, t_min]``, recovered
+    from the score by the Tweedie identity, rather than ``x`` itself.
+    """
+    s = score_fn(x, float(t_min))
+    alpha = float(np.exp(-t_min))
+    delta = float(1.0 - np.exp(-2.0 * t_min))
+    return (x + delta * s) / alpha
+
+
 def make_exact_arm(prior, grid, weights):
     """The true score. Defines the target the other arms are judged against."""
     def fn(X, t):
@@ -323,7 +349,7 @@ def run_generate(prior, grid, weights, cfg, out_dir):
                 # increments across arms, so differences are the score and nothing else.
                 rng = rng_for("exp16-gen", seed, n_chains)
                 x_init = rng.standard_normal((cfg["n_generate"], n))
-                a_gen = reverse_sde(x_init, fn, times, rng)
+                a_gen = _finish(reverse_sde(x_init, fn, times, rng), fn, cfg["t_min"])
 
                 c = compare_distributions(
                     a_gen, a_ref, prior.rho, sigma_true,
@@ -408,7 +434,7 @@ def run_steps(prior, grid, weights, cfg, out_dir):
         for name, fn in arms.items():
             rng = rng_for("exp16-steps", n_steps)
             x_init = rng.standard_normal((cfg["n_generate"], n))
-            a_gen = reverse_sde(x_init, fn, times, rng)
+            a_gen = _finish(reverse_sde(x_init, fn, times, rng), fn, cfg["t_min"])
             c = compare_distributions(
                 a_gen, a_ref, prior.rho, sigma_true,
                 innov_kurtosis_true=prior.innovation_excess_kurtosis,
