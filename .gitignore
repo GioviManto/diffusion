@@ -24,3 +24,10 @@ __pycache__/
 # --- latexmk build databases ---
 *.fdb_latexmk
 *.fls
+
+# --- tectonic intermediates ---
+*.xdv
+
+# --- generated from Markdown by tools/md2tex.py; the .md is the source ---
+research/nongaussian-bp/EXECUTIVE_SUMMARY.tex
+research/nongaussian-bp/ANSWERS_AND_QUESTIONS_FOR_ADVISORS.tex

@@ -1,21 +1,29 @@
 % ===========================================================================
 % Shared notation for the internal note and the compendium.
 %
-% Conventions follow Mezard, "Generative diffusion updated notes" (Dec 2025),
-% sections 2-3.1.1, and the statistical-physics usage of the surrounding
-% literature. Where that source and the project's earlier code disagreed, the
-% source wins and the code is translated in the text rather than the reverse.
+% Conventions follow the statistical-physics usage of the diffusion literature
+% (Song et al. 2021 for the SDE formulation; Mezard-Montanari 2009 for the
+% graphical-model side). Only publicly available sources are cited.
 %
-% Two deliberate departures from the source, both noted where they occur:
+% Symbol decisions that matter, fixed here once:
 %
-%   1. The source uses n for the number of data samples and d for the ambient
-%      dimension. Here the ambient dimension IS the chain length and is the
-%      quantity every graphical-model statement is indexed by, so it is written
-%      n, and the number of observed sequences is M. A translation sentence
-%      appears at first use.
+%   1. K (or K_theta) is the MARKOV TRANSITION KERNEL, everywhere and only.
+%      The number of quadrature grid points is N_g. These were previously W and
+%      K respectively, which collided; nothing in either document may now use
+%      K for a grid size or W for a kernel.
 %
-%   2. The source writes the decay factor as e^{-t} throughout. We keep e^{-t}
-%      in displayed equations and never abbreviate it to alpha_t.
+%   2. The ambient dimension IS the chain length, and every graphical-model
+%      statement is indexed by sites, so it is written n. The number of observed
+%      sequences is M. A translation sentence appears at first use, because much
+%      of the diffusion literature uses n for the sample count and d for the
+%      dimension.
+%
+%   3. The decay factor is written e^{-t} in displayed equations and is never
+%      abbreviated to alpha_t.
+%
+%   4. Gaussian white noise eta is STANDARDISED, <eta(t)eta(t')> = delta(t-t'),
+%      so the sqrt(2) is carried explicitly in both the forward and the reverse
+%      SDE. This keeps Delta_t = 1 - e^{-2t} consistent throughout.
 % ===========================================================================
 
 % --- Diffusion -------------------------------------------------------------
@@ -23,27 +31,30 @@
 \newcommand{\Pt}{P_t}                       % noised distribution at time t
 \newcommand{\Dt}{\Delta_t}                  % 1 - e^{-2t}
 \newcommand{\score}{S}                      % S(x,t) = grad log P_t(x)
-% Standardised Gaussian white noise: <eta(t)eta(t')> = delta(t-t'). The source's section 2
-% uses this convention in its Eq (3) but a variance-2 convention in its Eqs (1) and (18); we
-% fix the standardised one everywhere and carry the sqrt(2) explicitly in both the forward
-% and the reverse SDE, so that Delta_t = 1 - e^{-2t} is consistent throughout.
-\newcommand{\gwn}{\eta}
+\newcommand{\gwn}{\eta}                     % standardised Gaussian white noise
+\newcommand{\tmin}{t_{\min}}
+\newcommand{\tmax}{t_{\max}}
 
-% Posterior mean, in the source's bracket notation rather than E[a|x].
+% Posterior mean, in bracket notation rather than E[a|x].
 \newcommand{\pmean}[1]{\langle #1 \rangle_{x,t}}
 \newcommand{\pmeansite}[1]{\langle a_{#1} \rangle_{x,t}}
 
 % --- Chain and graphical model --------------------------------------------
 \newcommand{\nsites}{n}                     % chain length = ambient dimension
 \newcommand{\nseq}{M}                       % number of observed sequences
-\newcommand{\ngrid}{K}                      % quadrature grid points
-\newcommand{\kernel}{W}                     % transition kernel W(a'|a)
+\newcommand{\ngrid}{N_{\mathrm{g}}}         % number of quadrature grid points
+\newcommand{\gridpt}[1]{u_{#1}}             % grid point
+\newcommand{\gridh}{h}                      % grid spacing
+\newcommand{\halfwidth}{A}                  % grid half-width, domain [-A, A]
+\newcommand{\kernel}{K}                     % transition kernel K(a'|a)
+\newcommand{\kernelth}{K_{\params}}         % parameterised transition kernel
 \newcommand{\like}{\ell_t}                  % unary likelihood factor
 \newcommand{\lmsg}{\overrightarrow{m}}      % forward (left) message
 \newcommand{\rmsg}{\overleftarrow{m}}       % backward (right) message
 \newcommand{\innov}{\varphi}                % innovation density
 \newcommand{\corr}{\rho}                    % autoregression coefficient
 \newcommand{\ivar}{q}                       % innovation variance
+\newcommand{\ncomp}{C}                      % mixture component count
 
 % --- Estimation ------------------------------------------------------------
 \newcommand{\params}{\theta}

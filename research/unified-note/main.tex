@@ -188,7 +188,7 @@ process in \(\R^d\), then \emph{denoising} the result through another
 diffusion process with a guiding force field --- the \emph{score} ---
 trained from the data, so that the system generates fresh fake data
 with properties similar to the originals
-\citep{Mezard2025, SohlDickstein2015, Ho2020, Song2021SDE,
+\citep{SohlDickstein2015, Ho2020, Song2021SDE,
 Karras2022, Achilli2024}. This is presently the state of the art in
 image, text, and video generation.
 The same formalism can also be used to estimate the likelihood
@@ -500,7 +500,7 @@ entire noisy trajectory, not of \(x_k\) alone.
 \begin{bayesianview}[: the Fokker--Planck view of the forward process]
 The forward channel \eqref{eq:ou-sde} can equivalently be characterised
 by the evolution of the density \(P_t(x)\) itself, which solves the
-\emph{Fokker--Planck equation} \citep[][\S\,2]{Mezard2025}
+\emph{Fokker--Planck equation} \citep{Oksendal2003}
 \begin{equation}\label{eq:fpe-forward}
     \partial_t P_t(x)
     \;=\;
@@ -521,8 +521,7 @@ is the standard Gaussian
 ``\emph{easy distribution}'' from which reverse-time sampling
 starts); and the \(\nabla_x \log P_t\) gradient that appears as a
 correction to the drift when one time-reverses the Fokker--Planck
-equation is exactly the score \citep[][\S\,3.1]{Mezard2025,
-Anderson1982} which the rest of this note studies.
+equation is exactly the score \citep{Anderson1982} which the rest of this note studies.
 \end{bayesianview}
 
 
@@ -572,7 +571,7 @@ conditional expectation; the Gaussian channel contributes only the
 affine constants \(\mu = e^{-t}\) and \(\Detl = 1 - e^{-2t}\).
 Computing the score and computing the Bayesian denoiser are therefore
 the same problem; in the OU setting of this thesis the same identity
-appears in \cite[\S\,3]{Mezard2025} and is the foundation of denoising
+appears in \cite{Efron2011} and is the foundation of denoising
 score matching \citep{Vincent2011}.
 
 \begin{theorem}[Joint Tweedie identity, \Established; cf.\
@@ -770,7 +769,7 @@ enters as drift]
 The reverse-time SDE alluded to above is a special case of Anderson's
 general theorem on time reversal of diffusions \citep{Anderson1982,
 HaussmannPardoux1986}. We sketch the OU case to make explicit how the
-score appears \citep[][\S\,3.1]{Mezard2025}.
+score appears \citep{Efron2011}.
 
 \textbf{Step 1 (write the FPE in reversed time).} The forward
 Fokker--Planck \eqref{eq:fpe-forward} reads
@@ -862,8 +861,7 @@ only mechanism by which the score acquires nonlinearity. Section
 \subsection{The tilted-measure view of the posterior
 mean}\label{sec:tilted-measure}
 
-A second perspective on Tweedie's identity, due to Mézard
-\citep[\S\,3.1.1]{Mezard2025}, makes very explicit how the
+A second perspective on Tweedie's identity, makes very explicit how the
 observation \(x\) shapes the posterior over the clean signal. We work
 in the single-frame case for clarity; the argument extends
 component-wise.
@@ -910,7 +908,7 @@ trajectory; the pinning strength tells us how to trust it]
 a measure obtained from the prior \(p_0\) by \emph{tilting} it with
 a quadratic pinning centred at \(\widetilde x\). Two limiting
 behaviours are obvious from this form
-\citep[\S\,3.1.1]{Mezard2025}:
+\citep{Efron2011}:
 \begin{itemize}[leftmargin=1.4em, topsep=2pt, itemsep=2pt]
 \item \textbf{Small \(t\): pinning dominates.} The pinning strength
 \(\mu^2 / \Detl\) diverges like \(1 / (2 t)\). The tilted measure
@@ -936,7 +934,7 @@ and suppresses the rest.
 is an expectation of the original force]
 If \(p_0(a) \propto e^{-V_0(a)}\) for a smooth potential \(V_0\), the
 score admits the equivalent expression
-\citep[\S\,3.1.1]{Mezard2025}
+\citep{Efron2011}
 \begin{equation}\label{eq:score-as-force}
     S(x, t) \;=\; e^{t}\, \bigl\langle\, F_0(a) \,\bigr\rangle_{\!\text{tilt}},
     \qquad
@@ -1021,7 +1019,7 @@ counterpart at the level of \emph{training}: the score-matching loss
 \citep{Hyvarinen2005} is, up to an additive constant, the
 mean-squared error of a noise predictor. This is the foundational
 result of \citet{Vincent2011}; we give the explicit derivation in
-Mézard's form \citep[][\S\,3.1.1]{Mezard2025}.
+explicit form.
 
 \begin{theorem}[Score matching equals denoising MSE,
 \Established]\label{thm:score-matching}

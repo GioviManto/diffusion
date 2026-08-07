@@ -158,7 +158,7 @@ hold $n$ examples. The recipe has two halves: \emph{noising} the data by a
 diffusion process until all structure is destroyed, then \emph{denoising} by a
 reverse-time diffusion whose drift contains a trained vector field --- the
 \emph{score} $\nabla_x\log P_t(x)$
-\citep{mezard2025generative,song2021scorebased,vincent2011connection}. This is
+\citep{song2021scorebased,vincent2011connection}. This is
 the state of the art in image and video generation, and the same trained score
 also gives likelihood estimates of new data points.
 
@@ -567,7 +567,7 @@ describe this matrix completely.
 \subsection{The score, the Bayesian way: Tweedie's identity}
 
 \begin{theorem}[Joint Tweedie identity \citep{efron2011tweedie,
-vincent2011connection,mezard2025generative}]\label{thm:tweedie}
+vincent2011connection}]\label{thm:tweedie}
 For \emph{any} prior $P_0$ on $\R^K$ (not only Gaussian) and the channel
 \eqref{eq:likelihood}, the joint score admits, component-wise, the two
 equivalent forms
@@ -644,7 +644,7 @@ in $a$ inside Bayes' rule gives
 \]
 The posterior mean is the prior average \emph{tilted} by a quadratic pinning
 centred at the deconvolved observation $\widetilde x$, with pinning strength
-$e^{-2t}/\Dt$ \citep{mezard2025generative}. Small $t$: the strength diverges
+$e^{-2t}/\Dt$ \citep{song2021scorebased}. Small $t$: the strength diverges
 like $1/2t$, the tilt concentrates at $\widetilde x\to x$, the score
 vanishes --- the data is trusted. Large $t$: the strength vanishes, the tilt
 flattens, $\E[a\given x]\to0$ (prior mean) and $S\to-x$ --- the data is
@@ -655,7 +655,7 @@ quantitatively, in the bulk parameters of \S\ref{sec:bulk}.
 
 \begin{derivation}[: where the score enters generation --- the reverse-time SDE]
 For completeness we record why the score is the central object
-\citep{song2021scorebased,mezard2025generative}. The forward OU
+\citep{song2021scorebased}. The forward OU
 process has Fokker--Planck equation
 $\partial_tP_t=\nabla\!\cdot\!(xP_t)+\Delta P_t$. Set $\tau:=t_f-t$ and
 $\widetilde P_\tau:=P_{t_f-\tau}$; then
