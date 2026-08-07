@@ -181,6 +181,21 @@ as four inner conditional-maximisation sweeps. That makes the algorithm \emph{ge
 monotone ascent is preserved, exact maximisation is not.
 \end{pitfall}
 
+\begin{figure}[t]
+\centering
+\includegraphics[width=0.98\textwidth]{fig_em_diagnostics.pdf}
+\caption{Left: the marginal log-likelihood by iteration at $\ncomp=4$, $\nseq=512$, from four
+initialisations of $\corr$; the largest decrease across iterations is zero in all four runs, and
+in the four $\ncomp=8$ runs not shown. Centre: the estimated autoregressive coefficient over the
+same runs, reaching $[0.8497,0.8507]$ against a truth of $0.85$ from initialisations spanning
+$[-0.4,0.6]$ --- which is the direct evidence that $\corr$ is estimated rather than supplied.
+Right: RMSE of $\widehat\corr$ and of the innovation variance against the number of training
+sequences, with an $\nseq^{-1/2}$ reference. Sources \codefile{outputs/exp\_18/em\_trace.csv},
+\codefile{outputs/exp\_06\_em\_parameter\_recovery/em\_rate.csv}.}
+\label{fig:em-compendium}
+\end{figure}
+
+
 \begin{codebox}
 \coderef{src/kernels.py}{MixtureInnovationKernel} --- see its \texttt{m\_step}, whose
 \texttt{n\_inner=4} is the ECM sweep count. \texttt{theta} exposes the flat parameter vector,
@@ -218,3 +233,14 @@ the second-order structure, which is exactly the structure this project cares ab
 (\texttt{price\_of\_noising.csv}) and the recovery of an unknown innovation law from noisy data
 alone.
 \end{codebox}
+
+\section*{Sources}
+\addcontentsline{toc}{section}{Sources}
+EM is \citet{dempster1977}; the convergence analysis, including what monotone ascent does and
+does not guarantee, is \citet{wu1983}. The generalised and conditional-maximisation variants
+used here --- which is what the mixture M-step actually is --- are \citet{meng1993}. Fisher's
+identity for the gradient of the marginal likelihood goes back to \citet{fisher1925} and is
+given in the latent-variable form used here by \citet{louis1982} and \citet{cappe2005}. The
+transition-count statistic $\Xis$ is the continuum analogue of the one in \citet{baum1970}.
+Identifiability of finite mixtures, which Assumption~1 of the note leans on, is
+\citet{teicher1963} and \citet{yakowitz1968}.

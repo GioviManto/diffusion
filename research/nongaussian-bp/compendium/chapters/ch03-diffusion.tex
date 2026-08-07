@@ -1,15 +1,15 @@
 \chapter{The forward diffusion}
 \label{ch:diffusion}
 
-\section{Destroying data on purpose}
+\section{The forward process}
 
 A diffusion model is built around a process that takes a data point and gradually turns it
 into noise. The requirements are modest: the process should be easy to simulate, its
 end-state should be easy to sample from, and --- crucially --- the distribution at every
 intermediate time should be something we can reason about.
 
-The Ornstein--Uhlenbeck (OU) process satisfies all three. Following the convention of the
-notes we are matching \citep{mezard2025notes}, it is the stochastic differential equation
+The Ornstein--Uhlenbeck (OU) process satisfies all three. In the variance-preserving
+convention used throughout \citep{song2021}, it is the stochastic differential equation
 \begin{equation}
 \label{eq:ou}
 \frac{\mathrm{d}x}{\mathrm{d}t} \;=\; -x + \sqrt{2}\,\gwn(t),
@@ -143,9 +143,26 @@ is how the different estimators are compared on equal footing.
 \end{codebox}
 
 \begin{pitfall}
-Integration cannot be carried to $t=0$. As $\Dt\to0$ the score \eqref{eq:score-final} carries
-a factor $1/\Dt$ and diverges. Every implementation stops at some $t_{\min}>0$, and what it
-produces is therefore a sample of $P_{t_{\min}}$, \emph{not} of $\Pz$. Chapter~\ref{ch:numerics}
-returns to this; it caused two successive errors in this project's own measurements before it
-was handled correctly.
+Integration cannot be carried to $t=0$, but not for the reason usually given. The score
+\eqref{eq:score-final} carries a factor $1/\Dt$, and it is tempting to conclude that it
+diverges. It generally does not: the numerator $x - e^{-t}\pmean{a}$ vanishes at the same
+order, and for a $\Pz$ with a continuously differentiable density
+$\score(x,t)\to\nabla\log\Pz(x)$, which is finite. What actually forces $\tmin>0$ is a
+combination of four effects, separated in \S\ref{sec:resolution}: a genuine singularity for
+compactly supported innovations only; cancellation in a difference of nearly equal
+quantities divided by $\Dt$; a likelihood factor of width $\sqrt{\Dt}$ that the grid stops
+resolving; and a reverse drift whose Jacobian scales like $1/\Dt$, which stiffens the
+integrator. Whatever the reason, the consequence is the same: what the sampler produces is a
+sample of $P_{\tmin}$, \emph{not} of $\Pz$, and comparing it against clean data measures the
+stopping point rather than the score. That mistake was made twice in this project before the
+forward-noised reference of \S\ref{sec:tmin} fixed it.
 \end{pitfall}
+
+\section*{Sources}
+\addcontentsline{toc}{section}{Sources}
+The variance-preserving forward process and the SDE formulation of diffusion generative models
+are from \citet{song2021}; the discrete-time antecedents are \citet{sohl2015} and
+\citet{ho2020}. The time-reversal theorem that supplies the reverse drift is
+\citet{anderson1982}, with the general treatment in \citet{haussmann1986}. The Fokker--Planck
+machinery underlying both is standard \citep{risken1989}. Choices of $\tmin$, $\tmax$ and the
+time discretisation are discussed empirically by \citet{karras2022}.

@@ -39,10 +39,10 @@ a_i \;=\; \corr\, a_{i-1} + \varepsilon_i,
 \end{equation}
 with $|\corr|<1$, and $\innov$ an \emph{innovation density} of mean zero and variance $\ivar$.
 
-\subsection{Stationarity and the covariance}
+\subsection{Covariance stationarity}
 
-Suppose $a_1$ is drawn so that the chain is stationary, i.e.\ $\Var(a_i)=\sigma^2$ for all
-$i$. Taking variances in \eqref{eq:ar1} and using independence of $\varepsilon_i$ from
+Suppose $a_1$ is drawn with $\Var(a_1)=\sigma^2$ and ask when that variance is preserved along
+the chain. Taking variances in \eqref{eq:ar1} and using independence of $\varepsilon_i$ from
 $a_{i-1}$,
 \[
 \sigma^2 = \corr^2\sigma^2 + \ivar
@@ -151,12 +151,25 @@ by the recursion above with $a_1$ drawn standard normal. Batches are formed by s
 signature is a deliberate simplicity, not an oversight; batching is the caller's business.
 \end{codebox}
 
-\begin{remark}
-Setting $a_1\sim\normal{0}{1}$ makes the chain exactly stationary only for the Gaussian family,
-where the stationary law is $\normal{0}{1}$. For the others the first site is very slightly off
-the stationary distribution and the chain relaxes to it within a few sites. Since $\corr=0.85$
-gives a relaxation of $\corr^k$, the effect is below $10^{-3}$ by site $\sim40$, and all
-reported statistics either use interior sites or average over the sequence. The alternative ---
-sampling $a_1$ from the exact stationary law of each family --- would require a fixed-point
-computation per family for no measurable gain.
+\begin{remark}[Covariance-stationary, not strictly stationary]
+\label{rem:cov-stationary}
+The computation above establishes exactly one thing: with $\ivar=1-\corr^2$ and
+$\Var(a_1)=1$, \emph{second} moments propagate unchanged, so $\Var(a_i)=1$ for every $i$ and
+$\Cov(a_i,a_j)=\corr^{|i-j|}$, whatever the shape of $\innov$. The chain is
+\textbf{covariance-stationary} (equivalently second-order stationary).
+
+It is \textbf{not} strictly stationary in distribution unless $\innov$ is Gaussian. The
+invariant law of $a_i = \corr a_{i-1} + \varepsilon_i$ is the law of
+$\sum_{k\ge0}\corr^k\varepsilon_{-k}$, an infinite convolution which for non-Gaussian
+$\varepsilon$ is not Gaussian; drawing $a_1\sim\normal{0}{1}$ therefore starts the chain off
+its invariant law, and the marginal of $a_i$ drifts towards that law over a burn-in of order
+$1/\log(1/\corr)\approx6$ sites at $\corr=0.85$. Choosing $\ivar=1-\corr^2$ alone does not
+buy strict stationarity, and this document does not claim it does.
+
+Nothing in the comparisons depends on the difference. Every family shares the same $a_1$ law
+and the same covariance, so they still differ only beyond second moments, which is the property
+the controlled probe needs. But the alternative --- sampling $a_1$ from each family's invariant
+law, which needs a fixed-point computation per family --- has not been run, so the claim that it
+would change nothing is a prediction and not a measurement. It is on the list in
+\S\ref{sec:pending}.
 \end{remark}

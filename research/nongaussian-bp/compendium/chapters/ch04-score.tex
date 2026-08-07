@@ -186,3 +186,11 @@ computable. If one can compute it, one can ask how far a trained network is from
 separate ``the network is bad'' from ``this target is hard''. That is what the Markov chain
 of Chapter~\ref{ch:markov} provides.
 \end{intuition}
+
+\section*{Sources}
+\addcontentsline{toc}{section}{Sources}
+The identity between the score of a Gaussian-convolved density and the posterior mean is
+classical in empirical Bayes, due to \citet{robbins1956} and \citet{miyasawa1961}, and is
+usually called Tweedie's formula after the exposition in \citet{efron2011}. Its use as a
+training objective for generative models is \citet{vincent2011}, building on the score-matching
+estimator of \citet{hyvarinen2005}; the generative-modelling application is \citet{song2019}.

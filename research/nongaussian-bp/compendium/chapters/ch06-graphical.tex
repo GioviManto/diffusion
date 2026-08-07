@@ -161,9 +161,16 @@ losing tractability entirely. The coordinatewise structure of the OU noise
 (\S\ref{sec:coordinatewise}) is doing essential work here.
 \end{pitfall}
 
-\section{What we have bought}
+\section{The cost that has been removed}
 
 Marginalising \eqref{eq:posterior-factorised} naively to get $P(a_i\mid x,t)$ means
 integrating over $\nsites-1$ variables --- exponential in the sequence length if done by brute
 force on a discretisation. Proposition~\ref{prop:posterior-is-tree} says the posterior has the
 structure that makes this cost linear instead. Chapter~\ref{ch:bp} carries that out.
+
+\section*{Sources}
+\addcontentsline{toc}{section}{Sources}
+Factor graphs and the sum-product algorithm in the form used here are \citet{kschischang2001};
+the graphical-model formulation and the separation properties are \citet{pearl1988}. For the
+statistical-physics reading of the same objects, including exactness on trees, see
+\citet{mezard2009}; for the exponential-family and variational view, \citet{wainwright2008}.

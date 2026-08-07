@@ -52,10 +52,35 @@ interface, which is why the true and learned models are interchangeable in every
 \section{Two error sources}
 
 \subsection{Truncation}
+\label{sec:truncation}
 
-Probability mass outside $[-A,A]$ is discarded. The diagnostic is the mass in the boundary
-cells: if it is not negligible, $A$ is too small and refining $\ngrid$ will not help, because
-the error is in the domain rather than the resolution.
+Probability mass outside $[-\halfwidth,\halfwidth]$ is discarded rather than transported. The
+diagnostic is the mass in the boundary cells: if it is not negligible, $\halfwidth$ is too small
+and refining $\ngrid$ will not help, because the error is in the domain rather than the
+resolution.
+
+This diagnostic used to be computed inside the recursion and thrown away, so no aggregate could
+be quoted. It is now recorded (\codefile{outputs/exp\_18/boundary.csv},
+\codefile{experiments/exp\_18\_revision\_diagnostics.py}). Taking the worst case over all $32$
+sites of a forward sweep on a Laplace chain at $\corr=0.85$:
+
+\begin{center}
+\small
+\begin{tabular}{lcccc}
+\toprule
+$\halfwidth$ & $4$ & $6$ & $8$ & $10$ \\
+\midrule
+worst boundary mass & $3.4\times10^{-4}$ & $2.0\times10^{-6}$ & $1.4\times10^{-8}$
+                    & $1.4\times10^{-10}$ \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\noindent
+The value is essentially independent of $\ngrid$ across $\{201,401,801\}$, which is the point:
+truncation responds to the domain and not to the resolution, and a grid-refinement sweep at
+fixed $\halfwidth$ therefore cannot certify it. At the working $\halfwidth=8$ the discarded mass
+is eight orders of magnitude below any effect this project reports.
 
 \begin{pitfall}
 This failure is invisible unless one looks for it. An earlier package in this project ran at
@@ -85,19 +110,55 @@ not have. The accompanying note now claims second-order behaviour for that famil
 more.
 \end{pitfall}
 
-\subsection{A resolution condition}
+\begin{figure}[t]
+\centering
+\includegraphics[width=0.92\textwidth]{fig_grid_domain.pdf}
+\caption{The two error sources, measured separately. (a) Relative score error against the
+number of grid points at fixed $\halfwidth=8$, and (b) against the half-width at fixed
+$\ngrid=401$; both saturate at the floating-point floor $\sim10^{-14}$, beyond which the curves
+measure arithmetic rather than discretisation. (c) Worst boundary mass over $32$ sites against
+$\halfwidth$: the truncation diagnostic, near-independent of $\ngrid$. (d) Interior
+column-mass residual of the transition matrix against spacing at $\halfwidth=8$: the quadrature
+diagnostic, following $O(\gridh^2)$ as the trapezoidal rule predicts. Panels (a)--(b) from
+\codefile{outputs/exp\_01\_grid\_validation/grid\_heatmap.csv}, (c)--(d) from
+\codefile{outputs/exp\_18/boundary.csv}.}
+\label{fig:grid-compendium}
+\end{figure}
+
+\subsection{A resolution condition, and what really happens at small $t$}
+\label{sec:resolution}
 
 At small $t$ the likelihood $\like(x_i\mid a_i)$ is a narrow Gaussian of width
 $\sqrt{\Dt}/e^{-t}$. If that width is comparable to the grid spacing, the integrand is
 under-resolved and the quadrature is meaningless however fine the rest looks. The working
 condition used here is $\sqrt{2t} \gtrsim 3\Delta u$.
 
-\begin{intuition}
-Everything gets harder as $t\to0$, from two directions at once: the likelihood narrows, and the
-score \eqref{eq:score-final} carries a $1/\Dt$ that diverges. This is why reverse integration
-must stop at some $t_{\min}>0$ and why the small-$t$ end of every table deserves the most
-suspicion.
-\end{intuition}
+Everything gets harder as $t\to0$, and it is worth being precise about why, because the usual
+one-line explanation is wrong. It is often said that the score diverges as $\Dt\to0$ because
+\eqref{eq:score-final} carries a factor $1/\Dt$. It generally does not diverge: the numerator
+$x - e^{-t}\pmean{a}$ vanishes at the same order, and for a $\Pz$ with a continuously
+differentiable density $\score(x,t)\to\nabla\log\Pz(x)$, a finite limit. Four separate effects
+are at work, and only the first is a genuine mathematical singularity.
+
+\begin{enumerate}
+\item \textbf{A real singularity, for one family only.} The uniform-innovation chain has a
+      compactly supported $\Pz$, so $\nabla\log\Pz$ is unbounded at the support boundary. The
+      Laplace chain has a density with a kink, so its score has a jump discontinuity but stays
+      bounded. The Gaussian and mixture chains have scores bounded on compacta.
+\item \textbf{Numerical cancellation.} The implementation forms a difference of two nearly
+      equal quantities and divides by $\Dt\approx2t$, so relative error is amplified by
+      $O(1/t)$ no matter how accurate the posterior mean is.
+\item \textbf{Under-resolution.} The likelihood factor has width $\sqrt{\Dt}$; once that is
+      comparable to $\gridh$ the quadrature integrates it with $O(1)$ points. That is the
+      condition stated just above.
+\item \textbf{Integrator stiffness.} The reverse drift's Jacobian scales like $1/\Dt$, so the
+      step size must shrink as $t\to0$. This is why \coderef{src/reverse.py}{time\_grid} is
+      geometric rather than uniform.
+\end{enumerate}
+
+\noindent
+The practical conclusion --- stop at $\tmin>0$, and treat the small-$t$ end of every table with
+the most suspicion --- is unchanged. The reason for it is not a divergence of the score.
 
 \section{Stability}
 

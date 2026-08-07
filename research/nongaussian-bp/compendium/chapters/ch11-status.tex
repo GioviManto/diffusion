@@ -43,7 +43,7 @@ is not the representational constraint. \\
 \end{tabular}
 \end{center}
 
-\section{The result that changed the framing}
+\section{Pointwise accuracy and generative fidelity can disagree}
 \label{sec:dissociation}
 
 \codefile{exp\_16} compares the same estimators \emph{through reverse diffusion} rather than
@@ -114,15 +114,77 @@ exposes weight the distribution differently. A structured method therefore has t
 what it generates, which is exactly the objection that prompted this experiment.
 \end{intuition}
 
+\begin{figure}[t]
+\centering
+\includegraphics[width=0.92\textwidth]{fig_capacity.pdf}
+\caption{Both evaluation axes against the mixture component count. Left: MSE against the Bayes
+denoiser. Right: generated innovation excess kurtosis against the closed-form target. Both
+improve monotonically, so the curve moves towards better on \emph{both} coordinates rather than
+tracing a trade-off. The network arms are $\ncomp$-independent by construction.}
+\label{fig:capacity-compendium}
+\end{figure}
+
+\section{The capacity question, resolved on both axes}
+\label{sec:capacity-resolved}
+
+The previous version of this chapter left one question open: the component sweep varied
+$\ncomp$ for generation only, so it was possible that buying generative fidelity cost pointwise
+accuracy and the two axes traded against each other. That run has returned (SLURM job
+\texttt{617485\_[0-4]}, outputs \codefile{outputs/exp\_16/cpoint\_C*/pointwise.csv}), and the
+answer is that they do not.
+
+\begin{center}
+\small
+\begin{tabular}{rccc@{\qquad}ccc}
+\toprule
+& \multicolumn{3}{c}{MSE against the Bayes denoiser}
+& \multicolumn{3}{c}{generated excess kurtosis} \\
+\cmidrule(lr){2-4}\cmidrule(lr){5-7}
+$\ncomp$ & EM--BP & CNN & MLP & EM--BP & CNN & MLP \\
+\midrule
+2  & $0.002281$ & $0.005161$ & $0.012854$ & $-0.034$ & $1.273$ & $0.170$ \\
+4  & $0.000510$ & $0.005161$ & $0.012854$ & $0.812$  & $1.273$ & $0.170$ \\
+8  & $0.000276$ & $0.005161$ & $0.012854$ & $1.319$ & $1.273$ & $0.170$ \\
+12 & $0.000249$ & $0.005161$ & $0.012854$ & $1.363$ & $1.273$ & $0.170$ \\
+16 & $0.000234$ & $0.005161$ & $0.012854$ & $1.487$ & $1.273$ & $0.170$ \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\noindent
+(Laplace chain, $\nseq=2048$; pointwise column is the median over five noise levels and three
+seeds, generative column the median over three seeds against a target of $1.910$. The network
+arms do not depend on $\ncomp$ and are constant down both blocks, which is an internal
+consistency check rather than a finding.)
+
+Pointwise error falls by a factor of $9.7$ from $\ncomp=2$ to $\ncomp=16$ while generated
+kurtosis climbs from $-0.034$ to $1.487$. There is no capacity in the tested range at which the
+two axes trade. At $\ncomp=16$ the estimator is ahead of the convolution on both simultaneously:
+$0.000234$ against $0.005161$ pointwise, and a kurtosis deficit of $0.434$ against $0.648$.
+
+What this settles and what it does not: it settles that the disagreement observed at $\ncomp=4$
+is a property of a too-small innovation model rather than of the information surviving the
+channel, since enlarging the model removes it without costing anything on the other axis. It
+does not settle that information is never the binding constraint --- the kurtosis curve has not
+saturated at $\ncomp=16$, and how much further it can climb is not measured. Nor does the sweep
+cover marginal likelihood or runtime against $\ncomp$, which are the two coordinates of the
+joint experiment still missing.
+
 \section{Still in progress}
 \label{sec:pending}
 
-\textsc{[pending]} Nothing above relies on this.
+Nothing above relies on any of these.
 
 \begin{itemize}
-\item \textbf{Does the richer kernel keep its pointwise advantage?} The component sweep varied
-$C$ for generation only. If pointwise error degrades as $C$ grows, the two axes trade against
-each other and the reading changes; if it does not, the estimator dominates on both. Running.
+\item \textbf{Marginal likelihood and runtime against $\ncomp$.} The capacity sweep covers
+pointwise error and generated statistics. Adding the likelihood would show whether the
+improvement is visible in the objective the estimator actually maximises; adding runtime would
+price it.
+\item \textbf{A strictly stationary rerun.} Every chain here starts from
+$a_1\sim\normal{0}{1}$, which is not the invariant law for non-Gaussian innovations
+(Remark~\ref{rem:cov-stationary}). Sampling the invariant law needs a fixed-point computation
+per family and has not been done, so the claim that it changes nothing is a prediction.
+\item \textbf{Receptive field with a validation split.} See below.
 \end{itemize}
 
 \section{Known deficiencies in the current measurements}
@@ -141,11 +203,12 @@ network's receptive field in \codefile{exp\_12} was chosen by an oracle over the
 set the number is reported on. The bias favours the \emph{baseline}, so the quoted margin is
 conservative, but the protocol is improper and the run should be repeated with a validation
 split.
-\item \textbf{Four quantities are asserted only in tests.} The importance-sampling validation,
-the cross-family closure check, the boundary-mass diagnostic and the baseline-competence figure
-are checked by the test suite but never written to an output file, so they cannot be
-independently recomputed from committed data. They are marked as such wherever they appear.
-\item \textbf{The generative comparison covers one family.} Four more are running.
+\item \textbf{Three quantities are asserted only in tests.} The importance-sampling validation,
+the cross-family closure check and the baseline-competence figure are checked by the test suite
+but never written to an output file, so they cannot be independently recomputed from committed
+data. They are marked as such wherever they appear. The boundary-mass diagnostic was in this
+list; it is now computed and committed
+(\codefile{outputs/exp\_18/boundary.csv}, \S\ref{sec:truncation}).
 \end{itemize}
 
 \section{Not started}
@@ -158,3 +221,11 @@ remedy for its two-to-three-hundred-fold inference cost.
 \item Anything about non-Markov priors. The misspecification limitation of
 \S\ref{ch:markov} is stated and not addressed.
 \end{itemize}
+
+\section*{Sources}
+\addcontentsline{toc}{section}{Sources}
+For the wider context in which these measurements sit: the dynamical regimes of diffusion models
+and the role of the noise schedule \citep{biroli2023,biroli2024dynamical}; hierarchical data and
+the phase structure it induces \citep{sclocchi2025phase,garnierbrun2024transformers}; and the
+argument that generalisation in convolutional diffusion models is a property of the
+architecture rather than the objective \citep{kamb2024analytic}.
