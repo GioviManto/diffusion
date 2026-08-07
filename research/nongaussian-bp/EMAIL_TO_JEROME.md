@@ -1,7 +1,7 @@
 # Draft email to Jérôme — not sent
 
-Fill in the five `<...>` links from the pushed branch before sending. They are listed at the
-bottom of `FINAL_REVISION_REPORT.md` once the push completes.
+Links below are pinned to commit `c3c099d348` on branch `paper-revision-2026-08-07`, so they keep
+pointing at the version described here even if the branch moves. **Not sent.**
 
 ---
 
@@ -49,13 +49,13 @@ identifiability is assumed rather than proved.
 
 The documents are separate so you can read only as much as you have time for:
 
-- Repository and branch: `<BRANCH_URL>`
+- Repository and branch: <https://github.com/GioviManto/diffusion/tree/paper-revision-2026-08-07>
 - Executive summary, two pages — this is the one to read if you have ten minutes:
-  `<EXEC_SUMMARY_PDF_URL>`
+  <https://github.com/GioviManto/diffusion/blob/c3c099d348109e952642308ca2e643efcd5aa499/research/nongaussian-bp/EXECUTIVE_SUMMARY.pdf>
 - Answers and questions for the advisors, which reconstructs and answers the questions from our
-  call: `<QA_PDF_URL>`
-- Main note, ten pages plus appendices: `<PAPER_PDF_URL>`
-- Technical compendium, the long-form derivations: `<COMPENDIUM_PDF_URL>`
+  call: <https://github.com/GioviManto/diffusion/blob/c3c099d348109e952642308ca2e643efcd5aa499/research/nongaussian-bp/ANSWERS_AND_QUESTIONS_FOR_ADVISORS.pdf>
+- Main note, ten pages plus appendices: <https://github.com/GioviManto/diffusion/blob/c3c099d348109e952642308ca2e643efcd5aa499/research/nongaussian-bp/paper/main.pdf>
+- Technical compendium, the long-form derivations: <https://github.com/GioviManto/diffusion/blob/c3c099d348109e952642308ca2e643efcd5aa499/research/nongaussian-bp/compendium/main.pdf>
 
 The questions where your judgement would help most:
 
