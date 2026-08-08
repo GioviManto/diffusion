@@ -743,6 +743,26 @@ by a factor of $9.7$ from $\ncomp=2$ to $\ncomp=16$: the two axes do not trade a
 anywhere in the range tested, and at $\ncomp=16$ the estimator is ahead of the convolution on
 both at once.
 
+\begin{remark}[A third explanation, not controlled for: EM was stopped short]
+\label{rem:convergence-confound}
+The two explanations above are not exhaustive. Every run in this section uses
+\texttt{em\_iters}${}=40$, and EM on this kernel converges on $\rho$ much faster than on the
+innovation \emph{shape}: at $\rho=0.85$, $\nseq=512$, $\ncomp=8$ the fitted excess kurtosis is
+$0.84$ at 30 iterations, $2.30$ at 120 and $2.29$ at 400, while $\rho$ is flat from iteration
+${\sim}25$. A converged-looking $\rho$ trace is therefore not evidence of a converged kernel, and
+the estimator arm here may simply be underfitted.
+
+Rerunning this configuration (Laplace, composite, $\nseq=512$, grid $401$) with the iteration
+count as the only variable gives generated excess kurtosis $0.625\to1.464$ at $\ncomp=4$ and
+$0.871\to1.380$ at $\ncomp=8$ going from 40 to 200 iterations, against a convolution at $1.367$.
+Two consequences: the capacity gain in fitted kurtosis falls from $0.542$ to $0.022$, so it is
+mostly a difference in convergence \emph{rate} at a fixed budget rather than in capacity; and the
+ranking that opens this subsection reverses. That evidence is a single seed at $800$ generated
+chains and $200$ integration steps, enough to withdraw the attribution but not to replace it. The
+sweep needs rerunning at convergence before this paragraph is relied on. Nothing in
+\S\ref{sec:em} or the sample-efficiency results is affected.
+\end{remark}
+
 \begin{remark}[Where capacity stops paying, on a paired design]
 \label{rem:paired}
 Separate medians over a handful of seeds cannot resolve the small differences at the top of this

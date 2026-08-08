@@ -62,8 +62,54 @@ particular setting, and what causes it --- and \S\ref{sec:resolved} answers both
 who wants the conclusion rather than the sequence can skip there directly; what follows is
 worth reading only for how the two candidate explanations were separated.
 
+\begin{pitfall}[title=\textbf{The observation itself is in question}]
+A third possibility was not on the list when this was written and now looks like the leading one:
+that \codefile{exp\_16}'s \texttt{em\_iters=40} stops EM before the innovation shape has
+converged, so the estimator arm is being judged underfitted. Rerunning at 200 iterations moves
+the generated excess kurtosis from $0.625$ to $1.464$ at $\ncomp=4$ and from $0.871$ to $1.380$
+at $\ncomp=8$, against a convolution at $1.367$ --- which reverses the ordering this section
+reports. See the box in \S\ref{sec:resolved} and \codefile{simple/SIMPLE\_RESULTS.md}.
+\end{pitfall}
+
 \section{Resolved since: the dissociation is a capacity effect}
 \label{sec:resolved}
+
+\begin{pitfall}[title=\textbf{Under correction: this section rests on an unconverged fit}]
+\textbf{This section should not be defended as written.} Every run it
+rests on used \texttt{em\_iters=40}. EM on this kernel converges on $\rho$ by iteration ${\sim}25$
+but not on the innovation \emph{shape}, which is still moving at iteration 100: at
+$\rho=0.85$, $\nseq=512$, $\ncomp=8$ the fitted excess kurtosis reads $0.84$ at 30 iterations,
+$2.30$ at 120 and $2.29$ at 400. A converged-looking $\rho$ trace is not evidence that the kernel
+has converged.
+
+Rerunning this experiment's own configuration with the iteration count as the only variable
+(Laplace, composite, $\nseq=512$, grid $401$) gives:
+
+\begin{center}\small
+\begin{tabular}{@{}rrcc@{}}
+\toprule
+$\ncomp$ & EM iters & fitted kurtosis & generated kurtosis \\
+\midrule
+4  & 40  & $1.079$ & $0.625$ \\
+4  & 200 & $2.538$ & $1.464$ \\
+8  & 40  & $1.621$ & $0.871$ \\
+8  & 200 & $2.560$ & $1.380$ \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\noindent
+against a convolution at $1.367$ and a target of $1.888$. Enlarging $\ncomp$ from 4 to 8 buys
+$0.542$ in fitted kurtosis at 40 iterations and $0.022$ at 200, so the capacity effect this
+section reports is almost entirely a difference in convergence \emph{rate} at a fixed iteration
+budget. The dissociation reverses with it: below the convolution at 40 iterations, at or above it
+at 200.
+
+Claims about parameter recovery and sample efficiency elsewhere in this document are unaffected.
+The evidence above is one seed at 800 generated chains and 200 integration steps, which is enough
+to withdraw the conclusion but not to replace it; the sweep needs rerunning at convergence. See
+\codefile{simple/SIMPLE\_RESULTS.md}.
+\end{pitfall}
 
 Four sweeps have since returned, and together they settle what the dissociation is.
 
