@@ -287,6 +287,23 @@ class WaveletTreeModel:
         scaling = self.ll_mean + self.ll_std * rng.standard_normal((n, 1))
         return tree_to_images(self.qt, nodes, scaling)
 
+    def generation_snr(self, t: float) -> dict:
+        """Per-subband signal-to-noise ratio of the forward process at `t`.
+
+        SNR_d = alpha_t s_d / sqrt(Delta_t): the surviving signal in subband d
+        against the noise floor. A reverse sampler stopped at `t` cannot recover
+        content whose SNR there is small, because the forward process has already
+        destroyed it.
+        """
+        alpha, delta = alpha_delta(t)
+        snr = alpha * self.scales.scales / np.sqrt(delta)
+        return {
+            "t": float(t),
+            "snr_by_subband": snr,
+            "min_snr": float(snr.min()),
+            "max_snr": float(snr.max()),
+        }
+
     def sample_reverse(
         self,
         n: int,
@@ -300,10 +317,28 @@ class WaveletTreeModel:
         """Generate by reverse diffusion driven by the exact BP score.
 
         This is the route the project is actually about: no ancestral shortcut,
-        just the score integrated backwards. It should agree with
-        `sample_ancestral` in distribution, and where it does not, the gap is the
-        sampler's discretisation rather than the model's.
+        just the score integrated backwards.
+
+        **It does not currently produce valid samples, and the reason is not the
+        sampler.** `t_min` is floored at the grid-resolved t (`resolution_report`),
+        which for natural-image subband scales is around 0.95. At that t the
+        forward process has already destroyed the fine scales: with Delta = 0.85
+        the noise floor is 0.92 while the finest subbands have standard deviation
+        0.14 to 0.32, an SNR near 0.1. So neither readout is a sample from p_0 --
+        `x(t_min)` is noise in those bands and the posterior mean correctly
+        collapses them toward zero, because the likelihood there carries almost
+        no information.
+
+        Reverse-diffusion generation therefore needs the per-depth grid of
+        `resolution_report`, which is what would allow integration down to small
+        t. Until then `sample_ancestral` is the only route that yields samples,
+        and it is unaffected because it never touches the likelihood.
+
+        A warning is emitted rather than an exception so the diagnostic can still
+        be measured; the returned array is a posterior-mean readout at `t_min`
+        and should be labelled as such, never as a sample.
         """
+        import warnings
         from .reverse import (
             denoising_readout, probability_flow_ode, reverse_sde, time_grid,
         )
@@ -317,6 +352,19 @@ class WaveletTreeModel:
             raise ValueError(
                 f"grid resolves no t below {floor:.3f}; refine the grid "
                 f"(grid_size) or raise t_max above it"
+            )
+
+        snr = self.generation_snr(t_min)
+        if snr["min_snr"] < 1.0:
+            warnings.warn(
+                f"reverse sampling stops at t={t_min:.3f} where the weakest "
+                f"subband has SNR {snr['min_snr']:.2f}: its content has already "
+                "been destroyed by the forward process, so the result is a "
+                "posterior-mean readout, not a sample from p_0. Use "
+                "sample_ancestral for samples, or refine the grid to reach "
+                "smaller t.",
+                RuntimeWarning,
+                stacklevel=2,
             )
 
         side = self.qt.side

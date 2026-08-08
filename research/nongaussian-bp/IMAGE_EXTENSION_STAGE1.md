@@ -40,11 +40,16 @@ the linear effect explains, and the linear-autoregressive kernel family in
 family that can (§6.1), and generated samples confirm the diagnosis: the
 linear-AR family generates essentially **zero** cross-scale magnitude dependence.
 
-**And one limit is now known that was not before.** Per-subband standardisation
-makes the coarse subbands' likelihood narrower than a grid cell at small *t*, so
-below t ≈ 1.02 (at M = 201) neither the score nor the evidence is valid on a
-shared grid. This invalidated my own first likelihood numbers; they are corrected
-in §6.2. The fix — a per-depth grid — is cheap and is the top next task.
+**And one limit blocks half the story.** Per-subband standardisation makes the
+coarse subbands' likelihood narrower than a grid cell at small *t*, so below
+t ≈ 1.0 neither the score nor the evidence is valid on a shared grid (§6.2 —
+this invalidated my own first likelihood numbers). The sharper consequence
+(§6.3): the reverse sampler must stop where the finest subbands have SNR ≈ 0.1,
+so **reverse-diffusion generation does not currently work at all**. Ancestral
+sampling is unaffected and every generated-sample result below stands, but
+ancestral sampling tests the *model* while only reverse diffusion tests the
+*score* — which is the project's actual subject. The fix, a per-depth grid, is
+cheap in compute and is a hard blocker.
 
 **Video is built, not just argued** (§9). The fully coupled spatio-temporal model
 has 4-cycles and is *not* exact; a temporal chain of spatial trees — a
@@ -355,9 +360,8 @@ Consequences, recorded rather than smoothed over:
   image over the Gaussian closure, but the margins are entirely different — and
   at t = 1.147 the likelihood is heavily smoothed (α = 0.32), so this is a
   weaker statement than a small-t likelihood would be.
-- The reverse-diffusion samples in the smoke run showed reverse-vs-ancestral
-  standard-deviation gaps up to 8.4. That is this, not sampler noise.
-  `sample_reverse` now clamps `t_min` to the resolved value.
+- **Reverse-diffusion generation does not currently work at all**, and this is a
+  stronger statement than "the samples are inaccurate". See §6.3.
 
 `WaveletTreeModel.resolution_report` measures it; `exp_25` records the requested
 and used *t* in its output so no result can be quoted from an unresolved regime
@@ -372,6 +376,57 @@ grid and a child grid separately, which is a genuine change to
 `src/kernels.py`. **Not done.** It is the single highest-value next task, because
 it unlocks small-*t* scores and therefore both a meaningful held-out likelihood
 and a usable reverse sampler.
+
+---
+
+## 6.3 Reverse diffusion is blocked, not merely inaccurate
+
+Worth separating from §6.2 because it is the sharper consequence, and because my
+first reading of it was wrong twice.
+
+The reverse sampler must stop at the resolved t, ≈ 0.95 here. Measured at that
+point (α = 0.385, Δ = 0.852), per-subband standard deviations of a Gaussian-tree
+fit on 400 CIFAR images:
+
+| subband | ancestral (true) | `x(t_min)` | denoised readout |
+|---|---|---|---|
+| HL depth 0 (coarse) | 6.14 | 2.04 | 4.63 |
+| HL depth 3 | 0.85 | 0.96 | 0.33 |
+| HL depth 4 (finest) | 0.32 | **0.94** | **0.05** |
+| LL | 15.28 | 5.31 | 13.48 |
+
+The noise floor at that t is √Δ = 0.92. The finest subbands have true standard
+deviation 0.14–0.32, so their **SNR is about 0.1**: the forward process has
+already destroyed them by t = 0.95. Consequently
+
+- `x(t_min)` is *pure noise* in the fine bands — 0.94 against a 0.92 floor;
+- the denoising readout correctly collapses them toward zero (0.05 against 0.32),
+  because the posterior mean shrinks to the prior when the likelihood carries no
+  information.
+
+Neither is a sample from p₀, and no better readout exists: the information is
+gone. **Reverse-diffusion generation is not currently possible for this model.**
+
+Two corrections to my own earlier statements, recorded rather than quietly
+amended:
+
+1. I first reported reverse-vs-ancestral gaps of ~2 (worst 12.4) as a *sampler*
+   problem. They were partly my bug — `sample_reverse` returned `x(t_min)`
+   instead of the posterior-mean readout. Fixing that took the worst gap from
+   12.4 to 2.36.
+2. I then described the residual as the samples being "far from enough". That is
+   too soft. The residual is not a quality gap; the fine-scale content is
+   unrecoverable at the only t the grid permits.
+
+`sample_ancestral` is unaffected — it never touches the likelihood — so every
+generated-sample result in §6.1 and the contact sheets stand. `sample_reverse`
+now emits a `RuntimeWarning` when the weakest subband SNR is below 1 and
+`generation_snr` reports it, so this cannot be quoted as a sample by accident.
+
+This promotes the per-depth grid from "highest-value next task" to a **hard
+blocker for the diffusion half of the story**. Ancestral sampling tests the
+*model*; only reverse diffusion tests the *score*, and that is the project's
+actual subject.
 
 ---
 
