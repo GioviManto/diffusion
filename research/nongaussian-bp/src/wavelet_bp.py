@@ -59,11 +59,22 @@ class WaveletBPResult:
     log_evidence   : summed over the batch, log p_t(x), all constants included.
     xi_by_level    : per-level expected transition mass, or None if not asked for.
                      `xi_by_level[d]` belongs to the edge depth d -> depth d+1.
+    root_belief_up : (B, M) the root's evidence times all its children's upward
+                     messages, *excluding* the root prior. This is the message
+                     the whole spatial tree sends to whatever sits above it, and
+                     it is what lets a tree be attached to a temporal chain
+                     without reimplementing either (see `src/video_bp.py`).
+    log_scale      : (B,) the accumulated log-normalisation, excluding the final
+                     root contraction. Returned for the same reason: a caller
+                     that supplies its own root message has to finish the
+                     evidence bookkeeping itself.
     """
 
     posterior_mean: np.ndarray
     log_evidence: float
     xi_by_level: list[np.ndarray] | None
+    root_belief_up: np.ndarray | None = None
+    log_scale: np.ndarray | None = None
 
 
 def node_delta(ti: TreeIndex, delta_by_depth) -> np.ndarray:
@@ -86,12 +97,19 @@ def wavelet_tree_bp(
     depth: int,
     want_stats: bool = False,
     chunk: int = 64,
+    root_message: np.ndarray | None = None,
 ) -> WaveletBPResult:
     """Exact sum-product on the quadtree with observations at every node.
 
     `x` is (B, n_nodes) *standardised* coefficients in breadth-first order.
     `log_k` has length `depth`; `log_k[d]` is the (M, M) kernel for the edge
     from depth d to depth d+1. `delta_by_depth` has length `depth + 1`.
+
+    `root_message` is what the root receives from *outside* the tree, shape
+    (B, M) or (M,). It defaults to the root prior `exp(log_root)`, which is the
+    standalone case. Supplying something else is how a tree gets attached to a
+    larger loop-free graph -- a temporal chain of roots, in `src/video_bp.py` --
+    without either side needing to know how the other is implemented.
     """
     ti = TreeIndex(depth, branching)
     x = np.atleast_2d(np.asarray(x, dtype=float))
@@ -108,21 +126,28 @@ def wavelet_tree_bp(
     nd = node_delta(ti, delta_by_depth)
 
     means = np.empty_like(x)
+    root_up = np.empty((x.shape[0], m))
+    log_scale = np.empty(x.shape[0])
     log_evidence = 0.0
     xi_total = [np.zeros((m, m)) for _ in range(depth)] if want_stats else None
 
     for start in range(0, x.shape[0], chunk):
+        sl = slice(start, start + chunk)
+        rm = root_message
+        if rm is not None and np.ndim(rm) == 2:
+            rm = rm[sl]
         part = _bp_chunk(
-            ti, grid, weights, k_mats, root, x[start : start + chunk],
-            alpha, nd, want_stats,
+            ti, grid, weights, k_mats, root, x[sl], alpha, nd, want_stats, rm,
         )
-        means[start : start + chunk] = part.posterior_mean
+        means[sl] = part.posterior_mean
+        root_up[sl] = part.root_belief_up
+        log_scale[sl] = part.log_scale
         log_evidence += part.log_evidence
         if xi_total is not None and part.xi_by_level is not None:
             for d in range(depth):
                 xi_total[d] += part.xi_by_level[d]
 
-    return WaveletBPResult(means, log_evidence, xi_total)
+    return WaveletBPResult(means, log_evidence, xi_total, root_up, log_scale)
 
 
 def _bp_chunk(
@@ -135,6 +160,7 @@ def _bp_chunk(
     alpha: float,
     nd: np.ndarray,
     want_stats: bool,
+    root_message: np.ndarray | None = None,
 ) -> WaveletBPResult:
     b, n_nodes = x.shape
     depth, branching = ti.depth, ti.branching
@@ -169,13 +195,15 @@ def _bp_chunk(
         bu[:, parents], ls = norm(bu[:, parents] * prod)
         log_scale += ls.sum(axis=(1, 2))
 
+    root_belief_up = bu[:, 0].copy()
+    incoming = root if root_message is None else np.asarray(root_message, dtype=float)
     log_evidence = float(np.sum(
-        log_scale + np.log(np.maximum((weights * bu[:, 0] * root).sum(1), 1e-300))
+        log_scale + np.log(np.maximum((weights * bu[:, 0] * incoming).sum(1), 1e-300))
     ))
 
     # -- downward pass -----------------------------------------------------
     down = np.ones((b, n_nodes, m))
-    down[:, 0] = root
+    down[:, 0] = incoming
     xi_by_level = [np.zeros((m, m)) for _ in range(depth)] if want_stats else None
 
     for d in range(depth):
@@ -201,7 +229,9 @@ def _bp_chunk(
         down[:, kids], _ = norm(np.einsum("cnj,kj->cnk", weights * excl, k_mats[d]))
 
     belief, _ = norm(bu * down)
-    return WaveletBPResult(belief @ grid, log_evidence, xi_by_level)
+    return WaveletBPResult(
+        belief @ grid, log_evidence, xi_by_level, root_belief_up, log_scale,
+    )
 
 
 def stats_by_level(
