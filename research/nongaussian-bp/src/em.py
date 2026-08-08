@@ -350,6 +350,15 @@ def fit_em(
 
     Stops early when the relative increase of the marginal log-likelihood falls
     below `tol`.
+
+    The returned kernel is always the one whose evidence is `trace.log_evidence[-1]`, and
+    that alignment is load-bearing rather than cosmetic. An earlier version logged the
+    evidence *before* each M-step and returned the parameters produced by the last one, so
+    the kernel handed back was one update beyond anything that had been evaluated: its
+    likelihood was never computed, the monotonicity check never covered the final step, and
+    a caller comparing the reported evidence against a held-out number was comparing two
+    different models. The loop below therefore evaluates each proposal after the M-step that
+    produced it, and stops on the post-update value.
     """
     import time
 
@@ -362,11 +371,28 @@ def fit_em(
         stats = e_step_multi(grid, weights, log_k, groups, log_mu, chunk)
         trace.log_evidence.append(stats.log_evidence)
         trace.theta.append(np.asarray(current.theta, dtype=float).copy())
-        current = current.m_step(stats, grid)
+        proposal = current.m_step(stats, grid)
         trace.seconds.append(time.perf_counter() - t0)
-        if np.isfinite(prev) and abs(stats.log_evidence - prev) <= tol * abs(prev):
-            break
+        converged = (
+            np.isfinite(prev) and abs(stats.log_evidence - prev) <= tol * abs(prev)
+        )
         prev = stats.log_evidence
+        if converged:
+            # `current` is the parameter whose evidence is the last logged entry. The
+            # proposal is discarded rather than returned unevaluated.
+            break
+        current = proposal
+    else:
+        # Iteration budget exhausted: `current` is the last proposal, which has not been
+        # scored yet. Score it, so the returned kernel and the final trace entry agree here
+        # too -- this is the branch the old code silently got wrong.
+        log_k = current.log_transition_matrix(grid)
+        t0 = time.perf_counter()
+        stats = e_step_multi(grid, weights, log_k, groups, log_mu, chunk)
+        trace.log_evidence.append(stats.log_evidence)
+        trace.theta.append(np.asarray(current.theta, dtype=float).copy())
+        trace.seconds.append(time.perf_counter() - t0)
+
     return current, trace
 
 

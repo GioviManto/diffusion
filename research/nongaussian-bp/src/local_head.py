@@ -33,7 +33,7 @@ from dataclasses import dataclass
 
 import numpy as np
 
-from src.nnet import MLP, time_features
+from src.nnet import MLP, sample_training_times, time_features
 from src.noising import alpha_delta
 
 
@@ -70,12 +70,17 @@ def train_local_head(
     lr: float = 2e-3,
     parameterization: str = "eps",
     log_every: int = 500,
+    t_range: tuple[float, float] | None = None,
 ) -> LocalHeadResult:
     """Denoising score matching for a weight-shared window predictor.
 
     Each site contributes one training example, so a minibatch of B chains
     supplies B*n examples -- the weight sharing is what makes a small receptive
     field cheap as well as structured.
+
+    `t_range=(t_min, t_max)` trains continuously over the integration interval instead of on
+    the discrete levels in `t_values`, and is required for any head that will be called
+    inside a reverse SDE. See `nnet.sample_training_times`.
     """
     import time
 
@@ -96,7 +101,11 @@ def train_local_head(
     for step in range(1, n_steps + 1):
         idx = rng.integers(0, n_data, size=min(batch_size, n_data))
         a = A_train[idx]
-        t = t_arr[rng.integers(0, len(t_arr), size=len(idx))]
+        t = sample_training_times(
+            rng, len(idx),
+            t_values=None if t_range is not None else t_arr,
+            t_range=t_range,
+        )
         alpha = np.exp(-t)[:, None]
         delta = (1.0 - np.exp(-2.0 * t))[:, None]
         z = rng.standard_normal(a.shape)

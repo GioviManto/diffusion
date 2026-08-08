@@ -234,6 +234,55 @@ def test_em_is_monotone(kernel_name):
     assert trace.log_evidence[-1] > trace.log_evidence[0]
 
 
+@pytest.mark.parametrize("kernel_name", ["gaussian", "laplace", "mixture"])
+@pytest.mark.parametrize("n_iters,tol", [(4, 0.0), (200, 1e-9)])
+def test_returned_kernel_is_the_one_the_trace_ends_on(kernel_name, n_iters, tol):
+    """The returned kernel's evidence must be `trace.log_evidence[-1]`.
+
+    Both exit paths are covered on purpose, because they used to fail differently. With a
+    small `n_iters` and `tol=0` the loop runs out of budget; with a large `n_iters` it
+    converges and breaks. The old implementation logged the evidence before each M-step and
+    returned the parameters that M-step produced, so on *both* paths the returned kernel was
+    one update past anything evaluated -- its likelihood was never computed, the monotonicity
+    check never covered the final update, and comparing the reported evidence against a
+    held-out number silently compared two different models.
+
+    Recomputing the evidence here rather than trusting the trace is the point: it is an
+    independent evaluation of the returned object, so it catches the misalignment rather than
+    restating whatever the loop happened to record.
+    """
+    grid, weights = make_grid(8.0, 201)
+    prior = LaplaceAR1(RHO)
+    rng = rng_for("test-em-final-trace", kernel_name, n_iters)
+    groups = []
+    for t in (0.2, 0.6):
+        _, X, alpha, delta = _sample(prior, 24, t, rng)
+        groups.append((X, alpha, delta))
+
+    start = {
+        "gaussian": GaussianAR1Kernel(0.2, 0.9),
+        "laplace": LaplaceAR1Kernel(0.2, 0.9),
+        "mixture": MixtureInnovationKernel.init(
+            3, rho=0.2, var=0.9, rng=rng_for("test-em-final-init", n_iters)
+        ),
+    }[kernel_name]
+
+    fitted, trace = fit_em(start, grid, weights, groups, n_iters=n_iters, tol=tol)
+
+    assert len(trace.log_evidence) == len(trace.theta) == len(trace.seconds)
+    np.testing.assert_allclose(
+        np.asarray(fitted.theta, dtype=float), trace.theta[-1], rtol=0, atol=0
+    )
+
+    recomputed = e_step_multi(
+        grid, weights, fitted.log_transition_matrix(grid), groups
+    ).log_evidence
+    assert recomputed == pytest.approx(trace.log_evidence[-1], rel=1e-12)
+
+    # Monotonicity now covers every update, including the last one.
+    assert trace.monotone_violation < 1e-8
+
+
 def test_em_recovers_gaussian_parameters():
     """A well-specified fit lands on the truth from a bad initialization."""
     grid, weights = make_grid(8.0, 301)

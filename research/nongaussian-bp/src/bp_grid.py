@@ -164,6 +164,8 @@ def grid_bp_batch(
     delta: float,
     log_mu: np.ndarray | None = None,
     xp=None,
+    *,
+    return_evidence: bool = False,
 ) -> tuple[np.ndarray, np.ndarray]:
     """Vectorized grid BP over a batch of observations X of shape (B, n).
 
@@ -171,7 +173,15 @@ def grid_bp_batch(
     the site loop shared and each message update a (M, M) @ (M, B) matmul.
     Used by the reverse-dynamics experiments, where BP must run at every
     integration step for every trajectory. Returns (means, variances), each of
-    shape (B, n). Evidence is not accumulated here.
+    shape (B, n), or (means, variances, log_evidence) with `return_evidence=True`,
+    the third being the per-chain exact log p_t(x) of shape (B,).
+
+    The evidence is the same quantity `grid_bp` returns for a single chain, computed
+    the same way -- forward rescaling constants, tail integral, and the restored
+    per-(chain, site) likelihood shifts -- and `tests/test_bp_evidence_batch.py`
+    asserts the two agree. It is off by default because almost every caller wants
+    only the means, and because a per-chain evidence is what the non-Markov
+    reference needs to weight a latent variable it is marginalising over.
 
     ``xp`` selects the array module (numpy, or cupy for GPU execution). This is the *same*
     recursion either way -- there is deliberately no second implementation, because a
@@ -196,15 +206,18 @@ def grid_bp_batch(
         log_mu = to_device(log_mu, xp)
     K = xp.exp(log_K)
 
-    # ell[i] has shape (B, M): row-shifted per (batch, site).
+    # ell[i] has shape (B, M): row-shifted per (batch, site). The shifts are kept rather
+    # than discarded so the evidence can be restored exactly, as `grid_bp` does.
     z = X[:, :, None] - alpha * grid[None, None, :]
     log_ell = -0.5 * z**2 / delta
-    log_ell -= log_ell.max(axis=2, keepdims=True)
+    row_shift = log_ell.max(axis=2)  # (B, n)
+    log_ell = log_ell - row_shift[:, :, None]
     ell = xp.exp(log_ell)  # (B, n, M)
 
     L = xp.empty((n, b_size, m))
     R = xp.empty((n, b_size, m))
     L[0] = xp.exp(log_mu)[None, :]
+    log_z_fwd = xp.zeros(b_size)
 
     for i in range(n - 1):
         incoming = L[i] * ell[:, i, :] * weights[None, :]  # (B, M)
@@ -213,6 +226,7 @@ def grid_bp_batch(
         if not bool(xp.all(xp.isfinite(mass))) or bool(xp.any(mass <= 0.0)):
             raise FloatingPointError(f"Batched forward message {i + 1} lost mass.")
         L[i + 1] = out / mass[:, None]
+        log_z_fwd = log_z_fwd + xp.log(mass)
 
     R[-1] = 1.0
     for i in range(n - 1, 0, -1):
@@ -233,4 +247,9 @@ def grid_bp_batch(
         bel = raw / mass[:, None]
         means[:, i] = bel @ (grid * weights)
         variances[:, i] = bel @ (grid**2 * weights) - means[:, i] ** 2
+
+    if return_evidence:
+        tail = (L[-1] * ell[:, -1, :]) @ weights
+        log_const = row_shift.sum(axis=1) + n * (-0.5 * xp.log(2.0 * xp.pi * delta))
+        return means, variances, log_z_fwd + xp.log(tail) + log_const
     return means, variances

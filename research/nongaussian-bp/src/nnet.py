@@ -25,6 +25,45 @@ def time_features(t: np.ndarray | float) -> np.ndarray:
     return np.stack([t_arr, alpha, np.sqrt(delta)], axis=-1)
 
 
+def sample_training_times(
+    rng: np.random.Generator,
+    size: int,
+    t_values=None,
+    t_range: tuple[float, float] | None = None,
+) -> np.ndarray:
+    """Draw the noise levels a denoiser trains on.
+
+    Two regimes, and the difference is not cosmetic.
+
+    ``t_values`` draws uniformly from a fixed finite set. That is what this project did
+    originally, with five levels, and it leaves the network's score *undefined between them*:
+    it is fitted at five points and then queried everywhere. A reverse integration calls the
+    score at every point of ``[t_min, t_max]`` -- 400 of them on a geometric grid -- so a
+    generated-sample comparison built on discrete-level training measures interpolation and
+    out-of-range extrapolation on top of the estimator error it means to isolate. With
+    ``t_train`` spanning 0.1 to 1.6 and integration over 0.02 to 3.0, both extrapolation
+    regions are entered on every trajectory.
+
+    ``t_range=(t_min, t_max)`` draws log-uniformly over the continuous interval. Log-uniform
+    rather than uniform because `reverse.time_grid` is ``np.geomspace``: sampling in
+    ``log t`` puts training density where the integrator actually spends its steps, which is
+    the small-``t`` end where the drift stiffens like ``1/(2t)``. Uniform sampling would
+    under-train exactly the region that governs the generated law.
+
+    Exactly one of the two must be supplied, so that a caller cannot silently keep the old
+    behaviour by omission.
+    """
+    if (t_values is None) == (t_range is None):
+        raise ValueError("Supply exactly one of `t_values` or `t_range`.")
+    if t_range is not None:
+        lo, hi = float(t_range[0]), float(t_range[1])
+        if not 0.0 < lo < hi:
+            raise ValueError(f"Need 0 < t_min < t_max, got {t_range!r}.")
+        return np.exp(rng.uniform(np.log(lo), np.log(hi), size=size))
+    t_arr = np.asarray(t_values, dtype=float)
+    return t_arr[rng.integers(0, len(t_arr), size=size)]
+
+
 @dataclass
 class MLP:
     """Fully connected tanh MLP; parameters stored as a flat list of arrays."""

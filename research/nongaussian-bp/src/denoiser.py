@@ -32,7 +32,7 @@ import numpy as np
 
 from src.backend import get_xp, to_host
 from src.bp_grid import grid_bp_batch
-from src.nnet import MLP, time_features
+from src.nnet import MLP, sample_training_times, time_features
 from src.noising import alpha_delta
 
 
@@ -101,6 +101,7 @@ def train_dsm_denoiser(
     lr: float = 2e-3,
     log_every: int = 200,
     parameterization: str = "eps",
+    t_range: tuple[float, float] | None = None,
 ) -> DSMResult:
     """Vanilla diffusion training, in either standard parameterization.
 
@@ -122,8 +123,14 @@ def train_dsm_denoiser(
     that happens to flatter the structured method.
 
     A_train : (N, n) clean chains -- the data budget.
-    t_values: noise levels sampled uniformly at each step (the training
-              schedule); the same levels are used for evaluation.
+    t_values: discrete noise levels sampled uniformly at each step. Ignored when
+              `t_range` is given.
+    t_range : (t_min, t_max) for continuous log-uniform training over the whole
+              integration interval. **Use this for anything feeding a reverse SDE.**
+              Training on a handful of discrete levels and then integrating over a
+              continuum makes the generated-sample comparison measure interpolation
+              and extrapolation as much as score quality; see
+              `nnet.sample_training_times` for the full argument.
     """
     import time
 
@@ -144,7 +151,11 @@ def train_dsm_denoiser(
     for step in range(1, n_steps + 1):
         idx = rng.integers(0, n_data, size=min(batch_size, n_data))
         a = A_train[idx]
-        t = t_arr[rng.integers(0, len(t_arr), size=len(idx))]
+        t = sample_training_times(
+            rng, len(idx),
+            t_values=None if t_range is not None else t_arr,
+            t_range=t_range,
+        )
         alpha = np.exp(-t)[:, None]
         delta = (1.0 - np.exp(-2.0 * t))[:, None]
         z = rng.standard_normal(a.shape)

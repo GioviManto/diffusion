@@ -247,6 +247,54 @@ class MixtureInnovationKernel:
     def theta(self) -> np.ndarray:
         return np.concatenate([[self.rho], self.pi, self.mu, self.s2])
 
+    def scale_diagnostics(self, grid: np.ndarray) -> dict:
+        """Whether the fitted mixture is resolved by the grid it lives on.
+
+        `_VAR_FLOOR` is 1e-6, i.e. a component standard deviation floor of 1e-3, while the
+        default grid spacing is h = 0.04. Nothing stops a component from being forty times
+        narrower than one grid cell, and a high-capacity fit has every incentive to exploit
+        that: an under-resolved spike can raise the quadrature likelihood without
+        corresponding to any feature of the innovation law.
+
+        That matters for a specific claim. The capacity sweep's improvement from C = 12 to
+        C = 16 is small, and it cannot be read as real until the fitted components are known
+        to be wider than the mesh. `s_min_over_h` is the number to check: below roughly 2 the
+        narrowest component is a lattice artefact rather than a density.
+
+        Reports alongside it the effective number of components actually in use --
+        ``exp(entropy(pi))``, which counts a mixture that has collapsed onto two live
+        components as 2 regardless of its nominal C -- and the worst deviation of a
+        transition column from unit quadrature mass, weighted by nothing, since that is the
+        same normalisation residual the grid diagnostics track.
+        """
+        h = float(grid[1] - grid[0])
+        s = np.sqrt(self.s2)
+        p = np.clip(self.pi, 1e-300, None)
+        p = p / p.sum()
+
+        K = np.exp(self.log_transition_matrix(grid))
+        w = np.full(len(grid), h)
+        w[0] *= 0.5
+        w[-1] *= 0.5
+        col_mass = (K * w[:, None]).sum(axis=0)
+        interior = np.abs(grid) <= 0.5 * float(np.max(np.abs(grid)))
+
+        return {
+            "n_components": int(len(self.pi)),
+            "grid_spacing": h,
+            "s_min": float(s.min()),
+            "s_median": float(np.median(s)),
+            "s_min_over_h": float(s.min() / h),
+            "s_median_over_h": float(np.median(s) / h),
+            "resolved": bool(s.min() >= 2.0 * h),
+            "min_weight": float(self.pi.min()),
+            "effective_n_components": float(np.exp(-(p * np.log(p)).sum())),
+            "column_mass_residual_max": float(np.max(np.abs(col_mass - 1.0))),
+            "column_mass_residual_interior": float(
+                np.max(np.abs(col_mass[interior] - 1.0))
+            ),
+        }
+
     @property
     def innovation_moments(self) -> dict:
         """Mean, variance and excess kurtosis of the fitted innovation law.

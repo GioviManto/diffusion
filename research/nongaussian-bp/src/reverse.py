@@ -69,6 +69,76 @@ def reverse_sde(
     return x
 
 
+def nested_brownian_path(
+    times: np.ndarray, shape: tuple[int, ...], rng: np.random.Generator, refine: int
+) -> np.ndarray:
+    """Brownian increments on a fine grid that *sum* to the coarse grid's increments.
+
+    Returns increments of shape ``(refine * (len(times) - 1),) + shape``, one per fine
+    sub-step of the geometric grid obtained by splitting each coarse interval into `refine`
+    equal parts in ``t``.
+
+    Why this exists. `run_steps` currently integrates at 100, 200, 400 and 800 steps with
+    *independent* noise at each resolution and compares the resulting marginal statistics.
+    Those numbers came back non-monotone and all within one standard error of the target,
+    which supports step-size **robustness** over the tested range -- but it is not a
+    convergence study, and the write-up called it one. Independent noise means the difference
+    between two resolutions is dominated by Monte Carlo scatter, not by discretisation.
+
+    Nesting removes that. If the coarse increment over an interval is exactly the sum of the
+    fine increments inside it, the two trajectories are driven by the *same* Brownian path
+    and their difference is discretisation error alone, so a strong (pathwise) error can be
+    measured and its order estimated. That is what distinguishes "the answer stopped moving"
+    from "the noise is bigger than the movement".
+
+    Use `coarsen_increments` to obtain the matching coarse increments from the same path.
+    """
+    if refine < 1:
+        raise ValueError(f"refine must be >= 1, got {refine}.")
+    n_coarse = len(times) - 1
+    steps = []
+    for t_now, t_next in zip(times[:-1], times[1:]):
+        h_fine = float(t_now - t_next) / refine
+        steps.extend([h_fine] * refine)
+    h = np.asarray(steps, dtype=float)
+    z = rng.standard_normal((len(h),) + shape)
+    return np.sqrt(h).reshape((-1,) + (1,) * len(shape)) * z
+
+
+def coarsen_increments(dW: np.ndarray, refine: int) -> np.ndarray:
+    """Sum `refine` consecutive fine increments into one coarse increment.
+
+    The defining property of the nesting: ``coarsen_increments(dW, r)`` is exactly the
+    Brownian increment the coarse integrator would have used had it been driven by the same
+    path. Summing is correct precisely because Brownian increments are additive over
+    adjacent intervals -- no rescaling is involved, and any rescaling here would break the
+    pairing it exists to create.
+    """
+    n_fine = dW.shape[0]
+    if n_fine % refine:
+        raise ValueError(f"{n_fine} fine increments is not divisible by refine={refine}.")
+    return dW.reshape((n_fine // refine, refine) + dW.shape[1:]).sum(axis=1)
+
+
+def reverse_sde_with_increments(
+    x_init: np.ndarray, score_fn: ScoreFn, times: np.ndarray, dW: np.ndarray
+) -> np.ndarray:
+    """Euler-Maruyama driven by *supplied* Brownian increments.
+
+    Same recursion as `reverse_sde`, with the noise passed in rather than drawn, so that two
+    resolutions can be run against one Brownian path. ``dW[k]`` must already carry the
+    ``sqrt(h_k)`` scaling, which is what `nested_brownian_path` returns.
+    """
+    if len(dW) != len(times) - 1:
+        raise ValueError(f"need {len(times) - 1} increments, got {len(dW)}.")
+    x = x_init.copy()
+    for k, (t_now, t_next) in enumerate(zip(times[:-1], times[1:])):
+        h = float(t_now - t_next)
+        s = score_fn(x, float(t_now))
+        x = x + h * (x + 2.0 * s) + np.sqrt(2.0) * dW[k]
+    return x
+
+
 def probability_flow_ode(
     x_init: np.ndarray,
     score_fn: ScoreFn,

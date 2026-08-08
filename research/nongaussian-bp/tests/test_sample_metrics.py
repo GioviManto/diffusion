@@ -12,6 +12,7 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
+from src.priors import LaplaceAR1
 from src.sample_metrics import (
     bayes_risk,
     bootstrap_se,
@@ -22,6 +23,7 @@ from src.sample_metrics import (
     innovations,
     pointwise_ladder,
 )
+from src.utils import rng_for
 
 
 # ---------------------------------------------------------------------------
@@ -236,3 +238,55 @@ def test_bayes_risk_is_not_zero_for_a_genuine_posterior():
     m_star = rng.normal(size=(300, 10))
     a = m_star + 0.4 * rng.normal(size=(300, 10))
     assert bayes_risk(m_star, a) > 0.1
+
+
+# ---------------------------------------------------------------------------
+# AR-filtered residuals are not innovations at t_min > 0
+# ---------------------------------------------------------------------------
+
+def test_ar_residuals_are_correlated_at_positive_t_and_match_the_closed_form():
+    """The external review's point, turned into a measurement.
+
+    `r_i = x_i - rho x_{i-1}` applied to a sample of p_{t_min} is not an innovation
+    sequence: r_i = alpha eps_i + sqrt(Delta)(z_i - rho z_{i-1}), so adjacent residuals
+    carry Cov = -rho Delta. This test confirms the measured lag-1 correlation matches the
+    closed form, and -- the part that matters for the paper -- that it is clearly nonzero,
+    so calling these innovations overstates what has been recovered.
+
+    The clean chain is the control: there the same filter DOES return innovations, and the
+    correlation must vanish.
+    """
+    from src.sample_metrics import (
+        ar_residuals,
+        predicted_residual_autocorr,
+        residual_autocorrelation,
+    )
+
+    rho, t_min = 0.85, 0.02
+    prior = LaplaceAR1(rho)
+    rng = rng_for("test-ar-residuals")
+    a = np.stack([prior.sample(rng, 64) for _ in range(4000)])
+
+    # Clean chain: the filter really does recover innovations.
+    clean_acf = residual_autocorrelation(ar_residuals(a, rho), max_lag=2)
+    assert abs(clean_acf[0]) < 0.02
+
+    # Noised to t_min, as every generated sample in this project is.
+    alpha = float(np.exp(-t_min))
+    delta = float(1.0 - np.exp(-2.0 * t_min))
+    x = alpha * a + np.sqrt(delta) * rng.standard_normal(a.shape)
+
+    measured = residual_autocorrelation(ar_residuals(x, rho), max_lag=2)
+    predicted = predicted_residual_autocorr(rho, prior.q, t_min)
+
+    assert measured[0] == pytest.approx(predicted, abs=0.01)
+    assert abs(measured[0]) > 0.02, "the correction is only worth making if the effect is real"
+    assert predicted < 0.0
+
+
+def test_innovations_alias_still_works():
+    """Deprecated alias must not break committed callers."""
+    from src.sample_metrics import ar_residuals, innovations
+
+    a = np.random.default_rng(0).standard_normal((5, 9))
+    np.testing.assert_array_equal(innovations(a, 0.8), ar_residuals(a, 0.8))
