@@ -43,6 +43,25 @@ from .wavelet_bp import stats_by_level, wavelet_tree_bp
 _LOG_2PI = float(np.log(2.0 * np.pi))
 
 
+def _sample_columns(
+    cdf: np.ndarray, column: np.ndarray, rng: np.random.Generator, block: int = 200000
+) -> np.ndarray:
+    """Sample one state per entry of `column`, from that column's CDF.
+
+    `cdf` is (M, M) with `cdf[:, j]` the cumulative distribution of the child
+    given parent state j. Done by broadcast comparison rather than a per-sample
+    `searchsorted` loop, in blocks so the (M, N) intermediate stays bounded.
+    """
+    flat = column.ravel()
+    out = np.empty(flat.size, dtype=np.intp)
+    for start in range(0, flat.size, block):
+        idx = flat[start : start + block]
+        u = rng.random(idx.size)
+        out[start : start + block] = (cdf[:, idx] < u[None, :]).sum(axis=0)
+    np.clip(out, 0, cdf.shape[0] - 1, out=out)
+    return out.reshape(column.shape)
+
+
 # ----------------------------------------------------------------------------
 # Standardisation
 # ----------------------------------------------------------------------------
@@ -160,6 +179,154 @@ class WaveletTreeModel:
         v = self.ll_std**2
         return (alpha * v * (scaling - alpha * self.ll_mean) / (alpha**2 * v + delta)
                 + self.ll_mean)
+
+    # -- resolution -------------------------------------------------------
+
+    def resolution_report(self, t: float, points_per_std: float = 3.0) -> dict:
+        """Is the grid fine enough to resolve the likelihood at this `t`?
+
+        This is the failure mode that per-subband standardisation *creates*, and
+        it is worth stating plainly because nothing else in the package has it.
+        In standardised coordinates the likelihood of node v has standard
+        deviation
+
+            sqrt(Delta_t) / (alpha_t s_d),
+
+        so a subband with a *large* scale s_d gets a *narrow* likelihood. The
+        coarse subbands of a natural image have the largest scales (LH depth 0 is
+        10.7 against 0.14 for HH depth 4, a factor of 76), so on a shared grid
+        they are the ones that go under-resolved, and they do it at small t --
+        exactly where a reverse sampler spends its last steps.
+
+        The consequence is not a small loss of accuracy: below the resolved t the
+        near-delta likelihood is being integrated against a mesh that cannot see
+        it, and both the score and the evidence become unreliable. So this is
+        reported, and `min_resolved_t` is what the samplers clamp to, rather than
+        letting the caller integrate into a regime the discretisation does not
+        support.
+
+        The fix is a *per-depth* grid, and it is cheap: coarse subbands have 1, 4,
+        16 nodes against 256 at the finest level, so refining exactly where the
+        likelihood is narrow costs almost nothing. It needs rectangular
+        transition matrices and an M-step that takes a parent grid and a child
+        grid separately, which is a real change to `src/kernels.py` and is not
+        done here.
+        """
+        alpha, delta = alpha_delta(t)
+        dx = float(self.grid[1] - self.grid[0])
+        width = np.sqrt(delta) / (alpha * self.scales.scales)   # (3, depth+1)
+        pps = width / dx
+        # Smallest t at which every subband clears the threshold:
+        # sqrt(exp(2t) - 1) >= points_per_std * dx * s_max.
+        need = points_per_std * dx * float(self.scales.scales.max())
+        return {
+            "t": float(t),
+            "grid_spacing": dx,
+            "points_per_std": pps,
+            "min_points_per_std": float(pps.min()),
+            "resolved": bool(pps.min() >= points_per_std),
+            "min_resolved_t": float(0.5 * np.log(need**2 + 1.0)),
+        }
+
+    def score_images(self, noisy: np.ndarray, t: float, chunk: int = 32) -> np.ndarray:
+        """Pixel-space score grad_x log p_t(x), for `src/reverse.py`.
+
+        Built from the posterior mean, which is what BP returns:
+        s = (alpha E[a|x] - x) / Delta. Exact up to quadrature, and in *pixel*
+        coordinates because the orthonormal transform carries the wavelet-space
+        score back by W^T -- which `denoise_images` has already done.
+        """
+        alpha, delta = alpha_delta(t)
+        return (alpha * self.denoise_images(noisy, t, chunk) - noisy) / delta
+
+    # -- sampling ----------------------------------------------------------
+
+    def sample_ancestral(
+        self, n: int, rng: np.random.Generator, jitter: bool = True
+    ) -> np.ndarray:
+        """Draw `n` images from the fitted model directly, without diffusing.
+
+        The model is a Markov tree with a known root prior and known per-level
+        kernels, so it can be sampled root-to-leaves in closed form. On the grid
+        that is an ordinary discrete Markov chain over `M` states -- which is
+        exactly the model BP does inference in, so these samples and the
+        reverse-diffusion samples of `sample_reverse` are samples of the *same*
+        object. Any disagreement between them is sampler error, not model error,
+        which is what makes the comparison worth running.
+
+        `jitter` spreads each drawn state uniformly across its grid cell; without
+        it the samples live on a lattice and every downstream statistic inherits
+        a spurious discreteness.
+        """
+        grid, w = self.grid, self.weights
+        dx = float(grid[1] - grid[0])
+        ti = TreeIndex(self.depth, self.qt.branching)
+        nodes = np.empty((n, 3, ti.n_nodes))
+
+        for oi in range(3):
+            state = np.empty((n, ti.n_nodes), dtype=np.intp)
+            root_p = np.exp(self.log_root[oi] - self.log_root[oi].max()) * w
+            root_p /= root_p.sum()
+            state[:, 0] = rng.choice(len(grid), size=n, p=root_p)
+
+            for d in range(self.depth):
+                k = np.exp(self.kernels[oi][d].log_transition_matrix(grid)) * w[:, None]
+                cdf = np.cumsum(k, axis=0)
+                cdf /= cdf[-1][None, :]
+                parents = ti.nodes_at(d)
+                kids = ti.nodes_at(d + 1)
+                parent_state = np.repeat(state[:, parents], ti.branching, axis=1)
+                state[:, kids] = _sample_columns(cdf, parent_state, rng)
+
+            vals = grid[state]
+            if jitter:
+                vals = vals + (rng.random(vals.shape) - 0.5) * dx
+            nodes[:, oi, :] = vals
+
+        nodes = self.scales.restore(self.qt, nodes)
+        scaling = self.ll_mean + self.ll_std * rng.standard_normal((n, 1))
+        return tree_to_images(self.qt, nodes, scaling)
+
+    def sample_reverse(
+        self,
+        n: int,
+        rng: np.random.Generator,
+        n_steps: int = 200,
+        t_max: float = 3.0,
+        t_min: float = 0.02,
+        chunk: int = 32,
+        ode: bool = False,
+    ) -> np.ndarray:
+        """Generate by reverse diffusion driven by the exact BP score.
+
+        This is the route the project is actually about: no ancestral shortcut,
+        just the score integrated backwards. It should agree with
+        `sample_ancestral` in distribution, and where it does not, the gap is the
+        sampler's discretisation rather than the model's.
+        """
+        from .reverse import probability_flow_ode, reverse_sde, time_grid
+
+        # Never integrate below the resolved t: past it the coarse subbands'
+        # likelihood is narrower than a grid cell and the score is not merely
+        # inaccurate but meaningless. See `resolution_report`.
+        floor = self.resolution_report(t_min)["min_resolved_t"]
+        t_min = max(t_min, floor)
+        if t_max <= t_min:
+            raise ValueError(
+                f"grid resolves no t below {floor:.3f}; refine the grid "
+                f"(grid_size) or raise t_max above it"
+            )
+
+        side = self.qt.side
+        x = rng.standard_normal((n, side, side))
+        times = time_grid(t_max, t_min, n_steps)
+
+        def score_fn(z, t):
+            return self.score_images(z, float(t), chunk=chunk)
+
+        if ode:
+            return probability_flow_ode(x, score_fn, times, heun=False)
+        return reverse_sde(x, score_fn, times, rng)
 
     def log_likelihood_images(self, images: np.ndarray, t: float, chunk: int = 32) -> float:
         """Exact log p_t(x) for a batch of images, in *pixel* coordinates.

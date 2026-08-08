@@ -16,18 +16,26 @@ project has so far only tested on data it simulated itself:
    part that is easy to get wrong. `src/kernels.py` offers linear-autoregressive
    kernels, K(a'|a) = phi(a' - rho a), whose entire dependence on the parent is a
    shift of the innovation's location. The classical wavelet literature (Crouse,
-   Nowak, Baraniuk 1998) reports the opposite structure: parent and child
-   coefficients are close to *linearly uncorrelated* while their *magnitudes* are
-   strongly dependent -- a large parent predicts a large-variance child, of
-   either sign. A linear-AR kernel cannot express that at all: it would fit
-   rho ~ 0 and collapse to a factorised heavy-tailed model, which would score
-   well on marginals and capture no hierarchy whatsoever.
+   Nowak, Baraniuk 1998) reports a different structure: parent and child
+   *magnitudes* are strongly dependent -- a large parent predicts a
+   large-variance child, of either sign -- which a location-shift family cannot
+   express at all. Where that is the whole story, a linear-AR kernel fits rho ~ 0
+   and collapses to a factorised heavy-tailed model: good marginals, no hierarchy.
 
    `crossscale` measures both, so the choice of kernel family is made on
-   evidence. The decisive number is `std_ratio_q4_q1`: the standard deviation of
-   the child given a top-quartile |parent|, over the same given a bottom-quartile
-   |parent|. At 1 there is no magnitude dependence; well above 1 a linear-AR
-   kernel is the wrong family and a scale-mixture kernel is required.
+   evidence. The statistic is `std_ratio_q4_q1`: the standard deviation of the
+   child given a top-quartile |parent|, over the same given a bottom-quartile
+   |parent|.
+
+   **It must be read against a null, not against 1.** Conditioning the child on a
+   *set* of parent values picks up the spread of the conditional mean `rho a`
+   across that set, so a perfectly homoscedastic AR(1) already scores above 1 --
+   1.31 at rho = 0.45, 1.61 at rho = 0.60. `std_ratio_linear_ar_null` is that
+   value at the measured rho (`src.scale_kernel.linear_ar_magnitude_ratio`,
+   checked against simulation to three decimals) and
+   `std_ratio_excess_over_null` is the part a linear model cannot account for.
+   On CIFAR the excess reaches 2.33, and in HH -- where the linear correlation is
+   only 0.15 -- essentially the entire ratio is excess.
 
 Parts
 -----
@@ -45,6 +53,7 @@ from common import (
 from src.hierarchy import TreeIndex
 from src.image_data import load_cifar10_luminance
 from src.sample_metrics import bootstrap_se, excess_kurtosis
+from src.scale_kernel import linear_ar_magnitude_ratio
 from src.utils import ensure_dir, rng_for, write_csv, write_json
 from src.wavelet import ORIENTATIONS, images_to_tree
 
@@ -165,6 +174,13 @@ def part_crossscale(settings, out_dir):
             hi = np.abs(p_s) >= q[2]
             std_lo, std_hi = float(c_s[lo].std()), float(c_s[hi].std())
 
+            ratio = std_hi / std_lo if std_lo > 0 else float("nan")
+            # A purely linear model with this rho already produces a ratio above
+            # 1, because conditioning on a *set* of parent values picks up the
+            # spread of the conditional mean across it. Reporting the raw ratio
+            # alone would credit the linear effect to magnitude dependence.
+            null = linear_ar_magnitude_ratio(rho_lin)
+
             rows.append({
                 "orientation": orient,
                 "parent_depth": d,
@@ -175,18 +191,24 @@ def part_crossscale(settings, out_dir):
                 "corr_log_sq": rho_log,
                 "child_std_given_parent_q1": std_lo,
                 "child_std_given_parent_q4": std_hi,
-                "std_ratio_q4_q1": std_hi / std_lo if std_lo > 0 else float("nan"),
+                "std_ratio_q4_q1": ratio,
+                "std_ratio_linear_ar_null": null,
+                "std_ratio_excess_over_null": ratio - null,
             })
 
     write_csv(out_dir / "crossscale.csv", rows)
     lin = np.array([abs(r["corr_linear"]) for r in rows])
     ratio = np.array([r["std_ratio_q4_q1"] for r in rows])
+    excess = np.array([r["std_ratio_excess_over_null"] for r in rows])
     print(f"[crossscale] |linear corr|: median {np.median(lin):.4f}, max {lin.max():.4f}")
     print(f"[crossscale] magnitude ratio q4/q1: median {np.median(ratio):.3f}, "
           f"max {ratio.max():.3f}")
-    if lin.max() < 0.1 <= np.median(ratio) - 1.0:
-        print("[crossscale] VERDICT: dependence is in the magnitude, not the mean. "
-              "A linear-AR kernel is the wrong family; use a scale-mixture kernel.")
+    print(f"[crossscale] excess over the linear-AR null: median {np.median(excess):.3f}, "
+          f"max {excess.max():.3f}")
+    if np.median(excess) > 0.5:
+        print("[crossscale] VERDICT: dependence in the magnitude exceeds what the "
+              "linear effect explains. A linear-AR kernel is the wrong family; "
+              "use src.scale_kernel.ScaleMixtureKernel.")
     return rows
 
 

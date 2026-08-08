@@ -7,11 +7,10 @@
     "seed": 0
   },
   "parts": [
-    "subbands",
     "crossscale"
   ],
   "provenance": {
-    "timestamp": "2026-08-08 11:44:24",
+    "timestamp": "2026-08-08 12:22:06",
     "python": "3.12.5",
     "numpy": "2.4.2",
     "platform": "macOS-14.1.1-arm64-arm-64bit",

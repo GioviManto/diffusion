@@ -187,19 +187,29 @@ location**. Measured on CIFAR
 (`outputs/exp_23_wavelet_statistics/crossscale.csv`), at the finest scale
 boundary (d3 → d4, 2.56 M pairs per orientation):
 
-| orientation | linear corr | child std given \|parent\| in Q4 vs Q1 |
-|---|---|---|
-| HL | 0.452 | **3.65×** |
-| LH | 0.482 | **3.29×** |
-| HH | **0.148** | **2.89×** |
+| orientation | linear corr | Q4/Q1 std ratio | linear-AR null | **excess** |
+|---|---|---|---|---|
+| HL | 0.452 | 3.65 | 1.32 | **2.33** |
+| LH | 0.482 | 3.29 | 1.36 | **1.92** |
+| HH | **0.148** | 2.89 | **1.03** | **1.86** |
+
+> **The null matters, and an earlier draft of this document omitted it.** The raw
+> ratio is not a pure measure of magnitude dependence: conditioning the child on
+> a *set* of parent values also picks up the spread of the conditional mean ρa
+> across that set, so a perfectly homoscedastic AR(1) already scores 1.31 at
+> ρ = 0.45 and 1.61 at ρ = 0.60. The quantity that carries the argument is the
+> **excess** over that null (`scale_kernel.linear_ar_magnitude_ratio`, verified
+> against simulation to three decimals). The conclusion is unchanged and in fact
+> sharper: in HH, where the linear correlation is only 0.15, essentially the
+> entire ratio is excess.
 
 Two things follow.
 
-1. **Magnitude dependence is large and universal.** A top-quartile-magnitude
-   parent has children roughly 3× more spread than a bottom-quartile one, in
-   *every* orientation, growing with depth (1.34× at the coarsest boundary).
-   A linear-AR kernel cannot express this at all: its conditional variance does
-   not depend on the parent.
+1. **Magnitude dependence is large, universal, and not explained by the linear
+   effect.** The excess reaches 1.9–2.3 at the finest boundary in every
+   orientation and grows monotonically with depth (median excess 0.82 over all
+   twelve scale boundaries). A linear-AR kernel cannot express any of it: its
+   conditional variance does not depend on the parent.
 2. **HH has almost no linear correlation** (0.04–0.15) but full magnitude
    dependence. Fitted with a linear-AR kernel, HH would return ρ ≈ 0 and collapse
    to a *factorised* heavy-tailed model — good marginals, **zero hierarchy**. It
