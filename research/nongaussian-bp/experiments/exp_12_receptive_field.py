@@ -58,9 +58,9 @@ def _families(rho):
     return [GaussianAR1(rho), LaplaceAR1(rho), GaussianMixtureAR1(rho, kappa=0.9)]
 
 
-def _reference(prior, grid, weights, A_test, t_values):
+def _reference(prior, grid, weights, A_test, t_values, tag="exp12-testnoise"):
     """Exact-BP reference denoiser on held-out chains."""
-    rng = rng_for("exp12-testnoise", prior.name)
+    rng = rng_for(tag, prior.name)
     log_k = prior.log_transition_matrix(grid)
     bundle = {}
     for t in t_values:
@@ -303,6 +303,141 @@ def part3_efficiency(cfg, out):
     return rows
 
 
+def part4_efficiency_val(cfg, out):
+    """Part 3 again, with the radius and parameterisation chosen on validation.
+
+    Part 3 takes `min(...)` over every trained head and every global network *on the test
+    bundle*. That is an oracle over two axes at once -- receptive-field radius and
+    eps-versus-x0 -- and it is granted to the baselines only. It was introduced deliberately,
+    to bound what a locality-respecting architecture can achieve here rather than to report
+    a fair comparison, and part 3's docstring says so. What it cannot do is answer a reviewer
+    who asks what the honest number is.
+
+    This part answers that. A validation bundle is drawn from `exp12-val` -- disjoint chains
+    and disjoint noise from the test bundle, and from every training seed -- the argmin over
+    (radius, parameterisation) is taken there, and only that configuration is scored on test.
+
+    Both numbers are on every row. `*_selected` is the honest protocol, `*_oracle` reproduces
+    part 3, and their ratio is what the two-axis oracle is worth. The models are the same
+    fits part 3 evaluates: identical RNG keys, so only the selection protocol differs.
+
+    Note `interior_slice` still uses the largest swept radius for every arm, so all arms are
+    scored on identical sites regardless of which radius won. Scoring a small-radius winner
+    on its own wider interior would quietly give it easier sites.
+    """
+    grid, weights = make_grid(GRID_A, cfg["grid_size"])
+    prior = LaplaceAR1(cfg["rho"])
+
+    rng_test = rng_for("exp12-eff-test")
+    A_test = np.stack([prior.sample(rng_test, N_SITES) for _ in range(cfg["n_test"])])
+    test_bundle = _reference(prior, grid, weights, A_test, T_TRAIN)
+
+    rng_val = rng_for("exp12-eff-val")
+    A_val = np.stack([prior.sample(rng_val, N_SITES) for _ in range(cfg["n_val"])])
+    val_bundle = _reference(prior, grid, weights, A_val, T_TRAIN, tag="exp12-valnoise")
+
+    rows = []
+    for seed in range(cfg["eff_seeds"]):
+        for n_chains in cfg["eff_sizes"]:
+            # Same keys as part 3: these are the same fitted models.
+            rng = rng_for("exp12-eff", seed, n_chains)
+            A = np.stack([prior.sample(rng, N_SITES) for _ in range(n_chains)])
+
+            parts_idx = np.array_split(rng.permutation(len(A)), len(T_TRAIN))
+            groups = []
+            for t, idx in zip(T_TRAIN, parts_idx):
+                al, de = alpha_delta(t)
+                sub = A[idx]
+                groups.append(
+                    (al * sub + np.sqrt(de) * rng.standard_normal(sub.shape), al, de)
+                )
+            kernel, _ = fit_em(
+                MixtureInnovationKernel.init(
+                    4, rho=0.3, var=0.8, rng=rng_for("exp12-eff-init", seed)
+                ),
+                grid, weights, groups, n_iters=120,
+            )
+
+            heads = {}
+            for radius in cfg["eff_radii"]:
+                for mode in cfg["parameterizations"]:
+                    heads[(radius, mode)] = train_local_head(
+                        A, T_TRAIN, radius,
+                        rng_for("exp12-eff-head", seed, n_chains, radius, mode),
+                        hidden=cfg["hidden"], n_steps=cfg["eff_steps"],
+                        parameterization=mode,
+                    )
+            globals_ = {
+                mode: train_dsm_denoiser(
+                    A, T_TRAIN, rng_for("exp12-eff-glob", seed, n_chains, mode),
+                    hidden=cfg["global_hidden"], n_steps=cfg["eff_steps"],
+                    parameterization=mode,
+                )
+                for mode in cfg["parameterizations"]
+            }
+
+            sl = interior_slice(N_SITES, max(cfg["eff_radii"]))
+            for t in T_TRAIN:
+                Xv, mv = val_bundle[t]
+                Xt, mt = test_bundle[t]
+
+                def cnn_err(key, X, m_ref):
+                    return _score_error(
+                        local_posterior_mean(heads[key], X, t), m_ref, X, t, sl)
+
+                def mlp_err(mode, X, m_ref):
+                    return _score_error(
+                        dsm_posterior_mean(globals_[mode], X, t), m_ref, X, t, sl)
+
+                cnn_pick = min(heads, key=lambda k: cnn_err(k, Xv, mv))
+                mlp_pick = min(globals_, key=lambda m: mlp_err(m, Xv, mv))
+                cnn_oracle = min(heads, key=lambda k: cnn_err(k, Xt, mt))
+                mlp_oracle = min(globals_, key=lambda m: mlp_err(m, Xt, mt))
+
+                m_em = grid_bp_batch(
+                    grid, weights, kernel.log_transition_matrix(grid),
+                    Xt, *alpha_delta(t))[0]
+                em = _score_error(m_em, mt, Xt, t, sl)
+
+                rows.append({
+                    "seed": seed, "n_chains": n_chains, "t": t,
+                    "em_bp_score_rel_l2": em,
+                    "cnn_score_rel_l2_selected": cnn_err(cnn_pick, Xt, mt),
+                    "cnn_score_rel_l2_oracle": cnn_err(cnn_oracle, Xt, mt),
+                    "cnn_radius_selected": cnn_pick[0],
+                    "cnn_mode_selected": cnn_pick[1],
+                    "cnn_radius_oracle": cnn_oracle[0],
+                    "cnn_mode_oracle": cnn_oracle[1],
+                    "cnn_selection_agrees": int(cnn_pick == cnn_oracle),
+                    "mlp_score_rel_l2_selected": mlp_err(mlp_pick, Xt, mt),
+                    "mlp_score_rel_l2_oracle": mlp_err(mlp_oracle, Xt, mt),
+                    "mlp_mode_selected": mlp_pick,
+                    "mlp_mode_oracle": mlp_oracle,
+                    "ratio_cnn_selected": cnn_err(cnn_pick, Xt, mt) / em,
+                    "ratio_cnn_oracle": cnn_err(cnn_oracle, Xt, mt) / em,
+                })
+                print(f"  seed={seed} N={n_chains:5d} t={t:4.2f} "
+                      f"cnn r={cnn_pick[0]}/{cnn_pick[1]} "
+                      f"(oracle r={cnn_oracle[0]}/{cnn_oracle[1]}"
+                      f"{'' if cnn_pick == cnn_oracle else '  DIFFERS'})  "
+                      f"ratio {rows[-1]['ratio_cnn_selected']:5.2f} vs "
+                      f"{rows[-1]['ratio_cnn_oracle']:5.2f}", flush=True)
+
+    fig, ax = new_figure()
+    for key, style, label in (("ratio_cnn_selected", "o-", "chosen on validation"),
+                              ("ratio_cnn_oracle", "s--", "chosen on test (part 3)")):
+        means = [float(np.mean([r[key] for r in rows if r["n_chains"] == n]))
+                 for n in cfg["eff_sizes"]]
+        ax.loglog(cfg["eff_sizes"], means, style, label=label)
+    ax.axhline(1.0, color="k", lw=1, ls=":")
+    ax.set_xlabel("number of training chains $N$")
+    ax.set_ylabel("local CNN error / EM-BP error")
+    ax.set_title("Cost of the two-axis oracle, Laplace chain")
+    ax.legend()
+    save_figure(fig, out / "efficiency_val.png")
+    return rows
+
+
 def main() -> None:
     parser = experiment_parser(
         "exp_12_receptive_field",
@@ -315,7 +450,7 @@ def main() -> None:
         "radii": (0, 1, 2, 4), "hidden": (64, 64), "global_hidden": (64, 64),
         "n_steps": 2000, "parameterizations": ("eps",), "compare_radius": 4,
         "eff_seeds": 2, "eff_sizes": (128, 512), "eff_radii": (3, 6),
-        "eff_steps": 1500,
+        "eff_steps": 1500, "n_val": 128,
     }
     full = {
         "grid_size": GRID_M, "rho": 0.85, "n_chains": 1024, "n_test": N_TEST,
@@ -323,7 +458,7 @@ def main() -> None:
         "hidden": (64, 64), "global_hidden": (128, 128),
         "n_steps": 20000, "parameterizations": ("eps", "x0"), "compare_radius": 6,
         "eff_seeds": 4, "eff_sizes": (128, 512, 2048), "eff_radii": (3, 6, 12),
-        "eff_steps": 8000,
+        "eff_steps": 8000, "n_val": N_TEST,
     }
     cfg = apply_overrides(quick if args.quick else full, args.set)
 
@@ -336,6 +471,9 @@ def main() -> None:
         "efficiency": ("replicated oracle-fair three-way comparison",
                        lambda o: write_csv(o / "efficiency_three_way.csv",
                                            part3_efficiency(cfg, o))),
+        "efficiency_val": ("radius and parameterisation chosen on validation",
+                           lambda o: write_csv(o / "efficiency_val.csv",
+                                               part4_efficiency_val(cfg, o))),
     }
     if args.list_parts:
         print("\n".join(parts))

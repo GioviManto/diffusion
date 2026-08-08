@@ -32,6 +32,7 @@ from src.metrics import cosine, max_abs, mse, rel_l2
 from src.noising import log_likelihood_matrix, ou_noise_sample
 from src.plotting import new_figure, save_figure
 from src.priors import GaussianMixtureAR1, LaplaceAR1, StudentTAR1
+from src.stationary import invariant_log_density, sample_stationary
 from src.utils import ensure_dir, rng_for, write_csv, write_json
 
 N_SITES = 40
@@ -52,11 +53,18 @@ def families(rho: float):
 
 def main() -> None:
     args = experiment_parser("exp_03_nongaussian_innovation_sweep", __doc__).parse_args()
+    if args.list_parts:
+        print("baseline\nstationary")
+        return
     out = ensure_dir(args.output_dir)
     n_trials = 3 if args.quick else 12
     m_ref = 401 if args.quick else 801
     t_values = T_VALUES[1::2] if args.quick else T_VALUES
     rhos = (0.85,) if args.quick else RHOS
+
+    if args.only and args.only.strip() == "stationary":
+        run_stationary(out, rhos, t_values, n_trials, m_ref, args)
+        return
 
     write_json(out / "params.json", {
         "n_sites": N_SITES, "rhos": rhos, "t_values": t_values,
@@ -119,6 +127,86 @@ def main() -> None:
     make_figures(rows, rhos, t_values, out)
     write_summary_table(rows, rhos, out)
     print(f"exp_03 done -> {out}")
+
+
+def run_stationary(out, rhos, t_values, n_trials, m_ref, args) -> None:
+    """The same sweep on strictly stationary chains, testing a prediction the note makes.
+
+    The note states that sampling from the invariant law instead of starting at N(0,1) would
+    not change the closure results materially, and offers no run behind it. The reasoning is
+    that the Gaussian baseline depends on the prior only through its second moments, and
+    those are identical under both initialisations: Var(a_i) = 1 and Cov(a_i, a_j) =
+    rho^|i-j| hold exactly either way, since only the *shape* of the marginal drifts. So the
+    baseline arm is literally unchanged and only the reference arm can move.
+
+    That makes this a real prediction with a way to be wrong. If the closure error shifts
+    appreciably, the marginal shape at early sites was doing more work than the argument
+    allows, and the family comparison would need restating on stationary data throughout.
+
+    Both the data and the reference BP's initial law change together -- a strictly stationary
+    chain whose BP is told the law is N(0,1) would be neither construction.
+    """
+    grid, w = make_grid(8.0, m_ref)
+    write_json(out / "params_stationary.json", {
+        "n_sites": N_SITES, "rhos": rhos, "t_values": t_values,
+        "n_trials": n_trials, "ref_grid": {"M": m_ref, "A": 8.0},
+        "init": "invariant", "provenance": provenance(),
+    })
+
+    rows: list[dict] = []
+    for rho in rhos:
+        for prior in families(rho):
+            log_K = prior.log_transition_matrix(grid)
+            inv = invariant_log_density(prior, grid, w)
+            for t in t_values:
+                per_trial = []
+                for trial in range(n_trials):
+                    rng = rng_for("exp03-stat", prior.name, rho, t, trial)
+                    a = sample_stationary(prior, rng, N_SITES)
+                    x, alpha, delta = ou_noise_sample(rng, a, t)
+
+                    ref = grid_bp(
+                        grid, w, log_K,
+                        log_likelihood_matrix(grid, x, alpha, delta),
+                        x, alpha, delta, log_mu=inv.log_density,
+                    )
+                    s_ref = score_from_posterior_mean(x, ref.means, alpha, delta)
+                    # Unchanged from the baseline arm on purpose: the Gaussian model sees
+                    # only (rho, q), and neither moves under a change of initial law.
+                    gauss = gaussian_chain_bp(x, rho, prior.q, alpha, delta)
+                    s_gauss = score_from_posterior_mean(x, gauss.means, alpha, delta)
+
+                    per_trial.append({
+                        "mean_mse": mse(gauss.means, ref.means),
+                        "mean_rel": rel_l2(gauss.means, ref.means),
+                        "score_mse": mse(s_gauss, s_ref),
+                        "score_rel": rel_l2(s_gauss, s_ref),
+                        "cos": cosine(s_gauss, s_ref),
+                        "max_abs": max_abs(s_gauss, s_ref),
+                    })
+
+                def med(k):  # noqa: B023
+                    return float(np.median([p[k] for p in per_trial]))
+
+                rows.append({
+                    "init": "invariant",
+                    "family": prior.name,
+                    "rho": rho,
+                    "t": t,
+                    "excess_kurtosis": prior.innovation_excess_kurtosis,
+                    "invariant_iters": inv.n_iter,
+                    "posterior_mean_mse_median": med("mean_mse"),
+                    "posterior_mean_rel_median": med("mean_rel"),
+                    "score_mse_median": med("score_mse"),
+                    "score_rel_median": med("score_rel"),
+                    "score_cosine_median": med("cos"),
+                    "score_max_abs_median": med("max_abs"),
+                })
+                print(f"  {prior.name:18s} rho={rho} t={t:5.2f} "
+                      f"score_rel={rows[-1]['score_rel_median']:.5f}", flush=True)
+
+    write_csv(out / "innovation_sweep_stationary.csv", rows)
+    print(f"exp_03 stationary arm done -> {out}")
 
 
 def make_figures(rows, rhos, t_values, out) -> None:

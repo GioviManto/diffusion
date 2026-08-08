@@ -50,6 +50,11 @@ from src.priors import (
     StudentTAR1,
     UniformAR1,
 )
+from src.stationary import (
+    drifted_log_density,
+    invariant_log_density,
+    sample_stationary_batch,
+)
 from src.utils import ensure_dir, rng_for, write_csv, write_json
 
 N_SITES = 41  # odd, so there is a well-defined centre site
@@ -69,18 +74,31 @@ def _families(rho: float):
     ]
 
 
-def locality_curve(prior, grid, weights, X, t, radii):
-    """Error of the radius-r estimator at the centre site, against full-chain BP."""
+def locality_curve(prior, grid, weights, X, t, radii, log_mu_full=None, window_mu=None):
+    """Error of the radius-r estimator at the centre site, against full-chain BP.
+
+    `log_mu_full` is the initial law at site 1, for the full-chain reference. `window_mu` is
+    a callable ``lo -> log_mu`` giving the initial law at a window's left endpoint, since
+    that law depends on where the window starts. Both default to the standard normal that
+    `grid_bp_batch` assumes, which reproduces the original measurement exactly.
+
+    The window's initial law is the whole subtlety. A contiguous window of a Markov chain is
+    itself a chain with the same kernel, so window BP returns the exact conditional
+    expectation E[a_C | x_window] -- but only when it is handed the true marginal law of the
+    window's *left endpoint*. Supplying N(0,1) there is right for the Gaussian chain at every
+    site, and wrong for every other family at every site past the first.
+    """
     alpha, delta = alpha_delta(t)
     log_k = prior.log_transition_matrix(grid)
 
-    m_full, _ = grid_bp_batch(grid, weights, log_k, X, alpha, delta)
+    m_full, _ = grid_bp_batch(grid, weights, log_k, X, alpha, delta, log_mu_full)
     m_ref = m_full[:, CENTRE]
 
     out = []
     for r in radii:
         lo, hi = CENTRE - r, CENTRE + r + 1
-        m_win, _ = grid_bp_batch(grid, weights, log_k, X[:, lo:hi], alpha, delta)
+        mu_lo = None if window_mu is None else window_mu(lo)
+        m_win, _ = grid_bp_batch(grid, weights, log_k, X[:, lo:hi], alpha, delta, mu_lo)
         err = float(np.sqrt(np.mean((m_win[:, r] - m_ref) ** 2)))
         out.append((r, err))
     return out
@@ -165,6 +183,139 @@ def part1_universality(cfg, out):
     return rows
 
 
+def _rate_ratios(rows, key="init"):
+    """Attach each row's fitted rate divided by the Gaussian rate at matched conditions.
+
+    Grouped by `key` as well as (rho, t), so an arm is only ever normalised against the
+    Gaussian chain measured under the *same* protocol. Normalising across arms would mix the
+    thing being measured with the thing being corrected.
+    """
+    for row in rows:
+        ref = next(
+            x["fitted_rate"] for x in rows
+            if x["family"] == "gaussian" and x["rho"] == row["rho"]
+            and x["t"] == row["t"] and x[key] == row[key]
+        )
+        row["rate_over_gaussian"] = row["fitted_rate"] / ref if ref > 0 else np.nan
+
+
+def part2_stationary(cfg, out):
+    """The locality curve with the window's initial law made correct, three ways.
+
+    Part 1 draws chains from ``a_1 ~ N(0,1)`` and hands every window BP the same N(0,1) as
+    its initial law. For a window ``[C-r, C+r]`` that is the marginal law of site ``C-r``
+    only for the Gaussian chain; for the others site ``C-r`` has drifted towards the
+    invariant law. So part 1's estimator is the exact conditional expectation for the family
+    that everything else is normalised against, and an approximation for the families whose
+    departure from it is the reported result. The measured 1.12-1.46x rate ratios therefore
+    contain an unknown amount of initial-law mismatch.
+
+    Three arms separate the two effects rather than assuming which dominates:
+
+    ``n01``       the committed protocol -- N(0,1) data, N(0,1) window law. Reproduces
+                  part 1 and exists so the other arms have something to be compared against.
+    ``n01_exact`` the same data, but each window given the *exact* marginal of its own left
+                  endpoint, computed by pushing N(0,1) through the kernel that many times.
+                  The difference from ``n01`` is the error in the committed numbers, on the
+                  committed data, with nothing else changed.
+    ``invariant`` strictly stationary chains with the invariant law as initial law
+                  everywhere. Here the window estimator is exact at every site, so this is
+                  the locality law free of the artefact -- a T3 quantity, not a proxy.
+
+    The middle arm is what makes this a measurement instead of a replacement: without it we
+    would know the new numbers but not how wrong the old ones were.
+    """
+    grid, weights = make_grid(GRID_A, cfg["grid_size"])
+    rows = []
+    for rho in cfg["rhos"]:
+        for prior in _families(rho):
+            inv = invariant_log_density(prior, grid, weights)
+            # Marginal at each site the windows actually start from, computed once.
+            drifted = {
+                CENTRE - r: drifted_log_density(prior, grid, weights, CENTRE - r)
+                for r in cfg["radii"]
+            }
+            arms = {
+                "n01": (None, None),
+                "n01_exact": (None, drifted.get),
+                "invariant": (inv.log_density, lambda _lo: inv.log_density),
+            }
+
+            for init, (log_mu_full, window_mu) in arms.items():
+                rng = rng_for("exp11-stat", prior.name, rho, init)
+                if init == "invariant":
+                    A = sample_stationary_batch(prior, rng, cfg["n_chains"], N_SITES)
+                else:
+                    A = np.stack(
+                        [prior.sample(rng, N_SITES) for _ in range(cfg["n_chains"])]
+                    )
+
+                for t in cfg["t_values"]:
+                    alpha, delta = alpha_delta(t)
+                    X = alpha * A + np.sqrt(delta) * rng.standard_normal(A.shape)
+                    curve = locality_curve(prior, grid, weights, X, t, cfg["radii"],
+                                           log_mu_full, window_mu)
+                    q_hat, q_se = _fit_rate(*zip(*curve))
+                    for r, err in curve:
+                        rows.append({
+                            "init": init,
+                            "family": prior.name,
+                            "excess_kurtosis": prior.innovation_excess_kurtosis,
+                            "rho": rho,
+                            "t": t,
+                            "radius": r,
+                            "rms_error": err,
+                            "fitted_rate": q_hat,
+                            "fitted_rate_se": q_se,
+                            "invariant_iters": inv.n_iter,
+                        })
+                    print(f"  {init:10s} {prior.name:18s} rho={rho} t={t:5.2f} "
+                          f"rate={q_hat:.4f}+-{q_se:.4f}", flush=True)
+
+    _rate_ratios(rows)
+
+    fig, ax = new_figure(ncols=2, figsize=(11.0, 4.2))
+    rho0 = cfg["rhos"][len(cfg["rhos"]) // 2]
+    styles = {"n01": ("--", 0.55), "n01_exact": (":", 0.75), "invariant": ("-", 1.0)}
+    for prior in _families(rho0):
+        for init, (ls, alpha_) in styles.items():
+            sub = [r for r in rows if r["family"] == prior.name and r["rho"] == rho0
+                   and r["init"] == init and r["radius"] == cfg["radii"][0]]
+            sub.sort(key=lambda r: r["t"])
+            if not sub:
+                continue
+            ax[0].semilogx([r["t"] for r in sub], [r["rate_over_gaussian"] for r in sub],
+                           ls, alpha=alpha_, label=f"{prior.name} / {init}", lw=1.4)
+    ax[0].axhline(1.0, color="k", ls="--", lw=1)
+    ax[0].set_xlabel("noise level $t$")
+    ax[0].set_ylabel("fitted rate / Gaussian rate")
+    ax[0].set_title(rf"Rate ratio by protocol, $\rho={rho0}$")
+    ax[0].legend(fontsize=5, ncol=2)
+
+    # How much the committed protocol was off by, per family: the n01 ratio against the
+    # strictly stationary one. Unity means the artefact did not matter.
+    for prior in _families(rho0):
+        ts, rel = [], []
+        for t in cfg["t_values"]:
+            def pick(init):
+                return [r["rate_over_gaussian"] for r in rows
+                        if r["family"] == prior.name and r["rho"] == rho0
+                        and r["init"] == init and r["t"] == t and r["radius"] == cfg["radii"][0]]
+            a, b = pick("n01"), pick("invariant")
+            if a and b and b[0] != 0:
+                ts.append(t)
+                rel.append(a[0] / b[0])
+        if ts:
+            ax[1].semilogx(ts, rel, "o-", ms=3, label=prior.name)
+    ax[1].axhline(1.0, color="k", ls="--", lw=1)
+    ax[1].set_xlabel("noise level $t$")
+    ax[1].set_ylabel("committed ratio / stationary ratio")
+    ax[1].set_title("How much of the effect was the initial law?")
+    ax[1].legend(fontsize=7)
+    save_figure(fig, out / "locality_stationary.png")
+    return rows
+
+
 def main() -> None:
     parser = experiment_parser(
         "exp_11_nongaussian_locality",
@@ -187,6 +338,9 @@ def main() -> None:
         "universality": ("locality rate vs innovation shape",
                          lambda o: write_csv(o / "locality.csv",
                                              part1_universality(cfg, o))),
+        "stationary": ("locality rate with the window's initial law made correct",
+                       lambda o: write_csv(o / "locality_stationary.csv",
+                                           part2_stationary(cfg, o))),
     }
     if args.list_parts:
         print("\n".join(parts))

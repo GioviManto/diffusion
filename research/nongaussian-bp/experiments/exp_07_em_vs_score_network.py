@@ -81,9 +81,19 @@ N_COMPONENTS = 4
 N_TEST = 256
 
 
-def make_test_set(prior, grid, weights, t_values, n_test: int):
+N_VAL = 256
+
+# Two disjoint evaluation bundles. `exp07-test` is what everything is judged on and is
+# deliberately never mixed with a replicate index; `exp07-val` exists so that a choice
+# between models can be made without looking at the test bundle. Neither tag appears in
+# any training seed, so nothing a model is fitted on can leak into either.
+TEST_TAG = "exp07-test"
+VAL_TAG = "exp07-val"
+
+
+def make_test_set(prior, grid, weights, t_values, n_test: int, tag: str = TEST_TAG):
     """Held-out chains plus the exact BP reference denoiser at each level."""
-    rng = rng_for("exp07-test")
+    rng = rng_for(tag)
     A = np.stack([prior.sample(rng, N_SITES) for _ in range(n_test)])
     bundle = {}
     for t in t_values:
@@ -201,6 +211,106 @@ def part1_sample_efficiency(grid, weights, sizes, hidden, n_steps, out):
         ax[j].legend()
     save_figure(fig, out / "sample_efficiency.png")
     return rows, cost_rows
+
+
+# ----------------------------------------------------------------------------
+# Part 5: the same comparison, with model selection moved off the test set
+# ----------------------------------------------------------------------------
+
+def part5_sample_efficiency_val(grid, weights, sizes, hidden, n_steps, out):
+    """Part 1 again, with the parameterisation chosen on validation rather than on test.
+
+    Part 1 emits `dsm_net_eps` and `dsm_net_x0` as separate rows and the better of the two
+    is taken per noise level downstream. That is oracle post-selection on the evaluation
+    set, and it favours the baseline rather than us: the network gets two attempts at every
+    t and keeps the winner, while EM-BP gets one. The objection is real and cannot be
+    answered by argument, only by measuring how much the oracle is worth.
+
+    So: eps or x0 is chosen per noise level on a validation bundle drawn from `exp07-val`,
+    disjoint from both the test bundle and every training seed, and only the winner is
+    scored on test. Every row carries both numbers -- `*_selected` is the honest protocol,
+    `*_oracle` is what part 1 reports -- so their ratio is the size of the selection bias.
+
+    The fits are the *same models* part 1 evaluates: the RNG keys here are identical, so
+    nothing differs between the two parts except which bundle the choice is made on. That
+    is what makes the difference attributable to the protocol.
+
+    Prediction, recorded before the run: removing an oracle only the networks enjoy should
+    move the ratios in EM-BP's favour. If it moves them the other way, the validation
+    bundle is too small for its selections to be anything but noise, and N_VAL is the knob.
+    """
+    prior = LaplaceAR1(RHO_TRUE)
+    _, test_bundle = make_test_set(prior, grid, weights, T_TRAIN, N_TEST, tag=TEST_TAG)
+    _, val_bundle = make_test_set(prior, grid, weights, T_TRAIN, N_VAL, tag=VAL_TAG)
+
+    rows = []
+    for n_chains in sizes:
+        # Same keys as part 1, so these are literally the same fitted models.
+        rng = train_rng("exp07-p1", n_chains)
+        A = np.stack([prior.sample(rng, N_SITES) for _ in range(n_chains)])
+        kernel, _ = fit_em(
+            MixtureInnovationKernel.init(
+                N_COMPONENTS, rho=0.3, var=0.8, rng=train_rng("exp07-init")
+            ),
+            grid, weights, noisy_groups(A, T_TRAIN, rng), n_iters=120,
+        )
+        nets = train_nets(A, ("exp07-net", n_chains), hidden, n_steps)
+
+        for t in T_TRAIN:
+            X_val, m_val = val_bundle[t]
+            X_test, m_test = test_bundle[t]
+
+            val_err = {
+                mode: evaluate_denoiser(
+                    dsm_posterior_mean(nets[mode], X_val, t), m_val, X_val, t)["score_rel_l2"]
+                for mode in PARAMETERIZATIONS
+            }
+            test_err = {
+                mode: evaluate_denoiser(
+                    dsm_posterior_mean(nets[mode], X_test, t), m_test, X_test, t)
+                for mode in PARAMETERIZATIONS
+            }
+            chosen = min(val_err, key=val_err.get)
+            oracle = min(test_err, key=lambda m: test_err[m]["score_rel_l2"])
+
+            em = evaluate_denoiser(
+                bp_posterior_mean(kernel, grid, weights, X_test, t), m_test, X_test, t)
+
+            rows.append({
+                "n_chains": n_chains,
+                "t": t,
+                "em_bp_score_rel_l2": em["score_rel_l2"],
+                "em_bp_mean_rel_l2": em["mean_rel_l2"],
+                "net_score_rel_l2_selected": test_err[chosen]["score_rel_l2"],
+                "net_mean_rel_l2_selected": test_err[chosen]["mean_rel_l2"],
+                "net_score_rel_l2_oracle": test_err[oracle]["score_rel_l2"],
+                "net_mean_rel_l2_oracle": test_err[oracle]["mean_rel_l2"],
+                "mode_selected": chosen,
+                "mode_oracle": oracle,
+                "selection_agrees": int(chosen == oracle),
+                # The headline ratio under each protocol: how many times larger the
+                # network's error is than EM-BP's.
+                "ratio_selected": test_err[chosen]["score_rel_l2"] / em["score_rel_l2"],
+                "ratio_oracle": test_err[oracle]["score_rel_l2"] / em["score_rel_l2"],
+            })
+            print(f"  N={n_chains:5d} t={t:4.2f} chose {chosen} "
+                  f"(oracle {oracle}{'' if chosen == oracle else '  DIFFERS'})  "
+                  f"ratio {rows[-1]['ratio_selected']:6.2f} vs oracle "
+                  f"{rows[-1]['ratio_oracle']:6.2f}", flush=True)
+
+    fig, ax = new_figure()
+    for key, style, label in (("ratio_selected", "o-", "chosen on validation"),
+                              ("ratio_oracle", "s--", "chosen on test (part 1)")):
+        agg = [float(np.mean([r[key] for r in rows if r["n_chains"] == n]))
+               for n in sizes]
+        ax.loglog(sizes, agg, style, label=label)
+    ax.axhline(1.0, color="k", lw=1, ls=":")
+    ax.set_xlabel("number of training chains $N$")
+    ax.set_ylabel("network error / EM-BP error")
+    ax.set_title("Cost of moving model selection off the test set")
+    ax.legend()
+    save_figure(fig, out / "sample_efficiency_val.png")
+    return rows
 
 
 # ----------------------------------------------------------------------------
@@ -394,11 +504,17 @@ def main() -> None:
         write_csv(out / "inference_cost.csv", part4_inference_cost(
             grid, weights, cfg["inference_batches"], cfg["net_hidden"], out))
 
+    def p5(grid, weights, out):
+        write_csv(out / "sample_efficiency_val.csv", part5_sample_efficiency_val(
+            grid, weights, cfg["sizes"], cfg["net_hidden"], cfg["net_steps"], out))
+
     parts = {
         "sample_efficiency": ("sample efficiency", p1),
         "capacity": ("network capacity and training budget", p2),
         "transfer": ("transfer across the noise schedule", p3),
         "inference_cost": ("inference cost", p4),
+        "sample_efficiency_val": (
+            "sample efficiency, parameterisation chosen on validation", p5),
     }
     if args.list_parts:
         print("\n".join(parts))
@@ -412,6 +528,7 @@ def main() -> None:
     write_json(out / f"params_{tag}.json", {
         "n_sites": N_SITES, "rho_true": RHO_TRUE, "grid_half_width": GRID_A,
         "t_train": T_TRAIN, "n_components": N_COMPONENTS, "n_test": N_TEST,
+        "n_val": N_VAL, "test_tag": TEST_TAG, "val_tag": VAL_TAG,
         "parameterizations": PARAMETERIZATIONS, "quick": args.quick,
         "parts": list(selected), "overrides": args.set,
         **{k: (str(v) if k == "archs" else v) for k, v in cfg.items()},

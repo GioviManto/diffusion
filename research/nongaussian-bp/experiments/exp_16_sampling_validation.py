@@ -51,9 +51,16 @@ integrator with *common random numbers*:
     mlp      vanilla DSM network                     -- ~25k parameters, same N.
     cnn      weight-shared local head                -- ~6k parameters, same N.
 
-Both networks are trained in both standard parameterizations and the better is taken per
-noise level, which is the treatment exp_07 settled on: eps wins at low noise, x0 at high, and
-reporting one alone misleads in whichever direction is chosen.
+Both networks are trained in both standard parameterizations and the better is chosen on a
+fresh validation sample: eps wins at low noise, x0 at high, and reporting one alone misleads
+in whichever direction is chosen. The choice is made **once per arm**, not per noise level --
+switching between two independently trained networks partway through an integration gives the
+integrator a score field with jump discontinuities in t that belong to neither of them.
+
+Both are also trained on a **continuous** t schedule spanning the whole integration interval.
+Training on the five levels of `t_train` and then integrating over [t_min, t_max] leaves the
+network interpolating between the levels and extrapolating outside them, so the generated law
+would reflect that rather than the score estimator being compared.
 
 What is measured, and why all of it
 -----------------------------------
@@ -74,6 +81,14 @@ pointwise  The metric ladder at fixed noise levels, so the pointwise and distrib
            rankings can be put side by side and any disagreement between them attributed.
 steps      Integrator control. Halving the step size must not change the ranking; if it
            does, we are measuring discretization rather than score quality.
+heldout    Marginal likelihood and EM cost against mixture capacity C -- the two coordinates
+           the capacity sweep was missing. Training evidence is monotone in C by nesting and
+           says nothing; the held-out curve is the one that can turn over.
+paired     The same capacity question on a PAIRED design: every C fitted on the same training
+           set within a cell and scored on the same held-out bundle, so the reported interval
+           is on the within-dataset difference rather than on two separate medians. Also
+           persists the mixture scale diagnostics, since a capacity that "improves" by placing
+           a component narrower than a grid cell has not improved.
 
 The `steps` part is not optional garnish. A claim that arm A generates better samples than
 arm B is worthless if the gap is an Euler-Maruyama artifact, and this is the cheapest
@@ -87,11 +102,12 @@ import numpy as np
 from common import apply_overrides, experiment_parser, provenance
 from src.bp_grid import make_grid
 from src.denoiser import bp_posterior_mean, dsm_posterior_mean, train_dsm_denoiser
-from src.em import fit_em
+from src.em import e_step_multi, fit_em
 from src.kernels import MixtureInnovationKernel
 from src.local_head import local_posterior_mean, train_local_head
 from src.priors import (GaussianAR1, GaussianMixtureAR1, LaplaceAR1, StudentTAR1,
                         UniformAR1)
+from src.protocols import PROTOCOLS, composite_groups, one_view_groups, sample_budget
 from src.reverse import reverse_sde, time_grid
 from src.sample_metrics import compare_distributions, pointwise_ladder
 from src.utils import ensure_dir, rng_for, write_csv, write_json
@@ -142,6 +158,29 @@ SETTINGS = {
     "seed_offset": 0,
     # Integrator control.
     "steps_ladder": (100, 200, 400),
+    # Fresh chains for the held-out marginal likelihood. Matches the 512 the pointwise
+    # part evaluates on, so the two parts describe the same evaluation population.
+    "heldout_chains": 512,
+    # "continuous" trains the networks log-uniformly over [t_min, t_max], matching the
+    # geometric spacing of the integration grid. "discrete" reproduces the original
+    # five-level protocol and is retained only so the two can be compared directly --
+    # the difference between them is a reportable quantity, not a setting to forget.
+    "t_schedule": "continuous",
+    # "global" fixes one parameterisation per arm for the whole trajectory, chosen on a
+    # fresh validation sample. "per_level" is the original nearest-probe switch, which makes
+    # the integrated score field discontinuous in t between two independently trained
+    # networks. Kept so the cost of the old behaviour can be measured rather than asserted.
+    "param_selection": "global",
+    # Observation protocol; see src/protocols.py. "composite" reproduces the original
+    # behaviour (every chain noised at every level, groups treated as independent) and
+    # is the default so committed outputs stay reproducible. "one_view" gives one
+    # observation per latent chain, which makes the objective the exact marginal
+    # likelihood rather than a composite one -- the distinction the review raised.
+    "protocol": "composite",
+    # Capacities compared on a paired design. Includes C=1 (a single Gaussian
+    # innovation, i.e. the correctly-specified-second-order baseline) so the
+    # contrast has a meaningful floor rather than starting at an already-rich model.
+    "paired_components": (1, 2, 4, 8, 16, 24),
 }
 
 QUICK = {
@@ -154,9 +193,11 @@ QUICK = {
     "cnn_steps": 400,
     "grid_m": 201,
     "steps_ladder": (60, 120),
+    "heldout_chains": 64,
+    "paired_components": (1, 4),
 }
 
-PARTS = ("generate", "pointwise", "steps")
+PARTS = ("generate", "pointwise", "steps", "heldout", "paired")
 
 
 # ---------------------------------------------------------------------------
@@ -277,6 +318,43 @@ def make_cnn_arm(res_eps, res_x0, better_at):
 # Fitting all four arms at one data budget
 # ---------------------------------------------------------------------------
 
+def noised_groups(A: np.ndarray, t_values, rng: np.random.Generator, protocol="composite"):
+    """Observation groups for `fit_em`, under a named protocol.
+
+    Delegates to `src.protocols`, which carries the argument in full. The short version:
+
+    ``composite`` noises every chain at every level and hands the groups to `fit_em` as if
+    they were independent latent sequences. Each marginal is correctly specified, so the
+    estimator is legitimate, but the sum is a *composite* likelihood rather than the marginal
+    likelihood of the generated dataset -- the effective sample size is the number of clean
+    chains, not that times the number of levels. This was the only behaviour available before
+    the protocol audit, so it stays the default here to keep committed outputs reproducible,
+    and `composite_groups` is bit-identical to what this function used to do inline.
+
+    ``one_view`` splits the chains disjointly across levels, one observation per latent
+    chain, which makes the objective the exact marginal likelihood.
+    """
+    if protocol == "one_view":
+        return one_view_groups(A, t_values, rng)
+    if protocol in ("composite", "multi_view"):
+        # multi_view shares this data layout; what differs is how the likelihood is
+        # assembled, which `run_heldout` handles explicitly.
+        return composite_groups(A, t_values, rng)
+    raise SystemExit(f"unknown protocol {protocol!r}; choose from {PROTOCOLS}")
+
+
+def training_data(prior, n_chains, seed, cfg):
+    """The exact chains and noisy groups `fit_arms` fits on.
+
+    Factored out so the held-out evaluation can reconstruct the training set by calling the
+    same function, rather than replaying this generator's RNG consumption order by hand --
+    which would silently diverge the first time anything upstream drew one more number.
+    """
+    rng = rng_for("exp16-fit", seed, n_chains)
+    A = sample_chains(prior, rng, n_chains, cfg["n_sites"])
+    return A, noised_groups(A, cfg["t_train"], rng, cfg["protocol"])
+
+
 def fit_arms(prior, grid, weights, n_chains, seed, cfg):
     """Fit every learned arm on the *same* N noisy chains.
 
@@ -287,15 +365,7 @@ def fit_arms(prior, grid, weights, n_chains, seed, cfg):
     recorded rather than corrected, because correcting it would depart from how each method
     is normally used.
     """
-    rng = rng_for("exp16-fit", seed, n_chains)
-    A = sample_chains(prior, rng, n_chains, cfg["n_sites"])
-
-    # --- EM arm: one noisy realisation per chain, at each training noise level.
-    groups = []
-    for t in cfg["t_train"]:
-        alpha, delta = float(np.exp(-t)), float(1.0 - np.exp(-2.0 * t))
-        X = alpha * A + np.sqrt(delta) * rng.standard_normal(A.shape)
-        groups.append((X, alpha, delta))
+    A, groups = training_data(prior, n_chains, seed, cfg)
 
     kernel, trace = fit_em(
         MixtureInnovationKernel.init(
@@ -306,16 +376,25 @@ def fit_arms(prior, grid, weights, n_chains, seed, cfg):
     )
 
     # --- Network arms, both parameterizations.
+    # Continuous-time training over the whole integration interval, not the five discrete
+    # levels in t_train. The reverse integrator calls these networks at every point of
+    # [t_min, t_max]; trained on five levels they interpolate between them and extrapolate
+    # below 0.1 and above 1.6, so the generated-sample comparison would measure that on top
+    # of the score error it exists to isolate. `t_schedule` is None only when a caller
+    # deliberately wants the legacy discrete protocol for a pointwise-only run.
+    t_range = None if cfg["t_schedule"] == "discrete" else (cfg["t_min"], cfg["t_max"])
     nets = {}
     for mode in ("eps", "x0"):
         nets[("mlp", mode)] = train_dsm_denoiser(
             A, cfg["t_train"], rng_for("exp16-mlp", seed, n_chains, mode),
             hidden=cfg["net_hidden"], n_steps=cfg["net_steps"], parameterization=mode,
+            t_range=t_range,
         )
         nets[("cnn", mode)] = train_local_head(
             A, cfg["t_train"], cfg["cnn_radius"],
             rng_for("exp16-cnn", seed, n_chains, mode),
             hidden=cfg["cnn_hidden"], n_steps=cfg["cnn_steps"], parameterization=mode,
+            t_range=t_range,
         )
 
     return kernel, nets, trace
@@ -343,8 +422,34 @@ def choose_parameterization(prior, grid, weights, nets, cfg, seed):
     return best
 
 
-def _selector(best, family, t_probe):
-    """Nearest-probed-level lookup, so the arm is defined at every integrator time."""
+def _selector(best, family, t_probe, mode="global"):
+    """Which parameterisation the arm uses at integrator time ``t``.
+
+    ``global`` picks one parameterisation for the whole trajectory, by majority over the
+    probed levels. ``per_level`` is the original nearest-probe lookup and is retained only
+    for comparison.
+
+    The per-level version is not a harmless convenience. During a reverse integration it
+    swaps between two *independently trained* networks as ``t`` crosses the midpoint between
+    probe levels, so the score field the integrator sees has jump discontinuities in ``t``
+    that belong to neither network. A generated sample then reflects an estimator nobody
+    fitted. Choosing once, on validation data, keeps the arm a single well-defined score
+    model -- which is the only thing a reverse-SDE comparison can meaningfully be about.
+    """
+    if mode not in ("global", "per_level"):
+        raise ValueError(f"Unknown parameterisation-selection mode {mode!r}.")
+
+    if mode == "global":
+        votes = [best[(family, u)] for u in t_probe]
+        # Deterministic tie-break: count descending, then lexicographic. `max(set(votes),
+        # key=votes.count)` would resolve a tie by set iteration order, which CPython salts
+        # per process for str -- the identical nondeterminism that was just removed from
+        # exp_18's seeding, and that hpc/bocconi_p0.sbatch has a dedicated job to catch.
+        # A tie is impossible with the default five probe levels and two parameterisations,
+        # but --set t_probe=... with an even count is supported and would hit it.
+        winner = sorted(set(votes), key=lambda v: (-votes.count(v), v))[0]
+        return lambda t: winner
+
     def fn(t):
         nearest = min(t_probe, key=lambda u: abs(u - t))
         return best[(family, nearest)]
@@ -374,9 +479,9 @@ def run_generate(prior, grid, weights, cfg, out_dir):
                 "exact": make_exact_arm(prior, grid, weights),
                 "em_bp": make_em_arm(kernel, grid, weights),
                 "mlp": make_network_arm(nets[("mlp", "eps")], nets[("mlp", "x0")],
-                                        _selector(best, "mlp", cfg["t_probe"])),
+                                        _selector(best, "mlp", cfg["t_probe"], cfg["param_selection"])),
                 "cnn": make_cnn_arm(nets[("cnn", "eps")], nets[("cnn", "x0")],
-                                    _selector(best, "cnn", cfg["t_probe"])),
+                                    _selector(best, "cnn", cfg["t_probe"], cfg["param_selection"])),
             }
 
             # A reference sample from the forward model -- the yardstick. Never a
@@ -445,6 +550,203 @@ def run_pointwise(prior, grid, weights, cfg, out_dir):
     return rows
 
 
+def run_heldout(prior, grid, weights, cfg, out_dir):
+    """Marginal likelihood and EM cost against innovation-mixture capacity C.
+
+    The capacity sweep measured pointwise error and generated statistics but never the two
+    quantities that decide whether more components is *justified* rather than merely better
+    on those two axes. Both were already being computed and thrown away: `fit_em` records
+    the exact marginal log-likelihood and the wall clock of every iteration in its EMTrace,
+    and `fit_arms` returns it.
+
+    Two separations matter before reading the numbers.
+
+    **Training evidence cannot fall as C grows** -- a C-component mixture contains every
+    (C-1)-component one -- so that curve carries no model-selection information at all. Only
+    the held-out curve can turn over, and whether it does is the question this part exists to
+    answer. The held-out chains are drawn fresh and noised by `noised_groups`, the same
+    construction the training set uses, so the two log-likelihoods are comparable per edge.
+
+    **Cost does not obviously scale with C.** The E-step is O(N n M^2) and does not involve C
+    anywhere; only the M-step does. So seconds per iteration should be near-flat in C, and a
+    rise would mean the M-step dominates -- which would change the cost statement in the
+    note rather than decorate it.
+
+    The training evidence here is recomputed at the *returned* kernel. `fit_em` appends
+    log_evidence before each M-step, so `trace.log_evidence[-1]` belongs to the parameters
+    one M-step behind the kernel that is actually reported; comparing that against a
+    held-out number evaluated at the final kernel would compare two different models.
+    """
+    rows, trace_rows = [], []
+    n_comp = cfg["em_components"]
+    # rho (1) + weights (C, one simplex constraint) + locations (C) + scales (C).
+    n_params = 3 * n_comp
+
+    for n_chains in cfg["sizes"]:
+        for seed in range(cfg["seed_offset"], cfg["seed_offset"] + cfg["n_seed"]):
+            kernel, _, trace = fit_arms(prior, grid, weights, n_chains, seed, cfg)
+
+            for it, (le, sec) in enumerate(zip(trace.log_evidence, trace.seconds)):
+                trace_rows.append({
+                    "n_components": n_comp, "n_chains": n_chains, "seed": seed,
+                    "iter": it, "log_evidence": le, "seconds": sec,
+                })
+
+            log_k = kernel.log_transition_matrix(grid)
+            _, train_groups = training_data(prior, n_chains, seed, cfg)
+            train = e_step_multi(grid, weights, log_k, train_groups)
+
+            rng = rng_for("exp16-heldout", seed, n_chains)
+            A_new = sample_chains(prior, rng, cfg["heldout_chains"], cfg["n_sites"])
+            held = e_step_multi(
+                grid, weights, log_k, noised_groups(A_new, cfg["t_train"], rng)
+            )
+
+            rows.append({
+                "n_components": n_comp,
+                "n_chains": n_chains,
+                "seed": seed,
+                "n_params": n_params,
+                "n_iters": len(trace.log_evidence),
+                "monotone_violation": trace.monotone_violation,
+                "train_log_evidence": train.log_evidence,
+                "train_log_evidence_per_edge": train.log_evidence / train.n_edges,
+                "train_edges": train.n_edges,
+                "heldout_log_evidence": held.log_evidence,
+                "heldout_log_evidence_per_edge": held.log_evidence / held.n_edges,
+                "heldout_edges": held.n_edges,
+                "bic": -2.0 * train.log_evidence + n_params * float(np.log(train.n_edges)),
+                "em_seconds_total": float(np.sum(trace.seconds)),
+                "em_seconds_per_iter": float(np.mean(trace.seconds)),
+                "fitted_rho": float(kernel.rho),
+                **kernel.innovation_moments,
+                **sample_budget(cfg["protocol"], n_chains, cfg["n_sites"],
+                                len(cfg["t_train"])),
+                # Whether the fitted mixture is resolved by the grid. The C=12->16
+                # improvement cannot be read as real while the narrowest component is
+                # narrower than a cell.
+                **kernel.scale_diagnostics(grid),
+            })
+            print(f"  C={n_comp:2d} N={n_chains:5d} seed={seed} "
+                  f"train/edge={rows[-1]['train_log_evidence_per_edge']:+.5f} "
+                  f"held/edge={rows[-1]['heldout_log_evidence_per_edge']:+.5f}  "
+                  f"{rows[-1]['em_seconds_per_iter']:.2f}s/iter  "
+                  f"viol={trace.monotone_violation:.2e}", flush=True)
+
+    write_csv(out_dir / "em_trace.csv", trace_rows)
+    write_csv(out_dir / "heldout_evidence.csv", rows)
+    return rows
+
+
+def run_paired(prior, grid, weights, cfg, out_dir):
+    """Capacity and data budget on a **paired** design, with intervals on differences.
+
+    The capacity sweep so far reports separate medians at each C over three seeds, and the
+    C = 12 -> 16 improvement it shows is smaller than the spread between seeds. Separate
+    medians cannot settle that: most of the variance is the training draw, and it is shared
+    between capacities, so comparing marginal summaries throws away exactly the pairing that
+    would make the difference visible.
+
+    Here every capacity is fitted on the **same** training set within a (budget, seed) cell
+    and evaluated on the **same** held-out bundle, so the per-cell difference between two
+    capacities is a within-dataset contrast. The standard error of the mean difference is
+    then what says whether C = 16 beats C = 12, and it is typically far smaller than the
+    standard error of either arm alone.
+
+    Also persists, per fit, the quantities the audit asked for and that decide whether a
+    small gain is real: the fitted mixture's minimum component scale relative to the grid
+    spacing, its effective component count, and its column-mass residual. A capacity that
+    "improves" by placing a component narrower than a grid cell has not improved.
+    """
+    rows = []
+    t_eval = cfg["t_probe"]
+
+    for n_chains in cfg["sizes"]:
+        for seed in range(cfg["seed_offset"], cfg["seed_offset"] + cfg["n_seed"]):
+            # One training set and one evaluation set per cell, shared by every capacity.
+            A, groups = training_data(prior, n_chains, seed, cfg)
+            rng_e = rng_for("exp16-paired-eval", seed, n_chains)
+            A_eval = sample_chains(prior, rng_e, cfg["heldout_chains"], cfg["n_sites"])
+
+            bundles = {}
+            for t in t_eval:
+                alpha, delta = float(np.exp(-t)), float(1.0 - np.exp(-2.0 * t))
+                X = alpha * A_eval + np.sqrt(delta) * rng_e.standard_normal(A_eval.shape)
+                bundles[t] = (X, alpha, delta,
+                              bp_posterior_mean(prior, grid, weights, X, t))
+
+            for n_comp in cfg["paired_components"]:
+                kernel, trace = fit_em(
+                    MixtureInnovationKernel.init(
+                        n_comp, rho=0.3, var=0.8,
+                        rng=rng_for("exp16-paired-init", seed, n_chains, n_comp),
+                    ),
+                    grid, weights, groups, n_iters=cfg["em_iters"],
+                )
+                log_k = kernel.log_transition_matrix(grid)
+                held = e_step_multi(
+                    grid, weights, log_k,
+                    noised_groups(A_eval, cfg["t_train"],
+                                  rng_for("exp16-paired-held", seed, n_chains),
+                                  cfg["protocol"]),
+                )
+
+                for t in t_eval:
+                    X, alpha, delta, m_star = bundles[t]
+                    m_hat = bp_posterior_mean(kernel, grid, weights, X, t)
+                    rows.append({
+                        "n_chains": n_chains,
+                        "seed": seed,
+                        "n_components": n_comp,
+                        "t": t,
+                        "mse_vs_bayes": float(np.mean((m_hat - m_star) ** 2)),
+                        "heldout_log_evidence_per_edge":
+                            held.log_evidence / held.n_edges,
+                        "em_seconds_total": float(np.sum(trace.seconds)),
+                        "fitted_rho": float(kernel.rho),
+                        **kernel.innovation_moments,
+                        **kernel.scale_diagnostics(grid),
+                    })
+                print(f"  N={n_chains:5d} seed={seed} C={n_comp:2d} "
+                      f"held/edge={rows[-1]['heldout_log_evidence_per_edge']:+.6f} "
+                      f"s_min/h={rows[-1]['s_min_over_h']:.2f} "
+                      f"eff_C={rows[-1]['effective_n_components']:.2f}", flush=True)
+
+    write_csv(out_dir / "paired_capacity.csv", rows)
+
+    # Paired contrasts against the smallest capacity, with a standard error over cells.
+    base = min(cfg["paired_components"])
+    contrasts = []
+    for n_chains in cfg["sizes"]:
+        for n_comp in cfg["paired_components"]:
+            if n_comp == base:
+                continue
+            diffs = []
+            for seed in range(cfg["seed_offset"], cfg["seed_offset"] + cfg["n_seed"]):
+                def pick(c):
+                    v = [r["mse_vs_bayes"] for r in rows
+                         if r["n_chains"] == n_chains and r["seed"] == seed
+                         and r["n_components"] == c]
+                    return float(np.mean(v)) if v else np.nan
+                diffs.append(pick(n_comp) - pick(base))
+            d = np.asarray(diffs, dtype=float)
+            n = len(d)
+            contrasts.append({
+                "n_chains": n_chains,
+                "n_components": n_comp,
+                "baseline_components": base,
+                "n_pairs": n,
+                "mean_paired_diff": float(np.mean(d)),
+                "se_paired_diff": float(np.std(d, ddof=1) / np.sqrt(n)) if n > 1 else np.nan,
+                # Negative and beyond two standard errors means the extra capacity helped.
+                "significant": bool(
+                    n > 1 and abs(np.mean(d)) > 2.0 * np.std(d, ddof=1) / np.sqrt(n)
+                ),
+            })
+    write_csv(out_dir / "paired_contrasts.csv", contrasts)
+    return rows
+
+
 def run_steps(prior, grid, weights, cfg, out_dir):
     """Integrator control: does the ranking survive a change of step size?
 
@@ -464,9 +766,9 @@ def run_steps(prior, grid, weights, cfg, out_dir):
         "exact": make_exact_arm(prior, grid, weights),
         "em_bp": make_em_arm(kernel, grid, weights),
         "mlp": make_network_arm(nets[("mlp", "eps")], nets[("mlp", "x0")],
-                                _selector(best, "mlp", cfg["t_probe"])),
+                                _selector(best, "mlp", cfg["t_probe"], cfg["param_selection"])),
         "cnn": make_cnn_arm(nets[("cnn", "eps")], nets[("cnn", "x0")],
-                            _selector(best, "cnn", cfg["t_probe"])),
+                            _selector(best, "cnn", cfg["t_probe"], cfg["param_selection"])),
     }
     a_ref = reference_at(prior, rng_for("exp16-ref", 0), cfg["n_generate"], n, cfg["t_min"])
 
@@ -528,6 +830,10 @@ def main() -> None:
             run_pointwise(prior, grid, weights, cfg, out_dir)
         elif part == "steps":
             run_steps(prior, grid, weights, cfg, out_dir)
+        elif part == "heldout":
+            run_heldout(prior, grid, weights, cfg, out_dir)
+        elif part == "paired":
+            run_paired(prior, grid, weights, cfg, out_dir)
 
     write_json(out_dir / f"params_{'_'.join(parts)}.json",
                {"settings": cfg, "parts": list(parts), **provenance()})

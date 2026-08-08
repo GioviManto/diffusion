@@ -6,15 +6,18 @@ generated from committed data rather than from numbers typed out of prose.
 1. ``boundary`` -- truncation diagnostic.
    The note previously carried a [pending] marker here: the boundary mass was
    computed inside the recursion and thrown away, so no aggregate could be
-   quoted. We recompute it explicitly. For each (t, A, N_g) we run one forward
-   pass and record the fraction of each normalised message that sits in the two
-   edge cells of the grid, taking the worst case over sites. This is the
-   quantity that bounds the truncation error: mass that leaves [-A, A] is
-   discarded rather than transported.
+   quoted. For each (t, A, N_g) we run a forward pass over a batch of chains and
+   record the fraction of each normalised message sitting in the two edge cells
+   of the grid, taking the worst case over sites within a chain and then the
+   maximum and upper quantiles over chains. This is an *empirical diagnostic* of
+   how much mass approaches the truncation boundary, not a bound on the
+   truncation error -- a distinction the first version of this file got wrong in
+   both directions, by quoting one sampled trajectory and calling it a bound.
 
-   Reported alongside it is the normalisation residual |1 - \\int b| of the
-   single-site beliefs, which is the other half of the same story: quadrature
-   error at fixed support.
+   Reported alongside it, and carrying most of the weight, is the quadrature mass
+   of the kernel's own columns. That quantity involves no sample at all, and its
+   split into edge and interior columns is what separates truncation (responds to
+   A) from quadrature (responds to the spacing).
 
 2. ``emtrace`` -- per-iteration marginal log-likelihood.
    ``outputs/exp_06/monotonicity.csv`` records only the first and last value, so
@@ -47,8 +50,9 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from src.bp_grid import make_grid  # noqa: E402
 from src.em import fit_em  # noqa: E402
 from src.kernels import MixtureInnovationKernel  # noqa: E402
-from src.noising import alpha_delta, log_likelihood_matrix  # noqa: E402
+from src.noising import alpha_delta  # noqa: E402
 from src.priors import LaplaceAR1  # noqa: E402
+from src.utils import rng_for  # noqa: E402
 
 OUT = Path(__file__).resolve().parents[1] / "outputs" / "exp_18"
 
@@ -56,9 +60,24 @@ RHO = 0.85
 N_SITES = 32
 T_VALUES = (0.02, 0.05, 0.1, 0.2, 0.4, 0.8, 1.6)
 
+# Chains per (t, A, N_g) cell for the forward-message edge-mass diagnostic. One trajectory
+# cannot characterise a distribution over trajectories, and the quantity is a max over sites
+# of a sampled path -- exactly the sort of statistic a single draw understates.
+BOUNDARY_CHAINS = 256
 
-def _rng(*tag) -> np.random.Generator:
-    return np.random.default_rng(abs(hash(("exp18",) + tag)) % (2**32))
+# Seeding note. This module previously used
+#
+#     np.random.default_rng(abs(hash(("exp18",) + tag)) % (2 ** 32))
+#
+# which is not reproducible across processes: Python salts `hash` for str and bytes unless
+# PYTHONHASHSEED is fixed. `utils.rng_for` exists precisely because that class of
+# nondeterminism was removed from this project once already, and its docstring says so. All
+# outputs under `outputs/exp_18/` produced before this change must be regenerated.
+#
+# What the bug did *not* invalidate: the kernel column-mass residuals below are pure
+# functions of (prior, A, N_g) with no sample entering them, so the truncation-versus-
+# quadrature separation they carry is unaffected. Only the edge-mass column was ever
+# sample-dependent.
 
 
 # ---------------------------------------------------------------------------
@@ -66,49 +85,71 @@ def _rng(*tag) -> np.random.Generator:
 # ---------------------------------------------------------------------------
 
 def part_boundary() -> None:
-    """Boundary mass and normalisation residual over (t, A, N_g)."""
+    """Boundary mass and normalisation residual over (t, A, N_g).
+
+    Two quantities with different epistemic status, which the previous version ran together
+    and the write-up then conflated.
+
+    The **kernel column-mass residuals** are pure functions of ``(prior, A, N_g)``: no sample
+    enters them at all. They are what separates truncation from quadrature, and they are
+    deterministic, so they need no replication and were never affected by the seeding defect.
+
+    The **forward-message edge mass** does depend on the observations, and it is a maximum
+    over sites of a sampled trajectory -- a statistic a single draw systematically
+    understates. It is therefore an *empirical diagnostic* over ``BOUNDARY_CHAINS`` chains,
+    reported as a maximum and upper quantiles, not a bound. Calling one trajectory's value a
+    truncation bound, as the earlier comment did, was wrong twice over: not a bound, and not
+    a sample.
+    """
     prior = LaplaceAR1(RHO)
     rows = []
+    edge_sel = None
     for half_width in (4.0, 6.0, 8.0, 10.0):
         for n_grid in (201, 401, 801):
             grid, weights = make_grid(half_width, n_grid)
-            log_k = prior.log_transition_matrix(grid)
-            K = np.exp(log_k)
+            K = np.exp(prior.log_transition_matrix(grid))
+
+            # Deterministic, sample-free: computed once per (A, N_g). The maximum over all
+            # columns is attained at the edge, where the transition density is centred at
+            # rho*(+/-A) and its tail leaves the grid -- truncation, responding to A, not
+            # N_g. Restricting to interior columns (|u| <= A/2) removes the truncated tail,
+            # so what remains is quadrature, responding to the spacing.
+            col_mass = (K * weights[:, None]).sum(axis=0)
+            interior = np.abs(grid) <= 0.5 * half_width
+            resid = float(np.max(np.abs(col_mass - 1.0)))
+            resid_interior = float(np.max(np.abs(col_mass[interior] - 1.0)))
+
+            edge_sel = np.zeros(len(grid), dtype=bool)
+            edge_sel[0] = edge_sel[-1] = True
+            log_mu0 = np.exp(-0.5 * grid**2 - 0.5 * np.log(2.0 * np.pi))
+
             for t in T_VALUES:
                 alpha, delta = alpha_delta(t)
-                rng = _rng("boundary", t, half_width, n_grid)
-                a = prior.sample(rng, N_SITES)
-                x = alpha * a + np.sqrt(delta) * rng.standard_normal(N_SITES)
-                log_ell = log_likelihood_matrix(grid, x, alpha, delta)
+                rng = rng_for("exp18", "boundary", t, half_width, n_grid)
+                A = np.stack(
+                    [prior.sample(rng, N_SITES) for _ in range(BOUNDARY_CHAINS)]
+                )
+                X = alpha * A + np.sqrt(delta) * rng.standard_normal(A.shape)
+
+                # (B, n, M) likelihood, row-shifted per (chain, site) for conditioning.
+                z = X[:, :, None] - alpha * grid[None, None, :]
+                log_ell = -0.5 * z**2 / delta
+                log_ell -= log_ell.max(axis=2, keepdims=True)
                 ell = np.exp(log_ell)
 
-                # Forward sweep, recording the edge-cell mass of every message.
-                edge = np.zeros(len(grid), dtype=bool)
-                edge[0] = edge[-1] = True
-                worst_edge = 0.0
-                L = np.exp(-0.5 * grid**2 - 0.5 * np.log(2.0 * np.pi))
+                # Forward sweep over the whole batch, recording each chain's worst
+                # edge-cell mass across sites.
+                L = np.tile(log_mu0, (BOUNDARY_CHAINS, 1))
+                worst = np.zeros(BOUNDARY_CHAINS)
                 for i in range(N_SITES - 1):
-                    incoming = L * ell[i] * weights
-                    out = K @ incoming
-                    mass = float(np.sum(out * weights))
-                    L = out / mass
-                    dens = L * weights
-                    worst_edge = max(worst_edge, float(dens[edge].sum() / dens.sum()))
-
-                # Beliefs are renormalised by construction, so their normalisation
-                # carries no information. The informative quantity is the quadrature
-                # of the kernel itself: each column of K should integrate to one.
-                #
-                # Two residuals, because they measure different things. The maximum
-                # over all columns is attained at the edge, where the transition
-                # density is centred at rho*(+/-A) and its tail leaves the grid --
-                # that is truncation, and it responds to A, not to N_g. The maximum
-                # over interior columns (|u| <= A/2) has no truncated tail, so what
-                # remains is quadrature, and it responds to the spacing.
-                col_mass = (K * weights[:, None]).sum(axis=0)
-                interior = np.abs(grid) <= 0.5 * half_width
-                resid = float(np.max(np.abs(col_mass - 1.0)))
-                resid_interior = float(np.max(np.abs(col_mass[interior] - 1.0)))
+                    incoming = L * ell[:, i, :] * weights[None, :]
+                    out = incoming @ K.T
+                    out = out / (out @ weights)[:, None]
+                    dens = out * weights[None, :]
+                    worst = np.maximum(
+                        worst, dens[:, edge_sel].sum(axis=1) / dens.sum(axis=1)
+                    )
+                    L = out
 
                 rows.append(
                     {
@@ -116,15 +157,19 @@ def part_boundary() -> None:
                         "half_width": half_width,
                         "n_grid": n_grid,
                         "spacing": float(grid[1] - grid[0]),
-                        "worst_boundary_mass": worst_edge,
+                        "n_chains": BOUNDARY_CHAINS,
+                        "boundary_mass_max": float(worst.max()),
+                        "boundary_mass_p99": float(np.quantile(worst, 0.99)),
+                        "boundary_mass_p90": float(np.quantile(worst, 0.90)),
+                        "boundary_mass_median": float(np.median(worst)),
                         "kernel_norm_residual_max": resid,
                         "kernel_norm_residual_interior": resid_interior,
                     }
                 )
                 print(
                     f"A={half_width:>5} Ng={n_grid:>4} t={t:<5} "
-                    f"boundary={worst_edge:.3e} resid_max={resid:.3e} "
-                    f"resid_int={resid_interior:.3e}"
+                    f"edge_max={worst.max():.3e} edge_p90={np.quantile(worst, 0.9):.3e} "
+                    f"resid_max={resid:.3e} resid_int={resid_interior:.3e}"
                 )
     _write_csv(OUT / "boundary.csv", rows)
 
@@ -140,7 +185,7 @@ def part_emtrace() -> None:
     rows = []
     n_chains, t_train = 512, (0.1, 0.2, 0.4, 0.8, 1.6)
 
-    rng = _rng("emtrace", "data")
+    rng = rng_for("exp18", "emtrace", "data")
     A = np.stack([prior.sample(rng, N_SITES) for _ in range(n_chains)])
     groups = []
     for t in t_train:
@@ -151,7 +196,7 @@ def part_emtrace() -> None:
     for n_comp in (4, 8):
         for init_id, rho0 in enumerate((0.0, 0.3, 0.6, -0.4)):
             kernel = MixtureInnovationKernel.init(
-                n_comp, rho=rho0, var=0.8, rng=_rng("emtrace", n_comp, init_id)
+                n_comp, rho=rho0, var=0.8, rng=rng_for("exp18", "emtrace", n_comp, init_id)
             )
             fitted, trace = fit_em(kernel, grid, weights, groups, n_iters=60)
             mom = fitted.innovation_moments
@@ -193,7 +238,7 @@ def part_density() -> None:
 
     for n_chains in (128, 512, 2048):
         for n_comp in (4, 8):
-            rng = _rng("density", n_chains, n_comp)
+            rng = rng_for("exp18", "density", n_chains, n_comp)
             A = np.stack([prior.sample(rng, N_SITES) for _ in range(n_chains)])
             groups = []
             for t in (0.1, 0.2, 0.4, 0.8, 1.6):
@@ -201,7 +246,7 @@ def part_density() -> None:
                 X = alpha * A + np.sqrt(delta) * rng.standard_normal(A.shape)
                 groups.append((X, alpha, delta))
             kernel = MixtureInnovationKernel.init(
-                n_comp, rho=0.3, var=0.8, rng=_rng("density", "init", n_chains, n_comp)
+                n_comp, rho=0.3, var=0.8, rng=rng_for("exp18", "density", "init", n_chains, n_comp)
             )
             fitted, trace = fit_em(kernel, grid, weights, groups, n_iters=60)
 
@@ -256,11 +301,25 @@ PARTS = {"boundary": part_boundary, "emtrace": part_emtrace, "density": part_den
 
 
 def main() -> None:
+    global OUT
     import argparse
 
     ap = argparse.ArgumentParser()
     ap.add_argument("--parts", default="boundary,emtrace,density")
+    ap.add_argument(
+        "--out",
+        type=Path,
+        default=None,
+        help=(
+            "Output directory (default outputs/exp_18). Needed by the determinism check, "
+            "which runs this module twice under different PYTHONHASHSEED values and diffs "
+            "the results -- the failure mode of the old seeding was precisely that two "
+            "processes disagreed, so it cannot be demonstrated from a single directory."
+        ),
+    )
     args = ap.parse_args()
+    if args.out is not None:
+        OUT = args.out
     OUT.mkdir(parents=True, exist_ok=True)
     chosen = [p.strip() for p in args.parts.split(",") if p.strip()]
     for name in chosen:
