@@ -349,10 +349,35 @@ and a usable reverse sampler.
 
 ## 7. What "exact" does and does not buy — the honest counterweight
 
-The inference is exact. **The model is not the truth.** The wavelet HMT asserts
-that coefficients form a Markov tree across scale with no within-scale spatial
-edges — and real images certainly have within-scale spatial correlation, which
-this model omits by construction.
+**Look at the samples first** (`outputs/exp_25_wavelet_generation/samples.png`).
+They are *texture*, not objects. Nothing in a wavelet HMT sample resembles a
+frog, a truck or an aeroplane, and no amount of further training will change
+that. This is not a bug and not an undertrained model — it is the model class.
+
+The reason is exactly the structure that buys exactness. Within a subband, the
+4ᵈ coefficients at depth *d* are **conditionally independent given their
+parents**: there are no within-scale spatial edges, because adding them would
+close a loop and destroy the tree. So the model can reproduce the *marginal* and
+*cross-scale* statistics of natural images — which is what it is being asked to
+do — while having no mechanism whatever for spatial coherence within a scale.
+Objects live in precisely that missing structure.
+
+Consequences to state before anyone asks:
+
+- **FID/IS on these samples would be catastrophic and uninformative.** They would
+  report "not photographs", which is visible for free. This *strengthens* the
+  metric argument of §8 rather than weakening it, but it also caps the claim: the
+  contribution is about exact inference and learned coefficient structure, not
+  about competitive image synthesis, and it must not be written as if it were.
+- The visible difference between the rows is still real and in the predicted
+  direction: the scale-mixture row has visibly more large-scale blob structure
+  than the Gaussian and linear-AR rows, which is the magnitude dependence of
+  §6.1 showing up as coherent bright and dark regions.
+
+So the inference is exact. **The model is not the truth.** The wavelet HMT
+asserts that coefficients form a Markov tree across scale with no within-scale
+spatial edges — and real images certainly have within-scale spatial correlation,
+which this model omits by construction.
 
 So the correct statement is: *exact inference in an approximate model of images*,
 where previously the project had *exact inference in an exact model of simulated
