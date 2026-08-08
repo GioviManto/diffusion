@@ -2,14 +2,15 @@
   "settings": {
     "archive": "data/cifar-10-python.tar.gz",
     "levels": 5,
-    "n_train": 200,
-    "n_test": 200,
+    "n_train": 600,
+    "n_test": 1000,
     "t_train": [
-      0.5
+      0.4,
+      0.9
     ],
     "t_likelihood": 0.05,
-    "n_iters": 4,
-    "grid_size": 161,
+    "n_iters": 12,
+    "grid_size": 241,
     "half_width": 8.0,
     "n_components": 4,
     "families": [
@@ -17,17 +18,20 @@
       "mixture",
       "scale_mixture"
     ],
-    "n_generate": 400,
-    "n_reverse": 8,
-    "reverse_steps": 30,
+    "n_generate": 3000,
+    "n_reverse": 48,
+    "reverse_steps": 100,
     "chunk": 64,
     "seed": 0
   },
   "parts": [
-    "fit"
+    "fit",
+    "generate",
+    "sampler",
+    "grid"
   ],
   "provenance": {
-    "timestamp": "2026-08-08 12:44:20",
+    "timestamp": "2026-08-08 15:44:48",
     "python": "3.12.5",
     "numpy": "2.4.2",
     "platform": "macOS-14.1.1-arm64-arm-64bit",

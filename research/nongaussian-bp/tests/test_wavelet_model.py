@@ -101,6 +101,35 @@ def test_gaussian_control_recovers_per_level_rho_and_ascends():
 
 
 @pytest.mark.slow
+def test_reverse_samples_agree_with_ancestral_samples():
+    """Reverse diffusion and ancestral sampling target the same distribution.
+
+    This is the regression test for a real bug: `sample_reverse` used to return
+    `x(t_min)` rather than the posterior-mean readout. Because `t_min` is floored
+    at the grid-resolved t -- around 0.9 for natural-image subband scales, where
+    Delta_t is still ~0.8 -- the returned samples carried most of a unit of noise,
+    and comparing them against clean ancestral samples showed standard-deviation
+    gaps of 2 and worse. The gap was entirely the un-removed noise.
+    """
+    rng = rng_for("wavelet-model-reverse")
+    qt, images, _ = _make_images(rng, 300)
+    model, _ = fit_wavelet_tree(
+        images, levels=LEVELS, t_train=[0.4],
+        kernel_factory=lambda d, r: GaussianAR1Kernel(rho=0.3, q=0.6),
+        n_iters=10, half_width=8.0, grid_size=241, chunk=64,
+    )
+
+    anc = model.sample_ancestral(600, rng)
+    rev = model.sample_reverse(48, rng, n_steps=60, t_max=3.0, chunk=48)
+
+    assert np.all(np.isfinite(rev))
+    # Pixel-level spread must match to well within the ~10% sampling error of
+    # 48 samples; before the fix this ratio was off by a factor of order 2.
+    ratio = float(rev.std() / anc.std())
+    assert 0.8 < ratio < 1.25, f"reverse/ancestral pixel std ratio {ratio:.3f}"
+
+
+@pytest.mark.slow
 def test_denoising_beats_the_observation_and_likelihood_is_finite():
     rng = rng_for("wavelet-model-denoise")
     qt, images, _ = _make_images(rng, 200)

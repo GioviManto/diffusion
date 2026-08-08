@@ -119,6 +119,16 @@ Every number below is a test in `tests/test_wavelet*.py`, run on this machine.
 | **Gaussian control**: per-level ρ recovered (0.75/0.60/0.45) | max error < 0.05 |
 | EM monotone ascent (tree, per-level kernels) | violation 0 |
 
+> On the innovation variance `q`, the control is looser than on ρ and the reason
+> was checked rather than assumed. Refining the grid from M = 241 to M = 481
+> leaves the fitted `q` **bit-identical**, so the residual (0.099 at 400 images,
+> 0.077 at 1600) is not discretisation. It shrinks with data but more slowly than
+> Monte Carlo alone would predict, and the fitted values sit between the truth
+> and the initialisation — consistent with incomplete EM convergence at ten
+> iterations, and with the project's own finding that Fisher information for the
+> innovation *variance* falls 142× under the channel against 26× for the
+> correlation. Not fully attributed; the tolerance reflects that.
+
 The dense-solve check is the load-bearing one: it builds the prior covariance
 from the generative recursion itself (`a = M ε` by forward substitution), so an
 index or sign error in the tree bookkeeping cannot cancel against the same error
@@ -282,17 +292,35 @@ than asserted.
 They target the *same* distribution, so a gap between them is sampler
 discretisation and not model error. That is the point of having both.
 
-At smoke scale (200 images, 4 EM iterations — **not** converged, so directional
-only) the predicted failure shows up cleanly in what the models *generate*:
+### The comparison, at size
 
-| family | mean magnitude excess generated | real held-out |
-|---|---|---|
-| mixture (linear-AR) | **0.005** | 0.920 |
-| scale mixture | 0.190 | 0.920 |
+600 training images, 12 EM iterations, M = 241, **3 000 generated** samples
+against **1 000 held-out real** images. Monotone violation 0 for all three
+families. `outputs/exp_25_wavelet_generation/`.
 
-The linear-AR family generates essentially **zero** cross-scale magnitude
-dependence — it is structurally incapable, exactly as §6 predicts. The scale
-mixture generates some but far from enough at this training budget.
+| family | held-out loglik/image | subband kurtosis gap | **magnitude excess generated** |
+|---|---|---|---|
+| Gaussian tree | −1076.31 | 3.119 | **0.002** |
+| mixture (linear-AR) | −1071.91 | 2.751 | **0.010** |
+| **scale mixture** | **−1063.73** | **1.413** | **0.261** |
+| *real held-out* | — | *0* | *1.030* |
+
+Three things, in order of how much they matter.
+
+1. **Both linear-AR families generate essentially zero cross-scale magnitude
+   dependence** — 0.002 and 0.010 against a real 1.030. This is the prediction of
+   §6 confirmed on real data at size, and it is a *structural* zero, not a
+   training failure: their conditional variance cannot depend on the parent, so
+   no amount of data or capacity moves this number.
+2. **The scale mixture recovers a quarter of it** (0.261) and halves the subband
+   kurtosis gap (1.413 against 2.751). Clearly the right family, clearly not yet
+   enough — at C = 4 components, 600 images and 12 iterations, and with the
+   likelihood only evaluable at t = 0.889, none of those is the obvious binding
+   constraint. Untangling which is the next measurement, not a claim.
+3. **Held-out likelihood orders the three the same way**, scale mixture leading
+   the Gaussian closure by 12.6 nats/image. Note the ordering is the same on a
+   metric that never looks at samples and one that only looks at samples, which
+   is worth more than either alone.
 
 ---
 

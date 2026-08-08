@@ -304,7 +304,9 @@ class WaveletTreeModel:
         `sample_ancestral` in distribution, and where it does not, the gap is the
         sampler's discretisation rather than the model's.
         """
-        from .reverse import probability_flow_ode, reverse_sde, time_grid
+        from .reverse import (
+            denoising_readout, probability_flow_ode, reverse_sde, time_grid,
+        )
 
         # Never integrate below the resolved t: past it the coarse subbands'
         # likelihood is narrower than a grid cell and the score is not merely
@@ -325,8 +327,18 @@ class WaveletTreeModel:
             return self.score_images(z, float(t), chunk=chunk)
 
         if ode:
-            return probability_flow_ode(x, score_fn, times, heun=False)
-        return reverse_sde(x, score_fn, times, rng)
+            x = probability_flow_ode(x, score_fn, times, heun=False)
+        else:
+            x = reverse_sde(x, score_fn, times, rng)
+
+        # Read out the posterior mean rather than x(t_min). This is not a
+        # cosmetic choice here: `t_min` is floored at the resolved t, which for a
+        # natural-image subband set is around 0.9, and x(t_min) still carries
+        # Delta_t ~ 0.83 of noise. Comparing *that* against an ancestral sample
+        # compares a noisy variable with a clean one, and the disagreement is
+        # entirely the noise. The readout is exact for a BP score because the
+        # score is built from the posterior mean in the first place.
+        return denoising_readout(x, score_fn(x, t_min), t_min)
 
     def log_likelihood_images(self, images: np.ndarray, t: float, chunk: int = 32) -> float:
         """Exact log p_t(x) for a batch of images, in *pixel* coordinates.
