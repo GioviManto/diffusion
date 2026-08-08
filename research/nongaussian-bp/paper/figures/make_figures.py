@@ -279,15 +279,27 @@ def fig_grid_domain() -> None:
     ax[1].set_title("(b) domain")
     ax[1].legend()
 
-    # (c) truncation: mass that leaves the grid, worst case over 32 sites.
-    by_a = defaultdict(list)
+    # (c) truncation: mass approaching the grid edge, over a sample of chains.
+    #
+    # This panel used to plot `worst_boundary_mass`, a single sampled trajectory's worst site,
+    # and label it a bound. It was neither: not a bound, and not a sample. The diagnostic now
+    # runs 256 chains per cell, so the maximum and the 90th percentile are both available and
+    # both plotted -- the gap between them is the point, since the old single-draw number sat
+    # near the *median* while the maximum is some two orders of magnitude higher.
+    by_a_max = defaultdict(list)
+    by_a_p90 = defaultdict(list)
     for r in bnd:
-        by_a[float(r["half_width"])].append(float(r["worst_boundary_mass"]))
-    a_vals = sorted(by_a)
-    ax[2].semilogy(a_vals, [max(by_a[a]) for a in a_vals], color="#222222", marker="o")
+        by_a_max[float(r["half_width"])].append(float(r["boundary_mass_max"]))
+        by_a_p90[float(r["half_width"])].append(float(r["boundary_mass_p90"]))
+    a_vals = sorted(by_a_max)
+    ax[2].semilogy(a_vals, [max(by_a_max[a]) for a in a_vals],
+                   color="#222222", marker="o", label="max over chains")
+    ax[2].semilogy(a_vals, [max(by_a_p90[a]) for a in a_vals],
+                   color="#888888", marker="s", ls="--", label="90th percentile")
     ax[2].set_xlabel(r"half-width $A$")
-    ax[2].set_ylabel("worst boundary mass")
+    ax[2].set_ylabel("edge-cell mass")
     ax[2].set_title("(c) truncation")
+    ax[2].legend(fontsize=6)
 
     # (d) quadrature: interior column-normalisation residual against spacing.
     by_h = defaultdict(list)

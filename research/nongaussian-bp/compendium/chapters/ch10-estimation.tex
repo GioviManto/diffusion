@@ -222,10 +222,20 @@ $\kernel$ is pinned down only there. We assume these rather than prove them.
 \begin{intuition}
 Injective is not the same as stable. This is Gaussian deconvolution, whose inverse is
 unbounded, so identifiability survives at any finite $t$ while the \emph{information} degrades
-rapidly --- and unevenly. Measured per sequence, the Fisher information for the innovation
-scale falls by a factor $142$ between $t=0.05$ and $t=1.6$, while that for the correlation falls
-by $26$. The higher-order structure is roughly five times more fragile under the channel than
-the second-order structure, which is exactly the structure this project cares about.
+rapidly --- and unevenly. Measuring that unevenness needs care about what is being compared. In
+the Gaussian model with parameters $(\rho, q)$ the innovation \emph{scale} $q$ falls by a factor
+$142$ between $t=0.05$ and $t=1.6$ while the correlation falls by $26$, but both of those are
+second-order quantities: $q$ is a scale, not a shape, so the ratio says nothing about
+higher-order structure.
+
+A genuine shape coordinate is needed. On a generalised-Gaussian innovation
+$\varphi_\beta(e)\propto\exp(-(|e|/s)^\beta)$ with $s$ chosen so the variance is exactly $q$,
+$\beta$ moves the fourth moment at fixed second moment. Reporting the \emph{efficient}
+information for each coordinate --- projecting out the other two, since the diagonal ignores
+their coupling --- the decay across the same range is $56$--$87$ for the correlation,
+$235$--$522$ for the variance and $8.7\times10^3$--$6.8\times10^4$ for the shape. Higher-order
+structure is therefore not five times more fragile but $112$ to $1222$ times, which is exactly
+the structure this project cares about.
 \end{intuition}
 
 \begin{codebox}

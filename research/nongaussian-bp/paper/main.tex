@@ -284,10 +284,17 @@ trapezoidal rule is second order in $\gridh$ for integrands with bounded second 
 $\innov(e)\propto e^{-|e|/b}$ has a discontinuous derivative at the origin, so we claim no
 better than second order for the Laplace family and no spectral accuracy for it.
 
-Figure~\ref{fig:grid} measures both. Panel (c) reports the worst boundary mass over all $32$
-sites of a forward sweep: it falls from $3\times10^{-4}$ at $\halfwidth=4$ to
-$1.4\times10^{-8}$ at $\halfwidth=8$ and $1.4\times10^{-10}$ at $\halfwidth=10$, and is
-essentially independent of $\ngrid$ --- truncation responds to the domain, not the resolution.
+Figure~\ref{fig:grid} measures both. Panel (c) reports the edge-cell mass of the forward
+messages, taken as the worst site within a chain and then summarised over $256$ chains per
+configuration. This is an \emph{empirical diagnostic} of how much mass approaches the truncation
+boundary, not a bound on the truncation error, and the distinction is not pedantic: a single
+sampled trajectory --- which is what an earlier version of this diagnostic reported --- lands
+near the \emph{median} over chains, while the maximum is some two orders of magnitude higher. We
+therefore plot both the maximum and the ninetieth percentile. The quantity that carries the
+argument is panel (d) together with the column-mass residuals, which involve no sample at all.
+Truncation responds to the domain and not the resolution: the residual falls from
+$3\times10^{-4}$ at $\halfwidth=4$ to $1.4\times10^{-8}$ at $\halfwidth=8$ and
+$1.4\times10^{-10}$ at $\halfwidth=10$, essentially independently of $\ngrid$.
 Panel (d) reports the column-normalisation residual of the transition matrix restricted to
 interior columns, where no tail is truncated: at $\halfwidth=8$ it is
 $3.8\times10^{-3},\,9.6\times10^{-4},\,2.4\times10^{-4}$ at $\gridh = 0.08, 0.04, 0.02$, a
@@ -500,12 +507,33 @@ over-specified $\ncomp$ need not stay; and identification modulo label permutati
 these rather than prove them.
 \end{assumption}
 
-\paragraph{What noising destroys.} Measured per sequence from exact single-chain passes, the
-Fisher information for the innovation variance falls by a factor $142$ between $t=0.05$ and
-$t=1.6$, while that for the correlation falls by $26$
-(\codefile{outputs/exp\_06\_em\_parameter\_recovery/price\_of\_noising.csv}). Higher-order
-structure of $\innov$ is thus far more fragile under the channel than second-order structure, a
-fact \S\ref{sec:generation} returns to.
+\paragraph{What noising destroys.} The channel does not degrade every coordinate of the kernel
+equally, and the disparity is large enough to govern what can be learned at all. Measuring it
+requires a parameter that is genuinely \emph{higher order}: in the Gaussian model with parameters
+$(\rho,\ivar)$ both coordinates are second order, since $\ivar$ is a scale, so a comparison
+between them says nothing about shape. We therefore use a generalised-Gaussian innovation
+\[
+  \varphi_\beta(e)\;\propto\;\exp\!\big(-(|e|/s)^{\beta}\big),
+  \qquad s(\ivar,\beta)=\sqrt{\ivar\,\Gamma(1/\beta)/\Gamma(3/\beta)},
+\]
+in which $\beta$ moves the fourth moment while holding the variance at $\ivar$ exactly:
+$\beta=1$ is Laplace (excess kurtosis $3$), $\beta=2$ is Gaussian (excess kurtosis $0$).
+
+Comparing raw diagonal entries of the information matrix would ignore the coupling between
+coordinates, so we report the \emph{efficient} information for each, obtained by projecting out
+the other two,
+$\mathcal I_{\beta\beta\cdot\eta}=J_{\beta\beta}-J_{\beta\eta}J_{\eta\eta}^{-1}J_{\eta\beta}$
+with $\eta=(\rho,\ivar)$, which is what bounds any estimator of $\beta$ that must also fit the
+nuisance parameters. Between $t=0.05$ and $t=1.6$ the efficient information falls by $56$--$87$
+for the correlation, $235$--$522$ for the variance, and $8.7\times10^{3}$--$6.8\times10^{4}$ for
+the shape, so shape information decays $112$ to $1222$ times faster than correlation information
+depending on the true $\beta$
+(\codefile{outputs/exp\_22/shape\_information.csv}). The nuisance correction is itself
+asymmetric: at $t=1.6$ the correlation and variance coordinates become $90\%$ correlated and each
+loses a factor of about $5.5$ to coupling, while $\beta$ is nearly orthogonal to both and loses
+almost nothing. Higher-order structure of $\innov$ is thus far more fragile under the channel
+than second-order structure --- by two to three orders of magnitude, not the factor of five a
+comparison within the Gaussian model would suggest --- a fact \S\ref{sec:generation} returns to.
 
 \begin{figure}[t]
 \centering
@@ -554,11 +582,18 @@ general.
 \begin{table}[t]
 \caption{Relative denoising error against grid BP under the true kernel, averaged over the noise
 schedule. Mean over six replicates, $\pm$ one standard error. The network column takes, at each
-noise level, the better of the two parameterisations; this is \textbf{oracle post-selection} over
-two models and favours the baseline. Reporting the noise-predicting parameterisation alone would
-overstate the network's deficit by $15$--$30\%$, since predicting the clean signal is better at
-$t\in\{0.8,1.6\}$ at every budget. Source
-\codefile{outputs/replicates/merged\_summary.csv}. Empirical, six replicates.}
+noise level, the better of the two parameterisations. That is post-selection and favours the
+baseline, so we measured what it is worth rather than leaving it as a caveat: choosing the
+parameterisation on a disjoint validation bundle instead agrees with the test-set choice in $33$
+of $35$ cells and changes the mean advantage from $11.65$ to $11.66$ --- the oracle is worth
+$0.999\times$. The same holds for the harder two-axis case, where selecting receptive-field
+radius \emph{and} parameterisation on validation --- six configurations rather than two --- agrees
+in $54$ of $60$ cells and is worth $0.996\times$. Reporting the
+noise-predicting parameterisation alone would overstate the network's deficit by $15$--$30\%$,
+since predicting the clean signal is better at $t\in\{0.8,1.6\}$ at every budget. Sources
+\codefile{outputs/replicates/merged\_summary.csv},
+\codefile{outputs/exp\_07\_em\_vs\_score\_network/sample\_efficiency\_val.csv}. Empirical, six
+replicates.}
 \label{tab:pointwise}
 \centering
 \begin{tabular}{rccc}
@@ -652,11 +687,34 @@ nothing beyond it.
 magnitude more accurate pointwise (MSE against the Bayes denoiser $0.00052$ against the
 convolution's $0.00525$ and the fully connected network's $0.01330$) and three times better on
 second-order structure (worst covariance-lag error $0.0292$ against $0.0973$ and $0.0518$), and
-yet the convolution reproduces the \emph{innovation law} more faithfully, by kurtosis ($1.357$
-against $0.897$, target $1.910$) and by divergence ($0.0028$ against $0.0055$). The fully
-connected network shows the pattern most sharply: over the same range its denoising error improves
-twelvefold while its generated kurtosis degrades from $0.850$ to $0.206$. It fits the bulk of the
-posterior and loses the tail.
+yet the convolution reproduces the \emph{residual shape} more faithfully, by kurtosis ($1.357$
+against $0.897$, target $1.910$) and by divergence ($0.0028$ against $0.0055$).
+
+\begin{remark}[These residuals are not innovations]
+\label{rem:residuals}
+The statistic is the AR-filtered residual $r_i=x_i-\rho x_{i-1}$ of a sample of $P_{\tmin}$, not
+an innovation. Substituting $x_i=\alpha_t a_i+\sqrt{\Delta_t}z_i$ and $a_i=\rho a_{i-1}+\innov_i$
+gives $r_i=\alpha_t\innov_i+\sqrt{\Delta_t}\,(z_i-\rho z_{i-1})$, so adjacent residuals are
+correlated,
+\[
+  \operatorname{Cov}(r_i,r_{i+1})=-\rho\Delta_t,
+  \qquad
+  \operatorname{Corr}(r_i,r_{i+1})=\frac{-\rho\Delta_t}{\alpha_t^{2}\ivar+\Delta_t(1+\rho^{2})},
+\]
+which is $-0.0997$ at $\rho=0.85$, $\tmin=0.02$ and grows to $-0.286$ at $\tmin=0.1$. The noised
+process is not AR(1); even in the Gaussian case it is ARMA-type. The marginal shape comparison
+above remains valid and remains the sharpest discriminator between families at matched
+covariance, but it does not measure recovery of the clean transition innovation law, and we do
+not claim that it does. On the clean chain the same filter does recover innovations
+(measured $|\mathrm{ACF}_1|<0.02$).
+\end{remark}
+
+The fully connected network shows the pattern most sharply, and under the corrected training
+protocol of \S\ref{sec:generation} more sharply still: its generated residuals become
+statistically indistinguishable from Gaussian as data grows --- excess kurtosis $0.046$ at
+$M=2048$, per-seed $0.069$, $0.019$, $-0.002$, $0.097$ --- while its pointwise error improves
+monotonically over the same range. One estimator moving in opposite directions on the two axes is
+the cleanest form this dissociation takes. It fits the bulk of the posterior and loses the tail.
 
 
 \paragraph{It is not an artefact of the setting.} The disagreement holds across all four
@@ -674,15 +732,38 @@ to $0.489$ for the heaviest tail.
 \paragraph{Both axes improve with capacity.} Two explanations were available. Both the marginal
 likelihood and the squared-error loss are dominated by the bulk of the distribution, so the tail
 --- little mass, high leverage on shape statistics --- is weakly constrained by either;
-separately, the channel destroys innovation-shape information $142$-fold against $26$-fold for
-the correlation (\S\ref{sec:em}), so the data itself might not carry it. The first is a limit of
-the model class and is fixable; the second is a limit of the observation model and is not.
+separately, the channel destroys innovation-shape information two to three orders of magnitude
+faster than correlation information (\S\ref{sec:em}), so the data itself might not carry it. The
+first is a limit of the model class and is fixable; the second is a limit of the observation
+model and is not.
 
 Varying $\ncomp$ separates them (Table~\ref{tab:components}, Figure~\ref{fig:capacity}).
-Generated kurtosis climbs monotonically and is still climbing at $\ncomp=16$, and pointwise error
-\emph{also} improves monotonically, by a factor of $9.7$ from $\ncomp=2$ to $\ncomp=16$: the two
-axes do not trade against each other anywhere in the range tested, and at $\ncomp=16$ the
-estimator is ahead of the convolution on both at once. This is consistent with a capacity
+Generated kurtosis climbs monotonically and pointwise error \emph{also} improves monotonically,
+by a factor of $9.7$ from $\ncomp=2$ to $\ncomp=16$: the two axes do not trade against each other
+anywhere in the range tested, and at $\ncomp=16$ the estimator is ahead of the convolution on
+both at once.
+
+\begin{remark}[Where capacity stops paying, on a paired design]
+\label{rem:paired}
+Separate medians over a handful of seeds cannot resolve the small differences at the top of this
+range, because most of the variance is the training draw and it is shared between capacities. We
+therefore fit every $\ncomp$ on the \emph{same} training set within a cell and score it on the
+\emph{same} held-out bundle, so the contrast is within-dataset and its standard error is an order
+of magnitude below the effect. Held-out denoising MSE against the Bayes denoiser, six paired
+seeds, differences against $\ncomp=1$: at $M=512$ the gains are $+3.8\times10^{-5}$
+($\ncomp=2$), $-1.41\times10^{-3}$ ($4$), $-1.74\times10^{-3}$ ($8$), $-1.76\times10^{-3}$
+($16$), with standard errors $1.3\times10^{-5}$ to $1.1\times10^{-4}$
+(\codefile{outputs/exp\_16/paired\_local/paired\_contrasts.csv}).
+
+Three consequences. $\ncomp=8$ is the optimum: $\ncomp=16$ differs from it by less than one
+standard error and at $M=128$ is marginally worse. A two-component mixture is \emph{not} an
+improvement on a single Gaussian innovation, and at $M=512$ is significantly worse than one. And
+none of this is a discretisation artefact --- the narrowest fitted component is at least $8.8$
+grid spacings wide in all sixty cells, with the effective component count tracking the nominal
+one, so the mixture is genuinely using its capacity and every component is resolved.
+\end{remark}
+
+This is consistent with a capacity
 bottleneck at small $\ncomp$ and inconsistent with the information account being the binding
 constraint there. It does not show that information is never binding --- the curve has not
 saturated, and we have not measured how much further it can go.
@@ -736,8 +817,33 @@ likelihood or runtime against $\ncomp$.}
 \section{Limitations and open questions}
 \label{sec:limits}
 
-The model assumes exact first-order Markov structure; under a non-Markov prior the estimator is
-misspecified in a way more data does not repair. The transition family \eqref{eq:kernel} is
+The model assumes exact first-order Markov structure. Under a non-Markov prior the estimator is
+misspecified in a way more data does not repair, and how much that costs turns out to depend
+sharply on \emph{which} assumption is violated --- so we measured it rather than leaving it as a
+caveat.
+
+Two mechanisms, both with an exact reference. A shared global latent,
+$a=(y+\beta g)/\sqrt{1+\beta^{2}}$ with $g\sim\mathcal N(0,1)$, contaminates the prior with a
+rank-one term; weak long-range precision coupling, $Q=Q_{\mathrm{AR}(1)}+\gamma Q_{\mathrm{long}}$,
+does not. For Gaussian innovations both references are linear algebra; for the Laplace chain plus
+a global latent the reference is exact by conditioning on $g$ and marginalising it with
+Gauss--Hermite, since the prior is Markov given $g$ (Appendix~\ref{app:extra}).
+
+The estimator is remarkably robust to the rank-one violation and fails quickly under the other.
+Against the convolution, the ratio of relative score errors stays above $2.08$ across the whole
+global-latent sweep up to $\beta=1$, where half the marginal variance is a shared constant; with
+Laplace innovations it stays above $1.45$. Under long-range coupling it inverts at
+$\gamma\approx0.10$ and reaches $0.47$ at $\gamma=0.4$, where the fully connected network also
+overtakes the estimator. This is what the operator analysis of
+\S\ref{sec:numerics} predicts: a global latent makes the score residual exactly rank one, which a
+chain absorbs, while long-range coupling is not low-rank and cannot be represented. The fitted
+parameters corroborate it --- EM converges to the best-Markov (Chow--Liu) projection to within
+$0.0009$--$0.0128$ across the $\beta$ sweep but departs from it by up to $0.101$ under $\gamma$,
+exactly where the chain family stops being able to represent the truth. So the honest scope is:
+the structural prior survives rank-one contamination essentially intact, regardless of innovation
+shape, and should not be relied on under genuine long-range structure.
+
+The transition family \eqref{eq:kernel} is
 additionally misspecified at small $\ncomp$, which \S\ref{sec:generation} measures and shows is
 relieved by enlarging $\ncomp$. The initial law is fixed rather than estimated, and the chain is
 covariance-stationary rather than strictly stationary (Remark~\ref{rem:stationary}); no run yet
@@ -754,13 +860,25 @@ structural assumption, and the advantage narrows as the parametric dimension gro
 discrete-alphabet variant it falls from about $15$ at six estimated parameters to $3.6$--$6.1$
 at $132$.
 
-Three measurement gaps remain. The capacity sweep covers pointwise error and generated statistics
-but not marginal likelihood or runtime against $\ncomp$. The receptive-field comparison of
-\S\ref{sec:pointwise} lacks a validation split and its numbers are exploratory. And the locality
-of the score --- whether the required inference can be confined to a window --- is probed only
-through a receptive-field proxy; we have no statement about the score's own receptive field as a
-function of the observations. Comparisons are against the two architectures described and do not
-license a claim about neural denoisers in general (Remark~\ref{rem:asymmetry}).
+The measurement gaps that remain are narrower than they were. The capacity sweep now includes
+marginal likelihood and runtime against $\ncomp$: held-out evidence saturates by $\ncomp\approx8$
+and cost is flat in $\ncomp$, since the $O(\nseq\nsites\ngrid^{2})$ expectation step dominates and
+only the maximisation step scales with capacity. Model selection is on a disjoint validation
+bundle throughout, and the oracle it replaces was measured at $0.999\times$ and $0.996\times$
+(Table~\ref{tab:pointwise}). The locality statement is now exact rather than a proxy: under
+strictly stationary initialisation the windowed estimator \emph{is} $\E[a_i \mid x_{i-r:i+r}]$,
+because a contiguous window of a Markov chain is a chain with the correct endpoint law. That
+correction does not change the measured rates --- the ratio of the stationary to the original
+protocol has median $1.004$ across ninety cells --- so the earlier numbers stand, on better
+footing.
+
+What is still missing. The likelihoods reported here are a \emph{composite} objective: each clean
+chain is observed at several noise levels and the groups are treated as independent, so every
+marginal is correctly specified but the effective sample size is the number of clean chains, not
+that times the number of levels. Identifiability remains assumed. The neural comparison is
+against the two architectures described --- a fully connected network and a weight-shared
+convolution --- and does not license a claim about modern sequence denoisers, which is the
+comparison a practitioner would want (Remark~\ref{rem:asymmetry}).
 
 \section{Conclusion}
 
