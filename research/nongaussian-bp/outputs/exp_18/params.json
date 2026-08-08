@@ -11,9 +11,11 @@
     1.6
   ],
   "parts": [
+    "boundary",
+    "emtrace",
     "density"
   ],
-  "numpy": "2.4.2",
-  "python": "3.12.5",
-  "blas_threads": "4"
+  "numpy": "2.5.1",
+  "python": "3.13.11",
+  "blas_threads": "1"
 }

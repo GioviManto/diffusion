@@ -1,0 +1,35 @@
+{
+  "n_sites": 41,
+  "centre": 20,
+  "grid_half_width": 8.0,
+  "quick": true,
+  "parts": [
+    "stationary"
+  ],
+  "overrides": [],
+  "grid_size": 301,
+  "n_chains": 32,
+  "rhos": [
+    0.85
+  ],
+  "t_values": [
+    0.1,
+    0.4
+  ],
+  "radii": [
+    1,
+    2,
+    3,
+    4,
+    5
+  ],
+  "timestamp": "2026-08-07 18:07:20",
+  "python": "3.13.11",
+  "numpy": "2.5.1",
+  "platform": "Linux-5.14.0-687.5.3.el9_8.x86_64-x86_64-with-glibc2.34",
+  "hostname": "cnode07",
+  "slurm_job_id": "618126",
+  "slurm_array_task_id": "",
+  "cpu_count": "40",
+  "blas_threads": "1"
+}
