@@ -407,6 +407,36 @@ already destroyed them by t = 0.95. Consequently
 Neither is a sample from p₀, and no better readout exists: the information is
 gone. **Reverse-diffusion generation is not currently possible for this model.**
 
+The full-size run makes the mechanism unmistakable. Ratio of reverse-readout to
+ancestral standard deviation, by scale, scale-mixture model, 48 samples at 100
+steps (`outputs/exp_25_wavelet_generation/sampler_check.csv`):
+
+| subband | ancestral | reverse readout | ratio |
+|---|---|---|---|
+| HL depth 0 (coarsest) | 5.86 | 6.05 | **1.03** |
+| HL depth 1 | 4.48 | 3.99 | 0.89 |
+| HL depth 2 | 1.97 | 1.50 | 0.76 |
+| HL depth 3 | 0.93 | 0.43 | 0.46 |
+| HL depth 4 (finest) | 0.43 | 0.10 | **0.22** |
+
+A clean monotone gradient in scale: the coarsest subband is recovered essentially
+perfectly (1.03) and each finer level is recovered less well, down to 22 % at the
+finest. That is exactly the SNR ordering — coarse content survives to t = 0.95
+and fine content does not — and it is not what a sampler discretisation error
+would look like, which would not respect scale at all.
+
+Aggregate reverse-vs-ancestral standard-deviation gaps, before and after the
+readout fix:
+
+| family | before | after |
+|---|---|---|
+| Gaussian | 1.97 (worst 8.53) | 0.47 (worst 1.41) |
+| mixture | 1.95 (worst 9.44) | 0.45 (worst 0.85) |
+| scale mixture | 2.24 (worst 12.43) | 0.81 (worst 5.37) |
+
+The fix accounts for roughly a factor of four; the remainder is the fine-scale
+collapse above, and it will not shrink without reaching smaller t.
+
 Two corrections to my own earlier statements, recorded rather than quietly
 amended:
 

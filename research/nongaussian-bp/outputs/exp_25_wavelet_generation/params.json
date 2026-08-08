@@ -25,13 +25,10 @@
     "seed": 0
   },
   "parts": [
-    "fit",
-    "generate",
-    "sampler",
-    "grid"
+    "sampler"
   ],
   "provenance": {
-    "timestamp": "2026-08-08 15:44:48",
+    "timestamp": "2026-08-08 17:30:23",
     "python": "3.12.5",
     "numpy": "2.4.2",
     "platform": "macOS-14.1.1-arm64-arm-64bit",
