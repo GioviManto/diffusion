@@ -486,6 +486,14 @@ Consequences to state before anyone asks:
   direction: the scale-mixture row has visibly more large-scale blob structure
   than the Gaussian and linear-AR rows, which is the magnitude dependence of
   §6.1 showing up as coherent bright and dark regions.
+- **The samples are visibly blocky, on axis-aligned squares.** That is the Haar
+  basis showing through: each coefficient's support is a square block, and with
+  no within-scale coupling to smooth across them, the block boundaries survive
+  into the image. It is a property of the *basis*, separable from the tree
+  restriction above, and it is the one artefact here with a cheap remedy — a
+  smoother orthogonal wavelet (Daubechies-4) has overlapping support and would
+  not produce it. That makes the Haar-vs-D4 comparison (§12, item 4) worth more
+  than it looked: it addresses a visible failure, not just a statistical one.
 
 So the inference is exact. **The model is not the truth.** The wavelet HMT
 asserts that coefficients form a Markov tree across scale with no within-scale
