@@ -1,0 +1,80 @@
+% ===========================================================================
+% Shared notation for the internal note and the compendium.
+%
+% Conventions follow the statistical-physics usage of the diffusion literature
+% (Song et al. 2021 for the SDE formulation; Mezard-Montanari 2009 for the
+% graphical-model side). Only publicly available sources are cited.
+%
+% Symbol decisions that matter, fixed here once:
+%
+%   1. K (or K_theta) is the MARKOV TRANSITION KERNEL, everywhere and only.
+%      The number of quadrature grid points is N_g. These were previously W and
+%      K respectively, which collided; nothing in either document may now use
+%      K for a grid size or W for a kernel.
+%
+%   2. The ambient dimension IS the chain length, and every graphical-model
+%      statement is indexed by sites, so it is written n. The number of observed
+%      sequences is M. A translation sentence appears at first use, because much
+%      of the diffusion literature uses n for the sample count and d for the
+%      dimension.
+%
+%   3. The decay factor is written e^{-t} in displayed equations and is never
+%      abbreviated to alpha_t.
+%
+%   4. Gaussian white noise eta is STANDARDISED, <eta(t)eta(t')> = delta(t-t'),
+%      so the sqrt(2) is carried explicitly in both the forward and the reverse
+%      SDE. This keeps Delta_t = 1 - e^{-2t} consistent throughout.
+% ===========================================================================
+
+% --- Diffusion -------------------------------------------------------------
+\newcommand{\Pz}{P_0}                       % clean distribution
+\newcommand{\Pt}{P_t}                       % noised distribution at time t
+\newcommand{\Dt}{\Delta_t}                  % 1 - e^{-2t}
+\newcommand{\score}{S}                      % S(x,t) = grad log P_t(x)
+\newcommand{\gwn}{\eta}                     % standardised Gaussian white noise
+\newcommand{\tmin}{t_{\min}}
+\newcommand{\tmax}{t_{\max}}
+
+% Posterior mean, in bracket notation rather than E[a|x].
+\newcommand{\pmean}[1]{\langle #1 \rangle_{x,t}}
+\newcommand{\pmeansite}[1]{\langle a_{#1} \rangle_{x,t}}
+
+% --- Chain and graphical model --------------------------------------------
+\newcommand{\nsites}{n}                     % chain length = ambient dimension
+\newcommand{\nseq}{M}                       % number of observed sequences
+\newcommand{\ngrid}{N_{\mathrm{g}}}         % number of quadrature grid points
+\newcommand{\gridpt}[1]{u_{#1}}             % grid point
+\newcommand{\gridh}{h}                      % grid spacing
+\newcommand{\halfwidth}{A}                  % grid half-width, domain [-A, A]
+\newcommand{\kernel}{K}                     % transition kernel K(a'|a)
+\newcommand{\kernelth}{K_{\params}}         % parameterised transition kernel
+\newcommand{\like}{\ell_t}                  % unary likelihood factor
+\newcommand{\lmsg}{\overrightarrow{m}}      % forward (left) message
+\newcommand{\rmsg}{\overleftarrow{m}}       % backward (right) message
+\newcommand{\innov}{\varphi}                % innovation density
+\newcommand{\corr}{\rho}                    % autoregression coefficient
+\newcommand{\ivar}{q}                       % innovation variance
+\newcommand{\ncomp}{C}                      % mixture component count
+
+% --- Estimation ------------------------------------------------------------
+\newcommand{\params}{\theta}
+\newcommand{\Qfun}{\mathcal{Q}}             % EM auxiliary function
+\newcommand{\Xis}{\Xi}                      % expected transition statistic
+\newcommand{\Lik}{\mathcal{L}}              % marginal log-likelihood
+
+% --- Operators -------------------------------------------------------------
+\newcommand{\E}{\mathbb{E}}
+\newcommand{\Prob}{\mathbb{P}}
+\newcommand{\Reals}{\mathbb{R}}
+\newcommand{\Cov}{\operatorname{Cov}}
+\newcommand{\Var}{\operatorname{Var}}
+\newcommand{\KL}{D_{\mathrm{KL}}}
+\newcommand{\normal}[2]{\mathcal{N}\!\left(#1,#2\right)}
+
+% --- Estimators ------------------------------------------------------------
+\newcommand{\mmse}{\widehat{a}_{\mathrm{MMSE}}}
+\newcommand{\lmmse}{\widehat{a}_{\mathrm{LMMSE}}}
+
+% --- Repository pointers (shared by the note and the compendium) ------------
+\providecommand{\coderef}[2]{\texttt{\small #1}\,$\rightarrow$\,\texttt{\small #2}}
+\providecommand{\codefile}[1]{\texttt{\small #1}}

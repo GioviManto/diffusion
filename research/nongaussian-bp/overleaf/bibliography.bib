@@ -1,0 +1,243 @@
+% ===========================================================================
+% Public references only. No unpublished or privately circulated material is
+% cited anywhere in this project.
+% ===========================================================================
+
+% --- Diffusion models ------------------------------------------------------
+
+@inproceedings{sohl2015,
+  title     = {Deep unsupervised learning using nonequilibrium thermodynamics},
+  author    = {Sohl-Dickstein, Jascha and Weiss, Eric A. and Maheswaranathan, Niru
+               and Ganguli, Surya},
+  booktitle = {International Conference on Machine Learning},
+  year      = {2015}}
+
+@inproceedings{song2019,
+  title     = {Generative modeling by estimating gradients of the data distribution},
+  author    = {Song, Yang and Ermon, Stefano},
+  booktitle = {Advances in Neural Information Processing Systems},
+  year      = {2019}}
+
+@inproceedings{ho2020,
+  title     = {Denoising diffusion probabilistic models},
+  author    = {Ho, Jonathan and Jain, Ajay and Abbeel, Pieter},
+  booktitle = {Advances in Neural Information Processing Systems},
+  year      = {2020}}
+
+@inproceedings{song2021,
+  title     = {Score-based generative modeling through stochastic differential equations},
+  author    = {Song, Yang and Sohl-Dickstein, Jascha and Kingma, Diederik P. and
+               Kumar, Abhishek and Ermon, Stefano and Poole, Ben},
+  booktitle = {International Conference on Learning Representations},
+  year      = {2021}}
+
+@inproceedings{karras2022,
+  title     = {Elucidating the design space of diffusion-based generative models},
+  author    = {Karras, Tero and Aittala, Miika and Aila, Timo and Laine, Samuli},
+  booktitle = {Advances in Neural Information Processing Systems},
+  year      = {2022}}
+
+% --- Time reversal and the Fokker--Planck equation -------------------------
+
+@article{anderson1982,
+  title   = {Reverse-time diffusion equation models},
+  author  = {Anderson, Brian D. O.},
+  journal = {Stochastic Processes and their Applications},
+  volume  = {12}, number = {3}, pages = {313--326}, year = {1982}}
+
+@article{haussmann1986,
+  title   = {Time reversal of diffusions},
+  author  = {Haussmann, Ulrich G. and Pardoux, Etienne},
+  journal = {The Annals of Probability},
+  volume  = {14}, number = {4}, pages = {1188--1205}, year = {1986}}
+
+@book{risken1989,
+  title     = {The {Fokker--Planck} Equation: Methods of Solution and Applications},
+  author    = {Risken, Hannes},
+  edition   = {2nd}, publisher = {Springer}, year = {1989}}
+
+% --- The score / posterior-mean identity -----------------------------------
+
+@inproceedings{robbins1956,
+  title     = {An empirical {Bayes} approach to statistics},
+  author    = {Robbins, Herbert},
+  booktitle = {Proceedings of the Third Berkeley Symposium on Mathematical
+               Statistics and Probability, Volume 1},
+  pages     = {157--163}, year = {1956}}
+
+@article{miyasawa1961,
+  title   = {An empirical {Bayes} estimator of the mean of a normal population},
+  author  = {Miyasawa, Koichi},
+  journal = {Bulletin of the International Statistical Institute},
+  volume  = {38}, number = {4}, pages = {181--188}, year = {1961}}
+
+@article{efron2011,
+  title   = {{Tweedie}'s formula and selection bias},
+  author  = {Efron, Bradley},
+  journal = {Journal of the American Statistical Association},
+  volume  = {106}, number = {496}, pages = {1602--1614}, year = {2011}}
+
+@article{vincent2011,
+  title   = {A connection between score matching and denoising autoencoders},
+  author  = {Vincent, Pascal},
+  journal = {Neural Computation},
+  volume  = {23}, number = {7}, pages = {1661--1674}, year = {2011}}
+
+@article{hyvarinen2005,
+  title   = {Estimation of non-normalized statistical models by score matching},
+  author  = {Hyv{\"a}rinen, Aapo},
+  journal = {Journal of Machine Learning Research},
+  volume  = {6}, pages = {695--709}, year = {2005}}
+
+% --- Estimation theory -----------------------------------------------------
+
+@book{lehmann1998,
+  title     = {Theory of Point Estimation},
+  author    = {Lehmann, Erich L. and Casella, George},
+  edition   = {2nd}, publisher = {Springer}, year = {1998}}
+
+@book{kay1993,
+  title     = {Fundamentals of Statistical Signal Processing: Estimation Theory},
+  author    = {Kay, Steven M.},
+  publisher = {Prentice Hall}, year = {1993}}
+
+% --- Graphical models and message passing ----------------------------------
+
+@book{pearl1988,
+  title     = {Probabilistic Reasoning in Intelligent Systems},
+  author    = {Pearl, Judea},
+  publisher = {Morgan Kaufmann}, year = {1988}}
+
+@article{kschischang2001,
+  title   = {Factor graphs and the sum-product algorithm},
+  author  = {Kschischang, Frank R. and Frey, Brendan J. and Loeliger, Hans-Andrea},
+  journal = {IEEE Transactions on Information Theory},
+  volume  = {47}, number = {2}, pages = {498--519}, year = {2001}}
+
+@book{mezard2009,
+  title     = {Information, Physics, and Computation},
+  author    = {M\'ezard, Marc and Montanari, Andrea},
+  publisher = {Oxford University Press}, year = {2009}}
+
+@article{wainwright2008,
+  title   = {Graphical models, exponential families, and variational inference},
+  author  = {Wainwright, Martin J. and Jordan, Michael I.},
+  journal = {Foundations and Trends in Machine Learning},
+  volume  = {1}, number = {1--2}, pages = {1--305}, year = {2008}}
+
+% --- Forward--backward, Kalman, RTS ----------------------------------------
+
+@article{baum1970,
+  title   = {A maximization technique occurring in the statistical analysis of
+             probabilistic functions of {Markov} chains},
+  author  = {Baum, Leonard E. and Petrie, Ted and Soules, George and Weiss, Norman},
+  journal = {The Annals of Mathematical Statistics},
+  volume  = {41}, number = {1}, pages = {164--171}, year = {1970}}
+
+@article{rabiner1989,
+  title   = {A tutorial on hidden {Markov} models and selected applications in
+             speech recognition},
+  author  = {Rabiner, Lawrence R.},
+  journal = {Proceedings of the IEEE},
+  volume  = {77}, number = {2}, pages = {257--286}, year = {1989}}
+
+@article{kalman1960,
+  title   = {A new approach to linear filtering and prediction problems},
+  author  = {Kalman, Rudolph E.},
+  journal = {Journal of Basic Engineering},
+  volume  = {82}, number = {1}, pages = {35--45}, year = {1960}}
+
+@article{rauch1965,
+  title   = {Maximum likelihood estimates of linear dynamic systems},
+  author  = {Rauch, Herbert E. and Tung, F. and Striebel, Charlotte T.},
+  journal = {AIAA Journal},
+  volume  = {3}, number = {8}, pages = {1445--1450}, year = {1965}}
+
+@book{cappe2005,
+  title     = {Inference in Hidden {Markov} Models},
+  author    = {Capp\'e, Olivier and Moulines, Eric and Ryd\'en, Tobias},
+  publisher = {Springer}, year = {2005}}
+
+% --- EM, generalized EM, Fisher's identity ---------------------------------
+
+@article{dempster1977,
+  title   = {Maximum likelihood from incomplete data via the {EM} algorithm},
+  author  = {Dempster, Arthur P. and Laird, Nan M. and Rubin, Donald B.},
+  journal = {Journal of the Royal Statistical Society, Series B},
+  volume  = {39}, number = {1}, pages = {1--38}, year = {1977}}
+
+@article{wu1983,
+  title   = {On the convergence properties of the {EM} algorithm},
+  author  = {Wu, C. F. Jeff},
+  journal = {The Annals of Statistics},
+  volume  = {11}, number = {1}, pages = {95--103}, year = {1983}}
+
+@article{meng1993,
+  title   = {Maximum likelihood estimation via the {ECM} algorithm: a general framework},
+  author  = {Meng, Xiao-Li and Rubin, Donald B.},
+  journal = {Biometrika},
+  volume  = {80}, number = {2}, pages = {267--278}, year = {1993}}
+
+@article{fisher1925,
+  title   = {Theory of statistical estimation},
+  author  = {Fisher, Ronald A.},
+  journal = {Mathematical Proceedings of the Cambridge Philosophical Society},
+  volume  = {22}, number = {5}, pages = {700--725}, year = {1925}}
+
+@article{louis1982,
+  title   = {Finding the observed information matrix when using the {EM} algorithm},
+  author  = {Louis, Thomas A.},
+  journal = {Journal of the Royal Statistical Society, Series B},
+  volume  = {44}, number = {2}, pages = {226--233}, year = {1982}}
+
+% --- Mixture identifiability ------------------------------------------------
+
+@article{teicher1963,
+  title   = {Identifiability of finite mixtures},
+  author  = {Teicher, Henry},
+  journal = {The Annals of Mathematical Statistics},
+  volume  = {34}, number = {4}, pages = {1265--1269}, year = {1963}}
+
+@article{yakowitz1968,
+  title   = {On the identifiability of finite mixtures},
+  author  = {Yakowitz, Sidney J. and Spragins, John D.},
+  journal = {The Annals of Mathematical Statistics},
+  volume  = {39}, number = {1}, pages = {209--214}, year = {1968}}
+
+% --- Structure in diffusion models ------------------------------------------
+
+@article{biroli2023,
+  title   = {Generative diffusion in very large dimensions},
+  author  = {Biroli, Giulio and M\'ezard, Marc},
+  journal = {Journal of Statistical Mechanics: Theory and Experiment},
+  volume  = {2023}, number = {9}, pages = {093402}, year = {2023}}
+
+@article{biroli2024dynamical,
+  title   = {Dynamical regimes of diffusion models},
+  author  = {Biroli, Giulio and Bonnaire, Tony and de Bortoli, Valentin and
+             M\'ezard, Marc},
+  journal = {Nature Communications},
+  volume  = {15}, pages = {9957}, year = {2024}}
+
+@article{sclocchi2025phase,
+  title   = {A phase transition in diffusion models reveals the hierarchical nature of data},
+  author  = {Sclocchi, Antonio and Favero, Alessandro and Wyart, Matthieu},
+  journal = {Proceedings of the National Academy of Sciences},
+  volume  = {122}, number = {1}, pages = {e2408799121}, year = {2025}}
+
+@misc{garnierbrun2024transformers,
+  title         = {How transformers learn structured data: insights from
+                   hierarchical filtering},
+  author        = {Garnier-Brun, J\'er\^ome and M\'ezard, Marc and Moscato, Emanuele
+                   and Saglietti, Luca},
+  year          = {2024}, eprint = {2408.15138}, archivePrefix = {arXiv}}
+
+@misc{mei2024unet,
+  title         = {{U-Nets} as belief propagation},
+  author        = {Mei, Song and Wu, Yuchen},
+  year          = {2024}, eprint = {2404.18444}, archivePrefix = {arXiv}}
+
+@misc{kamb2024analytic,
+  title         = {An analytic theory of creativity in convolutional diffusion models},
+  author        = {Kamb, Mason and Ganguli, Surya},
+  year          = {2024}, eprint = {2412.20292}, archivePrefix = {arXiv}}
