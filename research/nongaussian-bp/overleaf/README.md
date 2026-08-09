@@ -36,12 +36,24 @@ them tracked changes and comments, which is the closest thing to what they asked
 
 ## Keeping it in sync with the repo
 
-This directory is a copy, not a symlink — the source of truth is `paper/`. After editing `paper/`,
-refresh with:
+This directory is a copy, not a symlink — the source of truth is `paper/`. A copy goes stale the
+moment `paper/` is edited, and a stale copy is worse than none because it still compiles and looks
+right. That already happened once here, so there is a script:
 
 ```bash
-cd research/nongaussian-bp && cp paper/main.tex paper/appendix.tex paper/notation.tex paper/bibliography.bib paper/neurips_2023.sty overleaf/ && cp paper/figures/*.pdf overleaf/figures/
+./overleaf/sync.sh
 ```
+
+It refreshes every file, rebuilds the project **from a temporary directory outside the repo** (so
+anything still reaching into `paper/` by path fails loudly rather than silently working), and
+refuses to finish if undefined references appear.
+
+```bash
+./overleaf/sync.sh --check
+```
+
+Verifies without copying — exit code 1 if anything has drifted. Worth wiring into a pre-commit
+hook if you edit the paper often.
 
 If instead you edit in Overleaf, copy the changed files back into `paper/` so the committed
 version stays authoritative. Do not let the two diverge.

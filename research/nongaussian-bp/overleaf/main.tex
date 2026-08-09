@@ -500,6 +500,22 @@ do not call it exact EM. Monotonicity is also observed: the largest decrease of 
 iterations is $0$ in all eight runs of Figure~\ref{fig:em}. Initialisation, stopping rule and
 parameter constraints are in Appendix~\ref{app:learning}.
 
+\begin{remark}[Stop on the shape, not on $\corr$]
+\label{rem:stopping}
+The coordinates of $\params$ do not converge at the same rate, and the gap is large enough to
+mislead. At $\corr=0.85$, $\nseq=512$, $\ncomp=8$ the autoregressive coefficient is flat from
+iteration ${\sim}25$, while the fitted innovation excess kurtosis reads $0.84$ at $30$ iterations,
+$1.85$ at $60$, $2.30$ at $120$ and $2.29$ at $400$. Monitoring $\corr$ --- the natural thing to
+plot, and a quantity whose trace looks textbook-converged --- certifies a kernel that still
+carries a third of the true higher-order structure.
+
+This is the same asymmetry the information analysis predicts: shape is the fragile coordinate
+under the channel, and it is also the slow one under the optimiser. Any stopping rule for this
+model should therefore be read off a shape statistic. Every estimation result in this paper uses
+$120$ iterations, past the plateau above; \S\ref{sec:generation} reports what happened in an
+earlier version that used $40$.
+\end{remark}
+
 \paragraph{Innovation centering.} The fitted mixture is \emph{not} constrained to satisfy
 $\sum_c\pi_c\nu_c=0$. Imposing it by reprojection after each update is not a maximisation step
 and broke monotone ascent by $\sim10^{-2}$ nats in testing, so the condition is monitored as a
@@ -748,12 +764,18 @@ not claim that it does. On the clean chain the same filter does recover innovati
 (measured $|\mathrm{ACF}_1|<0.02$).
 \end{remark}
 
-The fully connected network shows the pattern most sharply, and under the corrected training
-protocol of \S\ref{sec:generation} more sharply still: its generated residuals become
-statistically indistinguishable from Gaussian as data grows --- excess kurtosis $0.046$ at
-$M=2048$, per-seed $0.069$, $0.019$, $-0.002$, $0.097$ --- while its pointwise error improves
-monotonically over the same range. One estimator moving in opposite directions on the two axes is
-the cleanest form this dissociation takes. It fits the bulk of the posterior and loses the tail.
+\paragraph{The same thing, seen inside one estimator.} The parameterisation result above compares
+two networks. A second instance needs only one, and varies the data instead. The fully connected
+network's generated residuals become statistically indistinguishable from Gaussian as the budget
+grows --- excess kurtosis $0.046$ at $\nseq=2048$, per-seed $0.069$, $0.019$, $-0.002$, $0.097$
+--- while its pointwise error improves monotonically over the same range. One estimator moving in
+opposite directions on the two axes, with nothing else changing, is the cleanest form this takes:
+more data buys a better fit to the bulk of the posterior and a worse account of the tail.
+
+This arm is worth isolating because it is untouched by the correction below. It involves no
+transition kernel, no expectation--maximisation and no iteration count --- it is a network trained
+by denoising score matching --- so whatever is wrong with the estimator arm's optimisation cannot
+explain it. Of everything in this section it is the claim we would defend first.
 
 
 \paragraph{The Gaussian control.} On a Gaussian chain the fitted mixture family \emph{contains}
