@@ -26,7 +26,7 @@ A multiscale wavelet decomposition restores it. What is now built and verified:
   (`src/wavelet_model.py`);
 - a scale-mixture kernel with a parent-dependent conditional scale (`src/scale_kernel.py`);
 - exact BP on a temporal chain of spatial trees (`src/video_bp.py`);
-- 39 tests, including agreement with a dense Gaussian solve to 2·10⁻¹⁵;
+- 51 tests, including agreement with a dense Gaussian solve to 2·10⁻¹⁵;
 - the gating measurement on real CIFAR-10 (`experiments/exp_23_wavelet_statistics.py`).
 
 **The gate passes decisively.** CIFAR-10 wavelet coefficients are strongly
@@ -54,7 +54,18 @@ cheap in compute and is a hard blocker.
 **Video is built, not just argued** (§9). The fully coupled spatio-temporal model
 has 4-cycles and is *not* exact; a temporal chain of spatial trees — a
 caterpillar — is, and BP on it matches a dense Gaussian solve to 10⁻⁸ using only
-passes the package already had.
+passes the package already had. It is fitted by EM, generates video, and
+temporal coupling measurably helps.
+
+**And the video result is a ceiling, which is the most useful thing here** (§9.2).
+At most **one temporal edge per connected component** is loop-free — a second
+always closes a 4-cycle — and the wavelet frame has exactly four components. So
+**at most 4 of 1024 coefficients per frame can be temporally coupled in any exact
+model of this kind**, carrying 47 % of the variance. The caterpillar already
+couples all four and the best four, so it is optimal, and its coherence lands
+~5× worse than real video. That turns "can we do video exactly?" (yes, with this
+ceiling) into the sharper question of what *approximate* BP on the fully coupled
+graph buys against exact BP on the best tree.
 
 ---
 
@@ -267,7 +278,7 @@ conclusion, since the magnitude effect dominates and HH has both.
 
 ---
 
-## 6.1 The kernel that fixes it, and generation
+### 6.1 The kernel that fixes it, and generation
 
 `src/scale_kernel.py` implements the family the measurement calls for:
 
@@ -329,7 +340,7 @@ Three things, in order of how much they matter.
 
 ---
 
-## 6.2 A limit that per-subband standardisation creates
+### 6.2 A limit that per-subband standardisation creates
 
 This one is not a detail, and it invalidated my own first likelihood numbers.
 
@@ -379,7 +390,7 @@ and a usable reverse sampler.
 
 ---
 
-## 6.3 Reverse diffusion is blocked, not merely inaccurate
+### 6.3 Reverse diffusion is blocked, not merely inaccurate
 
 Worth separating from §6.2 because it is the sharper consequence, and because my
 first reading of it was wrong twice.
@@ -790,24 +801,30 @@ strongest available framing for why this is worth doing.
 
 1. **Per-depth grid** (§6.2). Rectangular `K_d[k, j]` between levels, and an
    M-step taking parent and child grids separately. Unblocks everything at
-   small *t*.
-2. Re-run `exp_25` at full size once (1) lands, and quote the likelihood at a
-   *small* *t* rather than at the currently-forced t ≈ 1.15.
-3. The factorised heavy-tailed baseline (same marginals, tree edges removed).
-4. Decide Haar vs Daubechies-4 by measuring §6 under both — the linear
-   correlation of 0.18–0.48 in HL/LH is larger than the classical literature
-   suggests and is probably a Haar artefact.
-5. For video: real video data, a temporal kernel fitted by EM through the
-   caterpillar E-step, and a loopy-BP fully coupled comparison to measure what
-   the tree restriction costs.
+   small *t*: the reverse sampler (§6.3), the image likelihood, and the video
+   likelihood, all of which are currently confined to a high-noise regime.
+2. Re-run `exp_25` and `exp_26 --only fit` once (1) lands, and quote both
+   likelihoods at a *small* *t* rather than at the currently-forced t ≈ 1.15
+   and t ≈ 1.26.
+3. The factorised heavy-tailed baseline (same marginals, tree edges removed) —
+   the control that makes the cross-scale metric mean something.
+4. Decide Haar vs Daubechies-4 by measuring §6 under both. Two reasons now: the
+   linear correlation of 0.18–0.48 in HL/LH is larger than the classical
+   literature suggests and is probably a Haar artefact, and Haar's square
+   support is what makes the samples visibly blocky (§7).
+5. **The loopy comparison** (§9.2). Now the most interesting experiment rather
+   than a formality: §9.2 puts a number on the exact-tree side, so what remains
+   is what approximate BP on the fully coupled spatio-temporal graph buys
+   against it. Real video data belongs with this.
 
 Files added — inference and modelling: `src/wavelet.py`, `src/wavelet_bp.py`,
 `src/wavelet_model.py`, `src/scale_kernel.py`, `src/wavelet_stats.py`,
-`src/video_bp.py`, `src/image_data.py`. Experiments:
-`experiments/exp_23_wavelet_statistics.py`, `exp_24_wavelet_fit.py`,
-`exp_25_wavelet_generation.py`. Tests: `tests/test_wavelet.py`,
-`test_wavelet_bp.py`, `test_wavelet_model.py`, `test_scale_kernel.py`,
-`test_video_bp.py`.
+`src/video_bp.py`, `src/video_model.py`, `src/video_data.py`,
+`src/image_data.py`. Experiments: `experiments/exp_23_wavelet_statistics.py`,
+`exp_24_wavelet_fit.py`, `exp_25_wavelet_generation.py`, `exp_26_video.py`.
+Tests: `tests/test_wavelet.py`, `test_wavelet_bp.py`, `test_wavelet_model.py`,
+`test_scale_kernel.py`, `test_video_bp.py`, `test_video_model.py` — 51 tests
+across the six.
 
-Full suite: **255 passed, 12 skipped**, plus 4 in `test_wavelet_model.py` run
-separately (~6 minutes).
+Full suite: **264 passed, 12 skipped** (5 slow end-to-end fits deselected; they
+pass separately and take ~14 minutes).
