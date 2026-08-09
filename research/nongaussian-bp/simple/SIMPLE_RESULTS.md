@@ -146,7 +146,7 @@ Take only what clears the intervals. Distance from target, in standard errors:
 |---|---|---|---|---|
 | 32 | 2.0σ | 1.0σ | **6.0σ** | 1.9σ |
 | 128 | 2.2σ | 0.4σ | **9.1σ** | 2.1σ |
-| 512 | 2.0σ | 0.5σ | **8.0σ** | 2.7σ |
+| 512 | 2.0σ | 0.5σ | **8.0σ** | 2.6σ |
 
 - **x₀ falls short at every budget, by 6–9σ.** This is the firmest result in the table.
 - **ε is consistent with the target at every budget** (0.4–1.0σ).
@@ -251,7 +251,7 @@ rules out the boring explanations.
 
 **Does not.** These are 32-site AR(1) chains, not images. Claim 2's ratio is measured against one
 convolutional baseline at one receptive field, not against a tuned modern denoiser. Claim 3 rests
-on six seeds, which resolves x₀'s shortfall (8.0σ) and the ε-versus-x₀ gap (2.7σ) but **not** any
+on six seeds, which resolves x₀'s shortfall (8.0σ) and the ε-versus-x₀ gap (2.6σ) but **not** any
 ordering between EM–BP and ε (0.65σ) — this evidence does not say the structured estimator
 generates better, only that it is the one arm that is simultaneously near the target and stable.
 And it establishes that pointwise error fails to *order* the generative result; it does not say how
