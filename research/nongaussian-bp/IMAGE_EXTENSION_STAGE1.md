@@ -638,20 +638,28 @@ so the comparison isolates temporal coupling *of the spatial trees*.
 
 | | ρ_time | held-out loglik/sequence | frame-difference energy |
 |---|---|---|---|
-| frozen (control) | 0 (held) | −5936.3 † | 1.420 |
-| **caterpillar** | **0.999** | **−5902.5** † | **1.005** |
+| frozen (control) | 0 (held) | −6739.8 | 1.420 |
+| **caterpillar** | **0.999** | **−6667.1** | **1.005** |
 | *real video* | — | — | ***0.211*** |
 | *independent frames* | — | — | *2.000* |
 
-> † **These two likelihoods are quoted from an unresolved regime and should not
-> be relied on.** They were evaluated at t = 0.6 on a 161-point grid, where the
-> coarsest subband (scale 11.25) resolves to 0.5 points per likelihood standard
-> deviation against the 3 required — the same defect as §6.2, which I failed to
-> guard against here when writing the experiment. `exp_26` now clamps to the
-> resolved t (1.259 at this grid) and records both values, as `exp_25` does. The
-> comparison is paired, so the *ordering* is likely robust, but the margin is
-> not; a corrected re-run is needed before the +33.8 nats figure is quoted
-> anywhere. The coherence column is unaffected — it involves no likelihood.
+**Temporal coupling is worth +72.7 nats per sequence** (+12.1 per frame),
+evaluated at t = 1.259 — the smallest *t* this grid resolves.
+
+> **A correction, and it moved the answer.** An earlier version of this table
+> quoted these likelihoods at t = 0.6, where the coarsest subband (scale 11.25)
+> gets 0.5 points per likelihood standard deviation against the 3 required. That
+> is the §6.2 defect, and I had built the guard for `exp_25` and then failed to
+> carry it into `exp_26`. The unresolved evaluation gave a gap of +33.8
+> nats/sequence — it **understated the benefit of temporal coupling by 2.2×**.
+> Both experiments now clamp to the resolved *t* and record requested and used
+> values side by side. The coherence column never involved a likelihood and is
+> unchanged.
+>
+> The standing caveat is that t = 1.259 is a heavily smoothed regime
+> (α = 0.28, Δ = 0.92). The comparison is paired and fair, but a likelihood this
+> far from t = 0 is a weaker statement than a small-*t* one would be — which is,
+> again, what the per-depth grid unblocks.
 
 **Temporal coupling earns its place**: +46.9 nats per sequence on held-out
 likelihood, and coherence improves from 1.538 to 1.086. EM is monotone
