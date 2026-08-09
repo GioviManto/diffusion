@@ -638,32 +638,66 @@ from the variance decomposition rather than from the fit.)*
 likelihood, and coherence improves from 1.538 to 1.086. EM is monotone
 (violation 0) and ρ_time = 0.983 is the right answer for translating video.
 
-**And it is nowhere near enough.** Real video sits at 0.223; the caterpillar
-reaches 1.086, barely a third of the way from the control to the truth. This is
-**not** undertraining, and the arithmetic says so before any fitting: the
-caterpillar couples the three tree *roots* and the LL band, which together carry
-only **43.7 %** of the per-frame variance. The other 56 % is redrawn
-independently at every frame. Predicting the frame-difference energy from that
-decomposition alone —
+**And it is nowhere near enough.** Real video sits at 0.223 while the caterpillar
+reaches 1.086 — barely a third of the way from the control to the truth. This is
+not undertraining, and the next subsection shows it is not even a limitation of
+*this* model.
 
-    2(1−ρ_time)·frac_root + 2(1−ρ_LL)·frac_LL + 2·(1−frac_coupled)
+### 9.2 The ceiling is a theorem, not a tuning problem
 
-— gives 1.133 against a measured 1.086 for the caterpillar, and 1.434 against
-1.538 for the control. Agreement to within 5 % on both. **The incoherence is a
-structural ceiling, not a training failure.**
+**At most one temporal edge per connected component.** Take two coefficients
+*u*, *v* in the same per-frame component, both coupled to their counterparts in
+the previous frame. The component is connected, so there is a path *u_f → v_f*
+inside frame *f*, and likewise inside frame *f−1*. Together with the two temporal
+edges that closes
 
-So the honest summary of the video direction: *exact BP on video is achievable,
-and the exactness costs most of the temporal coherence.* The spanning structure
-that removes the loops also removes the coupling that video is made of. That is
-a genuine result — it quantifies the price of exactness rather than asserting it
-is small — and it is the strongest argument in this document for why the
-**loopy** comparison is now the interesting experiment: one needs to know what
-approximate BP on the fully coupled graph buys against exact BP on this one.
+    u_f → v_f → v_{f−1} → u_{f−1} → u_f
 
-**What remains**: real video data; the fully coupled loopy-BP comparison above;
-and richer spanning structures (coupling one subband level in time rather than
-only the root) which trade a little exactness for a lot of coherence and can be
-enumerated systematically.
+— a cycle, always. Verified exhaustively on small trees
+(`exp_26`): coupling one node per component is loop-free for every choice,
+coupling two or more closes a cycle for every choice.
+
+The wavelet frame decomposes into exactly **four** components — three orientation
+trees and the isolated LL coefficient — so **at most 4 of 1024 coefficients per
+frame can carry temporal dependence** in *any* loop-free model over this
+coefficient set. The caterpillar already couples 4, and it couples the
+largest-variance one in each component (a root has more variance than any single
+coefficient below it). It is therefore **already optimal**, and the ceiling is a
+property of exactness itself rather than of this construction:
+
+| | coupled variance | floor on frame-difference energy |
+|---|---|---|
+| **any loop-free model** (4 of 1024 coefficients) | **46.6 %** | **1.069** |
+| *real moving CIFAR* | — | *0.211* |
+| *independent frames* | 0 % | *2.000* |
+
+**Exactness caps temporal coherence at 5.1× worse than the data.** And the
+measured 1.086 at ρ_time = 0.999 sits essentially *on* that floor: the fitted
+model has already saturated its structural capacity, so no amount of further
+training, data, or kernel capacity moves it.
+
+Both halves are reproducible without fitting anything —
+`exp_26 --only structure` writes `structure_budget.csv` (the union-find check
+over every coupling choice) and `structure_floor.csv` (the variance
+decomposition).
+
+There is an exact edge budget behind this. A spanning forest on *F* frames of *n*
+coefficients with *c* components per frame has `Fn − c` edges, split as `F(n−c)`
+spatial and `c(F−1)` temporal. Temporal edges can only be bought by cutting
+spatial ones, one for one. Coupling more scales in time therefore requires
+*disconnecting* the spatial tree by the same amount — the two structures compete
+for a fixed budget, and no arrangement escapes it.
+
+So the honest summary: *exact BP on video is achievable, and exactness caps
+temporal coherence at five times worse than the data.* That is a real result —
+it quantifies the price of exactness instead of asserting it is small — and it
+makes the **loopy comparison the interesting experiment** rather than a
+formality. The question is no longer "can we do video exactly" (yes, and here is
+the ceiling) but "what does approximate BP on the fully coupled graph buy against
+exact BP on the best tree", which is now well-posed and quantitative.
+
+**What remains**: real video data; the loopy-BP comparison above; and measuring
+where on the space-time edge-budget curve the best trade-off sits.
 
 ---
 

@@ -61,6 +61,51 @@ import numpy as np
 from .wavelet_bp import wavelet_tree_bp
 
 
+def spatiotemporal_has_cycle(
+    n_per_frame: int,
+    n_frames: int,
+    spatial_edges,
+    coupled_nodes,
+) -> bool:
+    """Is the spatio-temporal graph loopy, given which nodes carry temporal edges?
+
+    `spatial_edges` are within-frame edges, repeated identically in every frame;
+    `coupled_nodes` are the per-frame indices joined to their counterparts in the
+    next frame. Union-find, so this is a decision procedure rather than an
+    argument -- which matters, because the ceiling on video coherence rests on
+    it.
+
+    The result it establishes: **at most one temporal edge per connected
+    component**. If u and v lie in the same component and both are coupled, the
+    within-frame path u -> v exists in both frames, and together with the two
+    temporal edges that closes u_f -> v_f -> v_{f-1} -> u_{f-1} -> u_f. So
+    coupling a second node in a component is never loop-free, whatever the
+    choice.
+    """
+    total = n_per_frame * n_frames
+    parent = list(range(total))
+
+    def find(x):
+        while parent[x] != x:
+            parent[x] = parent[parent[x]]
+            x = parent[x]
+        return x
+
+    edges = []
+    for f in range(n_frames):
+        edges += [(a + f * n_per_frame, b + f * n_per_frame) for a, b in spatial_edges]
+    for f in range(n_frames - 1):
+        for v in coupled_nodes:
+            edges.append((v + f * n_per_frame, v + (f + 1) * n_per_frame))
+
+    for a, b in edges:
+        ra, rb = find(a), find(b)
+        if ra == rb:
+            return True
+        parent[ra] = rb
+    return False
+
+
 @dataclass(frozen=True)
 class ChainBPResult:
     """Forward-backward on a chain with supplied unary potentials.

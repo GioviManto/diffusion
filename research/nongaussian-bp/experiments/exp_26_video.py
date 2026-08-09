@@ -256,7 +256,79 @@ def part_strip(settings, out_dir):
     return []
 
 
-PARTS = {"fit": part_fit, "coherence": part_coherence, "strip": part_strip}
+def part_structure(settings, out_dir):
+    """The ceiling, derived rather than fitted.
+
+    Two things, neither of which involves training a model:
+
+    * the loop-free budget -- at most one temporal edge per per-frame connected
+      component, established by union-find over every choice rather than by
+      argument;
+    * the coherence floor that budget implies, i.e. the frame-difference energy
+      of a model whose temporal kernels are *perfect*.
+
+    Because the floor is reached at rho = 1, it bounds every loop-free
+    spatio-temporal model over this coefficient set, not merely the fitted one.
+    """
+    import itertools
+
+    from src.hierarchy import TreeIndex
+    from src.video_bp import spatiotemporal_has_cycle
+
+    train, test = _data(settings)
+
+    # -- the budget --------------------------------------------------------
+    ti = TreeIndex(settings["levels"] - 1, 4)
+    edges = [
+        (int(node), int(child))
+        for d in range(ti.depth)
+        for node in ti.nodes_at(d)
+        for child in ti.children(int(node), d)
+    ]
+    budget = []
+    for k in (1, 2, 3):
+        cyclic = [
+            spatiotemporal_has_cycle(ti.n_nodes, settings["n_frames"], edges, c)
+            for c in itertools.islice(itertools.combinations(range(ti.n_nodes), k), 40)
+        ]
+        budget.append({
+            "coupled_nodes_per_component": k,
+            "any_choice_loop_free": bool(not all(cyclic)),
+            "all_choices_loop_free": bool(not any(cyclic)),
+        })
+        print(f"[structure] {k} temporal edge(s) per component: "
+              f"loop-free for all choices = {budget[-1]['all_choices_loop_free']}")
+
+    # -- the floor ---------------------------------------------------------
+    frac, frac_root, frac_ll = _coupled_variance_fraction(train, settings["levels"])
+    real = frame_difference_energy(test)
+    rows = [{
+        "coupled_components": 4,
+        "coupled_coefficients_per_frame": 4,
+        "coefficients_per_frame": 3 * ti.n_nodes + 1,
+        "coupled_variance_fraction": frac,
+        "floor_frame_diff_energy": 2.0 * (1.0 - frac),
+        "real_frame_diff_energy": real,
+        "independent_frames": 2.0,
+        "floor_over_real": 2.0 * (1.0 - frac) / real if real > 0 else float("nan"),
+    }]
+    print(f"[structure] coupled variance {frac:.4f} over 4 of "
+          f"{3 * ti.n_nodes + 1} coefficients")
+    print(f"[structure] FLOOR with perfect temporal kernels: "
+          f"{2.0 * (1.0 - frac):.4f}  vs real {real:.4f} "
+          f"({2.0 * (1.0 - frac) / real:.1f}x)")
+
+    write_csv(out_dir / "structure_budget.csv", budget)
+    write_csv(out_dir / "structure_floor.csv", rows)
+    return rows
+
+
+PARTS = {
+    "fit": part_fit,
+    "coherence": part_coherence,
+    "structure": part_structure,
+    "strip": part_strip,
+}
 
 
 def main() -> None:

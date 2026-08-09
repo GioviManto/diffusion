@@ -215,6 +215,52 @@ def test_temporal_m_step_recovers_rho_time():
     assert abs(fitted.q - (1.0 - RHO_TIME**2)) < 0.05
 
 
+def test_at_most_one_temporal_edge_per_component():
+    """The ceiling on video coherence, as a decision procedure.
+
+    Coupling one node per per-frame component is loop-free for *every* choice;
+    coupling two or more closes a cycle for *every* choice. This is what makes
+    the caterpillar already optimal among loop-free spatio-temporal models, and
+    therefore what turns its coherence floor into a property of exactness rather
+    than of one construction.
+    """
+    import itertools
+
+    from src.video_bp import spatiotemporal_has_cycle
+
+    # One component: a root with three children.
+    tree = [(0, 1), (0, 2), (0, 3)]
+    for k in range(1, 5):
+        results = {
+            spatiotemporal_has_cycle(4, 3, tree, combo)
+            for combo in itertools.combinations(range(4), k)
+        }
+        assert results == ({False} if k == 1 else {True}), (
+            f"coupling {k} node(s) gave {results}"
+        )
+
+    # Two disjoint components: one temporal edge in each is still loop-free.
+    forest = [(0, 1), (2, 3)]
+    assert not spatiotemporal_has_cycle(4, 4, forest, [0, 2])
+    assert spatiotemporal_has_cycle(4, 4, forest, [0, 1])
+
+
+def test_the_caterpillar_coupling_is_loop_free():
+    """The construction this module actually implements, checked directly."""
+    from src.video_bp import spatiotemporal_has_cycle
+
+    ti = TreeIndex(DEPTH, BRANCHING)
+    edges = [
+        (int(node), int(child))
+        for d in range(ti.depth)
+        for node in ti.nodes_at(d)
+        for child in ti.children(int(node), d)
+    ]
+    assert not spatiotemporal_has_cycle(ti.n_nodes, FRAMES, edges, [0])
+    # Coupling any second node of the same tree closes a cycle.
+    assert spatiotemporal_has_cycle(ti.n_nodes, FRAMES, edges, [0, 1])
+
+
 def test_rejects_wrong_kernel_shape():
     grid, w = make_grid(8.0, 101)
     pot = np.ones((2, 3, 101))
