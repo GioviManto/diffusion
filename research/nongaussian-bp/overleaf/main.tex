@@ -765,12 +765,34 @@ not claim that it does. On the clean chain the same filter does recover innovati
 \end{remark}
 
 \paragraph{The same thing, seen inside one estimator.} The parameterisation result above compares
-two networks. A second instance needs only one, and varies the data instead. The fully connected
-network's generated residuals become statistically indistinguishable from Gaussian as the budget
-grows --- excess kurtosis $0.046$ at $\nseq=2048$, per-seed $0.069$, $0.019$, $-0.002$, $0.097$
---- while its pointwise error improves monotonically over the same range. One estimator moving in
-opposite directions on the two axes, with nothing else changing, is the cleanest form this takes:
-more data buys a better fit to the bulk of the posterior and a worse account of the tail.
+two networks. A second instance needs only one, and varies the data instead. For the fully
+connected network, across a $64$-fold range of budgets (medians over four seeds and the five
+probe levels):
+
+\begin{center}\small
+\begin{tabular}{@{}rcc@{}}
+\toprule
+$\nseq$ & MSE against the Bayes denoiser & generated residual excess kurtosis \\
+\midrule
+32   & $0.167$ & $7.068$ \\
+128  & $0.077$ & $1.276$ \\
+512  & $0.027$ & $0.166$ \\
+2048 & $0.016$ & $0.044$ \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\noindent
+against a target of ${\approx}1.9$. Pointwise error falls monotonically by a factor of $10.3$
+while the generated law walks monotonically away from the target and ends statistically
+indistinguishable from Gaussian (per-seed $0.069$, $0.019$, $-0.002$, $0.097$ at $\nseq=2048$).
+One estimator, nothing changing but the amount of data, moving in opposite directions on the two
+axes: more data buys a better fit to the bulk of the posterior and a worse account of the tail.
+
+This arm is worth isolating because it is untouched by the correction below. It involves no
+transition kernel, no expectation--maximisation and no iteration count --- it is a network trained
+by denoising score matching --- so whatever is wrong with the estimator arm's optimisation cannot
+explain it. Of everything in this section it is the claim we would defend first.
 
 This arm is worth isolating because it is untouched by the correction below. It involves no
 transition kernel, no expectation--maximisation and no iteration count --- it is a network trained
