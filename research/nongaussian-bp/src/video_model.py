@@ -148,6 +148,27 @@ class VideoTreeModel:
         imgs = tree_to_images(self.qt, post, ll.reshape(b * f_len, 1))
         return imgs.reshape(noisy.shape)
 
+    def resolution_report(self, t: float, points_per_std: float = 3.0) -> dict:
+        """Same grid-resolution limit as the image model, and it applies here too.
+
+        The LL band escapes it -- that one is solved in closed form, no grid --
+        but every tree coefficient is subject to it, and the coarsest detail
+        subbands of a natural frame have the largest scales, hence the narrowest
+        likelihoods. A video likelihood quoted below `min_resolved_t` is being
+        integrated against a mesh that cannot see it. See
+        `WaveletTreeModel.resolution_report` for the derivation.
+        """
+        alpha, delta = alpha_delta(t)
+        dx = float(self.grid[1] - self.grid[0])
+        pps = np.sqrt(delta) / (alpha * self.scales.scales) / dx
+        need = points_per_std * dx * float(self.scales.scales.max())
+        return {
+            "t": float(t),
+            "min_points_per_std": float(pps.min()),
+            "resolved": bool(pps.min() >= points_per_std),
+            "min_resolved_t": float(0.5 * np.log(need**2 + 1.0)),
+        }
+
     def log_likelihood_videos(self, videos: np.ndarray, t: float, chunk: int = 16) -> float:
         """Exact log p_t of whole sequences, in pixel coordinates.
 

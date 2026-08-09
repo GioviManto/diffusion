@@ -623,16 +623,24 @@ by EM through the caterpillar E-step; `frozen` holds ρ_time = 0. The LL band is
 treated identically in both (exact scalar Gaussian AR(1) across frames, no grid),
 so the comparison isolates temporal coupling *of the spatial trees*.
 
-*(80 sequences, 3 EM iterations — smoke scale. The full run is in flight; the
-structural conclusion below does not depend on it, since the prediction is made
-from the variance decomposition rather than from the fit.)*
+300 sequences of 6 frames, 8 EM iterations, 400 generated sequences:
 
 | | ρ_time | held-out loglik/sequence | frame-difference energy |
 |---|---|---|---|
-| frozen (control) | 0 (held) | −5993.4 | 1.538 |
-| **caterpillar** | **0.983** | **−5946.5** | **1.086** |
-| *real video* | — | — | ***0.223*** |
+| frozen (control) | 0 (held) | −5936.3 † | 1.420 |
+| **caterpillar** | **0.999** | **−5902.5** † | **1.005** |
+| *real video* | — | — | ***0.211*** |
 | *independent frames* | — | — | *2.000* |
+
+> † **These two likelihoods are quoted from an unresolved regime and should not
+> be relied on.** They were evaluated at t = 0.6 on a 161-point grid, where the
+> coarsest subband (scale 11.25) resolves to 0.5 points per likelihood standard
+> deviation against the 3 required — the same defect as §6.2, which I failed to
+> guard against here when writing the experiment. `exp_26` now clamps to the
+> resolved t (1.259 at this grid) and records both values, as `exp_25` does. The
+> comparison is paired, so the *ordering* is likely robust, but the margin is
+> not; a corrected re-run is needed before the +33.8 nats figure is quoted
+> anywhere. The coherence column is unaffected — it involves no likelihood.
 
 **Temporal coupling earns its place**: +46.9 nats per sequence on held-out
 likelihood, and coherence improves from 1.538 to 1.086. EM is monotone
@@ -671,10 +679,26 @@ property of exactness itself rather than of this construction:
 | *real moving CIFAR* | — | *0.211* |
 | *independent frames* | 0 % | *2.000* |
 
-**Exactness caps temporal coherence at 5.1× worse than the data.** And the
-measured 1.086 at ρ_time = 0.999 sits essentially *on* that floor: the fitted
-model has already saturated its structural capacity, so no amount of further
-training, data, or kernel capacity moves it.
+**Exactness caps temporal coherence at 5.1× worse than the data.**
+
+**A subtlety that the full-scale run exposed, and that an earlier draft of this
+section got wrong.** The fitted caterpillar measures **1.005** at ρ_time = 0.999
+— *below* the 1.069 quoted above. That is not a violated bound, it is a bound
+evaluated with the wrong variances. Writing the energy out,
+
+    energy = 2 [ (1−ρ_t)·Σ_coupled σ² + Σ_uncoupled σ² ] / Σ_all σ²,
+
+the floor at ρ_t → 1 is `2(1 − frac)` where **frac is the *model's* variance
+decomposition, not the data's**. 1.069 uses the data's 46.6 %; measuring 1.005
+implies the fitted model allocates ≈ 49.7 % to the coupled components.
+
+So the correct statement is sharper than the one it replaces: *a model can only
+get below the data-derived floor by allocating more variance to the coarse,
+temporally coupled components than the data has* — that is, by getting the
+cross-scale variance ladder wrong, which is a modelling error visible in the
+subband statistics of §6.1. The floor binds any model that also matches the
+marginals, and buying coherence below it costs marginal fidelity. Both models
+still land far above real video (0.211) either way.
 
 Both halves are reproducible without fitting anything —
 `exp_26 --only structure` writes `structure_budget.csv` (the union-find check

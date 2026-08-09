@@ -154,9 +154,12 @@ def part_fit(settings, out_dir):
     rows, traces = [], []
 
     for name, (model, trace, secs) in fitted.items():
-        ll = model.log_likelihood_videos(
-            test, settings["t_likelihood"], chunk=settings["chunk"]
-        )
+        # Only quote the likelihood where the grid resolves the likelihood width.
+        # Below that the coarse subbands are integrated against a mesh that
+        # cannot see them, exactly as in exp_25.
+        res = model.resolution_report(settings["t_likelihood"])
+        t_ll = max(settings["t_likelihood"], res["min_resolved_t"])
+        ll = model.log_likelihood_videos(test, t_ll, chunk=settings["chunk"])
         rows.append({
             "model": name,
             "n_train": settings["n_train"],
@@ -165,7 +168,9 @@ def part_fit(settings, out_dir):
             "rho_time": float(model.k_time.rho),
             "rho_ll": model.ll_rho,
             "monotone_violation": trace.monotone_violation,
-            "t_likelihood": settings["t_likelihood"],
+            "t_likelihood_requested": settings["t_likelihood"],
+            "t_likelihood_used": t_ll,
+            "min_resolved_t": res["min_resolved_t"],
             "heldout_loglik_per_sequence": ll / len(test),
             "heldout_loglik_per_frame": ll / (len(test) * settings["n_frames"]),
         })
@@ -173,7 +178,8 @@ def part_fit(settings, out_dir):
             {"model": name, "iteration": i, "log_evidence": v}
             for i, v in enumerate(trace.log_evidence)
         )
-        print(f"[fit] {name}: held-out loglik/sequence {ll / len(test):.2f}")
+        print(f"[fit] {name}: held-out loglik/sequence {ll / len(test):.2f} "
+              f"at t={t_ll:.3f} (min resolved {res['min_resolved_t']:.3f})")
 
     write_csv(out_dir / "fit.csv", rows)
     write_csv(out_dir / "em_trace.csv", traces)
