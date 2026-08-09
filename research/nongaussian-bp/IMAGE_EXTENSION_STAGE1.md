@@ -686,30 +686,49 @@ property of exactness itself rather than of this construction:
 
 | | coupled variance | floor on frame-difference energy |
 |---|---|---|
-| **any loop-free model** (4 of 1024 coefficients) | **46.6 %** | **1.069** |
+| **any loop-free model** (4 of 1024 coefficients) | **46.6 %** | **1.069** naive / **1.055** exact |
 | *real moving CIFAR* | — | *0.211* |
 | *independent frames* | 0 % | *2.000* |
 
 **Exactness caps temporal coherence at 5.1× worse than the data.**
 
-**A subtlety that the full-scale run exposed, and that an earlier draft of this
-section got wrong.** The fitted caterpillar measures **1.005** at ρ_time = 0.999
-— *below* the 1.069 quoted above. That is not a violated bound, it is a bound
-evaluated with the wrong variances. Writing the energy out,
+**A subtlety the full-scale run exposed, and that an earlier draft of this
+section got wrong twice.** The fitted caterpillar measures **1.005** at
+ρ_time = 0.999 — *below* the 1.069 quoted above. That is not a violated bound;
+it is a bound stated too crudely, in two separable ways, and both were measured
+rather than argued away.
 
-    energy = 2 [ (1−ρ_t)·Σ_coupled σ² + Σ_uncoupled σ² ] / Σ_all σ²,
+*First, the variance must be the model's.* Writing the energy out,
 
-the floor at ρ_t → 1 is `2(1 − frac)` where **frac is the *model's* variance
-decomposition, not the data's**. 1.069 uses the data's 46.6 %; measuring 1.005
-implies the fitted model allocates ≈ 49.7 % to the coupled components.
+    energy = 2 · Σ_c σ_c² (1 − ρ_c) / Σ_c σ_c²,
 
-So the correct statement is sharper than the one it replaces: *a model can only
-get below the data-derived floor by allocating more variance to the coarse,
-temporally coupled components than the data has* — that is, by getting the
-cross-scale variance ladder wrong, which is a modelling error visible in the
-subband statistics of §6.1. The floor binds any model that also matches the
-marginals, and buying coherence below it costs marginal fidelity. Both models
-still land far above real video (0.211) either way.
+the floor at ρ_t → 1 is `2(1 − frac)` with **frac the *model's* variance
+allocation, not the data's**. Measured: the data puts 46.55 % in the coupled
+components, the fitted model **49.02 %**, so the model's own naive floor is
+1.020, not 1.069.
+
+*Second, the tree leaks temporal information downward.* The "uncoupled"
+coefficients are not temporally independent after all: a depth-*d* coefficient
+is drawn given its parent, ultimately given the root, and the roots *are*
+correlated in time. It therefore inherits an effective temporal correlation
+
+    ρ_eff(d) = ρ_time · Π_{j≤d} ρ_j²
+
+— attenuated by the square of the spatial correlation at every level. With the
+fitted ρ_spatial ≈ 0.2–0.3 that is a factor of ~20 per level: **0.999 at the
+root, 0.042 at depth 1, 0.004 at depth 2, and gone.** Real, and worth naming as
+the one mechanism by which temporal structure reaches fine scales at all, but it
+buys 0.014 of energy.
+
+Putting both in: 1.0196 − 0.0142 = **1.0054 predicted against 1.0052 measured**.
+The model's temporal coherence is accounted for to 0.02 %.
+
+So the honest bound for a model that also matches the data's variance ladder is
+**≈1.055**, not 1.069, and a model can only go under it by mis-allocating
+variance across scales — a modelling error visible in the subband statistics of
+§6.1. Coherence bought that way is paid for in marginal fidelity. Every version
+of the number lands ~5× above real video (0.211), which is the conclusion that
+matters and the one none of this disturbs.
 
 Both halves are reproducible without fitting anything —
 `exp_26 --only structure` writes `structure_budget.csv` (the union-find check
