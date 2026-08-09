@@ -1,0 +1,3 @@
+model,rho_time,frame_diff_energy_real,frame_diff_energy_generated,frame_diff_energy_structural_prediction,frame_diff_energy_independent_frames,coupled_variance_fraction,prediction_error
+caterpillar,0.9833909658431949,0.22269991519533855,1.0861235541718193,1.133403606129163,2.0,0.436726355298763,0.04728005195734375
+frozen,0.0,0.22269991519533855,1.5374793276561376,1.433805907198108,2.0,0.436726355298763,0.10367342045802963

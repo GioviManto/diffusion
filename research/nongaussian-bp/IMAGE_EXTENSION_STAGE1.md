@@ -609,10 +609,61 @@ changes the answer.
 > forward scales double-count. It leaves every **posterior mean** untouched and
 > is invisible to every check except the evidence one.
 
-**What remains for a video model**: real video data (none is downloaded here),
-a temporal kernel fitted by EM through the caterpillar E-step, and the honest
-comparison against a fully coupled loopy-BP model to measure what the tree
-restriction costs. The inference layer is done; the modelling is not.
+### 9.1 The video model, fitted — and what the tree restriction costs
+
+The inference layer above is now a working model (`src/video_model.py`,
+`src/video_data.py`, `experiments/exp_26_video.py`). Data is **moving CIFAR**:
+reflect-pad each frame and crop a window translating at constant integer
+velocity. Real natural-image frame statistics, synthetic rigid motion, and that
+is stated as a limitation rather than implied away — real video has non-rigid
+motion, occlusion and lighting change, none of which this has.
+
+Two models, identical but for one thing: `caterpillar` fits the temporal kernel
+by EM through the caterpillar E-step; `frozen` holds ρ_time = 0. The LL band is
+treated identically in both (exact scalar Gaussian AR(1) across frames, no grid),
+so the comparison isolates temporal coupling *of the spatial trees*.
+
+*(80 sequences, 3 EM iterations — smoke scale. The full run is in flight; the
+structural conclusion below does not depend on it, since the prediction is made
+from the variance decomposition rather than from the fit.)*
+
+| | ρ_time | held-out loglik/sequence | frame-difference energy |
+|---|---|---|---|
+| frozen (control) | 0 (held) | −5993.4 | 1.538 |
+| **caterpillar** | **0.983** | **−5946.5** | **1.086** |
+| *real video* | — | — | ***0.223*** |
+| *independent frames* | — | — | *2.000* |
+
+**Temporal coupling earns its place**: +46.9 nats per sequence on held-out
+likelihood, and coherence improves from 1.538 to 1.086. EM is monotone
+(violation 0) and ρ_time = 0.983 is the right answer for translating video.
+
+**And it is nowhere near enough.** Real video sits at 0.223; the caterpillar
+reaches 1.086, barely a third of the way from the control to the truth. This is
+**not** undertraining, and the arithmetic says so before any fitting: the
+caterpillar couples the three tree *roots* and the LL band, which together carry
+only **43.7 %** of the per-frame variance. The other 56 % is redrawn
+independently at every frame. Predicting the frame-difference energy from that
+decomposition alone —
+
+    2(1−ρ_time)·frac_root + 2(1−ρ_LL)·frac_LL + 2·(1−frac_coupled)
+
+— gives 1.133 against a measured 1.086 for the caterpillar, and 1.434 against
+1.538 for the control. Agreement to within 5 % on both. **The incoherence is a
+structural ceiling, not a training failure.**
+
+So the honest summary of the video direction: *exact BP on video is achievable,
+and the exactness costs most of the temporal coherence.* The spanning structure
+that removes the loops also removes the coupling that video is made of. That is
+a genuine result — it quantifies the price of exactness rather than asserting it
+is small — and it is the strongest argument in this document for why the
+**loopy** comparison is now the interesting experiment: one needs to know what
+approximate BP on the fully coupled graph buys against exact BP on this one.
+
+**What remains**: real video data; the fully coupled loopy-BP comparison above;
+and richer spanning structures (coupling one subband level in time rather than
+only the root) which trade a little exactness for a lot of coherence and can be
+enumerated systematically.
 
 ---
 

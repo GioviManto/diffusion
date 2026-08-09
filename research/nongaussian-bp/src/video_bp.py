@@ -70,10 +70,15 @@ class ChainBPResult:
               exactly what a site must pass on to a subtree hanging below it.
     log_z   : (B,) log normalisation of the chain, given the potentials as
               supplied (so the caller's own normalisation must be added back).
+    xi      : (M, M) expected transition mass on the temporal edges, summed over
+              every edge of every sequence, or None if not requested. Same
+              `Xi[k, j]` convention as everywhere else, so the temporal kernel's
+              M-step is the existing M-step with no changes.
     """
 
     context: np.ndarray
     log_z: np.ndarray
+    xi: np.ndarray | None = None
 
 
 def chain_bp_potentials(
@@ -81,6 +86,7 @@ def chain_bp_potentials(
     k_time: np.ndarray,
     weights: np.ndarray,
     mu: np.ndarray,
+    want_stats: bool = False,
 ) -> ChainBPResult:
     """Exact forward-backward on a chain of arbitrary unary potentials.
 
@@ -121,13 +127,32 @@ def chain_bp_potentials(
     context = fwd * bwd
     total = (weights[None, :] * pot[:, 0] * context[:, 0]).sum(axis=1)
     log_z = log_z + np.log(np.maximum(total, 1e-300))
-    return ChainBPResult(context, log_z)
+
+    xi = None
+    if want_stats:
+        # Pairwise belief on each temporal edge:
+        #   b(a_f = u_j, a_{f+1} = u_k)  ~  K[k, j] left_f[j] right_{f+1}[k],
+        # with `left` carrying everything known at f from the left and its own
+        # potential, and `right` the same from the right. Normalised per edge, so
+        # Xi sums to the number of temporal edges -- the property every M-step in
+        # `src/kernels.py` relies on.
+        xi = np.zeros((m, m))
+        for i in range(f_len - 1):
+            left = weights[None, :] * pot[:, i] * fwd[:, i]
+            right = weights[None, :] * pot[:, i + 1] * bwd[:, i + 1]
+            partition = np.einsum("bk,bk->b", right, left @ k_time.T)
+            c_mat = (right / np.maximum(partition, 1e-300)[:, None]).T @ left
+            xi += c_mat * k_time
+
+    return ChainBPResult(context, log_z, xi)
 
 
 @dataclass(frozen=True)
 class VideoBPResult:
-    posterior_mean: np.ndarray   # (B, F, n_nodes)
+    posterior_mean: np.ndarray                  # (B, F, n_nodes)
     log_evidence: float
+    xi_space: list[np.ndarray] | None = None    # per spatial level
+    xi_time: np.ndarray | None = None           # temporal edges
 
 
 def caterpillar_bp(
@@ -142,6 +167,7 @@ def caterpillar_bp(
     branching: int,
     depth: int,
     chunk: int = 32,
+    want_stats: bool = False,
 ) -> VideoBPResult:
     """Exact BP on a temporal chain of spatial quadtrees.
 
@@ -172,14 +198,24 @@ def caterpillar_bp(
     tree_scale = up.log_scale.reshape(b, f_len).sum(axis=1)
 
     # -- 2. exact chain over the frames -----------------------------------
-    chain = chain_bp_potentials(pot, k_time, weights, np.exp(log_mu))
+    chain = chain_bp_potentials(
+        pot, k_time, weights, np.exp(log_mu), want_stats=want_stats
+    )
 
     # -- 3. downward pass per frame, with the chain context as the root message
+    # Once the root holds its correct incoming message, every belief the downward
+    # pass computes is the full-model posterior, not the per-frame one. So the
+    # spatial Xi taken from *this* call is the caterpillar's, which is the whole
+    # reason the statistics are collected here and not in step 1.
     context = chain.context.reshape(b * f_len, m)
     down = wavelet_tree_bp(
         grid, weights, log_k_space, uniform, flat, alpha, delta_by_depth,
         branching, depth, chunk=chunk, root_message=context,
+        want_stats=want_stats,
     )
 
     log_evidence = float(np.sum(tree_scale + chain.log_z))
-    return VideoBPResult(down.posterior_mean.reshape(b, f_len, n_nodes), log_evidence)
+    return VideoBPResult(
+        down.posterior_mean.reshape(b, f_len, n_nodes), log_evidence,
+        down.xi_by_level, chain.xi,
+    )

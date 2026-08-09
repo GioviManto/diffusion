@@ -1,0 +1,38 @@
+{
+  "settings": {
+    "archive": "data/cifar-10-python.tar.gz",
+    "levels": 5,
+    "n_train": 80,
+    "n_test": 60,
+    "n_frames": 6,
+    "max_speed": 1,
+    "t_train": [
+      0.6
+    ],
+    "t_likelihood": 0.6,
+    "n_iters": 3,
+    "grid_size": 161,
+    "half_width": 8.0,
+    "n_components": 4,
+    "spatial_family": "gaussian",
+    "n_generate": 100,
+    "chunk": 16,
+    "seed": 0
+  },
+  "parts": [
+    "fit",
+    "coherence",
+    "strip"
+  ],
+  "provenance": {
+    "timestamp": "2026-08-09 21:11:10",
+    "python": "3.12.5",
+    "numpy": "2.4.2",
+    "platform": "macOS-14.1.1-arm64-arm-64bit",
+    "hostname": "MacBook-Air-160.communityfibre.co.uk",
+    "slurm_job_id": "",
+    "slurm_array_task_id": "",
+    "cpu_count": "8",
+    "blas_threads": ""
+  }
+}

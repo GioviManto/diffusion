@@ -1,0 +1,330 @@
+"""A fitted video model: spatial trees per frame, a temporal chain over roots.
+
+Composition, not a new model class. The spatial half is `WaveletTreeModel`
+verbatim -- same subband scales, same per-level kernels, same per-depth Delta --
+and this adds exactly two things: a temporal kernel on the roots, and a temporal
+treatment of the LL coefficient.
+
+**The LL band is handled in closed form, on purpose.** Every other coefficient
+goes through the grid, but LL has a subband scale of about 17 against 0.14 at the
+finest detail level, so `Delta_d = Delta_t / s_d^2` would put it far below the
+resolution the shared grid can support (see `WaveletTreeModel.resolution_report`
+-- this is the same limit, at its most extreme). It is a scalar Gaussian AR(1)
+across frames, so a dense F x F solve is exact, needs no grid at all, and
+sidesteps the problem entirely rather than papering over it.
+
+**The control.** `rho_time = 0` gives frames that are independent *given* the LL
+trajectory, with every other part of the model identical. That isolates the one
+thing being tested -- temporal coupling of the spatial trees -- instead of
+confounding it with the LL treatment, which is shared.
+"""
+
+from __future__ import annotations
+
+import time
+from dataclasses import dataclass
+
+import numpy as np
+
+from .bp_grid import make_grid
+from .em import ExpectedStatistics
+from .noising import alpha_delta
+from .video_bp import caterpillar_bp
+from .wavelet import images_to_tree, tree_to_images
+from .wavelet_model import SubbandScales
+
+_LOG_2PI = float(np.log(2.0 * np.pi))
+
+
+# ----------------------------------------------------------------------------
+# The LL band: exact scalar Gaussian AR(1) across frames
+# ----------------------------------------------------------------------------
+
+def _ll_covariance(n_frames: int, var: float, rho: float) -> np.ndarray:
+    lag = np.abs(np.subtract.outer(np.arange(n_frames), np.arange(n_frames)))
+    return var * rho**lag
+
+
+def ll_posterior_mean(scaling, mean, var, rho, alpha, delta):
+    """E[LL | noisy LL] for the whole sequence, by dense solve. `scaling` is (B, F)."""
+    f_len = scaling.shape[1]
+    sigma = _ll_covariance(f_len, var, rho)
+    obs = alpha**2 * sigma + delta * np.eye(f_len)
+    centred = scaling - alpha * mean
+    return mean + alpha * (sigma @ np.linalg.solve(obs, centred.T)).T
+
+
+def ll_log_likelihood(scaling, mean, var, rho, alpha, delta) -> float:
+    f_len = scaling.shape[1]
+    sigma = _ll_covariance(f_len, var, rho)
+    obs = alpha**2 * sigma + delta * np.eye(f_len)
+    centred = scaling - alpha * mean
+    sign, logdet = np.linalg.slogdet(obs)
+    if sign <= 0:
+        return float("-inf")
+    quad = np.einsum("bi,ib->b", centred, np.linalg.solve(obs, centred.T))
+    return float(np.sum(-0.5 * (quad + logdet + f_len * _LOG_2PI)))
+
+
+def fit_ll_ar1(scaling: np.ndarray) -> tuple[float, float, float]:
+    """(mean, var, rho) of the LL band, by moments across frames."""
+    mean = float(scaling.mean())
+    var = float(scaling.var())
+    a = scaling[:, :-1].ravel() - mean
+    b = scaling[:, 1:].ravel() - mean
+    rho = float(np.clip((a * b).mean() / max(var, 1e-12), -0.999, 0.999))
+    return mean, var, rho
+
+
+# ----------------------------------------------------------------------------
+# The model
+# ----------------------------------------------------------------------------
+
+@dataclass(frozen=True)
+class VideoTreeModel:
+    qt: object
+    scales: SubbandScales
+    kernels: list                 # [orientation][level] spatial kernels
+    k_time: object                # temporal kernel on the roots
+    log_root: np.ndarray          # (3, M) prior on the first frame's root
+    grid: np.ndarray
+    weights: np.ndarray
+    ll_mean: float
+    ll_var: float
+    ll_rho: float
+
+    @property
+    def depth(self) -> int:
+        return self.qt.depth
+
+    def _log_k_space(self, oi):
+        return [k.log_transition_matrix(self.grid) for k in self.kernels[oi]]
+
+    def _bp(self, nodes_std, alpha, delta, want_stats=False, chunk=16):
+        """Run the caterpillar for each orientation. `nodes_std` is (B, F, 3, n)."""
+        out = np.empty_like(nodes_std)
+        log_ev = 0.0
+        xi_space = None
+        xi_time = None
+        k_time = np.exp(self.k_time.log_transition_matrix(self.grid))
+
+        for oi in range(3):
+            res = caterpillar_bp(
+                self.grid, self.weights, self._log_k_space(oi), k_time,
+                self.log_root[oi], nodes_std[:, :, oi, :], alpha,
+                self.scales.delta_by_depth(oi, delta), self.qt.branching,
+                self.depth, chunk=chunk, want_stats=want_stats,
+            )
+            out[:, :, oi, :] = res.posterior_mean
+            log_ev += res.log_evidence
+            if want_stats:
+                if xi_space is None:
+                    xi_space = [x.copy() for x in res.xi_space]
+                    xi_time = res.xi_time.copy()
+                else:
+                    for d, x in enumerate(res.xi_space):
+                        xi_space[d] += x
+                    xi_time += res.xi_time
+        return out, log_ev, xi_space, xi_time
+
+    def _to_std_nodes(self, videos):
+        b, f_len = videos.shape[:2]
+        flat = videos.reshape(b * f_len, *videos.shape[2:])
+        _, nodes, scaling = images_to_tree(flat, self.qt.levels)
+        std = self.scales.standardise(self.qt, nodes)
+        n = std.shape[-1]
+        return (std.reshape(b, f_len, 3, n), scaling.reshape(b, f_len), b, f_len)
+
+    def denoise_videos(self, noisy: np.ndarray, t: float, chunk: int = 16):
+        alpha, delta = alpha_delta(t)
+        std, scaling, b, f_len = self._to_std_nodes(noisy)
+        post, _, _, _ = self._bp(std, alpha, delta, chunk=chunk)
+        post = self.scales.restore(
+            self.qt, post.reshape(b * f_len, 3, post.shape[-1])
+        )
+        ll = ll_posterior_mean(
+            scaling, self.ll_mean, self.ll_var, self.ll_rho, alpha, delta
+        )
+        imgs = tree_to_images(self.qt, post, ll.reshape(b * f_len, 1))
+        return imgs.reshape(noisy.shape)
+
+    def log_likelihood_videos(self, videos: np.ndarray, t: float, chunk: int = 16) -> float:
+        """Exact log p_t of whole sequences, in pixel coordinates.
+
+        Same two exact corrections as the image model -- the diagonal
+        standardisation contributes -sum log s_v per frame, the orthonormal
+        transform contributes nothing -- plus the LL sequence likelihood.
+        """
+        alpha, delta = alpha_delta(t)
+        std, scaling, b, f_len = self._to_std_nodes(videos)
+        _, log_ev, _, _ = self._bp(std, alpha, delta, chunk=chunk)
+        log_jac = -float(np.sum(np.log(self.scales.per_node(self.qt)))) * b * f_len
+        ll = ll_log_likelihood(
+            scaling, self.ll_mean, self.ll_var, self.ll_rho, alpha, delta
+        )
+        return log_ev + log_jac + ll
+
+    # -- generation --------------------------------------------------------
+
+    def sample_ancestral(self, n: int, n_frames: int, rng, jitter: bool = True):
+        """Sample whole sequences: temporal chain of roots, then each frame's tree."""
+        from .wavelet_model import _sample_columns
+        from .hierarchy import TreeIndex
+
+        grid, w = self.grid, self.weights
+        dx = float(grid[1] - grid[0])
+        ti = TreeIndex(self.depth, self.qt.branching)
+        nodes = np.empty((n, n_frames, 3, ti.n_nodes))
+        k_time = np.exp(self.k_time.log_transition_matrix(grid)) * w[:, None]
+        cdf_t = np.cumsum(k_time, axis=0)
+        cdf_t /= cdf_t[-1][None, :]
+
+        for oi in range(3):
+            root_p = np.exp(self.log_root[oi] - self.log_root[oi].max()) * w
+            root_p /= root_p.sum()
+            state = np.empty((n, n_frames, ti.n_nodes), dtype=np.intp)
+            # Temporal backbone first: the roots are a Markov chain in time.
+            state[:, 0, 0] = rng.choice(len(grid), size=n, p=root_p)
+            for f in range(1, n_frames):
+                state[:, f, 0] = _sample_columns(cdf_t, state[:, f - 1, 0], rng)
+            # Then each frame's quadtree, conditioned on its own root.
+            cdfs = []
+            for d in range(self.depth):
+                k = np.exp(self.kernels[oi][d].log_transition_matrix(grid)) * w[:, None]
+                c = np.cumsum(k, axis=0)
+                cdfs.append(c / c[-1][None, :])
+            flat = state.reshape(n * n_frames, ti.n_nodes)
+            for d in range(self.depth):
+                parents = ti.nodes_at(d)
+                kids = ti.nodes_at(d + 1)
+                ps = np.repeat(flat[:, parents], ti.branching, axis=1)
+                flat[:, kids] = _sample_columns(cdfs[d], ps, rng)
+            vals = grid[flat.reshape(n, n_frames, ti.n_nodes)]
+            if jitter:
+                vals = vals + (rng.random(vals.shape) - 0.5) * dx
+            nodes[:, :, oi, :] = vals
+
+        flat_nodes = self.scales.restore(
+            self.qt, nodes.reshape(n * n_frames, 3, ti.n_nodes)
+        )
+        ll = self._sample_ll(n, n_frames, rng)
+        imgs = tree_to_images(self.qt, flat_nodes, ll.reshape(n * n_frames, 1))
+        side = self.qt.side
+        return imgs.reshape(n, n_frames, side, side)
+
+    def _sample_ll(self, n: int, n_frames: int, rng) -> np.ndarray:
+        sigma = _ll_covariance(n_frames, self.ll_var, self.ll_rho)
+        chol = np.linalg.cholesky(sigma + 1e-12 * np.eye(n_frames))
+        return self.ll_mean + rng.standard_normal((n, n_frames)) @ chol.T
+
+
+# ----------------------------------------------------------------------------
+# Fitting
+# ----------------------------------------------------------------------------
+
+@dataclass
+class VideoEMTrace:
+    log_evidence: list
+    seconds: list
+
+    @property
+    def monotone_violation(self) -> float:
+        if len(self.log_evidence) < 2:
+            return 0.0
+        return float(max(0.0, -np.diff(self.log_evidence).min()))
+
+
+def fit_video_tree(
+    videos: np.ndarray,
+    levels: int,
+    t_train,
+    kernel_factory,
+    time_kernel_factory,
+    n_iters: int = 12,
+    half_width: float = 8.0,
+    grid_size: int = 201,
+    freeze_time: bool = False,
+    chunk: int = 16,
+    verbose: bool = False,
+):
+    """Generalised EM for the caterpillar: spatial kernels and a temporal kernel.
+
+    `freeze_time=True` keeps the temporal kernel at its initial value, which is
+    how the no-temporal-coupling control is built: initialise it at rho = 0 and
+    it stays there, with every other part of the fit identical.
+    """
+    from .utils import rng_for
+
+    rng = rng_for("video-em", levels, tuple(t_train))
+    b, f_len = videos.shape[:2]
+    flat = videos.reshape(b * f_len, *videos.shape[2:])
+    qt, clean_nodes, clean_scaling = images_to_tree(flat, levels)
+    scales = SubbandScales.fit(qt, clean_nodes)
+    std_clean = scales.standardise(qt, clean_nodes)
+    n_nodes = std_clean.shape[-1]
+    std_clean = std_clean.reshape(b, f_len, 3, n_nodes)
+
+    grid, weights = make_grid(half_width, grid_size)
+    log_root = np.tile(-0.5 * grid**2 - 0.5 * _LOG_2PI, (3, 1))
+    ll_mean, ll_var, ll_rho = fit_ll_ar1(clean_scaling.reshape(b, f_len))
+
+    kern = [[kernel_factory(d, rng) for d in range(qt.depth)] for _ in range(3)]
+    k_time = time_kernel_factory(rng)
+
+    per_node = scales.per_node(qt)[None, None, :, :]
+    obs = []
+    for t in t_train:
+        alpha, delta = alpha_delta(t)
+        noise = rng.standard_normal(std_clean.shape)
+        obs.append((alpha * std_clean + np.sqrt(delta) * noise / per_node, alpha, delta))
+
+    trace = VideoEMTrace([], [])
+    for it in range(n_iters):
+        t0 = time.perf_counter()
+        model = VideoTreeModel(
+            qt=qt, scales=scales, kernels=kern, k_time=k_time, log_root=log_root,
+            grid=grid, weights=weights,
+            ll_mean=ll_mean, ll_var=ll_var, ll_rho=ll_rho,
+        )
+        tot_space = [None] * qt.depth
+        tot_time = np.zeros((grid_size, grid_size))
+        log_ev = 0.0
+        for x_std, alpha, delta in obs:
+            _, ev, xi_s, xi_t = model._bp(
+                x_std, alpha, delta, want_stats=True, chunk=chunk
+            )
+            log_ev += ev
+            tot_time += xi_t
+            for d, x in enumerate(xi_s):
+                tot_space[d] = x if tot_space[d] is None else tot_space[d] + x
+
+        trace.log_evidence.append(log_ev)
+        n_edge_time = b * (f_len - 1) * 3 * len(obs)
+        for d in range(qt.depth):
+            stats = ExpectedStatistics(
+                xi=tot_space[d], site1=np.zeros(grid_size), log_evidence=0.0,
+                n_edges=int(tot_space[d].sum()), n_chains=b,
+            )
+            new = kern[0][d].m_step(stats, grid)
+            for oi in range(3):
+                kern[oi][d] = new
+        if not freeze_time:
+            k_time = k_time.m_step(
+                ExpectedStatistics(
+                    xi=tot_time, site1=np.zeros(grid_size), log_evidence=0.0,
+                    n_edges=n_edge_time, n_chains=b,
+                ),
+                grid,
+            )
+        trace.seconds.append(time.perf_counter() - t0)
+        if verbose:
+            print(f"  video EM {it + 1:2d}/{n_iters}  log-ev {log_ev:.6e}  "
+                  f"rho_time {getattr(k_time, 'rho', float('nan')):.4f}  "
+                  f"{trace.seconds[-1]:.1f}s")
+
+    model = VideoTreeModel(
+        qt=qt, scales=scales, kernels=kern, k_time=k_time, log_root=log_root,
+        grid=grid, weights=weights,
+        ll_mean=ll_mean, ll_var=ll_var, ll_rho=ll_rho,
+    )
+    return model, trace

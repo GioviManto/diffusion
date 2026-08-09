@@ -1,0 +1,284 @@
+"""Experiment 26 -- video: what exact BP on a caterpillar can and cannot do.
+
+The model is a temporal chain of spatial quadtrees (`src/video_bp.py`): frames
+coupled through the *root* of each frame's tree, which is the loop-free spanning
+structure of the spatio-temporal graph. BP on it is exact. The question this
+experiment answers is whether that exactness is worth what it costs.
+
+Two models, identical in every respect but one:
+
+    caterpillar   temporal kernel fitted by EM through the caterpillar E-step.
+    frozen        temporal kernel held at rho_time = 0 -- frames independent
+                  *given* the LL trajectory, which is shared by both.
+
+Isolating the comparison to the tree-root coupling is the point. The LL band is
+handled identically in both (an exact scalar Gaussian AR(1) across frames), so
+the difference between them is the one thing being tested and not a bundle.
+
+The metric that matters is **frame-difference energy**: mean squared successive
+frame difference over frame variance. 0 is a frozen sequence, 2 is successive
+frames independent. Real translating video sits near 0.22.
+
+Parts
+-----
+fit        Both models; held-out sequence likelihood, fitted rho_time.
+coherence  Frame-difference energy of generated video against real, plus the
+           variance-decomposition prediction that says what the structure alone
+           implies.
+strip      PNG of real and generated frame strips.
+"""
+
+from __future__ import annotations
+
+import time
+
+import numpy as np
+
+from common import (
+    PACKAGE_ROOT, apply_overrides, experiment_parser, provenance, select_parts,
+)
+from src.image_data import load_cifar10_luminance
+from src.kernels import GaussianAR1Kernel
+from src.scale_kernel import ScaleMixtureKernel
+from src.utils import ensure_dir, rng_for, write_csv, write_json
+from src.video_data import frame_difference_energy, make_moving_sequences
+from src.video_model import fit_video_tree
+from src.wavelet import images_to_tree
+
+SETTINGS = {
+    "archive": "data/cifar-10-python.tar.gz",
+    "levels": 5,
+    "n_train": 300,
+    "n_test": 200,
+    "n_frames": 6,
+    "max_speed": 1,
+    "t_train": (0.6,),
+    "t_likelihood": 0.6,
+    "n_iters": 8,
+    "grid_size": 161,
+    "half_width": 8.0,
+    "n_components": 4,
+    "spatial_family": "gaussian",
+    "n_generate": 400,
+    "chunk": 16,
+    "seed": 0,
+}
+
+
+def _archive(settings):
+    from pathlib import Path
+
+    p = Path(settings["archive"])
+    return p if p.is_absolute() else PACKAGE_ROOT / p
+
+
+def _data(settings):
+    train = load_cifar10_luminance(
+        _archive(settings), "train", settings["n_train"], settings["seed"]
+    )
+    test = load_cifar10_luminance(
+        _archive(settings), "test", settings["n_test"], settings["seed"],
+        stats=(train.mean, train.std),
+    )
+    rng = rng_for("exp26", "motion", settings["seed"])
+    tr = make_moving_sequences(
+        train.images, settings["n_frames"], rng, settings["max_speed"]
+    )
+    te = make_moving_sequences(
+        test.images, settings["n_frames"], rng, settings["max_speed"]
+    )
+    return tr, te
+
+
+def _spatial_factory(settings):
+    if settings["spatial_family"] == "scale_mixture":
+        return lambda d, rng: ScaleMixtureKernel.init(
+            settings["n_components"], rho=0.2, var=0.8, rng=rng
+        )
+    return lambda d, rng: GaussianAR1Kernel(rho=0.2, q=0.8)
+
+
+_CACHE: dict = {}
+
+
+def _fit_both(settings, train):
+    key = repr(sorted(settings.items()))
+    if key in _CACHE:
+        return _CACHE[key]
+    out = {}
+    for name, freeze, rho0 in (("caterpillar", False, 0.3), ("frozen", True, 0.0)):
+        t0 = time.perf_counter()
+        model, trace = fit_video_tree(
+            train, levels=settings["levels"], t_train=list(settings["t_train"]),
+            kernel_factory=_spatial_factory(settings),
+            time_kernel_factory=lambda r, _r=rho0: GaussianAR1Kernel(rho=_r, q=0.8),
+            n_iters=settings["n_iters"], half_width=settings["half_width"],
+            grid_size=settings["grid_size"], freeze_time=freeze,
+            chunk=settings["chunk"],
+        )
+        out[name] = (model, trace, time.perf_counter() - t0)
+        print(f"[fit] {name}: {out[name][2]:.0f}s, rho_time "
+              f"{model.k_time.rho:.4f}, monotone violation "
+              f"{trace.monotone_violation:.3g}")
+    _CACHE[key] = out
+    return out
+
+
+def _coupled_variance_fraction(videos, levels):
+    """Fraction of per-frame variance carried by the temporally coupled parts.
+
+    The caterpillar couples the *roots* of the three orientation trees and the LL
+    band. Everything else is redrawn independently at every frame, so this
+    fraction is what caps the achievable temporal coherence before any parameter
+    is fitted.
+    """
+    flat = videos.reshape(-1, *videos.shape[2:])
+    qt, nodes, scaling = images_to_tree(flat, levels)
+    depth_of = qt.node_depth
+    total = 0.0
+    root = 0.0
+    for oi in range(3):
+        for d in range(qt.depth + 1):
+            blk = nodes[:, oi, depth_of == d]
+            v = float(blk.var() * blk.shape[1])
+            total += v
+            if d == 0:
+                root += v
+    ll = float(scaling.var() * scaling.shape[1])
+    return (root + ll) / (total + ll), root / (total + ll), ll / (total + ll)
+
+
+def part_fit(settings, out_dir):
+    train, test = _data(settings)
+    fitted = _fit_both(settings, train)
+    rows, traces = [], []
+
+    for name, (model, trace, secs) in fitted.items():
+        ll = model.log_likelihood_videos(
+            test, settings["t_likelihood"], chunk=settings["chunk"]
+        )
+        rows.append({
+            "model": name,
+            "n_train": settings["n_train"],
+            "n_frames": settings["n_frames"],
+            "seconds": secs,
+            "rho_time": float(model.k_time.rho),
+            "rho_ll": model.ll_rho,
+            "monotone_violation": trace.monotone_violation,
+            "t_likelihood": settings["t_likelihood"],
+            "heldout_loglik_per_sequence": ll / len(test),
+            "heldout_loglik_per_frame": ll / (len(test) * settings["n_frames"]),
+        })
+        traces.extend(
+            {"model": name, "iteration": i, "log_evidence": v}
+            for i, v in enumerate(trace.log_evidence)
+        )
+        print(f"[fit] {name}: held-out loglik/sequence {ll / len(test):.2f}")
+
+    write_csv(out_dir / "fit.csv", rows)
+    write_csv(out_dir / "em_trace.csv", traces)
+    return rows
+
+
+def part_coherence(settings, out_dir):
+    train, test = _data(settings)
+    fitted = _fit_both(settings, train)
+    real = frame_difference_energy(test)
+    frac, frac_root, frac_ll = _coupled_variance_fraction(train, settings["levels"])
+    rows = []
+
+    for name, (model, _, _) in fitted.items():
+        rng = rng_for("exp26", "gen", name, settings["seed"])
+        gen = model.sample_ancestral(
+            settings["n_generate"], settings["n_frames"], rng
+        )
+        got = frame_difference_energy(gen)
+        # What the structure alone implies, before any fitting: the coupled
+        # fraction contributes 2(1 - rho) and the rest contributes the full 2.
+        pred = (
+            2.0 * (1.0 - model.k_time.rho) * frac_root
+            + 2.0 * (1.0 - model.ll_rho) * frac_ll
+            + 2.0 * (1.0 - frac)
+        )
+        rows.append({
+            "model": name,
+            "rho_time": float(model.k_time.rho),
+            "frame_diff_energy_real": real,
+            "frame_diff_energy_generated": got,
+            "frame_diff_energy_structural_prediction": pred,
+            "frame_diff_energy_independent_frames": 2.0,
+            "coupled_variance_fraction": frac,
+            "prediction_error": abs(got - pred),
+        })
+        print(f"[coherence] {name}: generated {got:.4f}, predicted {pred:.4f}, "
+              f"real {real:.4f} (independent frames = 2.0)")
+
+    print(f"[coherence] temporally coupled variance fraction: {frac:.4f}")
+    write_csv(out_dir / "coherence.csv", rows)
+    return rows
+
+
+def part_strip(settings, out_dir):
+    import matplotlib
+
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+
+    train, test = _data(settings)
+    fitted = _fit_both(settings, train)
+    f = settings["n_frames"]
+
+    panels = [("real", test[:2])]
+    for name, (model, _, _) in fitted.items():
+        rng = rng_for("exp26", "strip", name, settings["seed"])
+        panels.append((name, model.sample_ancestral(2, f, rng)))
+
+    n_rows = len(panels) * 2
+    fig, axes = plt.subplots(n_rows, f, figsize=(f * 1.1, n_rows * 1.2))
+    r = 0
+    for label, vids in panels:
+        for k in range(2):
+            for c in range(f):
+                ax = axes[r, c]
+                ax.imshow(vids[k, c], cmap="gray", vmin=-2.5, vmax=2.5)
+                ax.set_xticks([])
+                ax.set_yticks([])
+                if c == 0:
+                    ax.set_ylabel(label, fontsize=6, rotation=0,
+                                  ha="right", va="center")
+            r += 1
+    fig.suptitle("Moving CIFAR: real vs caterpillar samples (time runs left to right)",
+                 fontsize=8)
+    fig.tight_layout()
+    fig.savefig(out_dir / "video_strips.png", dpi=170, bbox_inches="tight")
+    plt.close(fig)
+    print(f"[strip] wrote {out_dir / 'video_strips.png'}")
+    return []
+
+
+PARTS = {"fit": part_fit, "coherence": part_coherence, "strip": part_strip}
+
+
+def main() -> None:
+    parser = experiment_parser(
+        "exp_26_video", "Exact BP on a temporal chain of spatial trees, on moving CIFAR."
+    )
+    args = parser.parse_args()
+    if args.list_parts:
+        print("\n".join(PARTS))
+        return
+
+    settings = apply_overrides(SETTINGS, args.set)
+    if args.quick:
+        settings.update(n_train=80, n_test=60, n_iters=3, n_generate=100)
+
+    out_dir = ensure_dir(args.output_dir)
+    parts = select_parts(PARTS, args.only)
+    for name, fn in parts.items():
+        fn(settings, out_dir)
+    write_json(out_dir / "params.json",
+               {"settings": settings, "parts": list(parts), "provenance": provenance()})
+
+
+if __name__ == "__main__":
+    main()

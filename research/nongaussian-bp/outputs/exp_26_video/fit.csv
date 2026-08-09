@@ -1,0 +1,3 @@
+model,n_train,n_frames,seconds,rho_time,rho_ll,monotone_violation,t_likelihood,heldout_loglik_per_sequence,heldout_loglik_per_frame
+caterpillar,80,6,71.51462329200876,0.9833909658431949,0.9968613925702171,0.0,0.6,-5946.454227330527,-991.0757045550878
+frozen,80,6,77.05585966599756,0.0,0.9968613925702171,0.0,0.6,-5993.37752104936,-998.8962535082267

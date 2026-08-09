@@ -164,6 +164,57 @@ def test_chain_bp_potentials_reproduces_a_gaussian_chain():
     assert abs(float(np.sum(res.log_z + const)) - want_ev) / abs(want_ev) < 1e-9
 
 
+def test_statistics_carry_the_right_mass():
+    """Xi must sum to the edge count on both axes, spatial and temporal."""
+    deltas = [0.4, 0.6, 0.9]
+    n_videos = 4
+    ti, grid, w, log_ks, k_time, log_mu, _, x, alpha, _ = _setup(deltas, n_videos)
+    xr = x.reshape(n_videos, FRAMES, ti.n_nodes)
+
+    res = caterpillar_bp(
+        grid, w, log_ks, k_time, log_mu, xr, alpha, deltas,
+        BRANCHING, DEPTH, want_stats=True,
+    )
+    assert res.xi_time is not None and res.xi_space is not None
+
+    want_time = n_videos * (FRAMES - 1)
+    assert abs(float(res.xi_time.sum()) - want_time) < 1e-6 * want_time
+    for d, xi in enumerate(res.xi_space):
+        want = n_videos * FRAMES * BRANCHING ** (d + 1)
+        assert abs(float(xi.sum()) - want) < 1e-6 * want
+
+
+def test_temporal_m_step_recovers_rho_time():
+    """The statistic has to be *correct*, not merely correctly normalised.
+
+    Feeding the temporal Xi to the existing Gaussian M-step must return the rho
+    that generated the data. A Xi that summed to the right mass but paired the
+    wrong sites would pass the mass check and fail this one.
+    """
+    from src.kernels import GaussianAR1Kernel
+
+    deltas = [0.25, 0.25, 0.25]
+    n_videos = 200
+    ti, grid, w, log_ks, k_time, log_mu, _, x, alpha, _ = _setup(
+        deltas, n_videos, size=401, half_width=8.0
+    )
+    xr = x.reshape(n_videos, FRAMES, ti.n_nodes)
+
+    res = caterpillar_bp(
+        grid, w, log_ks, k_time, log_mu, xr, alpha, deltas,
+        BRANCHING, DEPTH, want_stats=True,
+    )
+    from src.em import ExpectedStatistics
+
+    stats = ExpectedStatistics(
+        xi=res.xi_time, site1=np.zeros(grid.size), log_evidence=0.0,
+        n_edges=n_videos * (FRAMES - 1), n_chains=n_videos,
+    )
+    fitted = GaussianAR1Kernel(rho=0.2, q=0.5).m_step(stats, grid)
+    assert abs(fitted.rho - RHO_TIME) < 0.05, f"got {fitted.rho}, want {RHO_TIME}"
+    assert abs(fitted.q - (1.0 - RHO_TIME**2)) < 0.05
+
+
 def test_rejects_wrong_kernel_shape():
     grid, w = make_grid(8.0, 101)
     pot = np.ones((2, 3, 101))
