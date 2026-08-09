@@ -742,6 +742,23 @@ spatial ones, one for one. Coupling more scales in time therefore requires
 *disconnecting* the spatial tree by the same amount — the two structures compete
 for a fixed budget, and no arrangement escapes it.
 
+**Two independent limitations, not one.** It is worth separating them, because
+the obvious response to the first is closed off by the second:
+
+* **Breadth.** At most 4 of 1024 coefficients per frame carry a temporal edge —
+  the component argument above.
+* **Depth.** Whatever those edges carry decays as ρ_spatial² per level going
+  down the tree: 0.999 at the root, **0.042** one level below, 0.004 two levels
+  below (measured, this section). So the coupling does not reach the scales
+  where most of the variance lives.
+
+The natural reply to the breadth limit is "choose a better spanning structure" —
+couple a different or better-placed coefficient in each component. The depth
+result says that cannot work: even a *perfectly* coupled root transmits
+essentially nothing past its immediate children, so no choice of which single
+coefficient to couple recovers fine-scale temporal structure. The two limits
+have to be defeated together, and inside the loop-free class they cannot be.
+
 So the honest summary: *exact BP on video is achievable, and exactness caps
 temporal coherence at five times worse than the data.* That is a real result —
 it quantifies the price of exactness instead of asserting it is small — and it
