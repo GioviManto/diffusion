@@ -564,6 +564,60 @@ almost nothing. Higher-order structure of $\innov$ is thus far more fragile unde
 than second-order structure --- by two to three orders of magnitude, not the factor of five a
 comparison within the Gaussian model would suggest --- a fact \S\ref{sec:generation} returns to.
 
+\paragraph{What the channel costs in practice, against the no-noising baseline.} The information
+numbers above are asymptotic and per noise level. What an estimator actually loses also depends
+on the protocol, so we measure it directly against the case where the question does not arise: if
+the clean chain is available, identifying $\kernel$ needs no noising at all --- it is plain
+maximum likelihood, \codefile{em.fit\_clean}, and the denoiser at every $t$ then follows from BP
+for free. Both arms receive the \emph{same} $\nseq$ clean chains and the same iteration count;
+the only difference is that one of them never sees them clean. Three replicates, paired
+(\codefile{outputs/exp\_06\_em\_parameter\_recovery/clean\_vs\_noised\_*.csv}):
+
+\begin{center}\small
+\begin{tabular}{@{}lll@{}}
+\toprule
+coordinate & noised\,/\,clean error & reading \\
+\midrule
+$\corr$ & $1.32\times$ (median of $15$ pairs) & the channel costs little \\
+$\ivar$ & ${\approx}4\times$, but see below      & the channel costs materially more \\
+shape ($\ncomp=8$ kurtosis) & paired gap $+0.22\pm0.15$ & \textbf{not resolved} at three replicates \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+Three things follow, and the third is the one we would want more replicates for. First, the
+ordering $\corr < \ivar$ matches the information analysis quantitatively: it predicts variance
+information decaying $4$--$6$ times faster than correlation information, and the estimator errors
+show a ratio of $3.3$. Second, the $\ivar$ figure should not be read as a clean statistical
+penalty, because the \emph{clean} arm's error is flat in $\nseq$
+($0.0041,0.0039,0.0059,0.0046,0.0040$ from $\nseq=64$ to $1024$) rather than falling like
+$\nseq^{-1/2}$: it has hit a discretisation floor, so the ratio mixes a statistical penalty with a
+grid artefact and shrinks from ${\approx}10$ to $2$ as $\nseq$ grows for that reason.
+
+Third, and least expected: the innovation \emph{shape} shows no resolved penalty at all, even
+though it is the coordinate the information analysis says is $112$--$1222$ times more fragile.
+The reconciliation is the protocol. Those information ratios compare single noise levels at the
+ends of the schedule, whereas the noised arm here spreads its chains across five levels including
+$t=0.1$, where shape information is still largely intact. A multi-level observation protocol
+therefore buys back most of what a single high-$t$ view would destroy. We report this as
+unresolved rather than as a null result: three replicates give a standard error of $0.15$ on an
+effect of $0.22$, and the per-budget signs are not consistent.
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=\textwidth]{fig_clean_vs_noised.pdf}
+\caption{Fitting from clean chains against fitting through the channel, paired: both arms get the
+same $\nseq$ clean chains and the same $120$ iterations, and differ only in whether the chains are
+observed clean or once each through the OU channel at one of five noise levels. Left, centre:
+RMSE of $\corr$ and $\ivar$ for the Gaussian kernel, with bootstrap standard errors. Note the
+clean arm's $\ivar$ error is flat in $\nseq$ --- a discretisation floor, which is why the centre
+panel's ratio should be read as indicative. Right: recovered innovation excess kurtosis for the
+$\ncomp=8$ mixture on a Laplace chain, where the paired gap is $+0.22\pm0.15$ and therefore not
+resolved. Three replicates. Source
+\codefile{outputs/exp\_06\_em\_parameter\_recovery/clean\_vs\_noised\_*.csv}.}
+\label{fig:clean-vs-noised}
+\end{figure}
+
 \begin{figure}[t]
 \centering
 \includegraphics[width=0.9\textwidth]{fig_em_diagnostics.pdf}
@@ -619,8 +673,13 @@ $0.999\times$. The same holds for the harder two-axis case, where selecting rece
 radius \emph{and} parameterisation on validation --- six configurations rather than two --- agrees
 in $54$ of $60$ cells and is worth $0.996\times$. Reporting the
 noise-predicting parameterisation alone would overstate the network's deficit by $15$--$30\%$,
-since predicting the clean signal is better at $t\in\{0.8,1.6\}$ at every budget. Sources
-\codefile{outputs/replicates/merged\_summary.csv},
+since predicting the clean signal is better at $t\in\{0.8,1.6\}$ at every budget.
+Sources: the network and EM--BP columns are computed from
+\codefile{outputs/replicates/merged\_raw.csv}, which is the per-noise-level record --- take the
+smaller of the two parameterisations' \texttt{score\_rel\_l2} at each $(\nseq,\text{seed},t)$,
+average over $t$, then over the six seeds, the spread across seeds giving the standard error. The
+aggregated \codefile{outputs/replicates/merged\_summary.csv} is averaged over $t$ already and so
+cannot reproduce the network column, only the EM--BP one. The validation check is
 \codefile{outputs/exp\_07\_em\_vs\_score\_network/sample\_efficiency\_val.csv}. Empirical, six
 replicates.}
 \label{tab:pointwise}

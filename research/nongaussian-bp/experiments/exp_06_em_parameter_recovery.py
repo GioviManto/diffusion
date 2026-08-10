@@ -34,6 +34,18 @@ Part 4 (rate). Parameter error versus number of observed chains for the two
   smooth kernels, confirming the parametric N^{-1/2} scaling that the whole
   efficiency argument rests on.
 
+Part 6 (the no-noising baseline, and what the channel actually costs). Part 2
+  lets t -> 0 stand in for the clean case; this measures it. `em.fit_clean` is
+  plain MLE on clean chains -- no noising, no latent variables, no BP in the
+  E-step -- and both arms get the SAME chains and the same iteration count, so
+  the gap between them is the channel and nothing else. Result: the channel
+  costs 1.32x on rho, materially more on the innovation variance (though the
+  clean arm floors on discretization there, so read that ratio with care), and
+  shows NO resolved penalty on the innovation shape at three replicates
+  (+0.22 +- 0.15) -- which sits oddly against the 112-1222x information decay
+  of Part 3 until one notices that the noised arm spreads chains across five
+  noise levels including t = 0.1, where shape information survives.
+
 Part 5 (a discretization caveat, honestly reported). The Laplace M-step is
   exact for the *discretized* model, and that exact solution is quantized: the
   minimizer of a weighted sum of |u_k - rho u_j| sits at one of the ratios
@@ -51,7 +63,7 @@ import numpy as np
 from common import apply_overrides, experiment_parser, provenance, select_parts
 from src.bp_grid import make_grid
 from src.denoiser import bp_posterior_mean, evaluate_denoiser
-from src.em import e_step_multi, fit_em, q_gradient
+from src.em import e_step_multi, fit_clean, fit_em, q_gradient
 from src.kernels import GaussianAR1Kernel, LaplaceAR1Kernel, MixtureInnovationKernel
 from src.noising import alpha_delta
 from src.plotting import new_figure, save_figure
@@ -434,6 +446,162 @@ def part5_quantization(grid_sizes, rho_values, n_chains, out):
     return rows
 
 
+def part6_clean_vs_noised(grid, weights, sizes, n_rep, t_eval, n_components, out):
+    """What does the noising actually cost? The clean-data MLE as the missing anchor.
+
+    Marc's remark is that identifying the prior needs no noising at all: if the clean chain is
+    available this is plain maximum likelihood, `em.fit_clean`, and the denoiser at every noise
+    level then follows from BP for free. Part 2 measures the other end -- fitting through the
+    channel at a single noise level -- and lets t -> 0 stand in for the clean case. That is an
+    extrapolation, not a measurement, and this part removes it.
+
+    The design is paired and matched-budget: both arms are given the *same* N clean chains, and
+    the only difference is that the noised arm never sees them clean. So the gap between the two
+    curves is the price of the channel and nothing else -- not sample size, not initialisation,
+    not the draw. Two regimes, because they fail differently:
+
+      Gaussian truth, Gaussian kernel  -- well specified, smooth, has a Cramer-Rao bound, so the
+                                          question is how far above its own information floor
+                                          each arm sits.
+      Laplace truth, mixture kernel    -- misspecified, the case the project cares about, where
+                                          what degrades first is the innovation *shape*.
+    """
+    rows_param, rows_shape = [], []
+    q_true = 1.0 - RHO_TRUE**2
+    gauss_prior, lap_prior = GaussianAR1(RHO_TRUE), LaplaceAR1(RHO_TRUE)
+
+    # Shared held-out reference for the induced denoiser error, common to every arm and budget.
+    rng_test = rng_for("exp06-p6-test")
+    A_test = np.stack([lap_prior.sample(rng_test, N_SITES) for _ in range(256)])
+    X_test, m_ref = {}, {}
+    for t in t_eval:
+        alpha, delta = alpha_delta(t)
+        X_test[t] = alpha * A_test + np.sqrt(delta) * rng_test.standard_normal(A_test.shape)
+        m_ref[t] = bp_posterior_mean(lap_prior, grid, weights, X_test[t], t)
+
+    for n_chains in sizes:
+        for r in range(n_rep):
+            rng = rng_for("exp06-p6", n_chains, r)
+            A_g = np.stack([gauss_prior.sample(rng, N_SITES) for _ in range(n_chains)])
+            A_l = np.stack([lap_prior.sample(rng, N_SITES) for _ in range(n_chains)])
+            # One permutation of noise levels, reused by the noised arm of both regimes.
+            groups_g = noisy_groups(A_g, T_TRAIN, rng_for("exp06-p6-ng", n_chains, r))
+            groups_l = noisy_groups(A_l, T_TRAIN, rng_for("exp06-p6-nl", n_chains, r))
+
+            k0 = GaussianAR1Kernel(0.2, 0.8)
+            clean_k, _ = fit_clean(k0, grid, A_g)
+            noised_k, _ = fit_em(k0, grid, weights, groups_g, n_iters=120)
+            for arm, k in (("clean", clean_k), ("noised", noised_k)):
+                rows_param.append({
+                    "arm": arm, "n_chains": n_chains, "rep": r,
+                    "rho_err": float(k.rho - RHO_TRUE), "q_err": float(k.q - q_true),
+                    "rho_fitted": float(k.rho), "q_fitted": float(k.q),
+                })
+
+            for c in n_components:
+                m0 = MixtureInnovationKernel.init(
+                    c, rho=0.3, var=0.8, rng=rng_for("exp06-p6-init", c, n_chains, r))
+                # The mixture carries its own latent label, so the clean arm still iterates --
+                # it just never touches the channel. Same count as the noised arm, so the
+                # comparison is not an optimisation-budget difference in disguise (the lesson
+                # of the em_iters=40 defect found in exp_16).
+                clean_m, _ = fit_clean(m0, grid, A_l, n_iters=120)
+                noised_m, _ = fit_em(m0, grid, weights, groups_l, n_iters=120)
+                for arm, k in (("clean", clean_m), ("noised", noised_m)):
+                    mom = k.innovation_moments
+                    row = {"arm": arm, "n_chains": n_chains, "rep": r, "n_components": c,
+                           "rho_fitted": float(k.rho), **mom}
+                    for t in t_eval:
+                        ev = evaluate_denoiser(
+                            bp_posterior_mean(k, grid, weights, X_test[t], t),
+                            m_ref[t], X_test[t], t)
+                        row[f"score_rel_l2_t{t}"] = ev["score_rel_l2"]
+                    rows_shape.append(row)
+        print(f"  N={n_chains} done", flush=True)
+
+    _fig_clean_vs_noised(rows_param, rows_shape, sizes, n_components, out)
+    return rows_param, rows_shape
+
+
+def label_budgets(ax, sizes):
+    """Tick a log axis at the budgets actually run, not at decades."""
+    ax.set_xticks(list(sizes), [str(n) for n in sizes])
+    ax.minorticks_off()
+
+
+def _fig_clean_vs_noised(rows_param, rows_shape, sizes, n_components, out):
+    """Three coordinates, three panels, error bars on all of them.
+
+    Accepts rows straight from the run or re-read from the committed CSVs, so the figure can be
+    restyled without repeating an hour of fitting. Every title states what the panel's own numbers
+    show rather than what the experiment was hoping for: the scatter here is large enough that a
+    line plot of bare means is actively misleading.
+    """
+    def sel(rows, arm, n, key, c=None):
+        return [float(r[key]) for r in rows if r["arm"] == arm and int(r["n_chains"]) == n
+                and (c is None or int(r["n_components"]) == c)]
+
+    def rmse_se(v, n_boot=400, seed=0):
+        """RMSE with a bootstrap standard error -- the sampling error of an RMSE over a handful
+        of replicates is not negligible and has no tidy closed form."""
+        v = np.asarray(v, dtype=float)
+        if v.size == 0:
+            return np.nan, np.nan
+        g = np.random.default_rng(seed)
+        boots = [np.sqrt(np.mean(np.square(g.choice(v, v.size, replace=True))))
+                 for _ in range(n_boot)]
+        return float(np.sqrt(np.mean(np.square(v)))), float(np.std(boots, ddof=1))
+
+    c_top = max(n_components)
+    fig, ax = new_figure(ncols=3, figsize=(14.0, 3.9))
+    ratios = {}
+    for j, (key, label) in enumerate((("rho_err", r"$\rho$"), ("q_err", r"$q$"))):
+        last = {}
+        for arm, style in (("clean", "o-"), ("noised", "s--")):
+            stats = [rmse_se(sel(rows_param, arm, n, key)) for n in sizes]
+            last[arm] = [s[0] for s in stats]
+            ax[j].errorbar(sizes, [s[0] for s in stats], yerr=[s[1] for s in stats],
+                           fmt=style, capsize=3, label=arm)
+        # Median ratio across budgets: a single ratio at one N would be dominated by which
+        # replicate draw happened to land badly.
+        ratios[key] = float(np.median([b / a for a, b in zip(last["clean"], last["noised"])
+                                       if a > 0]))
+        ax[j].set_xscale("log"); ax[j].set_yscale("log")
+        label_budgets(ax[j], sizes)
+        ax[j].set_xlabel("clean chains $N$"); ax[j].set_ylabel(f"RMSE of {label}")
+        ax[j].set_title(f"({'ab'[j]}) {label}: channel costs "
+                        f"${ratios[key]:.1f}\\times$")
+        ax[j].legend(fontsize=7)
+
+    paired = []
+    for arm, style in (("clean", "o-"), ("noised", "s--")):
+        means, ses = [], []
+        for n in sizes:
+            v = sel(rows_shape, arm, n, "innovation_excess_kurtosis", c_top)
+            means.append(float(np.mean(v)))
+            ses.append(float(np.std(v, ddof=1) / np.sqrt(len(v))) if len(v) > 1 else 0.0)
+        ax[2].errorbar(sizes, means, yerr=ses, fmt=style, capsize=3, label=arm)
+    for n in sizes:
+        c = {int(r["rep"]): float(r["innovation_excess_kurtosis"]) for r in rows_shape
+             if r["arm"] == "clean" and int(r["n_chains"]) == n
+             and int(r["n_components"]) == c_top}
+        d = {int(r["rep"]): float(r["innovation_excess_kurtosis"]) for r in rows_shape
+             if r["arm"] == "noised" and int(r["n_chains"]) == n
+             and int(r["n_components"]) == c_top}
+        paired += [c[k] - d[k] for k in c if k in d]
+    md = float(np.mean(paired))
+    sd = float(np.std(paired, ddof=1) / np.sqrt(len(paired))) if len(paired) > 1 else 0.0
+    ax[2].axhline(3.0, color="k", ls="--", lw=1, label="true Laplace")
+    ax[2].set_xscale("log")          # must precede label_budgets: setting the scale resets ticks
+    label_budgets(ax[2], sizes)
+    ax[2].set_xlabel("clean chains $N$")
+    ax[2].set_ylabel("recovered innovation excess kurtosis")
+    ax[2].set_title(f"(c) shape: paired gap ${md:+.2f}\\pm{sd:.2f}$ "
+                    f"(${abs(md) / sd if sd else 0:.1f}\\sigma$)")
+    ax[2].legend(fontsize=7)
+    save_figure(fig, out / "clean_vs_noised.pdf")
+
+
 def main() -> None:
     parser = experiment_parser(
         "exp_06_em_parameter_recovery",
@@ -448,6 +616,8 @@ def main() -> None:
         "sizes_kurtosis": (128, 512), "sizes_rate": (64, 256), "n_rep_rate": 2,
         "quantization_grids": (201, 401), "quantization_rhos": (0.8, 0.77),
         "n_chains_quantization": 128,
+        "sizes_clean": (64, 256), "n_rep_clean": 2, "components_clean": (4,),
+        "t_eval_clean": (0.2,),
     }
     full = {
         "grid_size": GRID_M, "n_chains": 1024, "n_inits": 6,
@@ -458,6 +628,11 @@ def main() -> None:
         "sizes_rate": (64, 128, 256, 512, 1024), "n_rep_rate": 4,
         "quantization_grids": (201, 401, 801, 1601),
         "quantization_rhos": (0.8, 0.77, 0.813), "n_chains_quantization": 256,
+        "sizes_clean": (64, 128, 256, 512, 1024), "n_rep_clean": 3,
+        # C = 8 only, and two probe levels rather than five: the headline of this part is
+        # parameter and shape recovery against N, and the induced denoiser error is a
+        # secondary read-out whose 256-chain BP passes otherwise dominate the runtime.
+        "components_clean": (8,), "t_eval_clean": (0.2, 0.8),
     }
     cfg = apply_overrides(quick if args.quick else full, args.set)
 
@@ -486,12 +661,20 @@ def main() -> None:
             cfg["quantization_grids"], cfg["quantization_rhos"],
             cfg["n_chains_quantization"], out))
 
+    def p6(grid, weights, out):
+        param_rows, shape_rows = part6_clean_vs_noised(
+            grid, weights, cfg["sizes_clean"], cfg["n_rep_clean"],
+            cfg["t_eval_clean"], cfg["components_clean"], out)
+        write_csv(out / "clean_vs_noised_params.csv", param_rows)
+        write_csv(out / "clean_vs_noised_shape.csv", shape_rows)
+
     parts = {
         "monotonicity": ("monotonicity and recovery", p1),
         "price_of_noising": ("price of noising vs Fisher information", p2),
         "misspecified": ("misspecified mixture kernel", p3),
         "rate": ("sample-size rate", p4),
         "quantization": ("Laplace lattice quantization", p5),
+        "clean_vs_noised": ("clean-data MLE against fitting through the channel", p6),
     }
     if args.list_parts:
         print("\n".join(parts))
