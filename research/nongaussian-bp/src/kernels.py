@@ -70,9 +70,18 @@ class ParametricKernel(Protocol):
     ) -> "ParametricKernel": ...
 
 
-def _residual(grid: np.ndarray, rho: float) -> np.ndarray:
-    """e[out, in] = u_out - rho u_in, the innovation implied by a grid pair."""
-    return grid[:, None] - rho * grid[None, :]
+def _residual(grid: np.ndarray, rho: float, grid_out: np.ndarray | None = None) -> np.ndarray:
+    """e[out, in] = u_out - rho u_in, the innovation implied by a grid pair.
+
+    `grid_out` lets the outgoing (child) axis live on a *different* grid from the
+    incoming (parent) one, which is what makes a transition matrix rectangular.
+    That is the whole mechanism behind per-depth grids: a subband whose
+    likelihood is narrow needs a fine mesh, its neighbour may not, and the two
+    are joined by an (M_out x M_in) matrix rather than a square one. Defaults to
+    `grid`, so every existing square call is unchanged.
+    """
+    out = grid if grid_out is None else grid_out
+    return out[:, None] - rho * grid[None, :]
 
 
 # ----------------------------------------------------------------------------
@@ -94,8 +103,10 @@ class GaussianAR1Kernel:
     def theta(self) -> np.ndarray:
         return np.array([self.rho, self.q])
 
-    def log_transition_matrix(self, grid: np.ndarray) -> np.ndarray:
-        e = _residual(grid, self.rho)
+    def log_transition_matrix(
+        self, grid: np.ndarray, grid_out: np.ndarray | None = None
+    ) -> np.ndarray:
+        e = _residual(grid, self.rho, grid_out)
         return -0.5 * e**2 / self.q - 0.5 * (_LOG_2PI + np.log(self.q))
 
     def grad_log_transition_matrix(self, grid: np.ndarray) -> np.ndarray:
@@ -105,7 +116,8 @@ class GaussianAR1Kernel:
         return np.stack([d_rho, d_q])
 
     def m_step(
-        self, stats: ExpectedStatistics, grid: np.ndarray
+        self, stats: ExpectedStatistics, grid: np.ndarray,
+        grid_out: np.ndarray | None = None,
     ) -> "GaussianAR1Kernel":
         """Exact maximizer: weighted least squares through the origin.
 
@@ -119,10 +131,11 @@ class GaussianAR1Kernel:
         ordinary AR(1) least-squares estimator, as it must.
         """
         xi = stats.xi
+        out = grid if grid_out is None else grid_out
         w_tot = float(xi.sum())
         s00 = float(np.einsum("kj,j,j->", xi, grid, grid))
-        s01 = float(np.einsum("kj,j,k->", xi, grid, grid))
-        s11 = float(np.einsum("kj,k,k->", xi, grid, grid))
+        s01 = float(np.einsum("kj,j,k->", xi, grid, out))
+        s11 = float(np.einsum("kj,k,k->", xi, out, out))
         rho = s01 / s00
         q = max((s11 - rho * s01) / w_tot, _VAR_FLOOR)
         return GaussianAR1Kernel(rho=float(rho), q=float(q))
@@ -147,8 +160,10 @@ class LaplaceAR1Kernel:
     def theta(self) -> np.ndarray:
         return np.array([self.rho, self.b])
 
-    def log_transition_matrix(self, grid: np.ndarray) -> np.ndarray:
-        e = _residual(grid, self.rho)
+    def log_transition_matrix(
+        self, grid: np.ndarray, grid_out: np.ndarray | None = None
+    ) -> np.ndarray:
+        e = _residual(grid, self.rho, grid_out)
         return -np.abs(e) / self.b - np.log(2.0 * self.b)
 
     def grad_log_transition_matrix(self, grid: np.ndarray) -> np.ndarray:
@@ -174,7 +189,8 @@ class LaplaceAR1Kernel:
         return np.stack([d_rho, d_b])
 
     def m_step(
-        self, stats: ExpectedStatistics, grid: np.ndarray
+        self, stats: ExpectedStatistics, grid: np.ndarray,
+        grid_out: np.ndarray | None = None,
     ) -> "LaplaceAR1Kernel":
         """Exact maximizer, obtained by profiling b out of Q.
 
@@ -188,16 +204,17 @@ class LaplaceAR1Kernel:
         kernel is not differentiable -- no line search, no gradient.
         """
         xi = stats.xi
+        out_g = grid if grid_out is None else grid_out
         w_tot = float(xi.sum())
         ratios = np.divide(
-            grid[:, None], grid[None, :],
-            out=np.zeros((len(grid), len(grid))),
+            out_g[:, None], grid[None, :],
+            out=np.zeros((len(out_g), len(grid))),
             where=np.abs(grid[None, :]) > 0,
         )
         wts = xi * np.abs(grid)[None, :]
         mask = wts > 0
         rho = _weighted_median(ratios[mask].ravel(), wts[mask].ravel())
-        resid = np.abs(_residual(grid, rho))
+        resid = np.abs(_residual(grid, rho, out_g))
         b = max(float(np.sum(xi * resid)) / w_tot, np.sqrt(_VAR_FLOOR))
         return LaplaceAR1Kernel(rho=float(rho), b=float(b))
 
@@ -326,9 +343,11 @@ class MixtureInnovationKernel:
         s2 = np.full(n_components, var) * (0.5 + rng.random(n_components))
         return cls(rho=rho, pi=pi, mu=mu, s2=s2)
 
-    def _component_logs(self, grid: np.ndarray) -> np.ndarray:
-        """(C, M, M) log of pi_c N(e; mu_c, s2_c)."""
-        e = _residual(grid, self.rho)
+    def _component_logs(
+        self, grid: np.ndarray, grid_out: np.ndarray | None = None
+    ) -> np.ndarray:
+        """(C, M_out, M_in) log of pi_c N(e; mu_c, s2_c)."""
+        e = _residual(grid, self.rho, grid_out)
         d = e[None, :, :] - self.mu[:, None, None]
         s2 = self.s2[:, None, None]
         return (
@@ -337,14 +356,18 @@ class MixtureInnovationKernel:
             - 0.5 * d**2 / s2
         )
 
-    def log_transition_matrix(self, grid: np.ndarray) -> np.ndarray:
+    def log_transition_matrix(
+        self, grid: np.ndarray, grid_out: np.ndarray | None = None
+    ) -> np.ndarray:
         from scipy.special import logsumexp
 
-        return logsumexp(self._component_logs(grid), axis=0)
+        return logsumexp(self._component_logs(grid, grid_out), axis=0)
 
-    def responsibilities(self, grid: np.ndarray) -> np.ndarray:
-        """(C, M, M) posterior over the mixture label given a grid transition."""
-        comp = self._component_logs(grid)
+    def responsibilities(
+        self, grid: np.ndarray, grid_out: np.ndarray | None = None
+    ) -> np.ndarray:
+        """(C, M_out, M_in) posterior over the mixture label given a transition."""
+        comp = self._component_logs(grid, grid_out)
         return np.exp(comp - _logsumexp_axis0(comp)[None, :, :])
 
     def grad_log_transition_matrix(self, grid: np.ndarray) -> np.ndarray:
@@ -361,7 +384,8 @@ class MixtureInnovationKernel:
         return (-grid[None, :] * inner)[None, :, :]
 
     def m_step(
-        self, stats: ExpectedStatistics, grid: np.ndarray, n_inner: int = 4
+        self, stats: ExpectedStatistics, grid: np.ndarray,
+        grid_out: np.ndarray | None = None, n_inner: int = 4,
     ) -> "MixtureInnovationKernel":
         """Exact block M-step, alternating the mixture block and rho.
 
@@ -379,11 +403,12 @@ class MixtureInnovationKernel:
         grows with the dataset.
         """
         xi = stats.xi
+        out_g = grid if grid_out is None else grid_out
         w_tot = float(xi.sum())
         current = self
         for _ in range(n_inner):
-            e = _residual(grid, current.rho)
-            r = current.responsibilities(grid)  # (C, M, M)
+            e = _residual(grid, current.rho, out_g)
+            r = current.responsibilities(grid, out_g)  # (C, M_out, M_in)
             wr = r * xi[None, :, :]
             mass = wr.sum(axis=(1, 2))
             mass = np.maximum(mass, 1e-300)
@@ -394,12 +419,12 @@ class MixtureInnovationKernel:
             current = replace(current, pi=pi, mu=mu, s2=s2)
 
             # rho block: weighted least squares with component-specific offsets.
-            r = current.responsibilities(grid)
+            r = current.responsibilities(grid, out_g)
             wr = r * xi[None, :, :]
             inv_s2 = 1.0 / current.s2[:, None, None]
             num = float(
                 (wr * inv_s2 * grid[None, None, :]
-                 * (grid[None, :, None] - current.mu[:, None, None])).sum()
+                 * (out_g[None, :, None] - current.mu[:, None, None])).sum()
             )
             den = float((wr * inv_s2 * (grid**2)[None, None, :]).sum())
             current = replace(current, rho=num / den)

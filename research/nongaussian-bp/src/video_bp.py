@@ -58,7 +58,7 @@ from dataclasses import dataclass
 
 import numpy as np
 
-from .wavelet_bp import wavelet_tree_bp
+from .wavelet_bp import as_grid_list, wavelet_tree_bp
 
 
 def spatiotemporal_has_cycle(
@@ -228,7 +228,11 @@ def caterpillar_bp(
     """
     x = np.asarray(x, dtype=float)
     b, f_len, n_nodes = x.shape
-    m = grid.size
+    grids = as_grid_list(grid, depth)
+    wts = as_grid_list(weights, depth)
+    # Everything temporal happens at the root, so the chain's grid is grids[0]
+    # whatever the deeper levels use.
+    m = grids[0].size
     flat = x.reshape(b * f_len, n_nodes)
 
     # -- 1. upward pass per frame -----------------------------------------
@@ -236,7 +240,7 @@ def caterpillar_bp(
     # knows from outside, and applying a prior as well would double-count it.
     uniform = np.zeros(m)
     up = wavelet_tree_bp(
-        grid, weights, log_k_space, uniform, flat, alpha, delta_by_depth,
+        grids, wts, log_k_space, uniform, flat, alpha, delta_by_depth,
         branching, depth, chunk=chunk, root_message=np.ones((b * f_len, m)),
     )
     pot = up.root_belief_up.reshape(b, f_len, m)
@@ -244,7 +248,7 @@ def caterpillar_bp(
 
     # -- 2. exact chain over the frames -----------------------------------
     chain = chain_bp_potentials(
-        pot, k_time, weights, np.exp(log_mu), want_stats=want_stats
+        pot, k_time, wts[0], np.exp(log_mu), want_stats=want_stats
     )
 
     # -- 3. downward pass per frame, with the chain context as the root message
@@ -254,7 +258,7 @@ def caterpillar_bp(
     # reason the statistics are collected here and not in step 1.
     context = chain.context.reshape(b * f_len, m)
     down = wavelet_tree_bp(
-        grid, weights, log_k_space, uniform, flat, alpha, delta_by_depth,
+        grids, wts, log_k_space, uniform, flat, alpha, delta_by_depth,
         branching, depth, chunk=chunk, root_message=context,
         want_stats=want_stats,
     )

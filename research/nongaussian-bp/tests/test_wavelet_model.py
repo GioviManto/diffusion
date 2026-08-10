@@ -68,6 +68,86 @@ def test_delta_by_depth_scales_as_one_over_variance():
     assert np.allclose(got, 0.5 / sc.scales[0] ** 2)
 
 
+def test_grid_sizing_spends_points_where_the_likelihood_is_narrow():
+    """The sizing rule, on scales shaped like a real image's.
+
+    Coarse subbands have the largest scales and therefore the narrowest
+    likelihoods, so they must get the *most* points despite holding the fewest
+    nodes. That inversion is the whole idea.
+    """
+    from src.wavelet_model import per_depth_grid_sizes
+
+    scales = np.array([[10.7, 5.1, 2.3, 1.0, 0.38]] * 3)
+    sizes = per_depth_grid_sizes(scales, t_min=0.05)
+    assert sizes == sorted(sizes, reverse=True), sizes
+    assert sizes[0] > 10 * sizes[-1]
+    assert all(s % 2 == 1 for s in sizes), "0 must lie on every grid"
+
+    # Relaxing the target t asks for less resolution everywhere.
+    looser = per_depth_grid_sizes(scales, t_min=0.3)
+    assert all(a <= b for a, b in zip(looser, sizes))
+
+    # The state constraint floors the fine end rather than letting it collapse.
+    assert min(per_depth_grid_sizes(scales, t_min=2.0)) >= 33
+
+
+def _ladder_images(rng, n, ladder=(10.0, 5.0, 2.3, 1.0)):
+    """Images whose subband scales span decades, as a real image's do.
+
+    `_make_images` gives every subband unit variance, and on *that* data a
+    uniform grid is perfectly adequate -- which is exactly why the per-depth
+    machinery cannot be tested on it. The resolution problem is created by the
+    spread of the scales, so the fixture has to have one.
+    """
+    qt = WaveletQuadtree(side=2**LEVELS, levels=LEVELS)
+    ti = TreeIndex(qt.depth, 4)
+    nodes = np.stack(
+        [_sample_tree_nodes(rng, ti, n, TRUE_RHO) for _ in range(3)], axis=1
+    )
+    depth_of = qt.node_depth
+    for d, scale in enumerate(ladder):
+        nodes[:, :, depth_of == d] *= scale
+    scaling = rng.standard_normal((n, 1))
+    return qt, tree_to_images(qt, nodes, scaling)
+
+
+def test_per_depth_grids_resolve_small_t_where_a_uniform_grid_cannot():
+    """The fix, stated as the thing it was supposed to buy.
+
+    A uniform grid of comparable total size cannot resolve the coarse subbands
+    below t ~ 0.9; a per-depth grid sized for t = 0.05 does, and the same
+    `resolution_report` says so.
+    """
+    rng = rng_for("wavelet-model-resolve")
+    qt, images = _ladder_images(rng, 80)
+
+    per_depth, _ = fit_wavelet_tree(
+        images, levels=LEVELS, t_train=[0.5],
+        kernel_factory=lambda d, r: GaussianAR1Kernel(rho=0.3, q=0.6),
+        n_iters=1, t_resolve=0.05, chunk=64,
+    )
+    uniform, _ = fit_wavelet_tree(
+        images, levels=LEVELS, t_train=[0.5],
+        kernel_factory=lambda d, r: GaussianAR1Kernel(rho=0.3, q=0.6),
+        n_iters=1, grid_size=241, chunk=64,
+    )
+    assert per_depth.resolution_report(0.05)["min_resolved_t"] <= 0.05
+    assert per_depth.resolution_report(0.05)["resolved"]
+    assert uniform.resolution_report(0.05)["min_resolved_t"] > 0.2
+    assert not uniform.resolution_report(0.05)["resolved"]
+
+
+def test_grid_size_and_t_resolve_are_mutually_exclusive():
+    rng = rng_for("wavelet-model-exclusive")
+    _, images, _ = _make_images(rng, 8)
+    with pytest.raises(ValueError, match="not both"):
+        fit_wavelet_tree(
+            images, levels=LEVELS, t_train=[0.5],
+            kernel_factory=lambda d, r: GaussianAR1Kernel(rho=0.3, q=0.6),
+            n_iters=1, grid_size=101, t_resolve=0.1,
+        )
+
+
 @pytest.mark.slow
 def test_gaussian_control_recovers_per_level_rho_and_ascends():
     """The negative control: Gaussian tree in, Gaussian tree out.

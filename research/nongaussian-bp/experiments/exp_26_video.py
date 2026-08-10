@@ -55,7 +55,7 @@ SETTINGS = {
     "t_train": (0.6,),
     "t_likelihood": 0.6,
     "n_iters": 8,
-    "grid_size": 161,
+    "t_resolve": 0.05,
     "half_width": 8.0,
     "n_components": 4,
     "spatial_family": "gaussian",
@@ -113,7 +113,7 @@ def _fit_both(settings, train):
             kernel_factory=_spatial_factory(settings),
             time_kernel_factory=lambda r, _r=rho0: GaussianAR1Kernel(rho=_r, q=0.8),
             n_iters=settings["n_iters"], half_width=settings["half_width"],
-            grid_size=settings["grid_size"], freeze_time=freeze,
+            t_resolve=settings["t_resolve"], freeze_time=freeze,
             chunk=settings["chunk"],
         )
         out[name] = (model, trace, time.perf_counter() - t0)
@@ -348,7 +348,9 @@ def main() -> None:
 
     settings = apply_overrides(SETTINGS, args.set)
     if args.quick:
-        settings.update(n_train=80, n_test=60, n_iters=3, n_generate=100)
+        settings.update(
+            n_train=80, n_test=60, n_iters=3, n_generate=100, t_resolve=0.3
+        )
 
     out_dir = ensure_dir(args.output_dir)
     parts = select_parts(PARTS, args.only)

@@ -1,6 +1,6 @@
 """Exact BP on a wavelet quadtree, where *every* node is observed.
 
-Three things separate this from `hierarchy.tree_bp_grid`, and each is forced by
+Four things separate this from `hierarchy.tree_bp_grid`, and each is forced by
 the data rather than chosen:
 
 1. **Evidence at every node, not only at the leaves.** In `hierarchy` the
@@ -25,20 +25,37 @@ the data rather than chosen:
    per-depth Delta_d = Delta / s_d^2. Nothing is approximated; the noise level is
    simply not the same number at every scale once the coordinates are rescaled.
 
-3. **One kernel per scale.** Wavelet coefficients are not scale-stationary, so a
-   single shared transition kernel is misspecified by construction. `log_k[d]`
-   governs the edge from depth d to depth d+1, and the E-step accumulates a
-   separate Xi per level. Because every kernel in `src/kernels.py` consumes only
-   `stats.xi`, the per-level M-step is the existing M-step called once per level
-   -- no kernel code changes.
+3. **A per-depth *grid*.** This is what (2) forces, and getting it wrong is what
+   confined an earlier version of this package to t >= 0.9. Because
+   Delta_d = Delta_t / s_d^2, a subband with a *large* scale gets a *narrow*
+   likelihood -- and in a natural image the largest scales are the coarsest
+   subbands (LH depth 0 has scale 10.7 against 0.14 at HH depth 4, a factor of
+   76). On a shared mesh those are the ones that go under-resolved, at small t,
+   which is exactly where a reverse sampler spends its last steps.
 
-The upward and downward passes are written once and serve both the score and the
-E-step, which is why `want_stats` is a flag on the same call rather than a second
-implementation to keep in sync.
+   The fix is to spend grid points where the likelihood is narrow. It is close
+   to free, because the coarse subbands are the ones with almost no nodes: level
+   d holds 4^d nodes and wants M_d proportional to s_d, and since s_d roughly
+   halves per level the product 4^d * M_d * M_{d+1} is nearly constant. Resolving
+   down to t = 0.05 costs *less* than the old uniform M = 241 that only reached
+   t = 0.9.
+
+   `grids` and `weights` may therefore be lists, one entry per depth. Passing a
+   single array keeps the old uniform behaviour, which is what the chain-derived
+   tests still exercise.
+
+4. **One kernel per scale.** Wavelet coefficients are not scale-stationary, so a
+   single shared transition kernel is misspecified by construction. `log_k[d]`
+   governs the edge from depth d to depth d+1 and is **(M_{d+1}, M_d)** -- child
+   values down the rows, parent values across the columns. Every kernel in
+   `src/kernels.py` accepts the two grids separately, so the per-level M-step is
+   the existing M-step called once per level.
 
 Convention, inherited unchanged from `src/bp_grid.py`: `log_k[d][k, j]` is
 log K_d(u_k | u_j) with k the *child* value and j the *parent* value, so the
-upward message is `K.T @ f` and the downward message is `K @ g`.
+upward message is `K.T @ f` and the downward message is `K @ g`. Note which grid
+each message lives on: a node's message *to its parent* is a function of the
+parent's value, so it lives on the parent's grid.
 """
 
 from __future__ import annotations
@@ -58,8 +75,8 @@ class WaveletBPResult:
     posterior_mean : (B, n_nodes) E[a_v | x], exact up to quadrature.
     log_evidence   : summed over the batch, log p_t(x), all constants included.
     xi_by_level    : per-level expected transition mass, or None if not asked for.
-                     `xi_by_level[d]` belongs to the edge depth d -> depth d+1.
-    root_belief_up : (B, M) the root's evidence times all its children's upward
+                     `xi_by_level[d]` is (M_{d+1}, M_d) for the edge d -> d+1.
+    root_belief_up : (B, M_0) the root's evidence times all its children's upward
                      messages, *excluding* the root prior. This is the message
                      the whole spatial tree sends to whatever sits above it, and
                      it is what lets a tree be attached to a temporal chain
@@ -85,9 +102,20 @@ def node_delta(ti: TreeIndex, delta_by_depth) -> np.ndarray:
     ])
 
 
+def as_grid_list(grid, depth: int) -> list[np.ndarray]:
+    """Accept either one grid for every depth, or one grid per depth."""
+    if isinstance(grid, (list, tuple)):
+        out = [np.asarray(g, dtype=float) for g in grid]
+        if len(out) != depth + 1:
+            raise ValueError(f"need {depth + 1} grids, got {len(out)}")
+        return out
+    g = np.asarray(grid, dtype=float)
+    return [g] * (depth + 1)
+
+
 def wavelet_tree_bp(
-    grid: np.ndarray,
-    weights: np.ndarray,
+    grid,
+    weights,
     log_k: list[np.ndarray],
     log_root: np.ndarray,
     x: np.ndarray,
@@ -102,14 +130,15 @@ def wavelet_tree_bp(
     """Exact sum-product on the quadtree with observations at every node.
 
     `x` is (B, n_nodes) *standardised* coefficients in breadth-first order.
-    `log_k` has length `depth`; `log_k[d]` is the (M, M) kernel for the edge
-    from depth d to depth d+1. `delta_by_depth` has length `depth + 1`.
+    `grid` and `weights` are either one array each (uniform mesh) or a list of
+    `depth + 1` arrays (per-depth mesh). `log_k[d]` is the (M_{d+1}, M_d) kernel
+    for the edge from depth d to depth d+1. `delta_by_depth` has length
+    `depth + 1`.
 
     `root_message` is what the root receives from *outside* the tree, shape
-    (B, M) or (M,). It defaults to the root prior `exp(log_root)`, which is the
-    standalone case. Supplying something else is how a tree gets attached to a
-    larger loop-free graph -- a temporal chain of roots, in `src/video_bp.py` --
-    without either side needing to know how the other is implemented.
+    (B, M_0) or (M_0,). It defaults to the root prior `exp(log_root)`, which is
+    the standalone case. Supplying something else is how a tree gets attached to
+    a larger loop-free graph -- a temporal chain of roots, in `src/video_bp.py`.
     """
     ti = TreeIndex(depth, branching)
     x = np.atleast_2d(np.asarray(x, dtype=float))
@@ -120,16 +149,27 @@ def wavelet_tree_bp(
     if len(np.asarray(delta_by_depth)) != depth + 1:
         raise ValueError(f"need {depth + 1} deltas, got {len(np.asarray(delta_by_depth))}")
 
-    m = grid.size
+    grids = as_grid_list(grid, depth)
+    wts = as_grid_list(weights, depth)
+    for d, lk in enumerate(log_k):
+        want = (grids[d + 1].size, grids[d].size)
+        if lk.shape != want:
+            raise ValueError(
+                f"log_k[{d}] must be {want} (child x parent), got {lk.shape}"
+            )
+
     k_mats = [np.exp(lk) for lk in log_k]
     root = np.exp(log_root)
-    nd = node_delta(ti, delta_by_depth)
+    deltas = np.asarray(delta_by_depth, dtype=float)
 
     means = np.empty_like(x)
-    root_up = np.empty((x.shape[0], m))
+    root_up = np.empty((x.shape[0], grids[0].size))
     log_scale = np.empty(x.shape[0])
     log_evidence = 0.0
-    xi_total = [np.zeros((m, m)) for _ in range(depth)] if want_stats else None
+    xi_total = (
+        [np.zeros((grids[d + 1].size, grids[d].size)) for d in range(depth)]
+        if want_stats else None
+    )
 
     for start in range(0, x.shape[0], chunk):
         sl = slice(start, start + chunk)
@@ -137,7 +177,7 @@ def wavelet_tree_bp(
         if rm is not None and np.ndim(rm) == 2:
             rm = rm[sl]
         part = _bp_chunk(
-            ti, grid, weights, k_mats, root, x[sl], alpha, nd, want_stats, rm,
+            ti, grids, wts, k_mats, root, x[sl], alpha, deltas, want_stats, rm,
         )
         means[sl] = part.posterior_mean
         root_up[sl] = part.root_belief_up
@@ -152,85 +192,105 @@ def wavelet_tree_bp(
 
 def _bp_chunk(
     ti: TreeIndex,
-    grid: np.ndarray,
-    weights: np.ndarray,
+    grids: list[np.ndarray],
+    wts: list[np.ndarray],
     k_mats: list[np.ndarray],
     root: np.ndarray,
     x: np.ndarray,
     alpha: float,
-    nd: np.ndarray,
+    deltas: np.ndarray,
     want_stats: bool,
     root_message: np.ndarray | None = None,
 ) -> WaveletBPResult:
-    b, n_nodes = x.shape
+    b = x.shape[0]
     depth, branching = ti.depth, ti.branching
-    m = grid.size
 
     def norm(v):
         s = v.sum(axis=-1, keepdims=True)
         return v / np.maximum(s, 1e-300), np.log(np.maximum(s, 1e-300))
 
-    # -- evidence at every node -------------------------------------------
+    # -- evidence at every node, level by level ---------------------------
     # Row-shifted so exp() cannot underflow a whole row; the discarded shift and
     # the Gaussian normaliser are both restored in `log_scale`.
-    z = x[:, :, None] - alpha * grid[None, None, :]
-    log_ell = -0.5 * z**2 / nd[None, :, None]
-    row_max = log_ell.max(axis=2)
-    ev = np.exp(log_ell - row_max[:, :, None])            # (B, n_nodes, M)
-    log_scale = row_max.sum(axis=1) - 0.5 * np.sum(np.log(2.0 * np.pi * nd))
+    ev: list[np.ndarray] = []
+    log_scale = np.zeros(b)
+    for d in range(depth + 1):
+        nodes = ti.nodes_at(d)
+        z = x[:, nodes, None] - alpha * grids[d][None, None, :]
+        log_ell = -0.5 * z**2 / deltas[d]
+        row_max = log_ell.max(axis=2)
+        ev.append(np.exp(log_ell - row_max[:, :, None]))       # (B, n_d, M_d)
+        log_scale += row_max.sum(axis=1)
+        log_scale -= 0.5 * len(nodes) * np.log(2.0 * np.pi * deltas[d])
 
     # -- upward pass -------------------------------------------------------
-    # bu[v] = evidence(v) * prod over children c of up[c]; up[v] is v's message
-    # to its parent. `ev` is kept intact because the downward pass needs the
-    # parent's own evidence separately from its children's contributions.
-    bu = ev.copy()
-    up = np.ones((b, n_nodes, m))
+    # bu[d][v] = evidence(v) * prod over children of their upward messages.
+    # up[d] is the message from a depth-d node to its parent, and is therefore a
+    # function of the *parent's* value: it lives on grids[d - 1].
+    bu = [e.copy() for e in ev]
+    up: list[np.ndarray | None] = [None] * (depth + 1)
     for d in range(depth, 0, -1):
-        nodes = ti.nodes_at(d)
-        msg, ls = norm(np.einsum("cnk,kj->cnj", weights * bu[:, nodes], k_mats[d - 1]))
-        up[:, nodes] = msg
+        msg, ls = norm(np.einsum("cnk,kj->cnj", wts[d] * bu[d], k_mats[d - 1]))
+        up[d] = msg                                            # (B, n_d, M_{d-1})
         log_scale += ls.sum(axis=(1, 2))
-        parents = ti.nodes_at(d - 1)
-        prod = msg.reshape(b, -1, branching, m).prod(axis=2)
-        bu[:, parents], ls = norm(bu[:, parents] * prod)
+        n_parents = branching ** (d - 1)
+        prod = msg.reshape(b, n_parents, branching, grids[d - 1].size).prod(axis=2)
+        bu[d - 1], ls = norm(bu[d - 1] * prod)
         log_scale += ls.sum(axis=(1, 2))
 
-    root_belief_up = bu[:, 0].copy()
+    root_belief_up = bu[0][:, 0].copy()
     incoming = root if root_message is None else np.asarray(root_message, dtype=float)
     log_evidence = float(np.sum(
-        log_scale + np.log(np.maximum((weights * bu[:, 0] * incoming).sum(1), 1e-300))
+        log_scale
+        + np.log(np.maximum((wts[0] * bu[0][:, 0] * incoming).sum(-1), 1e-300))
     ))
 
     # -- downward pass -----------------------------------------------------
-    down = np.ones((b, n_nodes, m))
-    down[:, 0] = incoming
-    xi_by_level = [np.zeros((m, m)) for _ in range(depth)] if want_stats else None
+    down: list[np.ndarray | None] = [None] * (depth + 1)
+    down[0] = np.broadcast_to(
+        np.atleast_2d(incoming)[:, None, :], (b, 1, grids[0].size)
+    ).copy()
+    xi_by_level = (
+        [np.zeros((grids[d + 1].size, grids[d].size)) for d in range(depth)]
+        if want_stats else None
+    )
 
     for d in range(depth):
-        parents = ti.nodes_at(d)
-        kids = ti.nodes_at(d + 1)
+        m_par, m_kid = grids[d].size, grids[d + 1].size
+        n_par = branching**d
         # Leave-one-out over siblings by prefix/suffix scan rather than division:
         # sibling messages are legitimately ~1e-16 in the tails, and dividing by
-        # them is where a tree BP implementation quietly loses digits.
-        loo = _leave_one_out_product(up[:, kids].reshape(b, -1, branching, m))
+        # them is where a tree BP implementation quietly loses digits. The
+        # sibling messages live on the *parent's* grid, which is why this is
+        # m_par wide.
+        loo = _leave_one_out_product(
+            up[d + 1].reshape(b, n_par, branching, m_par)
+        )
         # What the parent knows *apart from* this child: its own evidence, the
         # message from above, and its other children.
-        extra = ev[:, parents] * down[:, parents]
+        extra = ev[d] * down[d]
         excl, _ = norm(loo * extra[:, :, None, :])
-        excl = excl.reshape(b, -1, m)
+        excl = excl.reshape(b, n_par * branching, m_par)
 
         if want_stats:
-            f_all = (weights * excl).reshape(-1, m)             # parent side
-            g_all = (weights * bu[:, kids]).reshape(-1, m)      # child side
+            f_all = (wts[d] * excl).reshape(-1, m_par)          # parent side
+            g_all = (wts[d + 1] * bu[d + 1]).reshape(-1, m_kid)  # child side
             partition = np.einsum("ek,ek->e", g_all, f_all @ k_mats[d].T)
             c_mat = (g_all / np.maximum(partition, 1e-300)[:, None]).T @ f_all
             xi_by_level[d] += c_mat * k_mats[d]
 
-        down[:, kids], _ = norm(np.einsum("cnj,kj->cnk", weights * excl, k_mats[d]))
+        down[d + 1], _ = norm(
+            np.einsum("cnj,kj->cnk", wts[d] * excl, k_mats[d])
+        )
 
-    belief, _ = norm(bu * down)
+    # -- beliefs, reassembled in breadth-first order -----------------------
+    means = np.empty_like(x)
+    for d in range(depth + 1):
+        belief, _ = norm(bu[d] * down[d])
+        means[:, ti.nodes_at(d)] = belief @ grids[d]
+
     return WaveletBPResult(
-        belief @ grid, log_evidence, xi_by_level, root_belief_up, log_scale,
+        means, log_evidence, xi_by_level, root_belief_up, log_scale,
     )
 
 
@@ -243,12 +303,14 @@ def stats_by_level(
     """Wrap per-level Xi as `ExpectedStatistics`, one per edge level.
 
     The evidence is attached to level 0 only, so that summing the list does not
-    count it `depth` times; the M-step ignores it in any case.
+    count it `depth` times; the M-step ignores it in any case. `site1` follows
+    the *parent* grid, since that is the axis an initial-density estimate would
+    live on.
     """
     return [
         ExpectedStatistics(
             xi=xi,
-            site1=np.zeros(xi.shape[0]),
+            site1=np.zeros(xi.shape[1]),
             log_evidence=log_evidence if d == 0 else 0.0,
             n_edges=n_images * branching ** (d + 1),
             n_chains=n_images,

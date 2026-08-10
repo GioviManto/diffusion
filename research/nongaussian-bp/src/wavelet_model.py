@@ -43,6 +43,46 @@ from .wavelet_bp import stats_by_level, wavelet_tree_bp
 _LOG_2PI = float(np.log(2.0 * np.pi))
 
 
+def per_depth_grid_sizes(
+    scales: np.ndarray,
+    t_min: float,
+    half_width: float = 8.0,
+    points_per_std: float = 3.0,
+    state_points_per_std: float = 4.0,
+    max_size: int = 3001,
+) -> list[int]:
+    """How many grid points each depth needs, from the subband scales.
+
+    Two constraints, and the binding one differs by depth -- which is precisely
+    why a single grid cannot serve:
+
+    * **Resolve the likelihood.** In standardised coordinates it has standard
+      deviation `sqrt(Delta_t) / (alpha_t s_d)`, so a *large* subband scale gives
+      a *narrow* likelihood. This binds at the coarse end, and it is the
+      constraint that confined the shared-grid model to t >= 0.9.
+    * **Resolve the state.** Every subband is standardised to unit variance, so
+      the density itself needs a few points per unit however wide the likelihood
+      is. This binds at the fine end, where the likelihood is enormous and would
+      otherwise license a mesh too coarse to represent the coefficient at all.
+
+    Sizes are forced odd so that 0 lies on every grid; `max_size` caps the
+    coarsest level, and hitting the cap means `t_min` was set below what the
+    memory budget supports rather than something being wrong.
+    """
+    alpha, delta = alpha_delta(t_min)
+    s_max = np.asarray(scales, dtype=float).max(axis=0)
+    sizes = []
+    for s_d in s_max:
+        dx_likelihood = np.sqrt(delta) / (alpha * s_d) / points_per_std
+        dx = min(dx_likelihood, 1.0 / state_points_per_std)
+        size = int(np.ceil(2.0 * half_width / dx)) + 1
+        size = min(size, max_size)
+        if size % 2 == 0:
+            size += 1
+        sizes.append(size)
+    return sizes
+
+
 def _sample_columns(
     cdf: np.ndarray, column: np.ndarray, rng: np.random.Generator, block: int = 200000
 ) -> np.ndarray:
@@ -119,9 +159,9 @@ class WaveletTreeModel:
     qt: WaveletQuadtree
     scales: SubbandScales
     kernels: list[list]
-    log_root: np.ndarray          # (3, M) root prior per orientation
-    grid: np.ndarray
-    weights: np.ndarray
+    log_root: np.ndarray          # (3, M_0) root prior per orientation
+    grids: list                   # one grid per depth, coarsest first
+    weights: list
     ll_mean: float                # scaling-coefficient prior
     ll_std: float
     tie_orientations: bool = True
@@ -131,7 +171,17 @@ class WaveletTreeModel:
         return self.qt.depth
 
     def log_k(self, orientation_index: int) -> list[np.ndarray]:
-        return [k.log_transition_matrix(self.grid) for k in self.kernels[orientation_index]]
+        # Rectangular: parent grid in, child grid out.
+        return [
+            k.log_transition_matrix(self.grids[d], self.grids[d + 1])
+            for d, k in enumerate(self.kernels[orientation_index])
+        ]
+
+    @property
+    def grid(self) -> np.ndarray:
+        """The root grid. Kept because several call sites want *a* grid, but
+        anything depth-dependent must index `grids` instead."""
+        return self.grids[0]
 
     # -- inference ---------------------------------------------------------
 
@@ -148,7 +198,7 @@ class WaveletTreeModel:
         total_log_ev = 0.0
         for oi in range(3):
             res = wavelet_tree_bp(
-                self.grid, self.weights, self.log_k(oi), self.log_root[oi],
+                self.grids, self.weights, self.log_k(oi), self.log_root[oi],
                 nodes_std[:, oi, :], alpha,
                 self.scales.delta_by_depth(oi, delta),
                 self.qt.branching, self.depth, chunk=chunk,
@@ -213,15 +263,16 @@ class WaveletTreeModel:
         done here.
         """
         alpha, delta = alpha_delta(t)
-        dx = float(self.grid[1] - self.grid[0])
-        width = np.sqrt(delta) / (alpha * self.scales.scales)   # (3, depth+1)
-        pps = width / dx
-        # Smallest t at which every subband clears the threshold:
-        # sqrt(exp(2t) - 1) >= points_per_std * dx * s_max.
-        need = points_per_std * dx * float(self.scales.scales.max())
+        dx = np.array([float(g[1] - g[0]) for g in self.grids])  # (depth+1,)
+        width = np.sqrt(delta) / (alpha * self.scales.scales)    # (3, depth+1)
+        pps = width / dx[None, :]
+        # Smallest t at which every subband clears the threshold, now depth by
+        # depth: sqrt(exp(2t) - 1) >= points_per_std * dx_d * s_d, and the
+        # binding depth is whichever needs the largest t.
+        need = float(np.max(points_per_std * dx[None, :] * self.scales.scales))
         return {
             "t": float(t),
-            "grid_spacing": dx,
+            "grid_spacing": dx.tolist(),
             "points_per_std": pps,
             "min_points_per_std": float(pps.min()),
             "resolved": bool(pps.min() >= points_per_std),
@@ -258,19 +309,24 @@ class WaveletTreeModel:
         it the samples live on a lattice and every downstream statistic inherits
         a spurious discreteness.
         """
-        grid, w = self.grid, self.weights
-        dx = float(grid[1] - grid[0])
         ti = TreeIndex(self.depth, self.qt.branching)
         nodes = np.empty((n, 3, ti.n_nodes))
+        dx = [float(g[1] - g[0]) for g in self.grids]
 
         for oi in range(3):
             state = np.empty((n, ti.n_nodes), dtype=np.intp)
-            root_p = np.exp(self.log_root[oi] - self.log_root[oi].max()) * w
+            root_p = np.exp(self.log_root[oi] - self.log_root[oi].max()) * self.weights[0]
             root_p /= root_p.sum()
-            state[:, 0] = rng.choice(len(grid), size=n, p=root_p)
+            state[:, 0] = rng.choice(len(self.grids[0]), size=n, p=root_p)
 
             for d in range(self.depth):
-                k = np.exp(self.kernels[oi][d].log_transition_matrix(grid)) * w[:, None]
+                # Column j of the CDF is the child law given parent state j, so
+                # it is normalised down the *child* grid.
+                k = np.exp(
+                    self.kernels[oi][d].log_transition_matrix(
+                        self.grids[d], self.grids[d + 1]
+                    )
+                ) * self.weights[d + 1][:, None]
                 cdf = np.cumsum(k, axis=0)
                 cdf /= cdf[-1][None, :]
                 parents = ti.nodes_at(d)
@@ -278,9 +334,14 @@ class WaveletTreeModel:
                 parent_state = np.repeat(state[:, parents], ti.branching, axis=1)
                 state[:, kids] = _sample_columns(cdf, parent_state, rng)
 
-            vals = grid[state]
-            if jitter:
-                vals = vals + (rng.random(vals.shape) - 0.5) * dx
+            # Values and jitter both follow the grid of the node's own depth.
+            vals = np.empty((n, ti.n_nodes))
+            for d in range(self.depth + 1):
+                idx = ti.nodes_at(d)
+                v = self.grids[d][state[:, idx]]
+                if jitter:
+                    v = v + (rng.random(v.shape) - 0.5) * dx[d]
+                vals[:, idx] = v
             nodes[:, oi, :] = vals
 
         nodes = self.scales.restore(self.qt, nodes)
@@ -447,7 +508,8 @@ def fit_wavelet_tree(
     kernel_factory,
     n_iters: int = 30,
     half_width: float = 8.0,
-    grid_size: int = 401,
+    grid_size: int | None = None,
+    t_resolve: float | None = None,
     tie_orientations: bool = True,
     chunk: int = 32,
     tol: float = 1e-9,
@@ -461,7 +523,15 @@ def fit_wavelet_tree(
     exercise several.
 
     `kernel_factory(depth_index, rng)` returns a fresh kernel for one edge level.
+
+    Grids. Pass `t_resolve` to size a **per-depth** mesh that resolves the
+    likelihood down to that diffusion time (the default, at the smallest t in
+    `t_train`). Pass `grid_size` instead to force one uniform mesh everywhere,
+    which is what the pre-per-depth results used and is kept for comparison.
+    Passing both is refused rather than silently resolved.
     """
+    if grid_size is not None and t_resolve is not None:
+        raise ValueError("give grid_size or t_resolve, not both")
     from .utils import rng_for
 
     rng = rng_for("wavelet-em", levels, tuple(t_train))
@@ -469,8 +539,19 @@ def fit_wavelet_tree(
     scales = SubbandScales.fit(qt, clean_nodes)
     std_clean = scales.standardise(qt, clean_nodes)
 
-    grid, weights = make_grid(half_width, grid_size)
-    log_root = np.tile(-0.5 * grid**2 - 0.5 * _LOG_2PI, (3, 1))
+    if grid_size is not None:
+        sizes = [grid_size] * (qt.depth + 1)
+    else:
+        target = t_resolve if t_resolve is not None else min(t_train)
+        sizes = per_depth_grid_sizes(scales.scales, target, half_width)
+    grids, weights = [], []
+    for size in sizes:
+        g, w = make_grid(half_width, size)
+        grids.append(g)
+        weights.append(w)
+    log_root = np.tile(-0.5 * grids[0] ** 2 - 0.5 * _LOG_2PI, (3, 1))
+    if verbose:
+        print(f"  grid sizes by depth: {sizes}")
 
     n_kern = 1 if tie_orientations else 3
     kern = [[kernel_factory(d, rng) for d in range(qt.depth)] for _ in range(n_kern)]
@@ -494,9 +575,12 @@ def fit_wavelet_tree(
         for x_std, alpha, delta in obs:
             for oi in range(3):
                 ki = 0 if tie_orientations else oi
-                log_k = [k.log_transition_matrix(grid) for k in kern[ki]]
+                log_k = [
+                    k.log_transition_matrix(grids[d], grids[d + 1])
+                    for d, k in enumerate(kern[ki])
+                ]
                 res = wavelet_tree_bp(
-                    grid, weights, log_k, log_root[oi], x_std[:, oi, :], alpha,
+                    grids, weights, log_k, log_root[oi], x_std[:, oi, :], alpha,
                     scales.delta_by_depth(oi, delta), qt.branching, qt.depth,
                     want_stats=True, chunk=chunk,
                 )
@@ -510,7 +594,10 @@ def fit_wavelet_tree(
         trace.log_evidence.append(log_ev)
         for ki in range(n_kern):
             for d in range(qt.depth):
-                kern[ki][d] = kern[ki][d].m_step(total[ki][d], grid)
+                # The M-step needs both grids: Xi is (M_{d+1}, M_d).
+                kern[ki][d] = kern[ki][d].m_step(
+                    total[ki][d], grids[d], grids[d + 1]
+                )
         trace.seconds.append(time.perf_counter() - t0)
         if verbose:
             print(f"  EM {it + 1:3d}/{n_iters}  log-ev {log_ev:.6e}  "
@@ -522,7 +609,7 @@ def fit_wavelet_tree(
     kernels = kern * 3 if tie_orientations else kern
     model = WaveletTreeModel(
         qt=qt, scales=scales, kernels=list(kernels), log_root=log_root,
-        grid=grid, weights=weights,
+        grids=grids, weights=weights,
         ll_mean=float(clean_scaling.mean()), ll_std=float(clean_scaling.std()),
         tie_orientations=tie_orientations,
     )

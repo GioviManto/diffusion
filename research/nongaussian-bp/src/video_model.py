@@ -31,7 +31,7 @@ from .em import ExpectedStatistics
 from .noising import alpha_delta
 from .video_bp import caterpillar_bp
 from .wavelet import images_to_tree, tree_to_images
-from .wavelet_model import SubbandScales
+from .wavelet_model import SubbandScales, per_depth_grid_sizes
 
 _LOG_2PI = float(np.log(2.0 * np.pi))
 
@@ -86,9 +86,9 @@ class VideoTreeModel:
     scales: SubbandScales
     kernels: list                 # [orientation][level] spatial kernels
     k_time: object                # temporal kernel on the roots
-    log_root: np.ndarray          # (3, M) prior on the first frame's root
-    grid: np.ndarray
-    weights: np.ndarray
+    log_root: np.ndarray          # (3, M_0) prior on the first frame's root
+    grids: list                   # one grid per spatial depth, coarsest first
+    weights: list
     ll_mean: float
     ll_var: float
     ll_rho: float
@@ -98,7 +98,15 @@ class VideoTreeModel:
         return self.qt.depth
 
     def _log_k_space(self, oi):
-        return [k.log_transition_matrix(self.grid) for k in self.kernels[oi]]
+        return [
+            k.log_transition_matrix(self.grids[d], self.grids[d + 1])
+            for d, k in enumerate(self.kernels[oi])
+        ]
+
+    @property
+    def grid(self) -> np.ndarray:
+        """The root grid -- the one the temporal chain lives on."""
+        return self.grids[0]
 
     def _bp(self, nodes_std, alpha, delta, want_stats=False, chunk=16):
         """Run the caterpillar for each orientation. `nodes_std` is (B, F, 3, n)."""
@@ -106,11 +114,12 @@ class VideoTreeModel:
         log_ev = 0.0
         xi_space = None
         xi_time = None
-        k_time = np.exp(self.k_time.log_transition_matrix(self.grid))
+        # The temporal chain joins roots, so it lives on the root grid alone.
+        k_time = np.exp(self.k_time.log_transition_matrix(self.grids[0]))
 
         for oi in range(3):
             res = caterpillar_bp(
-                self.grid, self.weights, self._log_k_space(oi), k_time,
+                self.grids, self.weights, self._log_k_space(oi), k_time,
                 self.log_root[oi], nodes_std[:, :, oi, :], alpha,
                 self.scales.delta_by_depth(oi, delta), self.qt.branching,
                 self.depth, chunk=chunk, want_stats=want_stats,
@@ -159,9 +168,9 @@ class VideoTreeModel:
         `WaveletTreeModel.resolution_report` for the derivation.
         """
         alpha, delta = alpha_delta(t)
-        dx = float(self.grid[1] - self.grid[0])
-        pps = np.sqrt(delta) / (alpha * self.scales.scales) / dx
-        need = points_per_std * dx * float(self.scales.scales.max())
+        dx = np.array([float(g[1] - g[0]) for g in self.grids])
+        pps = np.sqrt(delta) / (alpha * self.scales.scales) / dx[None, :]
+        need = float(np.max(points_per_std * dx[None, :] * self.scales.scales))
         return {
             "t": float(t),
             "min_points_per_std": float(pps.min()),
@@ -192,10 +201,10 @@ class VideoTreeModel:
         from .wavelet_model import _sample_columns
         from .hierarchy import TreeIndex
 
-        grid, w = self.grid, self.weights
-        dx = float(grid[1] - grid[0])
         ti = TreeIndex(self.depth, self.qt.branching)
         nodes = np.empty((n, n_frames, 3, ti.n_nodes))
+        dx = [float(g[1] - g[0]) for g in self.grids]
+        grid, w = self.grids[0], self.weights[0]
         k_time = np.exp(self.k_time.log_transition_matrix(grid)) * w[:, None]
         cdf_t = np.cumsum(k_time, axis=0)
         cdf_t /= cdf_t[-1][None, :]
@@ -211,7 +220,11 @@ class VideoTreeModel:
             # Then each frame's quadtree, conditioned on its own root.
             cdfs = []
             for d in range(self.depth):
-                k = np.exp(self.kernels[oi][d].log_transition_matrix(grid)) * w[:, None]
+                k = np.exp(
+                    self.kernels[oi][d].log_transition_matrix(
+                        self.grids[d], self.grids[d + 1]
+                    )
+                ) * self.weights[d + 1][:, None]
                 c = np.cumsum(k, axis=0)
                 cdfs.append(c / c[-1][None, :])
             flat = state.reshape(n * n_frames, ti.n_nodes)
@@ -220,9 +233,14 @@ class VideoTreeModel:
                 kids = ti.nodes_at(d + 1)
                 ps = np.repeat(flat[:, parents], ti.branching, axis=1)
                 flat[:, kids] = _sample_columns(cdfs[d], ps, rng)
-            vals = grid[flat.reshape(n, n_frames, ti.n_nodes)]
-            if jitter:
-                vals = vals + (rng.random(vals.shape) - 0.5) * dx
+            state3 = flat.reshape(n, n_frames, ti.n_nodes)
+            vals = np.empty((n, n_frames, ti.n_nodes))
+            for d in range(self.depth + 1):
+                idx = ti.nodes_at(d)
+                v = self.grids[d][state3[:, :, idx]]
+                if jitter:
+                    v = v + (rng.random(v.shape) - 0.5) * dx[d]
+                vals[:, :, idx] = v
             nodes[:, :, oi, :] = vals
 
         flat_nodes = self.scales.restore(
@@ -263,7 +281,8 @@ def fit_video_tree(
     time_kernel_factory,
     n_iters: int = 12,
     half_width: float = 8.0,
-    grid_size: int = 201,
+    grid_size: int | None = None,
+    t_resolve: float | None = None,
     freeze_time: bool = False,
     chunk: int = 16,
     verbose: bool = False,
@@ -285,8 +304,22 @@ def fit_video_tree(
     n_nodes = std_clean.shape[-1]
     std_clean = std_clean.reshape(b, f_len, 3, n_nodes)
 
-    grid, weights = make_grid(half_width, grid_size)
-    log_root = np.tile(-0.5 * grid**2 - 0.5 * _LOG_2PI, (3, 1))
+    if grid_size is not None and t_resolve is not None:
+        raise ValueError("give grid_size or t_resolve, not both")
+    if grid_size is not None:
+        sizes = [grid_size] * (qt.depth + 1)
+    else:
+        target = t_resolve if t_resolve is not None else min(t_train)
+        sizes = per_depth_grid_sizes(scales.scales, target, half_width)
+    grids, weights = [], []
+    for size in sizes:
+        g, w = make_grid(half_width, size)
+        grids.append(g)
+        weights.append(w)
+    m_root = sizes[0]
+    log_root = np.tile(-0.5 * grids[0] ** 2 - 0.5 * _LOG_2PI, (3, 1))
+    if verbose:
+        print(f"  grid sizes by depth: {sizes}")
     ll_mean, ll_var, ll_rho = fit_ll_ar1(clean_scaling.reshape(b, f_len))
 
     kern = [[kernel_factory(d, rng) for d in range(qt.depth)] for _ in range(3)]
@@ -304,11 +337,12 @@ def fit_video_tree(
         t0 = time.perf_counter()
         model = VideoTreeModel(
             qt=qt, scales=scales, kernels=kern, k_time=k_time, log_root=log_root,
-            grid=grid, weights=weights,
+            grids=grids, weights=weights,
             ll_mean=ll_mean, ll_var=ll_var, ll_rho=ll_rho,
         )
         tot_space = [None] * qt.depth
-        tot_time = np.zeros((grid_size, grid_size))
+        # The temporal edge joins two roots, so its Xi is square on the root grid.
+        tot_time = np.zeros((m_root, m_root))
         log_ev = 0.0
         for x_std, alpha, delta in obs:
             _, ev, xi_s, xi_t = model._bp(
@@ -323,19 +357,19 @@ def fit_video_tree(
         n_edge_time = b * (f_len - 1) * 3 * len(obs)
         for d in range(qt.depth):
             stats = ExpectedStatistics(
-                xi=tot_space[d], site1=np.zeros(grid_size), log_evidence=0.0,
+                xi=tot_space[d], site1=np.zeros(sizes[d]), log_evidence=0.0,
                 n_edges=int(tot_space[d].sum()), n_chains=b,
             )
-            new = kern[0][d].m_step(stats, grid)
+            new = kern[0][d].m_step(stats, grids[d], grids[d + 1])
             for oi in range(3):
                 kern[oi][d] = new
         if not freeze_time:
             k_time = k_time.m_step(
                 ExpectedStatistics(
-                    xi=tot_time, site1=np.zeros(grid_size), log_evidence=0.0,
+                    xi=tot_time, site1=np.zeros(m_root), log_evidence=0.0,
                     n_edges=n_edge_time, n_chains=b,
                 ),
-                grid,
+                grids[0],
             )
         trace.seconds.append(time.perf_counter() - t0)
         if verbose:
@@ -345,7 +379,7 @@ def fit_video_tree(
 
     model = VideoTreeModel(
         qt=qt, scales=scales, kernels=kern, k_time=k_time, log_root=log_root,
-        grid=grid, weights=weights,
+        grids=grids, weights=weights,
         ll_mean=ll_mean, ll_var=ll_var, ll_rho=ll_rho,
     )
     return model, trace

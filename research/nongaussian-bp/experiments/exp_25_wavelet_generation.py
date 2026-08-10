@@ -60,7 +60,7 @@ SETTINGS = {
     "t_train": (0.4, 0.9),
     "t_likelihood": 0.05,
     "n_iters": 15,
-    "grid_size": 201,
+    "t_resolve": 0.05,
     "half_width": 8.0,
     "n_components": 4,
     "families": ("gaussian", "mixture", "scale_mixture"),
@@ -124,7 +124,7 @@ def _fit_all(settings, train):
             t_train=list(settings["t_train"]),
             kernel_factory=_factory(family, settings),
             n_iters=settings["n_iters"], half_width=settings["half_width"],
-            grid_size=settings["grid_size"], chunk=settings["chunk"],
+            t_resolve=settings["t_resolve"], chunk=settings["chunk"],
         )
         out[family] = (model, trace, time.perf_counter() - t0)
         print(f"[fit] {family}: {out[family][2]:.0f}s, "
@@ -167,7 +167,7 @@ def part_fit(settings, out_dir):
         for d in range(model.depth):
             k = model.kernels[0][d]
             row[f"magnitude_ratio_d{d}"] = (
-                k.magnitude_ratio(model.grid)
+                k.magnitude_ratio(model.grids[d])
                 if hasattr(k, "magnitude_ratio") else float("nan")
             )
         rows.append(row)
@@ -335,7 +335,7 @@ def main() -> None:
     settings = apply_overrides(SETTINGS, args.set)
     if args.quick:
         settings.update(
-            n_train=200, n_test=200, n_iters=4, grid_size=161, t_train=(0.5,),
+            n_train=200, n_test=200, n_iters=4, t_resolve=0.2, t_train=(0.5,),
             n_generate=400, n_reverse=8, reverse_steps=30,
         )
 

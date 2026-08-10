@@ -155,10 +155,17 @@ class ScaleMixtureKernel:
         """(M, C) mixing weights w_c(u_j), rows summing to 1."""
         return _softmax_rows(self._gate_logits(grid))
 
-    def _component_logs(self, grid: np.ndarray) -> np.ndarray:
-        """(C, M, M) log[ w_c(u_j) N(u_k; rho_c u_j, s2_c) ], indices [c, k, j]."""
-        w = self.gate(grid)                                   # (M_j, C)
-        resid = grid[None, :, None] - self.rho[:, None, None] * grid[None, None, :]
+    def _component_logs(
+        self, grid: np.ndarray, grid_out: np.ndarray | None = None
+    ) -> np.ndarray:
+        """(C, M_out, M_in) log[ w_c(u_j) N(u_k; rho_c u_j, s2_c) ], [c, k, j].
+
+        The gate reads only the *parent* value, so it lives on `grid` whatever
+        the child grid is; only the residual spans both.
+        """
+        out = grid if grid_out is None else grid_out
+        w = self.gate(grid)                                   # (M_in, C)
+        resid = out[None, :, None] - self.rho[:, None, None] * grid[None, None, :]
         s2 = self.s2[:, None, None]
         return (
             np.log(np.maximum(w.T, 1e-300))[:, None, :]
@@ -166,15 +173,19 @@ class ScaleMixtureKernel:
             - 0.5 * resid**2 / s2
         )
 
-    def log_transition_matrix(self, grid: np.ndarray) -> np.ndarray:
+    def log_transition_matrix(
+        self, grid: np.ndarray, grid_out: np.ndarray | None = None
+    ) -> np.ndarray:
         from scipy.special import logsumexp
 
-        return logsumexp(self._component_logs(grid), axis=0)
+        return logsumexp(self._component_logs(grid, grid_out), axis=0)
 
-    def responsibilities(self, grid: np.ndarray) -> np.ndarray:
+    def responsibilities(
+        self, grid: np.ndarray, grid_out: np.ndarray | None = None
+    ) -> np.ndarray:
         from scipy.special import logsumexp
 
-        comp = self._component_logs(grid)
+        comp = self._component_logs(grid, grid_out)
         return np.exp(comp - logsumexp(comp, axis=0)[None, :, :])
 
     def grad_log_transition_matrix(self, grid: np.ndarray) -> np.ndarray:
@@ -239,25 +250,29 @@ class ScaleMixtureKernel:
     # -- M-step ------------------------------------------------------------
 
     def m_step(
-        self, stats: ExpectedStatistics, grid: np.ndarray, n_inner: int = 3
+        self, stats: ExpectedStatistics, grid: np.ndarray,
+        grid_out: np.ndarray | None = None, n_inner: int = 3,
     ) -> "ScaleMixtureKernel":
         xi = stats.xi
+        out = grid if grid_out is None else grid_out
         current = self
         for _ in range(n_inner):
-            r = current.responsibilities(grid)                # (C, M_k, M_j)
+            r = current.responsibilities(grid, out)            # (C, M_k, M_j)
             w = r * xi[None, :, :]
 
             mass = np.maximum(w.sum(axis=(1, 2)), 1e-300)
             # rho_c: weighted least squares of child on parent, per component.
-            num = (w * grid[None, None, :] * grid[None, :, None]).sum(axis=(1, 2))
+            num = (w * grid[None, None, :] * out[None, :, None]).sum(axis=(1, 2))
             den = np.maximum((w * (grid**2)[None, None, :]).sum(axis=(1, 2)), 1e-300)
             rho = num / den
-            resid = grid[None, :, None] - rho[:, None, None] * grid[None, None, :]
+            resid = out[None, :, None] - rho[:, None, None] * grid[None, None, :]
             s2 = np.maximum((w * resid**2).sum(axis=(1, 2)) / mass, _VAR_FLOOR)
             current = replace(current, rho=rho, s2=s2)
 
             # Gate block: soft counts per parent value, then concave ascent.
-            r = current.responsibilities(grid)
+            # Summing over the child axis is what makes this independent of the
+            # child grid -- the gate is a function of the parent alone.
+            r = current.responsibilities(grid, out)
             counts = (r * xi[None, :, :]).sum(axis=1).T        # (M_j, C)
             current = current._fit_gate(grid, counts)
         return current

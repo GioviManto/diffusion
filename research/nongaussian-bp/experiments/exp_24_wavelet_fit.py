@@ -51,7 +51,7 @@ SETTINGS = {
     "t_train": (0.3, 0.6, 1.0),
     "t_eval": (0.2, 0.4, 0.8, 1.5),
     "n_iters": 25,
-    "grid_size": 241,
+    "t_resolve": 0.05,
     "half_width": 8.0,
     "n_components": 4,
     "families": ("gaussian", "mixture"),
@@ -93,7 +93,7 @@ def _fit(family, settings, train):
     model, trace = fit_wavelet_tree(
         train.images, levels=settings["levels"], t_train=list(settings["t_train"]),
         kernel_factory=_factory(family, settings), n_iters=settings["n_iters"],
-        half_width=settings["half_width"], grid_size=settings["grid_size"],
+        half_width=settings["half_width"], t_resolve=settings["t_resolve"],
         chunk=settings["chunk"],
     )
     return model, trace, time.perf_counter() - t0
@@ -188,7 +188,7 @@ def main() -> None:
     settings = apply_overrides(SETTINGS, args.set)
     if args.quick:
         settings.update(
-            n_train=300, n_test=100, n_iters=6, grid_size=161,
+            n_train=300, n_test=100, n_iters=6, t_resolve=0.3,
             t_train=(0.5,), t_eval=(0.4, 0.8),
         )
 

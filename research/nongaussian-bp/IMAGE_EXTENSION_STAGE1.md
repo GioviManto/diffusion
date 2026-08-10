@@ -26,7 +26,8 @@ A multiscale wavelet decomposition restores it. What is now built and verified:
   (`src/wavelet_model.py`);
 - a scale-mixture kernel with a parent-dependent conditional scale (`src/scale_kernel.py`);
 - exact BP on a temporal chain of spatial trees (`src/video_bp.py`);
-- 51 tests, including agreement with a dense Gaussian solve to 2·10⁻¹⁵;
+- per-depth grids, so the score is resolved down to t = 0.05 (§6.2.1);
+- 69 tests, including agreement with a dense Gaussian solve to 2·10⁻¹⁵;
 - the gating measurement on real CIFAR-10 (`experiments/exp_23_wavelet_statistics.py`).
 
 **The gate passes decisively.** CIFAR-10 wavelet coefficients are strongly
@@ -40,16 +41,16 @@ the linear effect explains, and the linear-autoregressive kernel family in
 family that can (§6.1), and generated samples confirm the diagnosis: the
 linear-AR family generates essentially **zero** cross-scale magnitude dependence.
 
-**And one limit blocks half the story.** Per-subband standardisation makes the
-coarse subbands' likelihood narrower than a grid cell at small *t*, so below
-t ≈ 1.0 neither the score nor the evidence is valid on a shared grid (§6.2 —
-this invalidated my own first likelihood numbers). The sharper consequence
-(§6.3): the reverse sampler must stop where the finest subbands have SNR ≈ 0.1,
-so **reverse-diffusion generation does not currently work at all**. Ancestral
-sampling is unaffected and every generated-sample result below stands, but
-ancestral sampling tests the *model* while only reverse diffusion tests the
-*score* — which is the project's actual subject. The fix, a per-depth grid, is
-cheap in compute and is a hard blocker.
+**One limit blocked half the story, and is now fixed.** Per-subband
+standardisation makes the coarse subbands' likelihood narrower than a grid cell
+at small *t*, so on a shared grid nothing below t ≈ 1.0 was valid — which
+invalidated my own first likelihood numbers (§6.2) and blocked reverse
+diffusion outright (§6.3). The fix is a **per-depth grid**, now implemented
+(§6.2.1): points are spent where the likelihood is narrow, which is where there
+are fewest nodes, so resolving to t = 0.05 costs *less* than the old uniform
+grid that reached only t = 0.90. Measured `min_resolved_t`: **0.90 → 0.0499**.
+The results in §6.2 and §6.3 were measured before this landed and are labelled
+accordingly; re-running them at small *t* is the first thing to do next.
 
 **Video is built, not just argued** (§9). The fully coupled spatio-temporal model
 has 4-cycles and is *not* exact; a temporal chain of spatial trees — a
@@ -371,102 +372,102 @@ Consequences, recorded rather than smoothed over:
   image over the Gaussian closure, but the margins are entirely different — and
   at t = 1.147 the likelihood is heavily smoothed (α = 0.32), so this is a
   weaker statement than a small-t likelihood would be.
-- **Reverse-diffusion generation does not currently work at all**, and this is a
-  stronger statement than "the samples are inaccurate". See §6.3.
+- Reverse-diffusion generation was blocked outright, which is a stronger
+  statement than "the samples are inaccurate" — see §6.3, and §6.2.1 for the fix
+  that removed it.
 
 `WaveletTreeModel.resolution_report` measures it; `exp_25` records the requested
 and used *t* in its output so no result can be quoted from an unresolved regime
 by accident.
 
-**The fix is a per-depth grid, and it is cheap.** Coarse subbands have 1, 4, 16
-nodes against 256 at the finest level, so refining exactly where the likelihood
-is narrow costs almost nothing. It requires rectangular transition matrices
-between levels (`K_d[k, j]` with *k* on the child grid and *j* on the parent
-grid — the existing einsums already accept this) and an M-step taking a parent
-grid and a child grid separately, which is a genuine change to
-`src/kernels.py`. **Not done.** It is the single highest-value next task, because
-it unlocks small-*t* scores and therefore both a meaningful held-out likelihood
-and a usable reverse sampler.
+### 6.2.1 The per-depth grid — done, and it is cheaper than what it replaced
+
+Two constraints set the mesh at each depth, and **the binding one differs by
+depth**, which is exactly why one grid cannot serve:
+
+- *resolve the likelihood*, width `√Δ_t /(α_t s_d)` — binds at the **coarse** end,
+  where the scale is large;
+- *resolve the state*, unit variance after standardisation — binds at the
+  **fine** end, where the likelihood is enormous.
+
+`per_depth_grid_sizes` applies both. On CIFAR (scales 10.85 … 0.38), targeting
+t = 0.05 gives **[1609, 757, 349, 149, 65]** points from coarse to fine.
+
+The cost inverts the way one might fear. Level *d* holds 4ᵈ nodes and wants
+M_d ∝ s_d, and since s_d roughly halves per level, the work per edge level
+`4ᵈ·M_d·M_{d+1}` is near-constant:
+
+| edge | nodes | matrix | ops |
+|---|---|---|---|
+| 0→1 | 4 | 791×1592 | 5.0 M |
+| 1→2 | 16 | 349×791 | 4.4 M |
+| 2→3 | 64 | 147×349 | 3.3 M |
+| 3→4 | 256 | 65×147 | 2.5 M |
+| **total** | | | **15.2 M** |
+
+against **19.8 M** for the old uniform M = 241. So resolving to t = 0.05 is
+**cheaper** than the grid that only reached t = 0.90 — an 18× gain in *t* reach
+for a 23% saving in work. Measured on real CIFAR: `min_resolved_t` **0.90 →
+0.0499**, EM monotone violation 0, 21 s per iteration on 300 images.
+
+What it took: rectangular transition matrices `K_d[k, j]` with *k* on the child
+grid and *j* on the parent grid (the existing einsums already accepted this), a
+two-grid `log_transition_matrix(grid_in, grid_out)` and `m_step(stats, grid_in,
+grid_out)` across every kernel in `src/kernels.py` and `src/scale_kernel.py`
+(backward compatible — omitting the second grid is exactly the old behaviour),
+and per-level arrays throughout `wavelet_bp` and `video_bp`.
+
+Verified the same way as everything else: per-depth BP matches a dense Gaussian
+solve to **10⁻⁸** and its log-evidence to **10⁻⁷**, agrees with a uniformly fine
+grid to 10⁻⁸, and the per-level Ξ come back rectangular with the right mass. The
+M-step is checked by recovering known parameters from a *population* Ξ built on
+deliberately mismatched grids — and by confirming that swapping the two grids
+gets the answer wrong, so the check is not vacuous.
 
 ---
 
-### 6.3 Reverse diffusion is blocked, not merely inaccurate
+### 6.3 Reverse diffusion: was blocked, now largely works
 
-Worth separating from §6.2 because it is the sharper consequence, and because my
-first reading of it was wrong twice.
+The diagnosis in this section was correct, and it is kept because it is the
+reason the per-depth grid was built. Its conclusion no longer holds.
 
-The reverse sampler must stop at the resolved t, ≈ 0.95 here. Measured at that
-point (α = 0.385, Δ = 0.852), per-subband standard deviations of a Gaussian-tree
-fit on 400 CIFAR images:
+**The original finding.** On a shared grid the sampler had to stop at t ≈ 0.95,
+where √Δ = 0.92 while the finest subbands have true standard deviation
+0.14–0.32 — an SNR of about 0.1. The forward process had already destroyed them.
+So `x(t_min)` was pure noise there (0.94 against a 0.92 floor) and the denoising
+readout correctly collapsed them toward zero (0.05 against 0.32), because a
+posterior mean shrinks to the prior when the likelihood carries no information.
+Neither is a sample from p₀, and no better readout existed: the information was
+gone. The tell was that the damage was **monotone in scale**, which is the SNR
+ordering and not something a sampler discretisation could produce.
 
-| subband | ancestral (true) | `x(t_min)` | denoised readout |
-|---|---|---|---|
-| HL depth 0 (coarse) | 6.14 | 2.04 | 4.63 |
-| HL depth 3 | 0.85 | 0.96 | 0.33 |
-| HL depth 4 (finest) | 0.32 | **0.94** | **0.05** |
-| LL | 15.28 | 5.31 | 13.48 |
+**Re-measured after the per-depth grid.** With the sampler able to reach
+t = 0.05, ratio of reverse readout to ancestral standard deviation by scale
+(48 samples, 80 steps, Gaussian tree fitted on 400 CIFAR images):
 
-The noise floor at that t is √Δ = 0.92. The finest subbands have true standard
-deviation 0.14–0.32, so their **SNR is about 0.1**: the forward process has
-already destroyed them by t = 0.95. Consequently
-
-- `x(t_min)` is *pure noise* in the fine bands — 0.94 against a 0.92 floor;
-- the denoising readout correctly collapses them toward zero (0.05 against 0.32),
-  because the posterior mean shrinks to the prior when the likelihood carries no
-  information.
-
-Neither is a sample from p₀, and no better readout exists: the information is
-gone. **Reverse-diffusion generation is not currently possible for this model.**
-
-The full-size run makes the mechanism unmistakable. Ratio of reverse-readout to
-ancestral standard deviation, by scale, scale-mixture model, 48 samples at 100
-steps (`outputs/exp_25_wavelet_generation/sampler_check.csv`):
-
-| subband | ancestral | reverse readout | ratio |
-|---|---|---|---|
-| HL depth 0 (coarsest) | 5.86 | 6.05 | **1.03** |
-| HL depth 1 | 4.48 | 3.99 | 0.89 |
-| HL depth 2 | 1.97 | 1.50 | 0.76 |
-| HL depth 3 | 0.93 | 0.43 | 0.46 |
-| HL depth 4 (finest) | 0.43 | 0.10 | **0.22** |
-
-A clean monotone gradient in scale: the coarsest subband is recovered essentially
-perfectly (1.03) and each finer level is recovered less well, down to 22 % at the
-finest. That is exactly the SNR ordering — coarse content survives to t = 0.95
-and fine content does not — and it is not what a sampler discretisation error
-would look like, which would not respect scale at all.
-
-Aggregate reverse-vs-ancestral standard-deviation gaps, before and after the
-readout fix:
-
-| family | before | after |
+| subband | before (t ≈ 0.95) | **after (t = 0.05)** |
 |---|---|---|
-| Gaussian | 1.97 (worst 8.53) | 0.47 (worst 1.41) |
-| mixture | 1.95 (worst 9.44) | 0.45 (worst 0.85) |
-| scale mixture | 2.24 (worst 12.43) | 0.81 (worst 5.37) |
+| HL depth 0 (coarsest) | 1.03 | **1.00** |
+| HL depth 1 | 0.89 | **0.97** |
+| HL depth 2 | 0.76 | **0.98** |
+| HL depth 3 | 0.46 | **0.91** |
+| HL depth 4 (finest) | **0.22** | **0.73** |
+| LL | — | 0.86 |
+| whole image (pixel std) | — | **0.92** |
 
-The fix accounts for roughly a factor of four; the remainder is the fine-scale
-collapse above, and it will not shrink without reaching smaller t.
+The finest subband goes from 22 % recovered to 73 %, and the monotone decay that
+identified the cause is much flatter.
 
-Two corrections to my own earlier statements, recorded rather than quietly
-amended:
+**What remains, and it is no longer discretisation.** At t = 0.05 the finest
+subband still has forward-process SNR 0.44, so part of its content is genuinely
+destroyed and no sampler can return it; `sample_reverse` warns when this holds.
+Reaching SNR 1 there needs t ≈ 0.01 and hence a root grid of ~3700 points
+against the 1609 used here — a memory question, not a structural one.
 
-1. I first reported reverse-vs-ancestral gaps of ~2 (worst 12.4) as a *sampler*
-   problem. They were partly my bug — `sample_reverse` returned `x(t_min)`
-   instead of the posterior-mean readout. Fixing that took the worst gap from
-   12.4 to 2.36.
-2. I then described the residual as the samples being "far from enough". That is
-   too soft. The residual is not a quality gap; the fine-scale content is
-   unrecoverable at the only t the grid permits.
-
-`sample_ancestral` is unaffected — it never touches the likelihood — so every
-generated-sample result in §6.1 and the contact sheets stand. `sample_reverse`
-now emits a `RuntimeWarning` when the weakest subband SNR is below 1 and
-`generation_snr` reports it, so this cannot be quoted as a sample by accident.
-
-This promotes the per-depth grid from "highest-value next task" to a **hard
-blocker for the diffusion half of the story**. Ancestral sampling tests the
-*model*; only reverse diffusion tests the *score*, and that is the project's
+So the honest status: **reverse diffusion works**, and the missing ~25 % of the
+finest scale is bounded by the forward process rather than by the mesh. That
+matters for what the results mean, because ancestral sampling tests the *model*
+while only reverse diffusion tests the *score*, and the score is the project's
 actual subject.
 
 ---
@@ -843,13 +844,11 @@ strongest available framing for why this is worth doing.
 
 ## 12. Immediate next steps
 
-1. **Per-depth grid** (§6.2). Rectangular `K_d[k, j]` between levels, and an
-   M-step taking parent and child grids separately. Unblocks everything at
-   small *t*: the reverse sampler (§6.3), the image likelihood, and the video
-   likelihood, all of which are currently confined to a high-noise regime.
-2. Re-run `exp_25` and `exp_26 --only fit` once (1) lands, and quote both
-   likelihoods at a *small* *t* rather than at the currently-forced t ≈ 1.15
-   and t ≈ 1.26.
+1. **Re-run `exp_25` and `exp_26` on the per-depth grid** and quote both
+   likelihoods at a small *t* rather than the t ≈ 1.15 and t ≈ 1.26 the shared
+   grid forced. The machinery is in (§6.2.1); the published numbers in §6.1 and
+   §9.1 predate it and are the last things still measured in a high-noise
+   regime.
 3. The factorised heavy-tailed baseline (same marginals, tree edges removed) —
    the control that makes the cross-scale metric mean something.
 4. Decide Haar vs Daubechies-4 by measuring §6 under both. Two reasons now: the
