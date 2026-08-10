@@ -380,9 +380,12 @@ Consequences, recorded rather than smoothed over:
   Worth recording that the discarded numbers turned out to be close to the
   correct ones — within 3 nats, and within 0.06 for the scale mixture. Setting
   them aside was still right: an unresolved quadrature carries no guarantee, and
-  the *same* defect in `exp_26` understated an effect by 2.2× (§9.1). But the
-  error here was small, and saying so is more useful than implying the caution
-  was vindicated by the outcome.
+  re-running `exp_26` on per-depth grids later showed *its* flagged likelihood to
+  have been accurate too (§9.1). The criterion is sufficient for trust, not
+  necessary. Setting the numbers aside was still the right call — an unresolved
+  quadrature carries no guarantee — but in both cases the error turned out to be
+  small, and saying so is more useful than implying the caution was vindicated
+  by the outcome.
 - Reverse-diffusion generation was blocked outright, which is a stronger
   statement than "the samples are inaccurate" — see §6.3, and §6.2.1 for the fix
   that removed it.
@@ -671,32 +674,46 @@ by EM through the caterpillar E-step; `frozen` holds ρ_time = 0. The LL band is
 treated identically in both (exact scalar Gaussian AR(1) across frames, no grid),
 so the comparison isolates temporal coupling *of the spatial trees*.
 
-300 sequences of 6 frames, 8 EM iterations, 400 generated sequences:
+300 sequences of 6 frames, 8 EM iterations, 400 generated sequences, on
+**per-depth grids** (`min_resolved_t` = 0.05, so t = 0.6 needs no clamp):
 
-| | ρ_time | held-out loglik/sequence | frame-difference energy |
-|---|---|---|---|
-| frozen (control) | 0 (held) | −6739.8 | 1.420 |
-| **caterpillar** | **0.999** | **−6667.1** | **1.005** |
-| *real video* | — | — | ***0.211*** |
-| *independent frames* | — | — | *2.000* |
+| | ρ_time | loglik/seq (t = 0.6) | loglik/seq (t = 1.259) | frame-difference energy |
+|---|---|---|---|---|
+| frozen (control) | 0 (held) | −5936.3 | −6739.8 | 1.420 |
+| **caterpillar** | **0.999** | **−5902.5** | **−6667.1** | **1.005** |
+| *real video* | — | — | — | ***0.211*** |
+| *independent frames* | — | — | — | *2.000* |
 
-**Temporal coupling is worth +72.7 nats per sequence** (+12.1 per frame),
-evaluated at t = 1.259 — the smallest *t* this grid resolves.
+**Temporal coupling is worth +33.8 nats per sequence** (+5.6 per frame) at
+t = 0.6, and **+72.7** at t = 1.259. The gap grows with the noise level: the
+coarse trajectory is what survives heavy noising, so a model that knows how it
+evolves gains most exactly where everything else has been washed out.
 
-> **A correction, and it moved the answer.** An earlier version of this table
-> quoted these likelihoods at t = 0.6, where the coarsest subband (scale 11.25)
-> gets 0.5 points per likelihood standard deviation against the 3 required. That
-> is the §6.2 defect, and I had built the guard for `exp_25` and then failed to
-> carry it into `exp_26`. The unresolved evaluation gave a gap of +33.8
-> nats/sequence — it **understated the benefit of temporal coupling by 2.2×**.
-> Both experiments now clamp to the resolved *t* and record requested and used
-> values side by side. The coherence column never involved a likelihood and is
-> unchanged.
+> **A correction to an earlier version of this section, which misattributed
+> that spread.** The first run quoted t = 0.6 on a uniform M = 161 grid, where
+> the coarsest subband gets 0.5 points per likelihood standard deviation against
+> the 3 the §6.2 criterion asks for. I clamped to the resolved t = 1.259, saw
+> the gap go from +33.8 to +72.7, and wrote that the unresolved evaluation had
+> **understated the effect by 2.2×**. That was wrong.
 >
-> The standing caveat is that t = 1.259 is a heavily smoothed regime
-> (α = 0.28, Δ = 0.92). The comparison is paired and fair, but a likelihood this
-> far from t = 0 is a weaker statement than a small-*t* one would be — which is,
-> again, what the per-depth grid unblocks.
+> Re-running on per-depth grids — which resolve down to t = 0.05, so t = 0.6 is
+> evaluated as requested with no clamp — returns **−5902.456 / −5936.256**,
+> matching the flagged run to the precision recorded, with ρ_time agreeing to
+> twelve significant figures. **The unresolved likelihood at t = 0.6 was
+> accurate.** The +33.8 → +72.7 spread is the change in *t*, not a corrected
+> error, and I had confounded the two.
+>
+> Why the criterion was conservative here: the under-resolved subbands are the
+> *coarse* ones, which hold 1, 4 and 16 coefficients against 256 at the finest
+> level, so their share of an aggregate likelihood is small. Three points per
+> standard deviation is **sufficient for trust, not necessary** — falling below
+> it means a quantity is no longer guaranteed, not that it is wrong.
+>
+> Where the resolution genuinely bound was elsewhere, and it was the *clamp*
+> rather than any demonstrated inaccuracy: refusing to integrate below t ≈ 0.9
+> stopped reverse diffusion where the fine subbands still had SNR ≈ 0.1. Lifting
+> it took finest-band recovery from 0.22 to 0.73 (§6.3). That is the real return
+> on the per-depth grid; the likelihood correction claimed here was not.
 
 **Temporal coupling earns its place**: +46.9 nats per sequence on held-out
 likelihood, and coherence improves from 1.538 to 1.086. EM is monotone
