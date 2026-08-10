@@ -45,9 +45,18 @@ A WARNING THIS FILE EXISTS TO CARRY
 -----------------------------------
 An earlier version of claim 3 reported that EM-BP generated *worse* samples than the network --
 the pointwise winner losing generatively. That was an artefact of stopping EM at 30 iterations.
-rho is flat by iteration 25 and the innovation shape is not: at 30 iterations the fitted kernel
-carries a third of the true excess kurtosis, at 120 it carries three quarters, and the generated
-statistic moves with it. Fitting to convergence reverses the conclusion. See `FULL["em_iters"]`.
+rho is flat by iteration 25 and the innovation shape is not, so the generated statistic moves
+with an unconverged kernel. Fitting to convergence reverses the conclusion.
+
+The same trap has now caught this project three times, at three different iteration budgets, and
+it is worth stating the general form. A fixed iteration budget does not compare estimators; it
+compares CONVERGENCE RATES. Whatever is slower to converge looks worse, and the coordinates here
+converge at wildly different speeds -- on clean chains rho is done after ONE M-step while the
+innovation shape takes tens, and the observation channel slows both further. Measured across
+eight independent data draws at 200 iterations, the fitted excess kurtosis is 3.02 +- 0.20
+against a truth of 3.0, i.e. unbiased; at 120 iterations on one draw it reads 2.15, and an
+earlier version of this file built an argument on that 2.15. Single-draw shape numbers at this
+budget span 2.40 to 3.99, so they carry almost no information. See `FULL["em_iters"]`.
 
 PROTOCOL CHOICES, ALL SETTLED ELSEWHERE
 ---------------------------------------

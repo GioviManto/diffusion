@@ -43,42 +43,48 @@ initialisations converge to the same place.
 Three initialisations spanning 0.0 to 0.6 agree to four decimal places, the evidence is monotone
 at every EM step (violation exactly 0.0), and the variance is recovered to 0.8%.
 
-Read this carefully, because the columns do not say the same thing. Correlation and variance are
-recovered tightly; **shape is recovered to about 72%** — the fitted mixture reaches an excess
-kurtosis of 2.15 against a true Laplace value of 3.0.
+Read this carefully, because the columns do not say the same thing — and because the third one
+nearly fooled us twice.
 
-That last number is the most important one in this document, and getting it right required
-noticing something that had been silently wrong. **Compare panels (a) and (b): they are the same
-three EM runs, plotted against the same iteration axis.** Panel (a) is flat from about iteration
-25 and looks converged. Panel (b) — the innovation shape, carried by the mixture weights and
-component variances — is still climbing steeply there and does not level off until roughly 100.
+**ρ and the variance are recovered tightly.** Three initialisations spanning 0.0 to 0.6 land within
+0.0001 of each other. Note what that does *not* establish: they share one dataset, so their
+agreement bounds the optimisation variance and says nothing about the estimation error.
 
-Sweeping the iteration count explicitly, on a separate draw at the same settings
-(ρ = 0.85, N = 512, C = 8), and carrying it out to 400 to confirm the plateau:
+**The kurtosis column is a single draw at 120 iterations, and neither of those is enough.**
+Panels (a) and (b) show why the iteration count is not: they are the same three runs on the same
+axis, and (a) is flat from iteration 25 while (b) is still climbing. A ρ trace that has plateaued
+is not evidence of a converged kernel.
 
-| EM iterations | fitted ρ | innovation variance | excess kurtosis |
-|---|---|---|---|
-| 30 | 0.8380 | 0.2918 | 0.841 |
-| 60 | 0.8461 | 0.2737 | 1.846 |
-| 120 | 0.8479 | 0.2701 | 2.301 |
-| 400 | 0.8481 | 0.2697 | 2.294 |
-| **truth** | **0.85** | **0.2775** | **3.0** |
+Varying the *data* rather than the initialisation, at 200 iterations, ρ = 0.85, N = 512, C = 8,
+eight independent draws:
 
-(A different data draw from the claim-1 table, which is why 120 iterations reads 2.30 here and
-2.15 there; the point is the shape of the curve, not the third digit.)
+| | mean | sd across draws | s.e. | range |
+|---|---|---|---|---|
+| fitted from clean chains | 2.972 | 0.209 | 0.074 | [2.592, 3.293] |
+| fitted through the channel | 3.024 | 0.577 | 0.204 | [2.396, 3.993] |
+| **truth** | **3.0** | | | |
 
-At 30 iterations the fitted kernel has *a third* of the true excess kurtosis; at 120 it has three
-quarters and stops improving. A ρ trace that has plateaued is not evidence that the kernel has
-converged, and every number in this document is therefore computed at 120 iterations. The same
-check was run on the network arm — see claim 2 — because converging one side and not the other
-decides a comparison by fiat rather than by evidence.
+So **at convergence the estimator recovers the innovation shape essentially exactly**, and a single
+draw is worth very little: the channel-fitted value ranges from 2.40 to 3.99 across draws. The
+2.15 in the table above is one low draw at an iteration count it had not converged at, and an
+earlier version of this note built an argument on it — "shape is recovered to 72%", with the
+missing 28% attributed to a contest between mixture capacity and channel information. Neither
+factor was needed; the deficit was optimisation and sampling noise.
 
-The remaining 28% is **not** a convergence artefact — the sweep is flat from 120 to 400 iterations.
-What it *is* remains open between two candidates this script does not separate: a finite Gaussian
-mixture cannot produce the cusp at the origin, which panel (c) shows directly, and the channel
-destroys innovation-shape information 112–1222× faster than it destroys correlation information
-(measured separately, in the Fisher analysis of `ch10-estimation`). The first is capacity and is
-fixable; the second is not. Carry the light tail forward either way — it is what claim 3 is about.
+**The channel costs convergence rate, not accuracy.** Paired on the same chains, clean against
+noised: the paired difference in recovered kurtosis is **−0.052 ± 0.217**, i.e. nothing. What does
+differ is how fast each gets there — ρ converges in a single iteration on clean data against
+roughly 30–60 through the channel, and the shape takes about 20–60 clean against 60–120 noised.
+That is the missing-information effect of Dempster–Laird–Rubin showing up where it belongs, in the
+rate, and it explains why every under-iterated run in this project produced a *deficit* rather
+than noise.
+
+One consequence worth stating plainly, because it has now caught us three times: at 40 iterations
+it manufactured a pointwise/generative dissociation and a capacity effect (see the last section);
+at 120 it manufactured this shape deficit; and a paired clean-vs-channel comparison at a fixed
+120 iterations manufactured a channel penalty of +0.22 ± 0.15 that is −0.05 ± 0.22 once both arms
+are run to convergence. The lesson is not "use more iterations" but that **a fixed iteration
+budget compares convergence rates, not estimators.**
 
 ---
 

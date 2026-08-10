@@ -585,23 +585,40 @@ shape ($\ncomp=8$ kurtosis) & paired gap $+0.22\pm0.15$ & \textbf{not resolved} 
 \end{tabular}
 \end{center}
 
-Three things follow, and the third is the one we would want more replicates for. First, the
-ordering $\corr < \ivar$ matches the information analysis quantitatively: it predicts variance
-information decaying $4$--$6$ times faster than correlation information, and the estimator errors
-show a ratio of $3.3$. Second, the $\ivar$ figure should not be read as a clean statistical
-penalty, because the \emph{clean} arm's error is flat in $\nseq$
+Two caveats on that table before the interpretation. The ordering $\corr < \ivar$ matches the
+information analysis quantitatively --- it predicts variance information decaying $4$--$6$ times
+faster than correlation information, and the estimator errors show a ratio of $3.3$. But the
+$\ivar$ figure is not a clean statistical penalty: the \emph{clean} arm's error is flat in $\nseq$
 ($0.0041,0.0039,0.0059,0.0046,0.0040$ from $\nseq=64$ to $1024$) rather than falling like
-$\nseq^{-1/2}$: it has hit a discretisation floor, so the ratio mixes a statistical penalty with a
-grid artefact and shrinks from ${\approx}10$ to $2$ as $\nseq$ grows for that reason.
+$\nseq^{-1/2}$, so it has hit a discretisation floor and the ratio mixes a statistical penalty
+with a grid artefact, shrinking from ${\approx}10$ to $2$ as $\nseq$ grows for that reason.
 
-Third, and least expected: the innovation \emph{shape} shows no resolved penalty at all, even
-though it is the coordinate the information analysis says is $112$--$1222$ times more fragile.
-The reconciliation is the protocol. Those information ratios compare single noise levels at the
-ends of the schedule, whereas the noised arm here spreads its chains across five levels including
-$t=0.1$, where shape information is still largely intact. A multi-level observation protocol
-therefore buys back most of what a single high-$t$ view would destroy. We report this as
-unresolved rather than as a null result: three replicates give a standard error of $0.15$ on an
-effect of $0.22$, and the per-budget signs are not consistent.
+\begin{remark}[The shape ``penalty'' is a convergence rate, not an information loss]
+\label{rem:rate-not-bias}
+The table above reports both arms at a fixed $120$ iterations, and at that budget the paired shape
+gap is $+0.22\pm0.15$ --- suggestive, and we initially reported it as an unresolved penalty. It is
+not a penalty. Run to convergence ($200$ iterations) over eight independent data draws, the paired
+gap is $-0.052\pm0.217$: nothing. Both arms recover the truth, clean at $2.972\pm0.074$ and
+channel-fitted at $3.024\pm0.204$ against $3.0$.
+
+What the channel changes is the \emph{rate}. On clean chains $\corr$ and $\ivar$ are converged
+after a single M-step --- with clean data $\Xi$ is the empirical pair distribution and does not
+depend on $\params$ at all --- while through the channel $\corr$ needs $30$--$60$ iterations; the
+innovation shape takes roughly $20$--$60$ iterations clean against $60$--$120$ noised. This is the
+missing-information mechanism of \citet{dempster1977} appearing where the theory puts it, in the
+convergence rate, and it explains why every under-iterated experiment in this paper produced an
+apparent \emph{deficit} rather than symmetric noise.
+
+It also explains the shape slowness itself, which is \emph{not} caused by the channel: on clean
+data, with no missing information whatsoever, $\corr$ converges in one iteration and the kurtosis
+still takes tens. That slowness belongs to the mixture's inner latent label, not to the OU
+observation model --- two effects we had conflated.
+
+Finally, a single draw is nearly uninformative about shape at this budget: across the eight draws
+the channel-fitted excess kurtosis ranges from $2.396$ to $3.993$. Any statement of the form ``the
+fitted kernel recovers $x\%$ of the true kurtosis'' from one dataset should be disregarded, including
+one we previously made.
+\end{remark}
 
 \begin{figure}[t]
 \centering
