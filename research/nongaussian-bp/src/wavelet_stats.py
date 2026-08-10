@@ -67,21 +67,34 @@ def crossscale_profile(images: np.ndarray, levels: int) -> list[dict]:
 
 
 def profile_gap(generated: list[dict], real: list[dict], key: str) -> dict:
-    """Mean and worst absolute gap in `key` between two profiles, row-aligned.
+    """Mean and worst gap in `key` between two profiles, row-aligned.
 
     Returns the *signed* mean as well, because a model that is uniformly too
     light-tailed and one that scatters either side of the truth are different
     failures and an absolute summary hides that.
+
+    **Relative gaps are reported alongside the absolute ones, and for `std` they
+    are the ones to read.** Subband standard deviations span 0.14 to 17 in a
+    natural image, so an absolute summary is simply a report about the LL band:
+    a 1.4 absolute gap there is a 9 % error, while the same number at the finest
+    subband would be a factor of four. Reading `worst_abs_gap` on `std` cost me a
+    wrong conclusion once -- a model whose *worst* absolute gap grew while every
+    detail band improved -- so both are returned and the ambiguity is removed at
+    the source.
     """
     g = np.array([r[key] for r in generated], dtype=float)
     r = np.array([row[key] for row in real], dtype=float)
     if g.shape != r.shape:
         raise ValueError("profiles are not row-aligned")
+    finite = np.isfinite(g - r)
+    g, r = g[finite], r[finite]
     d = g - r
-    finite = np.isfinite(d)
-    d = d[finite]
+    scale = np.maximum(np.abs(r), 1e-12)
+    rel = d / scale
     return {
         "mean_abs_gap": float(np.mean(np.abs(d))),
         "mean_signed_gap": float(np.mean(d)),
         "worst_abs_gap": float(np.max(np.abs(d))),
+        "mean_rel_gap": float(np.mean(np.abs(rel))),
+        "worst_rel_gap": float(np.max(np.abs(rel))),
     }

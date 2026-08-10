@@ -311,35 +311,40 @@ discretisation and not model error. That is the point of having both.
 
 ### The comparison, at size
 
-600 training images, 12 EM iterations, M = 241, **3 000 generated** samples
-against **1 000 held-out real** images. Monotone violation 0 for all three
-families. `outputs/exp_25_wavelet_generation/`.
+600 training images, 12 EM iterations, **per-depth grids resolving t = 0.05**,
+3 000 generated samples against 1 000 held-out real images. Monotone violation 0
+for all three families. `outputs/exp_25_wavelet_generation/`.
 
-| family | held-out loglik/image | subband kurtosis gap | **magnitude excess generated** |
+| family | held-out loglik/image (t = 0.05) | subband kurtosis gap | **magnitude excess generated** |
 |---|---|---|---|
-| Gaussian tree | −1076.31 | 3.119 | **0.002** |
-| mixture (linear-AR) | −1071.91 | 2.751 | **0.010** |
-| **scale mixture** | **−1063.73** | **1.413** | **0.261** |
+| Gaussian tree | −517.64 | 3.120 | **−0.001** |
+| mixture (linear-AR) | −565.85 | 2.751 | **0.010** |
+| **scale mixture** | **−481.78** | **1.418** | **0.262** |
 | *real held-out* | — | *0* | *1.030* |
 
-Three things, in order of how much they matter.
+Four things, in order of how much they matter.
 
 1. **Both linear-AR families generate essentially zero cross-scale magnitude
-   dependence** — 0.002 and 0.010 against a real 1.030. This is the prediction of
-   §6 confirmed on real data at size, and it is a *structural* zero, not a
+   dependence** — −0.001 and 0.010 against a real 1.030. This is the prediction
+   of §6 confirmed on real data at size, and it is a *structural* zero, not a
    training failure: their conditional variance cannot depend on the parent, so
-   no amount of data or capacity moves this number.
-2. **The scale mixture recovers a quarter of it** (0.261) and halves the subband
-   kurtosis gap (1.413 against 2.751). Clearly the right family, clearly not yet
-   enough — at C = 4 components, 600 images and 12 iterations, and with the
-   likelihood only evaluable at t = 0.889, none of those is the obvious binding
-   constraint. Untangling which is the next measurement, not a claim.
-3. **Held-out likelihood orders the three the same way**, scale mixture leading
-   the Gaussian closure by 12.6 nats/image. Note the ordering is the same on a
-   metric that never looks at samples and one that only looks at samples, which
-   is worth more than either alone.
-
----
+   no amount of data or capacity moves this number. It reproduces to three
+   decimals on a completely different mesh, which is about as robust as a
+   negative result gets.
+2. **The scale mixture recovers a quarter of it** (0.262) and halves the subband
+   kurtosis gap (1.418 against 2.751).
+3. **Held-out likelihood, now measured near clean data, ranks it first by a wide
+   margin**: +35.9 nats/image over the Gaussian closure. On the old shared grid
+   this could only be evaluated at t ≈ 1.15, where the margin was 14.4 — so
+   being able to reach small *t* **more than doubles the measured advantage**.
+   The ordering is the same on a metric that never looks at samples and one that
+   only looks at samples, which is worth more than either alone.
+4. **The two baselines swap places depending on t, and that is new.** At the
+   high-noise point the mixture beat the Gaussian (−1117.9 against −1121.8); at
+   t = 0.05 the Gaussian beats it by 48 nats. A flexible innovation *shape* helps
+   once the channel has washed out the detail and hurts when it has not, so
+   "which baseline is better" is not well posed without naming the noise level.
+   Only the scale mixture wins at both.
 
 ### 6.2 A limit that per-subband standardisation creates
 
@@ -366,12 +371,18 @@ t = 2. The grid is being spent in precisely the wrong place.
 Consequences, recorded rather than smoothed over:
 
 - My first held-out likelihoods (−481.7 / −514.6 / −562.8 at t = 0.05, M = 161)
-  were computed in an unresolved regime and are **not trustworthy**. Re-evaluated
-  at the resolved t = 1.147: **scale mixture −1107.4, mixture −1117.9, Gaussian
-  −1121.8**. The ordering survives and the scale mixture leads by 14.4 nats per
-  image over the Gaussian closure, but the margins are entirely different — and
-  at t = 1.147 the likelihood is heavily smoothed (α = 0.32), so this is a
-  weaker statement than a small-t likelihood would be.
+  were computed in an unresolved regime, so they had to be set aside. Forced up
+  to the resolved t = 1.147 the numbers became −1107.4 / −1117.9 / −1121.8: same
+  leader, margin 14.4 rather than 35.9 nats, and heavily smoothed (α = 0.32).
+  With per-depth grids the honest small-*t* values are **−481.8 / −517.6 /
+  −565.8** (§6.1).
+
+  Worth recording that the discarded numbers turned out to be close to the
+  correct ones — within 3 nats, and within 0.06 for the scale mixture. Setting
+  them aside was still right: an unresolved quadrature carries no guarantee, and
+  the *same* defect in `exp_26` understated an effect by 2.2× (§9.1). But the
+  error here was small, and saying so is more useful than implying the caution
+  was vindicated by the outcome.
 - Reverse-diffusion generation was blocked outright, which is a stronger
   statement than "the samples are inaccurate" — see §6.3, and §6.2.1 for the fix
   that removed it.
@@ -457,6 +468,31 @@ t = 0.05, ratio of reverse readout to ancestral standard deviation by scale
 
 The finest subband goes from 22 % recovered to 73 %, and the monotone decay that
 identified the cause is much flatter.
+
+**Confirmed at size, and a different weak spot emerges.** The full `exp_25`
+rerun on per-depth grids (48 samples, 100 steps, three families) gives
+reverse-over-ancestral standard-deviation *ratios*:
+
+| family | detail bands d0→d4 | LL |
+|---|---|---|
+| Gaussian | 0.94, 0.93, 0.96, 0.93, **0.73** | 0.94 |
+| mixture | 1.02, 0.89, 1.03, 0.97, **0.81** | 0.91 |
+| scale mixture | 1.02, 0.97, 1.04, 0.95, **0.83** | **0.79** |
+
+Every detail band is now within a few per cent except the finest, which sits at
+0.73–0.83 against 0.22 before. **The residual error has moved to the LL band**,
+and it is not resolution: at t = 0.05 LL has forward SNR ≈ 54, the best-resolved
+coefficient in the model. It is the reverse *integrator*. The sampler starts at
+N(0, I) in pixel space, where LL has standard deviation 1, and must inflate it
+to ≈ 17 by t_min — by far the largest dynamic range any coefficient has to
+traverse — and at 100 steps it undershoots. That is a step-count and schedule
+question, and it is the next thing to measure.
+
+> Read these as *ratios*, not absolute gaps. Subband standard deviations span
+> 0.14 to 17, so an absolute summary is a report about LL and nothing else. I
+> drew a wrong conclusion from `worst_abs_gap` once here — a family whose worst
+> absolute gap grew while every detail band improved — so `profile_gap` now
+> returns relative gaps too and `exp_25` prints those.
 
 **What remains, and it is no longer discretisation.** At t = 0.05 the finest
 subband still has forward-process SNR 0.44, so part of its content is genuinely

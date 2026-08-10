@@ -10,7 +10,7 @@
     ],
     "t_likelihood": 0.05,
     "n_iters": 12,
-    "grid_size": 241,
+    "t_resolve": 0.05,
     "half_width": 8.0,
     "n_components": 4,
     "families": [
@@ -25,10 +25,13 @@
     "seed": 0
   },
   "parts": [
-    "sampler"
+    "fit",
+    "generate",
+    "sampler",
+    "grid"
   ],
   "provenance": {
-    "timestamp": "2026-08-08 17:30:23",
+    "timestamp": "2026-08-10 10:16:57",
     "python": "3.12.5",
     "numpy": "2.4.2",
     "platform": "macOS-14.1.1-arm64-arm-64bit",

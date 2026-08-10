@@ -262,13 +262,19 @@ def part_sampler(settings, out_dir):
                 "std_reverse": r["std"],
                 "kurtosis_ancestral": a["excess_kurtosis"],
                 "kurtosis_reverse": r["excess_kurtosis"],
+                "std_ratio_reverse_over_ancestral": (
+                    r["std"] / a["std"] if a["std"] > 0 else float("nan")
+                ),
                 "n_samples": settings["n_reverse"],
                 "reverse_steps": settings["reverse_steps"],
                 "reverse_seconds": secs,
             })
         gap = profile_gap(r_prof, a_prof, "std")
+        # Relative, because subband scales span two orders of magnitude and an
+        # absolute summary is a report about the LL band and nothing else.
         print(f"[sampler] {family}: reverse vs ancestral std gap "
-              f"{gap['mean_abs_gap']:.4f} (worst {gap['worst_abs_gap']:.4f}), "
+              f"{gap['mean_rel_gap']:.1%} mean, {gap['worst_rel_gap']:.1%} worst "
+              f"(abs {gap['mean_abs_gap']:.4f}), "
               f"{secs:.0f}s for {settings['n_reverse']} samples")
 
     write_csv(out_dir / "sampler_check.csv", rows)
