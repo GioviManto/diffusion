@@ -266,3 +266,146 @@ def test_rejects_wrong_kernel_shape():
     pot = np.ones((2, 3, 101))
     with pytest.raises(ValueError, match="k_time"):
         chain_bp_potentials(pot, np.ones((50, 50)), w, np.ones(101))
+
+
+# ----------------------------------------------------------------------------
+# Trading spatial edges for temporal ones
+# ----------------------------------------------------------------------------
+
+def _cut_linear_map(ti, frames, rho_space, rho_time_top, rho_time_sub, cut):
+    """`a = M eps` for the cut model: severed spatial edges, extra temporal ones.
+
+    Built by forward substitution over the generative recursion the cut model
+    actually defines, so a mistake in which edges were removed cannot cancel
+    against the same mistake in the reference.
+    """
+    from src.hierarchy import level_offset
+
+    n = ti.n_nodes
+    total = frames * n
+    mat = np.zeros((total, total))
+    n_top = level_offset(cut, 4)
+
+    for f in range(frames):
+        base = f * n
+        # Root of the top piece: chained in time.
+        if f == 0:
+            mat[base, base] = 1.0
+        else:
+            mat[base] = rho_time_top * mat[base - n]
+            mat[base, base] += np.sqrt(1.0 - rho_time_top**2)
+        # Spatial edges, except the severed level.
+        for d in range(ti.depth):
+            if d == cut - 1:
+                continue
+            rho = rho_space[d]
+            for node in ti.nodes_at(d):
+                for child in ti.children(int(node), d):
+                    mat[base + child] = rho * mat[base + int(node)]
+                    mat[base + child, base + child] += np.sqrt(1.0 - rho**2)
+        # Each depth-cut node roots its own component, chained in time.
+        for node in ti.nodes_at(cut):
+            i = base + int(node)
+            if f == 0:
+                mat[i, i] = 1.0
+            else:
+                mat[i] = rho_time_sub * mat[i - n]
+                mat[i, i] += np.sqrt(1.0 - rho_time_sub**2)
+            # ...and its subtree hangs off it, which the loop above already did
+            # for levels below cut, so redo them now that the root has changed.
+        for d in range(cut, ti.depth):
+            rho = rho_space[d]
+            for node in ti.nodes_at(d):
+                for child in ti.children(int(node), d):
+                    mat[base + child] = rho * mat[base + int(node)]
+                    mat[base + child, base + child] += np.sqrt(1.0 - rho**2)
+    assert n_top >= 1
+    return mat
+
+
+def test_cut_caterpillar_matches_dense_gaussian_solve():
+    """Every point on the space/time trade-off is still exact, not just the ends."""
+    from src.video_bp import cut_caterpillar_bp
+
+    cut = 1
+    rho_sub = 0.7
+    deltas = [0.4, 0.6, 0.9]
+    ti, grid, w, log_ks, k_time, log_mu, _, x, alpha, nd = _setup(deltas)
+    k_sub = np.exp(_gaussian_kernel(grid, rho_sub))
+    xr = x.reshape(x.shape[0], FRAMES, ti.n_nodes)
+
+    mat = _cut_linear_map(ti, FRAMES, RHO_SPACE, RHO_TIME, rho_sub, cut)
+    sigma = mat @ mat.T
+    # Regenerate observations from *this* model, not the uncut one.
+    rng = rng_for("video-cut-test")
+    a = rng.standard_normal((x.shape[0], FRAMES * ti.n_nodes)) @ mat.T
+    xx = alpha * a + rng.standard_normal(a.shape) * np.sqrt(nd)
+    xxr = xx.reshape(x.shape[0], FRAMES, ti.n_nodes)
+
+    means, log_ev, _, _, _ = cut_caterpillar_bp(
+        grid, w, log_ks, k_time, k_sub, log_mu, log_mu, xxr, alpha, deltas,
+        BRANCHING, DEPTH, cut,
+    )
+    want, want_ev = _dense_posterior(sigma, xx, alpha, nd)
+    want = want.reshape(x.shape[0], FRAMES, ti.n_nodes)
+    assert np.max(np.abs(means - want)) < 1e-8
+    assert abs(log_ev - want_ev) / abs(want_ev) < 1e-7
+
+
+def test_cut_zero_is_exactly_the_caterpillar():
+    from src.video_bp import caterpillar_bp, cut_caterpillar_bp
+
+    deltas = [0.4, 0.6, 0.9]
+    ti, grid, w, log_ks, k_time, log_mu, _, x, alpha, _ = _setup(deltas)
+    xr = x.reshape(x.shape[0], FRAMES, ti.n_nodes)
+    a = caterpillar_bp(grid, w, log_ks, k_time, log_mu, xr, alpha, deltas,
+                       BRANCHING, DEPTH).posterior_mean
+    b, _, _, _, _ = cut_caterpillar_bp(
+        grid, w, log_ks, k_time, k_time, log_mu, log_mu, xr, alpha, deltas,
+        BRANCHING, DEPTH, 0,
+    )
+    assert np.max(np.abs(a - b)) < 1e-14
+
+
+def test_subtree_indices_partition_the_tree():
+    """Every node below the cut belongs to exactly one subtree, and the top piece
+    takes the rest -- a partition, or the reassembly would silently drop nodes."""
+    from src.hierarchy import level_offset
+    from src.video_bp import _subtree_indices
+
+    ti = TreeIndex(DEPTH, BRANCHING)
+    for cut in range(1, DEPTH + 1):
+        idx = _subtree_indices(BRANCHING, DEPTH, cut)
+        n_top = level_offset(cut, BRANCHING)
+        assert idx.shape[0] == BRANCHING**cut
+        flat = np.sort(idx.ravel())
+        assert flat.size + n_top == ti.n_nodes
+        assert np.array_equal(flat, np.arange(n_top, ti.n_nodes))
+
+    with pytest.raises(ValueError, match="cut must be"):
+        _subtree_indices(BRANCHING, DEPTH, DEPTH + 1)
+
+
+def test_cut_actually_severs_the_spatial_level():
+    """With the temporal kernels switched off, a cut model must factorise across
+    the severed level -- otherwise 'cut' is not doing what its name says."""
+    from src.video_bp import cut_caterpillar_bp
+
+    cut = 1
+    deltas = [0.4, 0.6, 0.9]
+    ti, grid, w, log_ks, k_time, log_mu, _, x, alpha, _ = _setup(deltas)
+    indep = np.exp(_gaussian_kernel(grid, 1e-9))
+    xr = x.reshape(x.shape[0], FRAMES, ti.n_nodes)
+
+    base, _, _, _, _ = cut_caterpillar_bp(
+        grid, w, log_ks, indep, indep, log_mu, log_mu, xr, alpha, deltas,
+        BRANCHING, DEPTH, cut,
+    )
+    # Changing the kernel on the severed level must not move anything.
+    altered = list(log_ks)
+    altered[cut - 1] = _gaussian_kernel(grid, 0.1)
+    moved, _, _, _, _ = cut_caterpillar_bp(
+        grid, w, altered, indep, indep, log_mu, log_mu, xr, alpha, deltas,
+        BRANCHING, DEPTH, cut,
+    )
+    assert np.max(np.abs(base - moved)) < 1e-12

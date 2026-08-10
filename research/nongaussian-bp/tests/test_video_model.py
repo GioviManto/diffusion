@@ -173,3 +173,45 @@ def test_freezing_time_holds_rho_at_zero_and_costs_coherence():
     a = frame_difference_energy(fitted.sample_ancestral(200, 5, rng))
     b = frame_difference_energy(frozen.sample_ancestral(200, 5, rng))
     assert a < b, f"fitted {a:.4f} should be more coherent than frozen {b:.4f}"
+
+
+@pytest.mark.slow
+def test_cut_model_fits_and_beats_the_caterpillar_on_coherence():
+    """The space-for-time trade, end to end.
+
+    Cutting the spatial tree below depth 1 severs 12 edges per frame and buys a
+    temporal edge for each of the four subtrees per orientation. The prediction
+    (§9.2 of the write-up) is that the coupled variance fraction rises from
+    ~0.47 to ~0.65, so generated video must come out *more* temporally coherent
+    -- a lower frame-difference energy -- than the plain caterpillar's.
+    """
+    rng = rng_for("video-cut-fit")
+    imgs = _smooth_frames(rng, n=120)
+    vids = make_moving_sequences(imgs, 5, rng)
+    common = dict(
+        levels=5, t_train=[0.6],
+        kernel_factory=lambda d, r: GaussianAR1Kernel(rho=0.2, q=0.8),
+        time_kernel_factory=lambda r: GaussianAR1Kernel(rho=0.3, q=0.8),
+        n_iters=4, grid_size=121, chunk=16,
+    )
+    flat, _ = fit_video_tree(vids, cut_depth=0, **common)
+    cut, _ = fit_video_tree(vids, cut_depth=1, **common)
+
+    assert cut.cut_depth == 1 and cut.k_time_sub is not None
+    a = frame_difference_energy(flat.sample_ancestral(300, 5, rng))
+    b = frame_difference_energy(cut.sample_ancestral(300, 5, rng))
+    assert b < a, f"cut model {b:.4f} should be more coherent than caterpillar {a:.4f}"
+
+
+@pytest.mark.slow
+def test_cut_model_em_is_monotone():
+    rng = rng_for("video-cut-monotone")
+    imgs = _smooth_frames(rng, n=100)
+    vids = make_moving_sequences(imgs, 5, rng)
+    _, trace = fit_video_tree(
+        vids, levels=5, t_train=[0.6],
+        kernel_factory=lambda d, r: GaussianAR1Kernel(rho=0.2, q=0.8),
+        time_kernel_factory=lambda r: GaussianAR1Kernel(rho=0.3, q=0.8),
+        n_iters=5, grid_size=121, chunk=16, cut_depth=1,
+    )
+    assert trace.monotone_violation <= 1e-6 * abs(trace.log_evidence[-1])

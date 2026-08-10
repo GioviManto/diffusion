@@ -29,7 +29,7 @@ import numpy as np
 from .bp_grid import make_grid
 from .em import ExpectedStatistics
 from .noising import alpha_delta
-from .video_bp import caterpillar_bp
+from .video_bp import caterpillar_bp, cut_caterpillar_bp
 from .wavelet import images_to_tree, tree_to_images
 from .wavelet_model import SubbandScales, per_depth_grid_sizes
 
@@ -85,13 +85,17 @@ class VideoTreeModel:
     qt: object
     scales: SubbandScales
     kernels: list                 # [orientation][level] spatial kernels
-    k_time: object                # temporal kernel on the roots
+    k_time: object                # temporal kernel on the top piece's root
     log_root: np.ndarray          # (3, M_0) prior on the first frame's root
     grids: list                   # one grid per spatial depth, coarsest first
     weights: list
     ll_mean: float
     ll_var: float
     ll_rho: float
+    # Defaults last, as a dataclass requires. cut_depth = 0 is the plain
+    # caterpillar, in which case k_time_sub is unused.
+    k_time_sub: object = None     # temporal kernel on the severed subtree roots
+    cut_depth: int = 0            # spatial level severed to buy temporal edges
 
     @property
     def depth(self) -> int:
@@ -109,32 +113,44 @@ class VideoTreeModel:
         return self.grids[0]
 
     def _bp(self, nodes_std, alpha, delta, want_stats=False, chunk=16):
-        """Run the caterpillar for each orientation. `nodes_std` is (B, F, 3, n)."""
+        """Run the (possibly cut) caterpillar per orientation. `nodes_std` is
+        (B, F, 3, n). Returns per-level spatial Xi plus the two temporal Xi --
+        the severed level's spatial entry is None, its edges having been cut."""
+        c = self.cut_depth
         out = np.empty_like(nodes_std)
         log_ev = 0.0
         xi_space = None
-        xi_time = None
-        # The temporal chain joins roots, so it lives on the root grid alone.
-        k_time = np.exp(self.k_time.log_transition_matrix(self.grids[0]))
+        xi_top = None
+        xi_sub = None
+        k_top = np.exp(self.k_time.log_transition_matrix(self.grids[0]))
+        k_sub = (
+            np.exp(self.k_time_sub.log_transition_matrix(self.grids[c]))
+            if c > 0 else k_top
+        )
 
         for oi in range(3):
-            res = caterpillar_bp(
-                self.grids, self.weights, self._log_k_space(oi), k_time,
-                self.log_root[oi], nodes_std[:, :, oi, :], alpha,
+            means, ev, xs, xt, xb = cut_caterpillar_bp(
+                self.grids, self.weights, self._log_k_space(oi), k_top, k_sub,
+                self.log_root[oi], self.log_root[oi],
+                nodes_std[:, :, oi, :], alpha,
                 self.scales.delta_by_depth(oi, delta), self.qt.branching,
-                self.depth, chunk=chunk, want_stats=want_stats,
+                self.depth, c, chunk=chunk, want_stats=want_stats,
             )
-            out[:, :, oi, :] = res.posterior_mean
-            log_ev += res.log_evidence
+            out[:, :, oi, :] = means
+            log_ev += ev
             if want_stats:
                 if xi_space is None:
-                    xi_space = [x.copy() for x in res.xi_space]
-                    xi_time = res.xi_time.copy()
+                    xi_space = [None if x is None else x.copy() for x in xs]
+                    xi_top = xt.copy()
+                    xi_sub = None if xb is None else xb.copy()
                 else:
-                    for d, x in enumerate(res.xi_space):
-                        xi_space[d] += x
-                    xi_time += res.xi_time
-        return out, log_ev, xi_space, xi_time
+                    for d, x in enumerate(xs):
+                        if x is not None:
+                            xi_space[d] += x
+                    xi_top += xt
+                    if xb is not None:
+                        xi_sub += xb
+        return out, log_ev, xi_space, (xi_top, xi_sub)
 
     def _to_std_nodes(self, videos):
         b, f_len = videos.shape[:2]
@@ -213,11 +229,11 @@ class VideoTreeModel:
             root_p = np.exp(self.log_root[oi] - self.log_root[oi].max()) * w
             root_p /= root_p.sum()
             state = np.empty((n, n_frames, ti.n_nodes), dtype=np.intp)
-            # Temporal backbone first: the roots are a Markov chain in time.
+            # Temporal backbone first: the top piece's root is a Markov chain
+            # in time.
             state[:, 0, 0] = rng.choice(len(grid), size=n, p=root_p)
             for f in range(1, n_frames):
                 state[:, f, 0] = _sample_columns(cdf_t, state[:, f - 1, 0], rng)
-            # Then each frame's quadtree, conditioned on its own root.
             cdfs = []
             for d in range(self.depth):
                 k = np.exp(
@@ -227,13 +243,44 @@ class VideoTreeModel:
                 ) * self.weights[d + 1][:, None]
                 c = np.cumsum(k, axis=0)
                 cdfs.append(c / c[-1][None, :])
+
+            c_cut = self.cut_depth
             flat = state.reshape(n * n_frames, ti.n_nodes)
-            for d in range(self.depth):
-                parents = ti.nodes_at(d)
-                kids = ti.nodes_at(d + 1)
-                ps = np.repeat(flat[:, parents], ti.branching, axis=1)
-                flat[:, kids] = _sample_columns(cdfs[d], ps, rng)
+
+            def descend(lo, hi):
+                """Fill depths lo+1 .. hi from their parents, in order."""
+                for d in range(lo, hi):
+                    parents = ti.nodes_at(d)
+                    kids = ti.nodes_at(d + 1)
+                    ps = np.repeat(flat[:, parents], ti.branching, axis=1)
+                    flat[:, kids] = _sample_columns(cdfs[d], ps, rng)
+
+            # Above the cut only. Descending past it here would read the
+            # depth-`c_cut` states before their temporal chains have drawn them,
+            # i.e. use uninitialised indices as parents.
+            descend(0, self.depth if c_cut == 0 else c_cut - 1)
             state3 = flat.reshape(n, n_frames, ti.n_nodes)
+
+            if c_cut > 0:
+                # Each depth-cut node roots an independent temporal chain.
+                g_sub, w_sub = self.grids[c_cut], self.weights[c_cut]
+                k_sub = np.exp(
+                    self.k_time_sub.log_transition_matrix(g_sub)
+                ) * w_sub[:, None]
+                cdf_sub = np.cumsum(k_sub, axis=0)
+                cdf_sub /= cdf_sub[-1][None, :]
+                sub_roots = ti.nodes_at(c_cut)
+                p_sub = np.exp(-0.5 * g_sub**2) * w_sub
+                p_sub /= p_sub.sum()
+                st = np.empty((n, n_frames, len(sub_roots)), dtype=np.intp)
+                st[:, 0] = rng.choice(len(g_sub), size=(n, len(sub_roots)), p=p_sub)
+                for f in range(1, n_frames):
+                    st[:, f] = _sample_columns(cdf_sub, st[:, f - 1], rng)
+                state3[:, :, sub_roots] = st
+                # Now push each subtree down from its freshly drawn root.
+                flat = state3.reshape(n * n_frames, ti.n_nodes)
+                descend(c_cut, self.depth)
+                state3 = flat.reshape(n, n_frames, ti.n_nodes)
             vals = np.empty((n, n_frames, ti.n_nodes))
             for d in range(self.depth + 1):
                 idx = ti.nodes_at(d)
@@ -284,14 +331,21 @@ def fit_video_tree(
     grid_size: int | None = None,
     t_resolve: float | None = None,
     freeze_time: bool = False,
+    cut_depth: int = 0,
     chunk: int = 16,
     verbose: bool = False,
 ):
-    """Generalised EM for the caterpillar: spatial kernels and a temporal kernel.
+    """Generalised EM for the caterpillar: spatial kernels and temporal kernels.
 
-    `freeze_time=True` keeps the temporal kernel at its initial value, which is
-    how the no-temporal-coupling control is built: initialise it at rho = 0 and
-    it stays there, with every other part of the fit identical.
+    `freeze_time=True` keeps the temporal kernels at their initial values, which
+    is how the no-temporal-coupling control is built: initialise at rho = 0 and
+    they stay there, with every other part of the fit identical.
+
+    `cut_depth = c > 0` severs the spatial edges into depth c, giving each of the
+    resulting `1 + 4^c` components per orientation its own temporal edge -- the
+    space-for-time trade described in `video_bp.cut_caterpillar_bp`. Level c-1
+    then has no spatial statistics, and its kernel is left at its initial value
+    because the model no longer contains those edges.
     """
     from .utils import rng_for
 
@@ -324,6 +378,8 @@ def fit_video_tree(
 
     kern = [[kernel_factory(d, rng) for d in range(qt.depth)] for _ in range(3)]
     k_time = time_kernel_factory(rng)
+    k_time_sub = time_kernel_factory(rng) if cut_depth > 0 else None
+    m_sub = sizes[cut_depth]
 
     per_node = scales.per_node(qt)[None, None, :, :]
     obs = []
@@ -339,23 +395,33 @@ def fit_video_tree(
             qt=qt, scales=scales, kernels=kern, k_time=k_time, log_root=log_root,
             grids=grids, weights=weights,
             ll_mean=ll_mean, ll_var=ll_var, ll_rho=ll_rho,
+            k_time_sub=k_time_sub, cut_depth=cut_depth,
         )
         tot_space = [None] * qt.depth
-        # The temporal edge joins two roots, so its Xi is square on the root grid.
+        # Each temporal edge joins two nodes at the same depth, so its Xi is
+        # square -- on the root grid for the top piece, on grid[cut] for the
+        # severed subtrees.
         tot_time = np.zeros((m_root, m_root))
+        tot_sub = np.zeros((m_sub, m_sub)) if cut_depth > 0 else None
         log_ev = 0.0
         for x_std, alpha, delta in obs:
-            _, ev, xi_s, xi_t = model._bp(
+            _, ev, xi_s, (xi_t, xi_b) = model._bp(
                 x_std, alpha, delta, want_stats=True, chunk=chunk
             )
             log_ev += ev
             tot_time += xi_t
+            if tot_sub is not None:
+                tot_sub += xi_b
             for d, x in enumerate(xi_s):
+                if x is None:
+                    continue
                 tot_space[d] = x if tot_space[d] is None else tot_space[d] + x
 
         trace.log_evidence.append(log_ev)
         n_edge_time = b * (f_len - 1) * 3 * len(obs)
         for d in range(qt.depth):
+            if tot_space[d] is None:
+                continue          # the severed level: no edges, nothing to fit
             stats = ExpectedStatistics(
                 xi=tot_space[d], site1=np.zeros(sizes[d]), log_evidence=0.0,
                 n_edges=int(tot_space[d].sum()), n_chains=b,
@@ -371,6 +437,14 @@ def fit_video_tree(
                 ),
                 grids[0],
             )
+            if tot_sub is not None:
+                k_time_sub = k_time_sub.m_step(
+                    ExpectedStatistics(
+                        xi=tot_sub, site1=np.zeros(m_sub), log_evidence=0.0,
+                        n_edges=int(tot_sub.sum()), n_chains=b,
+                    ),
+                    grids[cut_depth],
+                )
         trace.seconds.append(time.perf_counter() - t0)
         if verbose:
             print(f"  video EM {it + 1:2d}/{n_iters}  log-ev {log_ev:.6e}  "
@@ -381,5 +455,6 @@ def fit_video_tree(
         qt=qt, scales=scales, kernels=kern, k_time=k_time, log_root=log_root,
         grids=grids, weights=weights,
         ll_mean=ll_mean, ll_var=ll_var, ll_rho=ll_rho,
+        k_time_sub=k_time_sub, cut_depth=cut_depth,
     )
     return model, trace

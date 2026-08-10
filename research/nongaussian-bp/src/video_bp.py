@@ -268,3 +268,128 @@ def caterpillar_bp(
         down.posterior_mean.reshape(b, f_len, n_nodes), log_evidence,
         down.xi_by_level, chain.xi,
     )
+
+
+# ----------------------------------------------------------------------------
+# Trading spatial edges for temporal ones
+# ----------------------------------------------------------------------------
+
+def _subtree_indices(branching: int, depth: int, cut: int) -> np.ndarray:
+    """(n_subtrees, n_nodes_per_subtree) global node indices, subtree-BF order.
+
+    Cutting below depth `cut` severs the edges from depth cut-1 into depth cut,
+    leaving the top piece (depths 0..cut-1) and one subtree under each depth-cut
+    node. In breadth-first numbering the descendants of a node are *contiguous*
+    at every level, which is what makes the extraction a slice rather than a
+    search: the level-e nodes of subtree j sit at
+    `offset(cut + e) + j * b^e + [0, b^e)`.
+    """
+    from .hierarchy import level_offset
+
+    if not 0 <= cut <= depth:
+        raise ValueError(f"cut must be in [0, {depth}], got {cut}")
+    n_sub_trees = branching**cut
+    sub_depth = depth - cut
+    cols = []
+    for e in range(sub_depth + 1):
+        width = branching**e
+        base = level_offset(cut + e, branching)
+        cols.append(
+            base + np.arange(n_sub_trees)[:, None] * width + np.arange(width)[None, :]
+        )
+    return np.concatenate(cols, axis=1)
+
+
+def cut_caterpillar_bp(
+    grids,
+    weights,
+    log_k_space: list[np.ndarray],
+    k_time_top: np.ndarray,
+    k_time_sub: np.ndarray,
+    log_mu_top: np.ndarray,
+    log_mu_sub: np.ndarray,
+    x: np.ndarray,
+    alpha: float,
+    delta_by_depth,
+    branching: int,
+    depth: int,
+    cut: int,
+    chunk: int = 32,
+    want_stats: bool = False,
+):
+    """Exact BP after cutting the spatial tree below depth `cut`.
+
+    Why this exists. §9.2 of the write-up establishes that at most **one**
+    temporal edge per connected component is loop-free, so the caterpillar --
+    with one component per orientation -- can couple only the root. The way to
+    couple more is therefore not to add temporal edges to the same tree, which
+    always closes a cycle, but to *cut* the tree into more components and give
+    each its own. A spanning forest on F frames of n coefficients with c
+    components has `Fn - c` edges, `F(n-c)` spatial and `c(F-1)` temporal, so
+    the two are traded one for one against a fixed budget.
+
+    Cutting below depth `cut` leaves `1 + b^cut` components per orientation: the
+    top piece, plus one subtree under every depth-`cut` node. Each is itself a
+    caterpillar, so this is composition rather than new inference -- and every
+    point on the trade-off remains **exact**, which is the whole reason the
+    curve is worth measuring instead of argued about.
+
+    `cut = 0` is the plain caterpillar. `cut = depth` couples every leaf and
+    keeps no spatial edge below the top piece.
+
+    Returns `(posterior_mean, log_evidence, xi_space, xi_time_top, xi_time_sub)`
+    with `xi_space[cut - 1] = None`, that level's edges having been severed.
+    """
+    x = np.asarray(x, dtype=float)
+    b, f_len, n_nodes = x.shape
+    grids = as_grid_list(grids, depth)
+    wts = as_grid_list(weights, depth)
+    deltas = np.asarray(delta_by_depth, dtype=float)
+
+    if cut == 0:
+        res = caterpillar_bp(
+            grids, wts, log_k_space, k_time_top, log_mu_top, x, alpha, deltas,
+            branching, depth, chunk=chunk, want_stats=want_stats,
+        )
+        return res.posterior_mean, res.log_evidence, res.xi_space, res.xi_time, None
+    if not 1 <= cut <= depth:
+        raise ValueError(f"cut must be in [0, {depth}], got {cut}")
+
+    from .hierarchy import level_offset
+
+    n_top = level_offset(cut, branching)
+    means = np.empty_like(x)
+    log_ev = 0.0
+
+    # -- the top piece: depths 0 .. cut-1, chained at its own root ----------
+    top = caterpillar_bp(
+        grids[:cut], wts[:cut], log_k_space[: cut - 1], k_time_top, log_mu_top,
+        x[:, :, :n_top], alpha, deltas[:cut], branching, cut - 1,
+        chunk=chunk, want_stats=want_stats,
+    )
+    means[:, :, :n_top] = top.posterior_mean
+    log_ev += top.log_evidence
+
+    # -- the subtrees: structurally identical, so batch them as extra videos
+    idx = _subtree_indices(branching, depth, cut)          # (n_sub, n_per_sub)
+    n_sub, n_per = idx.shape
+    x_sub = x[:, :, idx]                                   # (B, F, n_sub, n_per)
+    x_sub = x_sub.transpose(0, 2, 1, 3).reshape(b * n_sub, f_len, n_per)
+    sub = caterpillar_bp(
+        grids[cut:], wts[cut:], log_k_space[cut:], k_time_sub, log_mu_sub,
+        x_sub, alpha, deltas[cut:], branching, depth - cut,
+        chunk=chunk, want_stats=want_stats,
+    )
+    post = sub.posterior_mean.reshape(b, n_sub, f_len, n_per).transpose(0, 2, 1, 3)
+    means[:, :, idx] = post
+    log_ev += sub.log_evidence
+
+    xi_space = None
+    if want_stats:
+        xi_space = [None] * depth
+        for d in range(cut - 1):
+            xi_space[d] = top.xi_space[d]
+        for e in range(depth - cut):
+            xi_space[cut + e] = sub.xi_space[e]
+
+    return means, log_ev, xi_space, top.xi_time, sub.xi_time
