@@ -259,7 +259,11 @@ sense of Remark~\ref{rem:exact}(ii). Implementation \coderef{src/em.py}{e\_step}
 \paragraph{Guarantees, initialisation, stopping.} Generalised EM guarantees monotone ascent of
 $\Lik$ \citep{dempster1977,wu1983}; convergence is to a stationary point, not necessarily a global
 maximum. Mixture components are initialised spread over $[-\sqrt{\Var}, \sqrt{\Var}]$ with random
-scales; $\corr$ is initialised at $0.3$ in every experiment against a truth of $0.85$. Iteration
+scales; $\corr$ is initialised away from its truth in every experiment --- at $0.3$ in most, and
+over $\{0,\,0.3,\,0.6,\,-0.4\}$ in the initialisation sweep of \codefile{exp\_18}. The truth is
+$0.85$ in \codefile{exp\_02}, \codefile{exp\_16}, \codefile{exp\_18} and \codefile{exp\_22}, and
+$0.8$ in \codefile{exp\_06}, \codefile{exp\_07} and \codefile{exp\_08}; every table and figure
+states the value it used. Iteration
 stops when the relative increase of $\Lik$ falls below $10^{-9}$, capped at $50$--$120$
 iterations depending on the experiment. Variances are floored at $10^{-6}$ to prevent component
 collapse; no other regularisation is applied, and the component means are unconstrained

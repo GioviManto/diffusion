@@ -14,7 +14,10 @@ source .venv/bin/activate
 pip install -r requirements.txt
 ```
 
-Versions used for the committed outputs: Python 3.12, NumPy 2.4, SciPy 1.17, Matplotlib 3.10.
+Versions used for the committed outputs: Python 3.12, NumPy 2.4, SciPy 1.17, Matplotlib 3.10 —
+except `outputs/exp_08_gradient_vs_exact_mstep/`, regenerated on 10 August 2026 under Python
+3.12.5 / NumPy 2.5.2 / SciPy 1.18.0 after the trace-alignment fix. Its `params.json` records
+the newer versions, so the difference is visible rather than implicit.
 The HPC runs used Python 3.11 / NumPy 2.4 on Linux; provenance (Python, NumPy, platform,
 hostname, SLURM ids, thread counts) is recorded in the `params*.json` beside every output
 directory, so a number can always be traced to the machine that produced it.
@@ -36,8 +39,8 @@ node with no working cuBLAS, so probing it would report a GPU that then fails mi
 OMP_NUM_THREADS=4 python3 -m pytest tests/ -q
 ```
 
-Expected: `135 passed, 12 skipped`. The skips are the CuPy parity tests, which are skipped when
-no GPU is present. These tests are the evidence behind several numbers quoted in the note —
+Expected: `236 passed, 12 skipped` (Python 3.12.5, NumPy 2.5.2, SciPy 1.18.0; ~2 min on four CPU
+threads). The skips are the CuPy parity tests, which are skipped when no GPU is present. These tests are the evidence behind several numbers quoted in the note —
 the brute-force enumeration check, the message-normalisation convention, the Fisher-identity
 gradient check — so a failure here invalidates part of the write-up, not just the code.
 

@@ -70,8 +70,10 @@ $1.6\times10^{-14}$ on means and $1.8\times10^{-15}$ on the log-evidence.
 The kernel is estimated inside the linear-autoregressive family
 $K_\theta(a'\mid a) = \sum_c \pi_c\,\mathcal{N}(a' - \rho a;\ \nu_c, s_c^2)$, by maximum
 marginal likelihood. **Both** the autoregressive coefficient $\rho$ and the innovation density
-are estimated: $\rho$ is initialised at $0.3$ against a truth of $0.85$ and recovered to
-$[0.8497, 0.8507]$ from initialisations spanning $[-0.4, 0.6]$. At $C=4$ there are twelve free
+are estimated: $\rho$ is initialised away from its truth and recovered. In `exp_18` (truth
+$0.85$) it lands in $[0.8517, 0.8520]$ at $C=4$ from initialisations spanning $[-0.4, 0.6]$.
+The recovery and sample-efficiency experiments (`exp_06`, `exp_07`, `exp_08`) use a truth of
+$0.8$ instead; no table pools the two. At $C=4$ there are twelve free
 parameters. The **initial law is held fixed** at $\mathcal{N}(0,1)$, which is the correct one,
 so there is no misspecification in it — but neither is there evidence it could be recovered.
 The linear form of the kernel is assumed, not learned.

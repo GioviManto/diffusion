@@ -84,7 +84,8 @@ noise level with no further fitting.
 
 **Numerical evidence.** Twelve free parameters against 25,248, at a relative denoising error 9–14×
 lower, across seven doublings of the data. Against a locality-respecting convolution the margin
-is 2–4. Parameter recovery is clean: $\rho$ from $0.3$ to $[0.8497, 0.8507]$, RMSE falling at
+is 2–4. Parameter recovery is clean: $\rho$ from $\{0,0.3,0.6,-0.4\}$ to $[0.8517, 0.8520]$ against a
+truth of $0.85$ (`exp_18`, $C=4$), RMSE falling at
 roughly $M^{-1/2}$.
 
 **Interpretation.** The gain depends on correct specification and on the representational
@@ -192,7 +193,8 @@ likelihood versus $C$ and runtime versus $C$ are still missing.
 
 ## Part II — Our questions for Jérôme
 
-1. **Framing.** $\rho$ *is* estimated (initialised at 0.3, recovered to 0.850), so we kept
+1. **Framing.** $\rho$ *is* estimated (initialised away from truth, recovered to $0.852$
+   against a truth of $0.85$ in `exp_18`), so we kept
    "transition-kernel estimation" in the title rather than downgrading to "innovation law".
    But the kernel is constrained to the linear form $K(a'|a) = \varphi(a'-\rho a)$. Is the
    stronger title defensible, or would you rather the restriction were in the title?

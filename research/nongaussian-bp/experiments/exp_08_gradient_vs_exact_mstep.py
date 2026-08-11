@@ -63,18 +63,37 @@ def gradient_ascent(kernel, grid, weights, groups, lr, n_iters, project):
     scale, |rho| < 1); without it the iterate can leave the domain in one step
     and the run dies rather than merely converging badly, which would confuse
     "the learning rate is too large" with "the method does not work".
+
+    Every state in the trace is *evaluated*: the loop records (theta, logL) for
+    the same kernel, and the returned kernel is the one whose statistics sit at
+    the end of the trace. The previous version appended before updating and then
+    returned the post-update iterate, so `param_err` and `logL_final` described
+    two different parameters -- the reported likelihood belonged to the
+    second-to-last kernel. This yields `n_updates + 1` evaluated states; the
+    update count is returned separately rather than inferred from the trace
+    length.
     """
     trace = {"log_evidence": [], "theta": []}
     current = kernel
-    for _ in range(n_iters):
-        stats = e_step_multi(
-            grid, weights, current.log_transition_matrix(grid), groups
+
+    def evaluate(kern):
+        return e_step_multi(
+            grid, weights, kern.log_transition_matrix(grid), groups
         )
-        trace["log_evidence"].append(stats.log_evidence)
-        trace["theta"].append(np.asarray(current.theta, dtype=float).copy())
+
+    stats = evaluate(current)
+    trace["log_evidence"].append(stats.log_evidence)
+    trace["theta"].append(np.asarray(current.theta, dtype=float).copy())
+
+    for _ in range(n_iters):
         grad = q_gradient(stats, current.grad_log_transition_matrix(grid))
         theta_new = np.asarray(current.theta, dtype=float) + lr * grad / stats.n_edges
         current = project(theta_new)
+        stats = evaluate(current)
+        trace["log_evidence"].append(stats.log_evidence)
+        trace["theta"].append(np.asarray(current.theta, dtype=float).copy())
+
+    trace["n_updates"] = n_iters
     return current, trace
 
 
@@ -97,7 +116,8 @@ def run_family(name, prior, make_kernel, project, truth, grid, weights,
     traces["exact M-step"] = trace.log_evidence
     rows.append({
         "family": name, "route": "exact_m_step", "lr": np.nan,
-        "n_chains": n_chains, "iters": len(trace.log_evidence),
+        "n_chains": n_chains, "n_evaluated_states": len(trace.log_evidence),
+        "n_updates": len(trace.log_evidence) - 1,
         "logL_final": trace.log_evidence[-1],
         "param0_err": float(err[0]), "param1_err": float(err[1]),
         "monotone_violation": trace.monotone_violation,
@@ -113,7 +133,9 @@ def run_family(name, prior, make_kernel, project, truth, grid, weights,
         traces[f"gradient, $\\eta={lr:g}$"] = tr["log_evidence"]
         rows.append({
             "family": name, "route": "gradient", "lr": lr,
-            "n_chains": n_chains, "iters": len(tr["log_evidence"]),
+            "n_chains": n_chains,
+            "n_evaluated_states": len(tr["log_evidence"]),
+            "n_updates": tr["n_updates"],
             "logL_final": tr["log_evidence"][-1],
             "param0_err": float(err[0]), "param1_err": float(err[1]),
             "monotone_violation": _monotone_violation(tr["log_evidence"]),

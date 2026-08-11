@@ -48,6 +48,25 @@ echo "start=$(date -Is)"
 echo
 
 case "$MODE" in
+  parity)
+    # Parity has already run above; this mode adds the measurement that decides
+    # whether the EM sweeps belong on GPU at all. The honest comparison is not
+    # "is one task faster" but "does the speedup beat the throughput we get from
+    # 10 concurrent CPU tasks", so the per-cell wall clock is what gets printed.
+    echo "=== EM cell timing, GPU vs CPU, identical config ==="
+    # `/usr/bin/time` is absent on these nodes; bash's SECONDS is always there.
+    for DEV in gpu cpu; do
+        echo "--- BP_DEVICE=$DEV ---"
+        T0=$SECONDS
+        BP_DEVICE=$DEV "$PYTHON" \
+            experiments/exp_27_shape_convergence.py --only trace \
+            --set 'sizes=(512,)' --set 'components=(8,)' --set "designs=('uniform',)" \
+            --set n_seeds=1 --set n_updates=60 \
+            --output-dir "$ROOT/outputs/final_em/gpu_bench/${DEV}" 2>&1 | tail -3
+        echo "  wall $(( SECONDS - T0 )) s on $DEV"
+    done
+    echo "PARITY+BENCH OK"
+    ;;
   families)
     # Does the exp_16 finding -- that the pointwise ranking does not transfer to the
     # generated law -- hold beyond the Laplace chain? Five innovation families at matched

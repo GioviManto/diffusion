@@ -444,10 +444,13 @@ linear-autoregressive family
 in which \textbf{both} the autoregressive coefficient $\corr$ and the innovation density are
 free. At $\ncomp=4$ the free-parameter count is $\corr$ (one), weights (four, one simplex
 constraint, so three), locations (four) and scales (four): \textbf{twelve}, against $3\ncomp$ in
-general. Every experiment initialises $\corr$ at $0.3$ against a truth of $0.85$, so the
-autoregressive coefficient is genuinely recovered rather than supplied; from initialisations at
-$\corr^{(0)}\in\{0,\,0.3,\,0.6,\,-0.4\}$ the fitted value lands in $[0.8497, 0.8507]$
-(Figure~\ref{fig:em}). What is \emph{not} estimated is the initial law $\mu(a_1)$: it is held
+general. Every experiment initialises $\corr$ away from its truth, so the autoregressive
+coefficient is genuinely recovered rather than supplied. The truth itself differs by experiment
+and each figure states its own: the diagnostics of Figure~\ref{fig:em} use $\corr=0.85$
+(\codefile{exp\_18}), while the recovery and sample-efficiency experiments
+(\codefile{exp\_06}, \codefile{exp\_07}, \codefile{exp\_08}) use $\corr=0.8$. From
+initialisations at $\corr^{(0)}\in\{0,\,0.3,\,0.6,\,-0.4\}$ against the truth of $0.85$, the
+fitted value lands in $[0.8517, 0.8520]$ at $\ncomp=4$ (Figure~\ref{fig:em}). What is \emph{not} estimated is the initial law $\mu(a_1)$: it is held
 fixed at $\normal{0}{1}$, which is exactly the law the data-generating process uses, so there is
 no misspecification in $\mu$ anywhere in these results --- but neither is there evidence that it
 could be recovered. The linear form of \eqref{eq:kernel} is likewise assumed, not learned: what
@@ -488,9 +491,12 @@ $\sim10^{-9}$.
 
 \paragraph{Which algorithm actually runs.} Equation~\eqref{eq:fisher} licenses gradient ascent on
 $\Lik$; EM instead increases $\Qfun$. Both are implemented and neither dominates: on the smooth
-Gaussian kernel gradient ascent reaches EM's optimum to $2\times10^{-9}$ nats while needing a
-tuned step size, and on the Laplace kernel it attains a higher likelihood, because there the
-exact maximiser of $\Qfun$ is a lattice artefact of the discretisation. The results below use EM.
+Gaussian kernel gradient ascent reaches EM's optimum to $1.6\times10^{-9}$ nats while needing a
+tuned step size, and on the Laplace kernel it attains a likelihood higher by $1.9$ nats, because
+there the exact maximiser of $\Qfun$ is a lattice artefact of the discretisation. Both figures
+are at the best step size of the four swept; larger steps diverge, and the $\eta=8$ Laplace run
+reaches the constraint boundary $b=10^{-3}$, where the density spikes and the reported
+likelihood is degenerate rather than better. The results below use EM.
 For the mixture kernel \eqref{eq:kernel} the M-step is itself iterative --- the complete-data
 problem carries a second latent variable, the mixture label, and we run four inner
 conditional-maximisation sweeps --- so the algorithm is \textbf{generalised EM} of ECM type
@@ -503,8 +509,11 @@ parameter constraints are in Appendix~\ref{app:learning}.
 \begin{remark}[Stop on the shape, not on $\corr$]
 \label{rem:stopping}
 The coordinates of $\params$ do not converge at the same rate, and the gap is large enough to
-mislead. At $\corr=0.85$, $\nseq=512$, $\ncomp=8$ the autoregressive coefficient is flat from
-iteration ${\sim}25$, while the fitted innovation excess kurtosis reads $0.84$ at $30$ iterations,
+mislead. At $\corr=0.85$, $\nseq=512$, $\ncomp=8$ the autoregressive coefficient settles within
+$10^{-2}$ of its final value by iteration $27$--$30$ across the eight runs of
+Figure~\ref{fig:em} --- though only by iteration $51$--$54$ at a tolerance of $10^{-3}$, which is
+itself the point: ``flat'' is a statement about a tolerance, and reporting it without one is how
+a coordinate gets certified by eye. Meanwhile the fitted innovation excess kurtosis reads $0.84$ at $30$ iterations,
 $1.85$ at $60$, $2.30$ at $120$ and $2.29$ at $400$. Monitoring $\corr$ --- the natural thing to
 plot, and a quantity whose trace looks textbook-converged --- certifies a kernel that still
 carries a third of the true higher-order structure.
@@ -588,10 +597,24 @@ shape ($\ncomp=8$ kurtosis) & paired gap $+0.22\pm0.15$ & \textbf{not resolved} 
 Two caveats on that table before the interpretation. The ordering $\corr < \ivar$ matches the
 information analysis quantitatively --- it predicts variance information decaying $4$--$6$ times
 faster than correlation information, and the estimator errors show a ratio of $3.3$. But the
-$\ivar$ figure is not a clean statistical penalty: the \emph{clean} arm's error is flat in $\nseq$
-($0.0041,0.0039,0.0059,0.0046,0.0040$ from $\nseq=64$ to $1024$) rather than falling like
-$\nseq^{-1/2}$, so it has hit a discretisation floor and the ratio mixes a statistical penalty
-with a grid artefact, shrinking from ${\approx}10$ to $2$ as $\nseq$ grows for that reason.
+$\ivar$ ratio should be read with care, because it shrinks from ${\approx}10$ to $2$ as $\nseq$
+grows and the clean arm's own error is estimated from only three replicates.
+
+We previously read that clean-arm curve ($0.0041,0.0039,0.0059,0.0046,0.0040$ from $\nseq=64$
+to $1024$) as flat, and attributed the flatness to a discretisation floor. \textbf{That reading
+is withdrawn.} At three replicates an RMSE is estimated from three numbers, and its own sampling
+error is comparable to the effect being read off it. At sixteen the curve is not flat: it runs
+$0.0136, 0.0073, 0.0056, 0.0042, 0.0032$, close to the $\nseq^{-1/2}$ reference
+$0.0135, 0.0095, 0.0067, 0.0048, 0.0034$. The $\nseq=64$ entry alone moves by a factor of three
+between the two replication levels.
+
+Nor was the grid ever a plausible culprit. Removing it entirely --- exact clean-data OLS on the
+raw transition pairs, no binning --- gives $0.0135, 0.0071, 0.0057, 0.0043, 0.0032$, statistically
+indistinguishable from the binned fit, and the paired grid-minus-raw discrepancy is a constant
+$4.4\times10^{-4}$ across all budgets: an order of magnitude below the estimation error at
+$\nseq=64$ and about a seventh of it at $\nseq=1024$. A quantity that small cannot produce a
+floor at $4\times10^{-3}$. Source \codefile{outputs/exp\_06\_em\_parameter\_recovery/clean\_raw\_mle.csv}
+(\codefile{exp\_06 --only clean\_raw\_mle}).
 
 \begin{remark}[The shape ``penalty'' is a convergence rate, not an information loss]
 \label{rem:rate-not-bias}
@@ -626,9 +649,10 @@ one we previously made.
 \caption{Fitting from clean chains against fitting through the channel, paired: both arms get the
 same $\nseq$ clean chains and the same $120$ iterations, and differ only in whether the chains are
 observed clean or once each through the OU channel at one of five noise levels. Left, centre:
-RMSE of $\corr$ and $\ivar$ for the Gaussian kernel, with bootstrap standard errors. Note the
-clean arm's $\ivar$ error is flat in $\nseq$ --- a discretisation floor, which is why the centre
-panel's ratio should be read as indicative. Right: recovered innovation excess kurtosis for the
+RMSE of $\corr$ and $\ivar$ for the Gaussian kernel, with bootstrap standard errors. The centre
+panel's ratio should be read as indicative: at three replicates the clean arm's $\ivar$ error is
+too noisy to give the ratio a stable denominator (at sixteen replicates that arm falls like
+$\nseq^{-1/2}$, and the grid contributes a constant $4.4\times10^{-4}$ --- see the text). Right: recovered innovation excess kurtosis for the
 $\ncomp=8$ mixture on a Laplace chain, where the paired gap is $+0.22\pm0.15$ and therefore not
 resolved. Three replicates. Source
 \codefile{outputs/exp\_06\_em\_parameter\_recovery/clean\_vs\_noised\_*.csv}.}
@@ -641,9 +665,9 @@ resolved. Three replicates. Source
 \caption{Optimisation diagnostics. Left: marginal log-likelihood by iteration at $\ncomp=4$,
 $\nseq=512$, from four initialisations of $\corr$; the largest decrease across iterations is
 zero in all four, and in the four $\ncomp=8$ runs not shown. Centre: the estimated autoregressive
-coefficient over the same runs, converging to $[0.8497,0.8507]$ against a truth of $0.85$ from
+coefficient over the same runs, converging to $[0.8517,0.8520]$ against a truth of $0.85$ from
 initialisations spanning $[-0.4, 0.6]$ --- direct evidence that $\corr$ is estimated and not
-supplied. Right: RMSE of the recovered $\corr$ and innovation variance against the number of
+supplied. (The eight $\ncomp\in\{4,8\}$ runs together span $[0.8517,0.8529]$.) Right: RMSE of the recovered $\corr$ and innovation variance against the number of
 training sequences, with an $\nseq^{-1/2}$ reference. Sources
 \codefile{outputs/exp\_18/em\_trace.csv} and
 \codefile{outputs/exp\_06\_em\_parameter\_recovery/em\_rate.csv}.}
@@ -653,9 +677,12 @@ training sequences, with an $\nseq^{-1/2}$ reference. Sources
 \section{Experimental protocol}
 \label{sec:protocol}
 
-Unless stated otherwise: Laplace chain, $\nsites=32$, $\corr=0.85$, grid $\ngrid=401$,
+Unless stated otherwise: Laplace chain, $\nsites=32$, grid $\ngrid=401$,
 $\halfwidth=8$, five training noise levels $t\in\{0.1,0.2,0.4,0.8,1.6\}$, and $256$ held-out
-sequences drawn from a seed disjoint from every training seed. Estimators are scored against
+sequences drawn from a seed disjoint from every training seed. The autoregressive truth is
+$\corr=0.85$ except in the parameter-recovery, sample-efficiency and gradient-route experiments
+(\codefile{exp\_06}, \codefile{exp\_07}, \codefile{exp\_08}), which use $\corr=0.8$; the two
+groups are never pooled into a single table, and each result states the value it used. Estimators are scored against
 grid BP under the \emph{true} kernel on those held-out sequences.
 
 Neural baselines are trained by denoising score matching in both standard parameterisations

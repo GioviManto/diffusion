@@ -186,6 +186,21 @@ class LaplaceAR1Kernel:
         solution is the weighted median of the ratios u_k / u_j with weights
         Xi[k, j] |u_j|. So the joint M-step is closed form even though the
         kernel is not differentiable -- no line search, no gradient.
+
+        Being a breakpoint estimator, `rho` is *lattice-valued*: on a uniform
+        grid through the origin every ratio is a rational a/b with
+        |a|,|b| <= (M-1)/2, and low-denominator values pool the weight of all
+        their aliases (4/5 collects 8/10, 12/15, ...), which makes them
+        attractors. At a truth of 0.7913 the estimate is pinned at exactly 0.8
+        across an eightfold grid refinement, holding a constant 0.0087 bias --
+        this is a bias, not a discretization error, and refining does not help.
+        See Remark `rem:quantization` in report/em_bp_learning.tex,
+        `outputs/exp_06_em_parameter_recovery/laplace_quantization.csv`, and
+        tests/test_laplace_rho_lattice.py. It is also why exp_06's Laplace arm
+        recovers rho to 1e-16: the truth there is 0.8 = 4/5, the strongest
+        attractor in its neighbourhood, so that figure measures the lattice
+        rather than the estimator's accuracy. The mixture kernel's rho block is
+        a continuous weighted least-squares solve and is not affected.
         """
         xi = stats.xi
         w_tot = float(xi.sum())
@@ -350,15 +365,26 @@ class MixtureInnovationKernel:
     def grad_log_transition_matrix(self, grid: np.ndarray) -> np.ndarray:
         """Gradient w.r.t. rho only; the mixture block uses its exact M-step.
 
-        d log K / d rho = -u_j * sum_c r_c (e - mu_c) / s_c^2, where r_c are the
+        d log K / d rho = +u_j * sum_c r_c (e - mu_c) / s_c^2, where r_c are the
         responsibilities: the usual "gradient of a log-mixture is the
         responsibility-weighted average of the component gradients".
+
+        The sign follows from e = u_k - rho u_j, so de/drho = -u_j, and
+
+            d/drho log N(e; mu_c, s2_c) = -(e - mu_c)/s2_c * de/drho
+                                        = +u_j (e - mu_c)/s2_c.
+
+        The two minus signs cancel. This branch previously returned the negative
+        of this quantity; the C = 1, mu = 0 case must agree with
+        `GaussianAR1Kernel.grad_log_transition_matrix`, which uses the positive
+        convention, and it now does. See
+        `test_mixture_rho_gradient_matches_finite_difference`.
         """
         e = _residual(grid, self.rho)
         r = self.responsibilities(grid)
         d = e[None, :, :] - self.mu[:, None, None]
         inner = (r * d / self.s2[:, None, None]).sum(axis=0)
-        return (-grid[None, :] * inner)[None, :, :]
+        return (grid[None, :] * inner)[None, :, :]
 
     def m_step(
         self, stats: ExpectedStatistics, grid: np.ndarray, n_inner: int = 4

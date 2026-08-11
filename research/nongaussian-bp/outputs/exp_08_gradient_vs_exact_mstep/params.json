@@ -19,8 +19,16 @@
     8.0
   ],
   "quick": false,
-  "timestamp": "2026-07-31 12:52:50",
-  "python": "3.11.15",
-  "numpy": "2.4.6",
-  "platform": "Linux-6.18.5-x86_64-with-glibc2.39"
+  "timestamp": "2026-08-10 17:00:00",
+  "git_commit": "60a3080272c75708a05250bead4be62de16d2944",
+  "git_branch": "claude/em-bp-finalization",
+  "git_dirty": "M research/nongaussian-bp/ANSWERS_AND_QUESTIONS_FOR_ADVISORS.md\n M research/nongaussian-bp/EXECUTIVE_SUMMARY.md\n M research/nongaussian-bp/FINAL_REVISION_REPORT.md\n M research/nongaussian-bp/compendium/chapters/ch10-estimation.tex\n M research/nongaussian-bp/experiments/common.py\n M research/nongaussian-bp/experiments/exp_08_gradient_vs_exact_mstep.py\n M research/nongaussian-bp/experiments/exp_16_sampling_validation.py\n M research/nongaussian-bp/outputs/exp_08_gradient_vs_exact_mstep/gradient_vs_exact.csv\n M research/nongaussian-bp/outputs/exp_08_gradient_vs_exact_mstep/gradient_vs_exact.png\n M research/nongaussian-bp/outputs/exp_08_gradient_vs_exact_mstep/params.json\n M research/nongaussian-bp/overleaf/appendix.tex\n M research/nongaussian-bp/overleaf/main.tex\n M research/nongaussian-bp/paper/appendix.tex\n M research/nongaussian-bp/paper/main.tex\n M research/nongaussian-bp/src/kernels.py\n M research/nongaussian-bp/tests/test_em_bp.py\n?? research/nongaussian-bp/.claude/\n?? research/nongaussian-bp/tests/test_gradient_trace_alignment.py\n?? research/nongaussian-bp/tests/test_laplace_rho_lattice.py",
+  "python": "3.12.5",
+  "numpy": "2.5.2",
+  "platform": "macOS-14.1.1-arm64-arm-64bit",
+  "hostname": "MacBook-Air-160.local",
+  "slurm_job_id": "",
+  "slurm_array_task_id": "",
+  "cpu_count": "8",
+  "blas_threads": "4"
 }

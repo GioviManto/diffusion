@@ -39,9 +39,13 @@ network".
 
 Design
 ------
-One prior (Laplace AR(1), rho=0.85, n=32 -- the exp_07 setting, so the pointwise numbers are
-directly comparable). Four score functions, all evaluated inside the *same* reverse
-integrator with *common random numbers*:
+One prior (Laplace AR(1), rho=0.85, n=32). Four score functions, all evaluated inside the
+*same* reverse integrator with *common random numbers*.
+
+Note that rho here is 0.85 while exp_07 uses 0.8, so the pointwise numbers are *not* directly
+comparable across the two experiments; an earlier version of this docstring claimed they were.
+The comparisons that matter here are internal -- the four score functions share a prior, a
+seed and an integrator, which is what the common-random-numbers design buys.
 
     exact    grid BP under the true prior            -- the reference. Not a competitor:
                                                         this is the true score, so its
@@ -118,7 +122,8 @@ from src.utils import ensure_dir, rng_for, write_csv, write_json
 # ---------------------------------------------------------------------------
 
 SETTINGS = {
-    # Data model. n=32 and rho=0.85 match exp_07 so the pointwise numbers line up.
+    # Data model. n=32 matches exp_07; rho does *not* (exp_07 uses 0.8), so pointwise
+    # numbers are not comparable across the two experiments -- see the module docstring.
     "n_sites": 32,
     "rho": 0.85,
     # Innovation family. All are variance-matched, so they share the covariance rho^|i-j|

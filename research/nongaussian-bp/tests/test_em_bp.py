@@ -8,6 +8,8 @@ through BP, the M-steps really maximize Q, and EM ascends the exact evidence.
 
 from __future__ import annotations
 
+from dataclasses import replace
+
 import numpy as np
 import pytest
 
@@ -699,3 +701,59 @@ def test_innovation_moments_match_sampling_from_the_fitted_mixture():
     assert abs(mom["innovation_mean"] - m1) < 5e-3
     assert abs(mom["innovation_var"] - m2) / m2 < 5e-3
     assert abs(mom["innovation_excess_kurtosis"] - excess) < 2e-2
+
+
+def test_mixture_rho_gradient_matches_finite_difference():
+    """Guards the sign of d log K / d rho for the mixture kernel.
+
+    e = u_k - rho u_j, so de/drho = -u_j and the two minus signs in
+    d/drho log N(e; mu_c, s2_c) cancel: the derivative is *plus*
+    u_j sum_c r_c (e - mu_c)/s2_c. The branch previously returned the negative
+    of this, which a finite difference catches immediately -- the ratio came out
+    at -1.0000000000239 and analytic + finite_difference vanished to 2e-10.
+
+    Nothing in the ECM M-step calls this method (its rho block solves the
+    weighted least-squares normal equations directly and had the right sign), so
+    the bug was invisible to every recovery experiment. It corrupts only the
+    routes that consume the analytic derivative: Fisher-gradient ascent, score
+    tests, and the observed-information estimates of exp_22.
+    """
+    grid = np.array([-1.2, -0.4, 0.3, 1.1])
+    kernel = MixtureInnovationKernel(
+        rho=0.37,
+        pi=np.array([0.35, 0.65]),
+        mu=np.array([-0.25, 0.4]),
+        s2=np.array([0.55, 1.3]),
+    )
+
+    h = 1e-6
+    hi = replace(kernel, rho=kernel.rho + h).log_transition_matrix(grid)
+    lo = replace(kernel, rho=kernel.rho - h).log_transition_matrix(grid)
+    fd = (hi - lo) / (2 * h)
+    analytic = kernel.grad_log_transition_matrix(grid)[0]
+
+    np.testing.assert_allclose(analytic, fd, rtol=1e-5, atol=1e-7)
+
+
+def test_mixture_rho_gradient_reduces_to_gaussian_case():
+    """A one-component, zero-mean mixture *is* a Gaussian AR(1) kernel.
+
+    Pins the two branches against each other so they can never again disagree
+    by a sign: this is the invariant the sign bug violated.
+    """
+    grid = np.linspace(-3.0, 3.0, 25)
+    rho, q = 0.63, 0.8
+    mixture = MixtureInnovationKernel(
+        rho=rho,
+        pi=np.array([1.0]),
+        mu=np.array([0.0]),
+        s2=np.array([q]),
+    )
+    gaussian = GaussianAR1Kernel(rho=rho, q=q)
+
+    np.testing.assert_allclose(
+        mixture.grad_log_transition_matrix(grid)[0],
+        gaussian.grad_log_transition_matrix(grid)[0],
+        rtol=1e-12,
+        atol=1e-12,
+    )

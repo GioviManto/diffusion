@@ -91,9 +91,32 @@ def select_parts(parts: dict, only: str | None) -> dict:
     return {name: parts[name] for name in wanted}
 
 
+def _git(*args: str) -> str:
+    """A git query that degrades to "" rather than killing an experiment.
+
+    Runs on compute nodes and from exported tarballs where .git may be absent,
+    so every failure mode -- no repo, no git binary, timeout -- returns the empty
+    string and the manifest simply records that the commit was unavailable.
+    """
+    import subprocess
+
+    try:
+        return subprocess.run(
+            ["git", "-C", str(Path(__file__).resolve().parent), *args],
+            capture_output=True, text=True, timeout=10, check=True,
+        ).stdout.strip()
+    except Exception:
+        return ""
+
+
 def provenance() -> dict[str, str]:
     return {
         "timestamp": time.strftime("%Y-%m-%d %H:%M:%S"),
+        "git_commit": _git("rev-parse", "HEAD"),
+        "git_branch": _git("rev-parse", "--abbrev-ref", "HEAD"),
+        # Non-empty means the tree carried uncommitted changes when this ran, so
+        # git_commit alone does not reproduce the result.
+        "git_dirty": _git("status", "--porcelain"),
         "python": sys.version.split()[0],
         "numpy": np.__version__,
         "platform": platform.platform(),

@@ -9,7 +9,7 @@ Branch `paper-revision-2026-08-07`, 7 August 2026.
 | # | was | is now | why |
 |---|---|---|---|
 | 1 | "$q=1-\rho^2$ makes the chain stationary" | covariance-stationary; not strictly stationary for non-Gaussian innovations | every prior draws $a_1\sim\mathcal N(0,1)$; the invariant law is not Gaussian |
-| 2 | title implies the full kernel is learned | kept — $\rho$ **is** estimated (0.3 → 0.850), and the linear restriction is now stated | verified in `src/kernels.py` and every experiment's init |
+| 2 | title implies the full kernel is learned | kept — $\rho$ **is** estimated (init away from truth → $0.852$ against a truth of $0.85$ in `exp_18`), and the linear restriction is now stated | verified in `src/kernels.py` and every experiment's init |
 | 3 | "exact E-step", "exact BP" | four tiers separated and applied throughout | the E-step is exact for the *discretised* model |
 | 4 | table column headed `exact` holding a Monte Carlo median | `reference` | it is a T5 estimate, not an exact quantity |
 | 5 | "the score diverges as $\Delta_t\to0$" | four effects separated; genuine singularity only for the uniform family | the numerator vanishes at the same order |
@@ -88,7 +88,7 @@ with respect to its data, and no value in any panel is entered by hand.
 
 | check | result |
 |---|---|
-| `pytest tests/ -q` | **135 passed, 12 skipped** (skips are CuPy parity, no GPU locally) |
+| `pytest tests/ -q` | **236 passed, 12 skipped** (skips are CuPy parity, no GPU locally) |
 | paper build | clean, **0 overfull boxes**, 0 undefined references or citations |
 | compendium build | clean, 43 pages, 0 undefined references or citations |
 | main narrative length | 10 pages, references start on p. 11 |

@@ -187,8 +187,9 @@ monotone ascent is preserved, exact maximisation is not.
 \caption{Left: the marginal log-likelihood by iteration at $\ncomp=4$, $\nseq=512$, from four
 initialisations of $\corr$; the largest decrease across iterations is zero in all four runs, and
 in the four $\ncomp=8$ runs not shown. Centre: the estimated autoregressive coefficient over the
-same runs, reaching $[0.8497,0.8507]$ against a truth of $0.85$ from initialisations spanning
+same runs, reaching $[0.8517,0.8520]$ against a truth of $0.85$ from initialisations spanning
 $[-0.4,0.6]$ --- which is the direct evidence that $\corr$ is estimated rather than supplied.
+(The eight $\ncomp\in\{4,8\}$ runs together span $[0.8517,0.8529]$.)
 Right: RMSE of $\widehat\corr$ and of the innovation variance against the number of training
 sequences, with an $\nseq^{-1/2}$ reference. Sources \codefile{outputs/exp\_18/em\_trace.csv},
 \codefile{outputs/exp\_06\_em\_parameter\_recovery/em\_rate.csv}.}

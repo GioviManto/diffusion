@@ -39,12 +39,20 @@ Part 6 (the no-noising baseline, and what the channel actually costs). Part 2
   plain MLE on clean chains -- no noising, no latent variables, no BP in the
   E-step -- and both arms get the SAME chains and the same iteration count, so
   the gap between them is the channel and nothing else. Result: the channel
-  costs 1.32x on rho, materially more on the innovation variance (though the
-  clean arm floors on discretization there, so read that ratio with care), and
+  costs 1.32x on rho, materially more on the innovation variance (though at three
+  replicates that ratio has a noisy denominator -- Part 7 shows the clean arm is
+  not floored, it is under-replicated -- so read the ratio with care), and
   shows NO resolved penalty on the innovation shape at three replicates
   (+0.22 +- 0.15) -- which sits oddly against the 112-1222x information decay
   of Part 3 until one notices that the noised arm spreads chains across five
   noise levels including t = 0.1, where shape information survives.
+
+Part 7 (is the clean arm floored on the grid? No.). Part 6's clean arm looked flat
+  in N at three replicates and we read that as a discretization floor. It is not:
+  at sixteen replicates it falls like N^{-1/2}, and estimating the same quantity
+  with no grid at all -- exact OLS and raw-transition ECM in `src.clean_mle` --
+  reproduces it, the paired difference being a constant 4.4e-4 across budgets.
+  That is an order of magnitude below the error it was supposed to explain.
 
 Part 5 (a discretization caveat, honestly reported). The Laplace M-step is
   exact for the *discretized* model, and that exact solution is quantized: the
@@ -62,6 +70,7 @@ import numpy as np
 
 from common import apply_overrides, experiment_parser, provenance, select_parts
 from src.bp_grid import make_grid
+from src.clean_mle import gaussian_ols, mixture_ecm_raw
 from src.denoiser import bp_posterior_mean, evaluate_denoiser
 from src.em import e_step_multi, fit_clean, fit_em, q_gradient
 from src.kernels import GaussianAR1Kernel, LaplaceAR1Kernel, MixtureInnovationKernel
@@ -602,6 +611,116 @@ def _fig_clean_vs_noised(rows_param, rows_shape, sizes, n_components, out):
     save_figure(fig, out / "clean_vs_noised.pdf")
 
 
+def part7_clean_raw_mle(grid, weights, sizes, n_rep, n_components, out):
+    """Is the clean arm's residual error a grid artefact? Measured, not asserted.
+
+    Part 6 fits the clean arm with `em.fit_clean`, which bins the observed
+    transitions onto the same grid the BP E-step uses. At three replicates its
+    innovation-variance error looked flat in N, and we read that as a
+    discretisation floor. Two things were wrong with that reading, and this part
+    measures both.
+
+    First, the grid is removed entirely: `clean_mle.gaussian_ols` is the exact
+    closed-form MLE on the raw pairs and `clean_mle.mixture_ecm_raw` is ECM on
+    the raw pairs, neither touching a grid. If the plateau were a grid artefact
+    the raw estimators would not show it.
+
+    Second, the replication is raised. Three replicates give an RMSE estimated
+    from three numbers, whose own sampling error is comparable to the effect
+    being read off it -- which is enough to manufacture a plateau out of a curve
+    that is in fact falling.
+
+    Reports both arms on identical chains, so the grid contribution is a paired
+    difference rather than a difference of two independently noisy curves.
+    """
+    rows = []
+    q_true = 1.0 - RHO_TRUE**2
+    gauss_prior, lap_prior = GaussianAR1(RHO_TRUE), LaplaceAR1(RHO_TRUE)
+
+    for n_chains in sizes:
+        for r in range(n_rep):
+            # Same stream as part 6, so the two parts describe the same draws.
+            rng = rng_for("exp06-p6", n_chains, r)
+            A_g = np.stack([gauss_prior.sample(rng, N_SITES) for _ in range(n_chains)])
+            A_l = np.stack([lap_prior.sample(rng, N_SITES) for _ in range(n_chains)])
+
+            rho_ols, q_ols = gaussian_ols(A_g)
+            k_grid, _ = fit_clean(GaussianAR1Kernel(0.2, 0.8), grid, A_g)
+            rows.append({
+                "regime": "gaussian", "n_chains": n_chains, "rep": r,
+                "n_components": 0,
+                "rho_raw": rho_ols, "param_raw": q_ols,
+                "rho_grid": float(k_grid.rho), "param_grid": float(k_grid.q),
+                "rho_err_raw": rho_ols - RHO_TRUE,
+                "rho_err_grid": float(k_grid.rho) - RHO_TRUE,
+                "param_err_raw": q_ols - q_true,
+                "param_err_grid": float(k_grid.q) - q_true,
+                "rho_grid_minus_raw": float(k_grid.rho) - rho_ols,
+                "param_grid_minus_raw": float(k_grid.q) - q_ols,
+                # Mixture-only columns, held as NaN so both regimes share one schema
+                # and the CSV can be read without a per-regime branch.
+                "exkurt_raw": float("nan"),
+                "exkurt_grid": float("nan"),
+                "raw_monotone_violation": float("nan"),
+            })
+
+            for c in n_components:
+                init_rng = rng_for("exp06-p7-init", c, n_chains, r)
+                # 120 iterations in both arms, matching part 6 exactly: this part audits
+                # part 6's clean arm, so it must not differ from it in optimisation budget.
+                raw = mixture_ecm_raw(A_l, c, init_rng, n_iters=120)
+                m0 = MixtureInnovationKernel.init(
+                    c, rho=0.3, var=0.8,
+                    rng=rng_for("exp06-p6-init", c, n_chains, r))
+                m_grid, _ = fit_clean(m0, grid, A_l, n_iters=120)
+                mom = m_grid.innovation_moments
+                rows.append({
+                    "regime": "mixture", "n_chains": n_chains, "rep": r,
+                    "n_components": c,
+                    "rho_raw": raw["rho"], "param_raw": raw["innovation_var"],
+                    "rho_grid": float(m_grid.rho),
+                    "param_grid": mom["innovation_var"],
+                    "rho_err_raw": raw["rho"] - RHO_TRUE,
+                    "rho_err_grid": float(m_grid.rho) - RHO_TRUE,
+                    "param_err_raw": raw["innovation_var"] - q_true,
+                    "param_err_grid": mom["innovation_var"] - q_true,
+                    "rho_grid_minus_raw": float(m_grid.rho) - raw["rho"],
+                    "param_grid_minus_raw": mom["innovation_var"] - raw["innovation_var"],
+                    "exkurt_raw": raw["innovation_excess_kurtosis"],
+                    "exkurt_grid": mom["innovation_excess_kurtosis"],
+                    "raw_monotone_violation": raw["monotone_violation"],
+                })
+        print(f"  N={n_chains} done", flush=True)
+
+    _report_clean_raw(rows, sizes)
+    return rows
+
+
+def _report_clean_raw(rows, sizes):
+    """Print the comparison the paper claim turns on, so a run is self-describing."""
+    def rmse(vals):
+        v = np.asarray(vals, dtype=float)
+        return float(np.sqrt(np.mean(v**2))) if v.size else float("nan")
+
+    for regime in ("gaussian", "mixture"):
+        sel = [r for r in rows if r["regime"] == regime]
+        if not sel:
+            continue
+        print(f"\n  [{regime}] innovation-variance RMSE by budget "
+              f"({len({r['rep'] for r in sel})} replicates)")
+        print(f"    {'N':>6}  {'grid':>10}  {'raw':>10}  {'N^-1/2 ref':>10}  {'|grid-raw| RMS':>14}")
+        base = None
+        for n in sizes:
+            at = [r for r in sel if r["n_chains"] == n]
+            if not at:
+                continue
+            g, w = rmse([r["param_err_grid"] for r in at]), rmse([r["param_err_raw"] for r in at])
+            d = rmse([r["param_grid_minus_raw"] for r in at])
+            base = base if base is not None else (w, n)
+            ref = base[0] * np.sqrt(base[1] / n)
+            print(f"    {n:>6}  {g:>10.6f}  {w:>10.6f}  {ref:>10.6f}  {d:>14.6f}")
+
+
 def main() -> None:
     parser = experiment_parser(
         "exp_06_em_parameter_recovery",
@@ -617,7 +736,7 @@ def main() -> None:
         "quantization_grids": (201, 401), "quantization_rhos": (0.8, 0.77),
         "n_chains_quantization": 128,
         "sizes_clean": (64, 256), "n_rep_clean": 2, "components_clean": (4,),
-        "t_eval_clean": (0.2,),
+        "t_eval_clean": (0.2,), "n_rep_raw": 3,
     }
     full = {
         "grid_size": GRID_M, "n_chains": 1024, "n_inits": 6,
@@ -633,6 +752,9 @@ def main() -> None:
         # parameter and shape recovery against N, and the induced denoiser error is a
         # secondary read-out whose 256-chain BP passes otherwise dominate the runtime.
         "components_clean": (8,), "t_eval_clean": (0.2, 0.8),
+        # Part 7 is cheap -- no BP, no held-out denoiser passes -- so it can afford the
+        # replication Part 6 cannot, which is exactly the point of running it.
+        "n_rep_raw": 32,
     }
     cfg = apply_overrides(quick if args.quick else full, args.set)
 
@@ -668,6 +790,11 @@ def main() -> None:
         write_csv(out / "clean_vs_noised_params.csv", param_rows)
         write_csv(out / "clean_vs_noised_shape.csv", shape_rows)
 
+    def p7(grid, weights, out):
+        write_csv(out / "clean_raw_mle.csv", part7_clean_raw_mle(
+            grid, weights, cfg["sizes_clean"], cfg["n_rep_raw"],
+            cfg["components_clean"], out))
+
     parts = {
         "monotonicity": ("monotonicity and recovery", p1),
         "price_of_noising": ("price of noising vs Fisher information", p2),
@@ -675,6 +802,7 @@ def main() -> None:
         "rate": ("sample-size rate", p4),
         "quantization": ("Laplace lattice quantization", p5),
         "clean_vs_noised": ("clean-data MLE against fitting through the channel", p6),
+        "clean_raw_mle": ("grid-free clean MLE against the grid-binned fit", p7),
     }
     if args.list_parts:
         print("\n".join(parts))
