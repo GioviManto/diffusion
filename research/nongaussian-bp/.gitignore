@@ -1,1 +1,4 @@
 outputs/_determinism/
+
+# Agent worktrees: scratch checkouts, never part of a result.
+.claude/
