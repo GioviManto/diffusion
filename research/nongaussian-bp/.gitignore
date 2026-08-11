@@ -2,3 +2,7 @@ outputs/_determinism/
 
 # Agent worktrees: scratch checkouts, never part of a result.
 .claude/
+
+# Datasets: fetched per-machine, never committed. cifar-10-python.tar.gz alone
+# is 163 MB, and the cluster copy is the one that matters.
+data/

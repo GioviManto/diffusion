@@ -1,0 +1,4 @@
+coupled_nodes_per_component,any_choice_loop_free,all_choices_loop_free
+1,True,True
+2,False,False
+3,False,False
