@@ -4,10 +4,18 @@ Prepared for review, **not applied**. Each row gives the claim as it currently s
 the evidence now supports, and where that evidence lives. Rewriting the argument is a
 judgement call, so the wording below is a proposal rather than an edit.
 
-Sections 1–9 carry complete data. **Section 10 is partial** — the generation rerun (`618378`)
-has returned only its smallest data budget, and its finding is the one that could still move the
-paper's headline, so it is explicitly marked not-yet-writable and should not be acted on until
-the remaining budgets land.
+**All sections now carry complete data, section 10 included.** This paragraph previously said
+section 10 was partial and must not be acted on, because when it was written the generation
+rerun (`618378`) had returned only its N=32 cells. All four budgets landed on 2026-08-08 and
+the section was extended to 10b and 10c, but this header was never updated — so for three days
+the document told its reader to disregard the one result it had in fact finished. Anyone
+reading top-down would have stopped at the most consequential section in the file.
+
+Re-verified 2026-08-12 by re-deriving the section 10c table from the committed CSVs rather
+than from the prose: `python tools/summarize_generation_rerun.py`. The numbers reproduce (10c
+quotes seed means, the tool prints medians as well, and the N=2048 MLP per-seed values agree
+exactly: 0.097, 0.069, 0.019, −0.002). Machine-readable copy at
+`outputs/exp_16_summary/generation_rerun_summary.csv`.
 
 ---
 
