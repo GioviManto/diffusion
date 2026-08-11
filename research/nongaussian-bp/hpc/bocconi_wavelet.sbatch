@@ -56,6 +56,15 @@
 #   Video -- caterpillar vs frozen control, coherence, structure, strips:
 #     sbatch --dependency=afterok:$SMOKE --export=ALL,MODE=video bocconi_wavelet.sbatch
 #
+# COMBINED MODES, for when the queue is full. The QOS caps submissions at 30 per
+# user and array tasks count individually, so an 11-job plan does not fit beside
+# other work. `images` and `videoall` do the same runs sequentially in one job
+# each, which costs wall-clock but only one slot. They need the `compute`
+# partition (3-00:10:00); medium_cpu at 6:10 is not enough for either.
+#
+#     sbatch --partition=compute --time=12:00:00 --export=ALL,MODE=images   bocconi_wavelet.sbatch
+#     sbatch --partition=compute --time=23:00:00 --export=ALL,MODE=videoall bocconi_wavelet.sbatch
+#
 # The image array splits by *family* and the video array by *cut depth*, because
 # in both cases the tasks share nothing: each fits its own model and writes its
 # own file, so there is no merge step. Splitting by experiment *part* instead
@@ -148,8 +157,50 @@ case "$MODE" in
         --set n_frames=6 --set t_resolve=0.05 --set n_generate=4000
     ;;
 
+  images)
+    # Everything on real CIFAR in one slot: the gate, then each kernel family.
+    # Sequential because the QOS cap makes an array unaffordable, not because
+    # the tasks depend on each other -- they do not.
+    echo "=== stats ==="
+    "$PYTHON" -u experiments/exp_23_wavelet_statistics.py \
+        --output-dir "$ROOT/outputs/exp_23_wavelet_statistics" \
+        --set n_images=10000 --set n_boot=400
+    for F in gaussian mixture scale_mixture; do
+        echo "=== generate: $F ==="
+        "$PYTHON" -u experiments/exp_25_wavelet_generation.py \
+            --output-dir "$ROOT/outputs/exp_25_wavelet_generation/$F" \
+            --set families="('$F',)" \
+            --set n_train=2000 --set n_test=5000 --set n_iters=20 \
+            --set t_resolve=0.05 --set t_train="(0.3,0.6,1.0)" \
+            --set t_likelihood=0.05 \
+            --set n_generate=10000 --set n_reverse=128 --set reverse_steps=150
+    done
+    ;;
+
+  videoall)
+    # The whole video story in one slot: the space/time trade at every cut
+    # depth, then the caterpillar against its frozen control with the coherence
+    # decomposition, the loop-free budget and the frame strips.
+    OUT=$ROOT/outputs/exp_26_video
+    for C in 0 1 2 3 4; do
+        echo "=== cutcurve: cut_depth=$C ==="
+        "$PYTHON" -u experiments/exp_26_video.py --only cutcurve \
+            --output-dir "$OUT" \
+            --set cuts="($C,)" \
+            --set n_train=1000 --set n_test=1000 --set n_iters=12 \
+            --set n_frames=6 --set t_resolve=0.05 --set n_generate=4000
+    done
+    echo "=== caterpillar vs frozen, coherence, structure, strips ==="
+    "$PYTHON" -u experiments/exp_26_video.py \
+        --only fit,coherence,structure,strip \
+        --output-dir "$OUT" \
+        --set n_train=1000 --set n_test=1000 --set n_iters=12 \
+        --set n_frames=6 --set t_resolve=0.05 --set n_generate=4000
+    ;;
+
   *)
-    echo "unknown MODE=$MODE (expected smoke, stats, generate, cutcurve or video)" >&2
+    echo "unknown MODE=$MODE (expected smoke, stats, generate, cutcurve," >&2
+    echo "                    video, images or videoall)" >&2
     exit 2
     ;;
 esac
