@@ -125,27 +125,43 @@ in the tested range; at $C=16$ the estimator leads on both simultaneously.
 
 ## Limitations
 
-- Exact Markov structure and coordinatewise noise are assumed, not tested.
-- The initial law is fixed; strict stationarity has never been run.
+Four items that stood here until 2026-08-12 have been measured since this section was written
+and are listed under *Resolved* below instead. They are called out rather than silently deleted
+because this document is the one `EMAIL_TO_JEROME.md` recommends reading first, and it spent
+several days understating what the project had done.
+
 - Identifiability of the kernel is assumed, not proved.
-- Inference costs $O(nN_g^2)$ per sequence — measured at 210–289× a network forward pass. Since
-  reverse diffusion calls the denoiser at every step, this is the practical weak point.
-- No validation split. Two selections happen on the evaluation set, both favouring the
-  baselines; the receptive-field numbers are labelled exploratory because of it.
-- The capacity sweep covers pointwise error and generated statistics, but not marginal
-  likelihood or runtime against $C$.
-- Locality of the score is probed only through a receptive-field proxy.
+- Inference costs $O(nN_g^2)$ per sequence — measured at 211–320× a network forward pass
+  (1.31 ms against 0.0041 ms at batch 512). Since reverse diffusion calls the denoiser at every
+  step, this is the practical weak point.
+- Locality of the score is probed only through a receptive-field proxy — now an *exact*
+  conditional expectation under stationary initialisation, but still a proxy for the score's
+  own locality.
+- The image baseline (`exp_24`) covers `gaussian` and `mixture` only. `exp_25` gained a
+  `scale_mixture` kernel that `exp_24`'s factory does not accept, so the second-order closure
+  is not quoted against the family built to capture magnitude dependence.
+
+## Resolved since this summary was first written
+
+- **Non-Markov structure is now tested.** 15 cells of `exp_21` (rank-one contamination β and
+  long-range coupling γ, Gaussian and Laplace). The advantage survives β up to 1.0 and fails by
+  γ ≈ 0.10. See `CLAIMS_TO_UPDATE.md` §8.
+- **Strict stationarity has been run.** `exp_11` stationary arms at ρ = 0.5, 0.85, 0.95; the
+  initial-law mismatch does not account for the locality effect.
+- **A validation split exists throughout.** Selection is on a disjoint validation bundle; the
+  oracle it replaces was worth 0.999× and 0.996×, so the correction does not move the
+  conclusion. Receptive-field numbers are no longer exploratory.
+- **The capacity sweep now includes marginal likelihood and runtime against $C$.** Held-out
+  evidence per edge saturates by $C \approx 8$; runtime is flat at 13.5 → 14.2 s/iter.
 
 ## Immediate next experiments
 
-1. Rerun the receptive-field comparison with a genuine validation split; replace the
-   per-noise-level "better of two parameterisations" with validation-based selection.
-2. Add marginal likelihood and runtime to the capacity sweep, completing the joint experiment.
-3. Sample $a_1$ from each family's invariant law and confirm that nothing changes.
-4. Learn $\rho$ *and* $\mu$ jointly, using the site-one statistic the E-step already computes but
+1. Learn $\rho$ *and* $\mu$ jointly, using the site-one statistic the E-step already computes but
    currently discards.
-5. A direct locality measurement — windowed inference, or the Jacobian of the score with respect
+2. A direct locality measurement — windowed inference, or the Jacobian of the score with respect
    to distant observations — rather than the current proxy.
+3. Extend the `exp_24` image baseline to the `scale_mixture` kernel, so the Gaussian closure is
+   compared against the family intended to capture cross-scale magnitude dependence.
 
 ---
 

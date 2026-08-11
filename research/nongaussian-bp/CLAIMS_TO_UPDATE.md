@@ -179,15 +179,27 @@ likelihood) and `multi_view` (correct joint), and every output records the sampl
 
 ---
 
-## Pending — do not move any claim on these yet
+## Both formerly-pending items have landed — sections 8 and 10 below are the results
 
-- **Generation rerun under continuous-`t`** (`618378`). The current dissociation result was
-  produced with networks trained on five discrete levels and evaluated across [0.02, 3.0], with
-  a parameterisation switch mid-integration. Until the rerun lands, the size of that artefact is
-  unknown, and it bears directly on the paper's headline.
-- **Non-Markov robustness** (`618380`, `618390`). First-ever runs. The quick configuration hinted
-  at a CNN crossover at β = 0.5, but its Markov control mis-fits ρ as 0.777 against a true 0.85,
-  so that is under-convergence and not a result.
+This section used to read "Pending — do not move any claim on these yet" and listed the two
+runs below as unfinished. Both returned on 2026-08-08 and both are written up further down
+this same document, which made the heading actively harmful: a reader taking it at its word
+skips sections 8, 8b, 10, 10b and 10c — that is, every result on the page.
+
+- **Generation rerun under continuous-`t`** (`618378`) — **landed.** All four data budgets ×
+  four seeds. Written up in sections 10, 10b and 10c; the artefact it was meant to size turned
+  out to *strengthen* the dissociation rather than explain it away.
+  *Provenance:* `outputs/exp_16/gen2_n2048_seed0/params.json`, 2026-08-08 02:26:59.
+- **Non-Markov robustness** (`618380`, `618390`) — **landed.** 15 cells (5 Gaussian β, 5
+  Gaussian γ, 5 Laplace β). The under-convergence that made the quick configuration
+  uninterpretable is resolved; section 8 is the result. *Provenance:*
+  `outputs/exp_21/gauss_gamma0.4/params_gauss.json`, 2026-08-08 01:00:41.
+
+Two smaller instances of the same drift, both inside the finished section 10: the sentence
+"Larger budgets (512, 2048) are still running" and "Not claimed yet: N = 2048 is still
+running" have been corrected below. All of them had one cause — status prose written while
+work was queued and never revisited once it returned. The measurements were never wrong;
+every numeric table in this file re-derives from the committed CSVs.
 
 ---
 
@@ -333,8 +345,8 @@ leaving EM-BP bit-identical. State the correction, state that it strengthened ra
 weakened the finding, and drop any suggestion that the earlier five-level numbers were adequate
 for a reverse-SDE comparison.
 
-Larger budgets (512, 2048) are still running; nothing above depends on them, but they should be
-folded in before the figure is regenerated.
+Larger budgets (512, 2048) have since landed and are folded in at 10b and 10c below; nothing
+above depends on them. The figure still needs regenerating against the complete set.
 
 ### 10b. N = 512: the dissociation is clean, and there is a new within-arm version of it
 
@@ -359,9 +371,10 @@ sharper statement of the paper's central phenomenon than the between-arm compari
 rests on. It is one experiment away from being a result: fit the MLP at several budgets and plot
 pointwise error and generated kurtosis against N on the same axis.
 
-Not claimed yet: N = 2048 is still running, and the mechanism (a better L2 fit to the posterior
-mean being smoother, hence more Gaussian in the generated law) is a hypothesis, not a
-measurement.
+N = 2048 has since landed and is tabulated at 10c: the trend continues, with the MLP's four
+seeds at 0.097, 0.069, 0.019 and −0.002 against a target of 1.9098. Still not claimed: the
+mechanism. That a better L2 fit to the posterior mean is smoother, and hence more Gaussian in
+the generated law, remains a hypothesis and has not been measured.
 
 ### 2b. Paired capacity contrasts on the primary pointwise metric, both budgets
 

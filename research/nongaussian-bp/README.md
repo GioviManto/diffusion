@@ -137,10 +137,13 @@ image-like data, and is recorded rather than glossed.
                   scores, Markov approximations, numpy MLP, reverse samplers,
                   EM + parameterized kernels + denoiser comparison,
                   tree priors + tree BP + tree EM, speciation/collapse scales)
-    experiments/  exp_01 ... exp_15, all with --quick smoke mode
+    experiments/  exp_01 ... exp_27, all with --quick smoke mode
     outputs/      CSV + JSON + PNG per experiment (committed results)
-    notebooks/    executed analysis notebooks 01-04
-    tests/        pytest suite (101 tests)
+    notebooks/    executed analysis notebooks 01-05
+    docs/         PAPER_CONNECTIONS.md, the Layer-6 study note
+    tests/        pytest suite (321 collected; 309 passed, 12 skipped locally --
+                  the 12 skips are the CUDA backend-parity tests, which pass on
+                  the cluster's H200 nodes)
     report/       updated_report.tex / .pdf   (Layers 1-4)
                   em_bp_learning.tex / .pdf   (Layer 5 theory)
     audit/        Layer-1 audit note

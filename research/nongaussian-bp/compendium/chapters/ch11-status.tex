@@ -263,10 +263,19 @@ list; it is now computed and committed
 \item A hybrid estimator combining a learned chain kernel with a learned low-rank correction,
 which is the natural next step for relaxing the Markov assumption.
 \item Distillation of the fitted inference-based denoiser into a network, which is the obvious
-remedy for its two-to-three-hundred-fold inference cost.
-\item Anything about non-Markov priors. The misspecification limitation of
-\S\ref{ch:markov} is stated and not addressed.
+remedy for its three-hundred-fold inference cost.
 \end{itemize}
+
+\noindent
+This list until 2026-08-12 also carried the entry ``Anything about non-Markov priors. The
+misspecification limitation of \S\ref{ch:markov} is stated and not addressed.'' That was the
+project's largest acknowledged gap, and it has been measured: \codefile{exp\_21} covers fifteen
+cells --- rank-one contamination $\beta$ and long-range coupling $\gamma$, Gaussian and Laplace
+innovations --- and the result is that the structural prior survives rank-one contamination up
+to $\beta = 1.0$, where half the marginal variance is a shared constant, and fails under
+long-range coupling by $\gamma \approx 0.10$. The entry is removed rather than struck through
+because leaving ``not started'' next to a completed sweep is how a reader concludes the sweep
+does not exist.
 
 \section*{Sources}
 \addcontentsline{toc}{section}{Sources}
