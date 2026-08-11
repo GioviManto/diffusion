@@ -60,6 +60,7 @@ SETTINGS = {
     "n_components": 4,
     "spatial_family": "gaussian",
     "n_generate": 400,
+    "cuts": (0, 1, 2, 3, 4),
     "chunk": 16,
     "seed": 0,
 }
@@ -364,7 +365,11 @@ def part_cutcurve(settings, out_dir):
     depth = settings["levels"] - 1
     rows = []
 
-    for cut in range(depth + 1):
+    # `cuts` is a setting so a job array can take one depth per task: each fit is
+    # independent and writes its own file, so there is no merge step.
+    for cut in settings["cuts"]:
+        if not 0 <= cut <= depth:
+            raise SystemExit(f"cut {cut} outside [0, {depth}]")
         t0 = time.perf_counter()
         model, trace = fit_video_tree(
             train, levels=settings["levels"], t_train=list(settings["t_train"]),
@@ -410,7 +415,9 @@ def part_cutcurve(settings, out_dir):
     best_fde = min(rows, key=lambda r: r["frame_diff_energy_generated"])
     print(f"[cutcurve] best likelihood at cut={best_ll['cut_depth']}, "
           f"best coherence at cut={best_fde['cut_depth']}")
-    write_csv(out_dir / "cutcurve.csv", rows)
+    suffix = "" if tuple(settings["cuts"]) == tuple(range(depth + 1)) else \
+        "_cut" + "".join(str(c) for c in settings["cuts"])
+    write_csv(out_dir / f"cutcurve{suffix}.csv", rows)
     return rows
 
 

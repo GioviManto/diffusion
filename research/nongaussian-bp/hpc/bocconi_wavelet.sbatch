@@ -1,52 +1,65 @@
 #!/bin/bash
 #SBATCH --job-name=wavelet
 #SBATCH --partition=medium_cpu
-#SBATCH --time=07:45:00
+#SBATCH --time=05:45:00
 #SBATCH --nodes=1
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=8
-#SBATCH --mem=16G
+#SBATCH --mem=24G
 #SBATCH --output=/home/3164542/nongaussian-bp/logs/%x_%A_%a.out
 #SBATCH --error=/home/3164542/nongaussian-bp/logs/%x_%A_%a.err
 #
-# exp_23/24/25 -- the wavelet-tree extension to real images.
+# exp_23/25 (real images) and exp_26 (video) -- the wavelet-tree extension.
 #
-# Why this needs the cluster, and why the settings are what they are.
+# TIME LIMIT. `medium_cpu` caps at 6:10:00 (sinfo), so the 07:45:00 this script
+# asked for in its previous version would have been rejected at submit rather
+# than run and truncated. 05:45 leaves margin under the cap. Anything longer
+# belongs on `compute` (3-00:10:00, 3 nodes) -- see MODE=video below.
 #
-# One BP pass costs ~30 ms per image-orientation at grid M = 241 and 72 ms at M = 401,
-# measured rather than estimated, and it scales as M^2. One EM iteration is
-# N x 3 orientations x T noise levels passes, so the fit alone is
+# COST, measured rather than estimated. One BP pass is ~30 ms per
+# image-orientation on a uniform M=241 grid; per-depth grids resolving to
+# t = 0.05 cost about the same in total while reaching 18x further down in t
+# (they spend points where the likelihood is narrow, which is where the nodes
+# are few). Measured on this laptop:
 #
-#     N=2000, T=3, M=301, 20 iters  ->  12.2 min/iter  ->  4.1 h   (per family)
-#     N=4000, T=3, M=401, 30 iters  ->  43.2 min/iter  -> 21.6 h   (per family)
+#   exp_25 fit: 600 images, 12 iters, 3 orientations, 2 noise levels -> ~9 min
+#               so n_train=2000, n_iters=20 -> ~50 min per family
+#   exp_26 fit: 300 sequences x 6 frames, 8 iters                    -> ~20 min
+#               (the caterpillar traverses each frame's tree twice)
+#   exp_26 cutcurve: ~25 min per cut depth at those settings
 #
-# The second of those is what this script asked for in its first version and it would
-# have hit the 7:45 wall and been killed, wasting a QOS slot. The settings below are
-# budgeted against the measured cost with margin: ~4.1 h fit + ~0.7 h reverse sampling
-# + generation, against a 7:45 limit. The numbers assume ONE core; the BLAS threads
-# requested above help the GEMMs but are not counted on.
+# Cost is linear in n_train and n_iters and quadratic in grid size; the grid
+# sizes follow from t_resolve, so *lowering t_resolve raises cost sharply*.
+# Re-run the arithmetic before raising anything.
 #
-# If you raise n_train or grid_size, re-run the arithmetic first. Cost is linear in
-# n_train and n_iters and quadratic in grid_size.
+# LOG BUFFERING. Every python call uses `-u`. Without it CPython block-buffers
+# stdout to a file, so a multi-hour job writes nothing until it exits and a hung
+# job is indistinguishable from a quiet one.
 #
-# Note on log output. Every python invocation below uses `-u`. Without it CPython
-# block-buffers stdout when it is a file rather than a tty, so a multi-hour job writes
-# nothing to the .out file until it finishes -- which makes `tail -f` on a running job
-# useless and makes a hung job indistinguishable from a quiet one. The existing sbatch
-# scripts in this directory do not do this; they predate the observation.
+# USAGE
 #
-#   Gate first (tests plus every experiment at --quick, ~15 min):
-#     SMOKE=$(sbatch --parsable --time=00:45:00 --export=ALL,MODE=smoke bocconi_wavelet.sbatch)
+#   Gate first (tests + every experiment at --quick, ~20 min):
+#     SMOKE=$(sbatch --parsable --partition=short_cpu --time=01:00:00 \
+#             --export=ALL,MODE=smoke bocconi_wavelet.sbatch)
 #
-#   The gating measurement -- subband kurtosis and cross-scale dependence on 10k images:
+#   Images -- the gating measurement on 10k CIFAR images:
 #     sbatch --dependency=afterok:$SMOKE --export=ALL,MODE=stats bocconi_wavelet.sbatch
 #
-#   The generation comparison, one array task per kernel family:
-#     sbatch --dependency=afterok:$SMOKE --array=0-2 --export=ALL,MODE=generate bocconi_wavelet.sbatch
+#   Images -- generation, one array task per kernel family:
+#     sbatch --dependency=afterok:$SMOKE --array=0-2 --export=ALL,MODE=generate \
+#            bocconi_wavelet.sbatch
 #
-# The array splits by *family* rather than by part because the three parts share the
-# fitted models (exp_25 caches them per process) and refitting per part would triple
-# the cost. Each task writes to its own --output-dir, so there is no merge step.
+#   Video -- the space/time trade-off, one array task per cut depth:
+#     sbatch --dependency=afterok:$SMOKE --array=0-4 --export=ALL,MODE=cutcurve \
+#            bocconi_wavelet.sbatch
+#
+#   Video -- caterpillar vs frozen control, coherence, structure, strips:
+#     sbatch --dependency=afterok:$SMOKE --export=ALL,MODE=video bocconi_wavelet.sbatch
+#
+# The image array splits by *family* and the video array by *cut depth*, because
+# in both cases the tasks share nothing: each fits its own model and writes its
+# own file, so there is no merge step. Splitting by experiment *part* instead
+# would refit the same models once per part.
 
 set -euo pipefail
 
@@ -81,8 +94,9 @@ echo
 case "$MODE" in
 
   smoke)
-    "$PYTHON" -u -m pytest tests/ -q
-    for e in exp_23_wavelet_statistics exp_24_wavelet_fit exp_25_wavelet_generation; do
+    "$PYTHON" -u -m pytest tests/ -q -m "not slow"
+    for e in exp_23_wavelet_statistics exp_24_wavelet_fit \
+             exp_25_wavelet_generation exp_26_video; do
         echo "--- $e --quick ---"
         "$PYTHON" -u "experiments/$e.py" --quick \
             --output-dir "$ROOT/outputs/smoke/$e"
@@ -90,8 +104,8 @@ case "$MODE" in
     ;;
 
   stats)
-    # The gate: if CIFAR subband coefficients came back approximately Gaussian the
-    # whole premise would not apply, so this runs first and at full size.
+    # The gate: if CIFAR subband coefficients came back approximately Gaussian
+    # the whole premise would not apply, so this runs first and at full size.
     "$PYTHON" -u experiments/exp_23_wavelet_statistics.py \
         --output-dir "$ROOT/outputs/exp_23_wavelet_statistics" \
         --set n_images=10000 --set n_boot=400
@@ -106,12 +120,36 @@ case "$MODE" in
         --output-dir "$OUT" \
         --set families="('$F',)" \
         --set n_train=2000 --set n_test=5000 --set n_iters=20 \
-        --set grid_size=301 --set t_train="(0.3,0.6,1.0)" \
+        --set t_resolve=0.05 --set t_train="(0.3,0.6,1.0)" \
+        --set t_likelihood=0.05 \
         --set n_generate=10000 --set n_reverse=128 --set reverse_steps=150
     ;;
 
+  cutcurve)
+    # One cut depth per task. Each is an independent fit of a *different exact
+    # model* -- the space/time edge trade of video_bp.cut_caterpillar_bp -- and
+    # writes cutcurve_cut<N>.csv, so the five concatenate with no merge logic.
+    OUT=$ROOT/outputs/exp_26_video
+    echo "cut_depth=$TASK -> $OUT"
+    "$PYTHON" -u experiments/exp_26_video.py --only cutcurve \
+        --output-dir "$OUT" \
+        --set cuts="($TASK,)" \
+        --set n_train=1000 --set n_test=1000 --set n_iters=12 \
+        --set n_frames=6 --set t_resolve=0.05 --set n_generate=4000
+    ;;
+
+  video)
+    # Caterpillar against the frozen-time control, plus the coherence
+    # decomposition, the loop-free budget, and the frame strips.
+    "$PYTHON" -u experiments/exp_26_video.py \
+        --only fit,coherence,structure,strip \
+        --output-dir "$ROOT/outputs/exp_26_video" \
+        --set n_train=1000 --set n_test=1000 --set n_iters=12 \
+        --set n_frames=6 --set t_resolve=0.05 --set n_generate=4000
+    ;;
+
   *)
-    echo "unknown MODE=$MODE (expected smoke, stats or generate)" >&2
+    echo "unknown MODE=$MODE (expected smoke, stats, generate, cutcurve or video)" >&2
     exit 2
     ;;
 esac
