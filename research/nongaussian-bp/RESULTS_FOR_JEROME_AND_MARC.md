@@ -90,36 +90,44 @@ rested on one draw at an iteration count it had not converged at.
 
 ### 3.3 Sample efficiency against neural denoisers
 
-Six training seeds, budgets 32→4096, paired on a common held-out test set scored against
-grid BP under the true kernel. Ratio of aggregate mean relative score error,
-network / EM-BP:
+**Sixteen** independent training seeds, budgets 32→4096, paired on a common held-out test set
+scored against grid BP under the true kernel, with the network parameterisation chosen on a
+disjoint validation bundle. Ratio of aggregate mean relative score error, network / EM-BP:
 
 | N | selected network | EM-BP | ratio |
 |---:|---:|---:|---:|
-| 32 | 0.607007 ± 0.003985 | 0.065072 ± 0.003083 | 9.33 |
-| 64 | 0.556940 ± 0.004800 | 0.051515 ± 0.007161 | 10.81 |
-| 128 | 0.469970 ± 0.002303 | 0.033271 ± 0.003498 | 14.13 |
-| 256 | 0.338483 ± 0.003962 | 0.028799 ± 0.002106 | 11.75 |
-| 512 | 0.236145 ± 0.001574 | 0.021109 ± 0.002158 | 11.19 |
-| 1024 | 0.173611 ± 0.000919 | 0.018213 ± 0.002096 | 9.53 |
-| 2048 | 0.137181 ± 0.001000 | 0.014213 ± 0.000875 | 9.65 |
-| 4096 | 0.123994 ± 0.000339 | 0.012410 ± 0.000477 | 9.99 |
+| 32 | 0.627154 ± 0.002852 | 0.069216 ± 0.003413 | 9.06 |
+| 64 | 0.571787 ± 0.002283 | 0.055364 ± 0.003704 | 10.33 |
+| 128 | 0.496461 ± 0.001975 | 0.034918 ± 0.001828 | 14.22 |
+| 256 | 0.369294 ± 0.001848 | 0.024782 ± 0.001483 | 14.90 |
+| 512 | 0.263256 ± 0.001247 | 0.021458 ± 0.001368 | 12.27 |
+| 1024 | 0.186614 ± 0.000774 | 0.016894 ± 0.000946 | 11.05 |
+| 2048 | 0.146012 ± 0.000742 | 0.013881 ± 0.000481 | 10.52 |
+| 4096 | 0.121890 ± 0.000579 | 0.012921 ± 0.000357 | 9.43 |
 
-Uncertainty is over the six independent training seeds (`ddof=1`, `SE = SD/√6`);
+The advantage is **9–15×** across seven doublings, peaking near `N=256` and narrowing at both
+ends. The earlier six-seed table gave 9–14×; the shape is the same but `N=256` moved from 11.8
+to 14.9, which is the kind of movement six seeds could not resolve and is the reason this was
+rerun at sixteen.
+
+Uncertainty is over the sixteen independent training seeds (`ddof=1`, `SE = SD/√16`);
 the displayed ratio is the ratio of aggregate means, not the mean of seed-level ratios.
 
-> `outputs/replicates/merged_raw.csv` — recomputed from raw rows, reproduces to 6 d.p.
+> `outputs/final_em/merged_reps_16seed.csv` (Bocconi array `621771`, 16 tasks,
+> commit `78b6466`) — recomputed from raw per-seed rows.
 
-**On the selection objection.** The table above lets the network keep the better of the
-`eps`/`x0` parameterisations per noise level, which is oracle post-selection on the
-evaluation set and favours the *baseline*. Choosing on a disjoint validation bundle
-instead: the two protocols **agree in 33 of 35 cells**, and the mean cell ratio is
-**11.659 selected vs 11.653 oracle**. The oracle is worth essentially nothing here.
+**On the selection objection.** A network that keeps the better of the `eps`/`x0`
+parameterisations *per noise level, judged on the evaluation set* is enjoying oracle
+post-selection that EM-BP does not get. The table above therefore selects on a disjoint
+validation bundle. Both columns come from the **same fitted models**, so the honest protocol
+and the oracle cannot drift apart, and the networks are not refitted.
 
-> `outputs/exp_07_em_vs_score_network/sample_efficiency_val.csv`
+Across all **640 cells** (16 seeds × 8 budgets × 5 noise levels) the two protocols agree in
+**635**, and the aggregate ratios are indistinguishable — e.g. 14.90 selected vs 14.90 oracle
+at `N=256`, 9.43 vs 9.43 at `N=4096`. **The oracle is worth essentially nothing**, so the
+objection, though correct in principle, does not move the result.
 
-This is one seed and excludes `N=4096` — it bounds the selection bias, it does not
-replace the six-seed table.
+> `outputs/final_em/merged_reps_16seed.csv`
 
 **The honest scope.** EM-BP is given the correct graph, a homogeneous linear-autoregressive
 transition form, and a low-dimensional innovation family. The networks are not. The result
@@ -264,25 +272,24 @@ attributed the flatness to a discretisation floor. Both halves were wrong.
 
 The flatness was **replication noise**. At three replicates an RMSE is estimated from three
 numbers, and its own sampling error is comparable to the effect being read off it. At
-sixteen the curve is not flat:
+**64 replicates** (Bocconi `621772`, task 0) the curve is not flat, and removing the grid
+entirely — exact clean-data OLS and raw-transition ECM on the raw pairs, `src/clean_mle.py` —
+reproduces it:
 
-| N | clean, grid-binned | clean, no grid at all | N^(−1/2) reference |
-|---:|---:|---:|---:|
-| 64 | 0.01357 | 0.01348 | 0.01348 |
-| 128 | 0.00731 | 0.00715 | 0.00953 |
-| 256 | 0.00565 | 0.00565 | 0.00674 |
-| 512 | 0.00422 | 0.00428 | 0.00477 |
-| 1024 | 0.00318 | 0.00320 | 0.00337 |
+| N | Gaussian: grid | Gaussian: no grid | mixture: grid | mixture: no grid | N^(−1/2) ref (Gaussian) |
+|---:|---:|---:|---:|---:|---:|
+| 64 | 0.011367 | 0.011303 | 0.019150 | 0.019185 | 0.011303 |
+| 128 | 0.007449 | 0.007386 | 0.014256 | 0.014128 | 0.007992 |
+| 256 | 0.005660 | 0.005605 | 0.009433 | 0.009333 | 0.005651 |
+| 512 | 0.004260 | 0.004232 | 0.005732 | 0.005653 | 0.003996 |
+| 1024 | 0.002690 | 0.002665 | 0.004863 | 0.004815 | 0.002826 |
 
-The `N=64` entry alone moves by a factor of three between the two replication levels.
+Both regimes fall at essentially `N^(−1/2)`, with or without a grid. The paired
+grid-minus-raw discrepancy is a **constant 4.37 × 10⁻⁴** at every budget — it does not grow,
+shrink, or interact with `N`. At `N=64` that is 4% of the error; a quantity that small cannot
+produce a floor at 4 × 10⁻³, and there is no floor there to produce.
 
-And the grid was never a plausible culprit. Removing it entirely — exact clean-data OLS and
-raw-transition ECM on the raw pairs, implemented in `src/clean_mle.py` — reproduces the
-binned curve, with a paired grid-minus-raw discrepancy that is a **constant 4.4 × 10⁻⁴**
-across every budget. That is an order of magnitude below the estimation error at `N=64`.
-A quantity that small cannot produce a floor at 4 × 10⁻³.
-
-> `outputs/exp_06_em_parameter_recovery/clean_raw_mle.csv` — `exp_06 --only clean_raw_mle`;
+> `outputs/final_em/20260811/recovery/clean_raw/clean_raw_mle.csv`, 64 replicates;
 > estimators guarded by `tests/test_clean_mle.py`
 
 This also gives Regime A a proper grid-free reference, which it previously lacked: the

@@ -711,9 +711,10 @@ general.
 schedule. Mean over six replicates, $\pm$ one standard error. The network column takes, at each
 noise level, the better of the two parameterisations. That is post-selection and favours the
 baseline, so we measured what it is worth rather than leaving it as a caveat: choosing the
-parameterisation on a disjoint validation bundle instead agrees with the test-set choice in $33$
-of $35$ cells and changes the mean advantage from $11.65$ to $11.66$ --- the oracle is worth
-$0.999\times$. The same holds for the harder two-axis case, where selecting receptive-field
+parameterisation on a disjoint validation bundle instead agrees with the test-set choice in $635$
+of the $640$ cells of this run ($16$ seeds $\times\,8$ budgets $\times\,5$ noise levels) and leaves
+every aggregate ratio unchanged to three significant figures --- the oracle is worth nothing
+measurable. Both columns come from the same fitted models, so the two protocols cannot drift. The same holds for the harder two-axis case, where selecting receptive-field
 radius \emph{and} parameterisation on validation --- six configurations rather than two --- agrees
 in $54$ of $60$ cells and is worth $0.996\times$. Reporting the
 noise-predicting parameterisation alone would overstate the network's deficit by $15$--$30\%$,
@@ -721,10 +722,11 @@ since predicting the clean signal is better at $t\in\{0.8,1.6\}$ at every budget
 Sources: the network and EM--BP columns are computed from
 \codefile{outputs/replicates/merged\_raw.csv}, which is the per-noise-level record --- take the
 smaller of the two parameterisations' \texttt{score\_rel\_l2} at each $(\nseq,\text{seed},t)$,
-average over $t$, then over the six seeds, the spread across seeds giving the standard error. The
-aggregated \codefile{outputs/replicates/merged\_summary.csv} is averaged over $t$ already and so
-cannot reproduce the network column, only the EM--BP one. The validation check is
-\codefile{outputs/exp\_07\_em\_vs\_score\_network/sample\_efficiency\_val.csv}. Empirical, six
+average over $t$, then over the \textbf{sixteen} seeds, the spread across seeds giving the
+standard error. Both the validation-selected and the test-oracle column come from
+\codefile{outputs/final\_em/merged\_reps\_16seed.csv}, merged from the sixteen per-seed records of
+Bocconi array \texttt{621771} at commit \texttt{78b6466}; a per-noise-level record is required,
+since averaging over $t$ first destroys the selection information. Empirical, sixteen
 replicates.}
 \label{tab:pointwise}
 \centering
@@ -732,18 +734,20 @@ replicates.}
 \toprule
 sequences $\nseq$ & network ($25{,}248$ params) & EM--BP ($12$ free) & ratio \\
 \midrule
-32   & $0.6070 \pm 0.0040$ & $\mathbf{0.0651 \pm 0.0031}$ & $9.3$ \\
-128  & $0.4700 \pm 0.0023$ & $\mathbf{0.0333 \pm 0.0035}$ & $14.1$ \\
-512  & $0.2361 \pm 0.0016$ & $\mathbf{0.0211 \pm 0.0022}$ & $11.2$ \\
-1024 & $0.1736 \pm 0.0009$ & $\mathbf{0.0182 \pm 0.0021}$ & $9.5$ \\
-2048 & $0.1372 \pm 0.0010$ & $\mathbf{0.0142 \pm 0.0009}$ & $9.7$ \\
-4096 & $0.1240 \pm 0.0003$ & $\mathbf{0.0124 \pm 0.0005}$ & $10.0$ \\
+32   & $0.6272 \pm 0.0029$ & $\mathbf{0.0692 \pm 0.0034}$ & $9.1$ \\
+128  & $0.4965 \pm 0.0020$ & $\mathbf{0.0349 \pm 0.0018}$ & $14.2$ \\
+256  & $0.3693 \pm 0.0018$ & $\mathbf{0.0248 \pm 0.0015}$ & $14.9$ \\
+512  & $0.2633 \pm 0.0012$ & $\mathbf{0.0215 \pm 0.0014}$ & $12.3$ \\
+1024 & $0.1866 \pm 0.0008$ & $\mathbf{0.0169 \pm 0.0009}$ & $11.0$ \\
+2048 & $0.1460 \pm 0.0007$ & $\mathbf{0.0139 \pm 0.0005}$ & $10.5$ \\
+4096 & $0.1219 \pm 0.0006$ & $\mathbf{0.0129 \pm 0.0004}$ & $9.4$ \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-Table~\ref{tab:pointwise} and Figure~\ref{fig:efficiency} show a ratio between $9$ and $14$
-across seven doublings of the data, with no trend in the budget. The scoped statement this
+Table~\ref{tab:pointwise} and Figure~\ref{fig:efficiency} show a ratio between $9$ and $15$
+across seven doublings of the data, peaking near $\nseq=256$ and narrowing at both ends rather
+than holding flat. The scoped statement this
 supports is: \emph{under the correctly specified Markov model and at the data budgets tested, the
 structured estimator is more sample-efficient in pointwise denoising than the neural baselines we
 trained}. The network at $\nseq=4096$ did not reach the error the estimator attains at

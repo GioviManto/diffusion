@@ -1,0 +1,65 @@
+{
+  "n_sites": 32,
+  "rho_true": 0.8,
+  "grid_half_width": 8.0,
+  "t_train": [
+    0.1,
+    0.2,
+    0.4,
+    0.8,
+    1.6
+  ],
+  "n_components": 4,
+  "n_test": 256,
+  "n_val": 256,
+  "test_tag": "exp07-test",
+  "val_tag": "exp07-val",
+  "parameterizations": [
+    "eps",
+    "x0"
+  ],
+  "quick": true,
+  "parts": [
+    "sample_efficiency_val"
+  ],
+  "overrides": [],
+  "grid_size": 201,
+  "sizes": [
+    64,
+    256
+  ],
+  "net_hidden": [
+    64,
+    64
+  ],
+  "net_steps": 1500,
+  "archs": "((32, 32), (128, 128))",
+  "step_counts": [
+    1000,
+    4000
+  ],
+  "capacity_n": 256,
+  "t_probe": [
+    0.05,
+    0.2,
+    0.8,
+    3.0
+  ],
+  "inference_batches": [
+    32,
+    128
+  ],
+  "seed": 0,
+  "timestamp": "2026-08-11 08:53:24",
+  "git_commit": "",
+  "git_branch": "",
+  "git_dirty": "",
+  "python": "3.13.11",
+  "numpy": "2.5.1",
+  "platform": "Linux-5.14.0-687.5.3.el9_8.x86_64-x86_64-with-glibc2.34",
+  "hostname": "cnode05",
+  "slurm_job_id": "621761",
+  "slurm_array_task_id": "",
+  "cpu_count": "40",
+  "blas_threads": "4"
+}

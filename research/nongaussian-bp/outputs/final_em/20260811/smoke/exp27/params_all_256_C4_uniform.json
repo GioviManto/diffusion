@@ -1,0 +1,51 @@
+{
+  "n_sites": 32,
+  "rho_true": 0.85,
+  "grid_half_width": 8.0,
+  "noise_designs": {
+    "low": [
+      0.1,
+      0.2
+    ],
+    "uniform": [
+      0.1,
+      0.2,
+      0.4,
+      0.8,
+      1.6
+    ],
+    "high": [
+      0.8,
+      1.6
+    ]
+  },
+  "quick": true,
+  "parts": [
+    "trace"
+  ],
+  "overrides": [],
+  "sizes": [
+    256
+  ],
+  "components": [
+    4
+  ],
+  "designs": [
+    "uniform"
+  ],
+  "n_seeds": 1,
+  "n_updates": 40,
+  "grid_size": 201,
+  "timestamp": "2026-08-11 08:52:49",
+  "git_commit": "",
+  "git_branch": "",
+  "git_dirty": "",
+  "python": "3.13.11",
+  "numpy": "2.5.1",
+  "platform": "Linux-5.14.0-687.5.3.el9_8.x86_64-x86_64-with-glibc2.34",
+  "hostname": "cnode05",
+  "slurm_job_id": "621761",
+  "slurm_array_task_id": "",
+  "cpu_count": "40",
+  "blas_threads": "4"
+}
