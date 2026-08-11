@@ -28,10 +28,14 @@ EM_FILES=(experiments/exp_27_shape_convergence.py src/clean_mle.py
 WAVELET_FILES=(src/wavelet.py src/wavelet_bp.py src/video_bp.py src/video_model.py
                src/image_data.py experiments/exp_23_wavelet_statistics.py
                experiments/exp_26_video.py hpc/bocconi_wavelet.sbatch)
+# Downloaded datasets live on the cluster and in nobody's branch, so --delete ate a 163 MB
+# CIFAR tarball too and a wavelet job died 10 seconds in for want of it. Data is checked like
+# code, and excluded from the push so a laptop copy can never overwrite the cluster's.
+DATA_FILES=(data/cifar-10-python.tar.gz)
 
 verify() {
     local missing=0
-    for f in "${EM_FILES[@]}" "${WAVELET_FILES[@]}"; do
+    for f in "${EM_FILES[@]}" "${WAVELET_FILES[@]}" "${DATA_FILES[@]}"; do
         ssh -o BatchMode=yes "$HOST" "test -e '$REMOTE/research/nongaussian-bp/$f'" \
             || { echo "MISSING on cluster: $f"; missing=1; }
     done
@@ -40,7 +44,8 @@ verify() {
     else
         echo
         echo "Restore from the branch that owns them before submitting anything."
-        echo "The wavelet/video files live in the eloquent-wu-07a351 worktree."
+        echo "The wavelet/video files live in the eloquent-wu-07a351 worktree;"
+        echo "data/ is a download -- see the curl command in hpc/bocconi_wavelet.sbatch."
     fi
     return $missing
 }
@@ -54,7 +59,7 @@ fi
 
 echo "syncing $(git rev-parse --short HEAD 2>/dev/null || echo 'no-git') -> $HOST:$REMOTE"
 rsync -az --exclude '.git' --exclude '.claude' --exclude '__pycache__' \
-      --exclude '*.pyc' --exclude '.venv' --exclude 'outputs/final_em' \
+      --exclude '*.pyc' --exclude '.venv' --exclude 'outputs/final_em' --exclude 'data' \
       ./ "$HOST:$REMOTE/research/nongaussian-bp/"
 [[ -d ../../tools ]] && rsync -az ../../tools/ "$HOST:$REMOTE/tools/"
 echo "synced. verifying..."
