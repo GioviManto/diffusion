@@ -2,31 +2,28 @@
   "settings": {
     "archive": "data/cifar-10-python.tar.gz",
     "levels": 5,
-    "n_train": 300,
-    "n_test": 200,
+    "n_train": 80,
+    "n_test": 60,
     "n_frames": 6,
     "max_speed": 1,
     "t_train": [
       0.6
     ],
     "t_likelihood": 0.6,
-    "n_iters": 8,
-    "t_resolve": 0.05,
+    "n_iters": 3,
+    "t_resolve": 0.3,
     "half_width": 8.0,
     "n_components": 4,
     "spatial_family": "gaussian",
-    "n_generate": 400,
+    "n_generate": 100,
     "chunk": 16,
     "seed": 0
   },
   "parts": [
-    "fit",
-    "coherence",
-    "structure",
-    "strip"
+    "cutcurve"
   ],
   "provenance": {
-    "timestamp": "2026-08-10 15:46:32",
+    "timestamp": "2026-08-11 07:47:14",
     "python": "3.12.5",
     "numpy": "2.4.2",
     "platform": "macOS-14.1.1-arm64-arm-64bit",

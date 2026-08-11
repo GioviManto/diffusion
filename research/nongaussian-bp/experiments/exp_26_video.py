@@ -329,8 +329,94 @@ def part_structure(settings, out_dir):
     return rows
 
 
+def _coupled_fraction_at_cut(videos, levels, cut):
+    """Variance fraction a cut-`cut` forest can couple in time.
+
+    Cutting below depth c leaves the top piece (whose best single node is the
+    depth-0 root) and one component per depth-c node, so *every* depth-c
+    coefficient becomes couplable. Hence root variance plus the whole of level c,
+    plus LL, which is its own component either way.
+    """
+    flat = videos.reshape(-1, *videos.shape[2:])
+    qt, nodes, scaling = images_to_tree(flat, levels)
+    depth_of = qt.node_depth
+    per_depth = np.zeros(qt.depth + 1)
+    for oi in range(3):
+        for d in range(qt.depth + 1):
+            blk = nodes[:, oi, depth_of == d]
+            per_depth[d] += float(blk.var() * blk.shape[1])
+    ll = float(scaling.var() * scaling.shape[1])
+    total = per_depth.sum() + ll
+    coupled = per_depth[0] + (0.0 if cut == 0 else per_depth[cut])
+    return (coupled + ll) / total
+
+
+def part_cutcurve(settings, out_dir):
+    """The space-for-time trade, measured rather than predicted.
+
+    Cutting the spatial tree buys temporal edges but *removes real spatial
+    dependence*, so coherence and likelihood pull in opposite directions. The
+    likelihood is the arbiter: a cut that improves coherence while costing
+    likelihood is a more coherent model, not a better one. Both are reported and
+    neither is allowed to stand for the other.
+    """
+    train, test = _data(settings)
+    depth = settings["levels"] - 1
+    rows = []
+
+    for cut in range(depth + 1):
+        t0 = time.perf_counter()
+        model, trace = fit_video_tree(
+            train, levels=settings["levels"], t_train=list(settings["t_train"]),
+            kernel_factory=_spatial_factory(settings),
+            time_kernel_factory=lambda r: GaussianAR1Kernel(rho=0.3, q=0.8),
+            n_iters=settings["n_iters"], half_width=settings["half_width"],
+            t_resolve=settings["t_resolve"],
+            cut_depth=cut, chunk=settings["chunk"],
+        )
+        secs = time.perf_counter() - t0
+        res = model.resolution_report(settings["t_likelihood"])
+        t_ll = max(settings["t_likelihood"], res["min_resolved_t"])
+        ll = model.log_likelihood_videos(test, t_ll, chunk=settings["chunk"])
+        rng = rng_for("exp26", "cutgen", cut, settings["seed"])
+        gen = model.sample_ancestral(
+            settings["n_generate"], settings["n_frames"], rng
+        )
+        fde = frame_difference_energy(gen)
+        frac = _coupled_fraction_at_cut(train, settings["levels"], cut)
+        rows.append({
+            "cut_depth": cut,
+            "components_per_orientation": 1 if cut == 0 else 1 + 4**cut,
+            "spatial_edges_severed_per_frame": 0 if cut == 0 else 3 * 4**cut,
+            "coupled_variance_fraction": frac,
+            "coherence_floor": 2.0 * (1.0 - frac),
+            "rho_time_top": float(model.k_time.rho),
+            "rho_time_sub": (
+                float(model.k_time_sub.rho) if model.k_time_sub is not None
+                else float("nan")
+            ),
+            "monotone_violation": trace.monotone_violation,
+            "t_likelihood_used": t_ll,
+            "heldout_loglik_per_sequence": ll / len(test),
+            "frame_diff_energy_generated": fde,
+            "frame_diff_energy_real": frame_difference_energy(test),
+            "seconds": secs,
+        })
+        print(f"[cutcurve] cut={cut}: loglik/seq {ll / len(test):9.2f}  "
+              f"fde {fde:.4f} (floor {2.0 * (1.0 - frac):.4f})  "
+              f"rho_sub {rows[-1]['rho_time_sub']:.4f}  {secs:.0f}s", flush=True)
+
+    best_ll = max(rows, key=lambda r: r["heldout_loglik_per_sequence"])
+    best_fde = min(rows, key=lambda r: r["frame_diff_energy_generated"])
+    print(f"[cutcurve] best likelihood at cut={best_ll['cut_depth']}, "
+          f"best coherence at cut={best_fde['cut_depth']}")
+    write_csv(out_dir / "cutcurve.csv", rows)
+    return rows
+
+
 PARTS = {
     "fit": part_fit,
+    "cutcurve": part_cutcurve,
     "coherence": part_coherence,
     "structure": part_structure,
     "strip": part_strip,

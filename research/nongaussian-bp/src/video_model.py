@@ -127,11 +127,15 @@ class VideoTreeModel:
             np.exp(self.k_time_sub.log_transition_matrix(self.grids[c]))
             if c > 0 else k_top
         )
+        # The severed subtrees are rooted at depth c, so their chain's initial
+        # law lives on grids[c] -- not on the root grid, which is a different
+        # length entirely once the meshes differ by depth.
+        log_mu_sub = -0.5 * self.grids[c] ** 2 - 0.5 * _LOG_2PI
 
         for oi in range(3):
             means, ev, xs, xt, xb = cut_caterpillar_bp(
                 self.grids, self.weights, self._log_k_space(oi), k_top, k_sub,
-                self.log_root[oi], self.log_root[oi],
+                self.log_root[oi], log_mu_sub,
                 nodes_std[:, :, oi, :], alpha,
                 self.scales.delta_by_depth(oi, delta), self.qt.branching,
                 self.depth, c, chunk=chunk, want_stats=want_stats,

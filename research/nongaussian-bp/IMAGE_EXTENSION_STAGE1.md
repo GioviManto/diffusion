@@ -58,15 +58,23 @@ caterpillar — is, and BP on it matches a dense Gaussian solve to 10⁻⁸ usin
 passes the package already had. It is fitted by EM, generates video, and
 temporal coupling measurably helps.
 
-**And the video result is a ceiling, which is the most useful thing here** (§9.2).
-At most **one temporal edge per connected component** is loop-free — a second
-always closes a 4-cycle — and the wavelet frame has exactly four components. So
-**at most 4 of 1024 coefficients per frame can be temporally coupled in any exact
-model of this kind**, carrying 47 % of the variance. The caterpillar already
-couples all four and the best four, so it is optimal, and its coherence lands
-~5× worse than real video. That turns "can we do video exactly?" (yes, with this
-ceiling) into the sharper question of what *approximate* BP on the fully coupled
-graph buys against exact BP on the best tree.
+**And the video result is a ceiling** (§9.2). At most **one temporal edge per
+connected component** is loop-free — a second always closes a 4-cycle. That caps
+what any exact model of this kind can couple in time, and the cap is reached, so
+the model saturates its structural capacity rather than underfitting.
+
+**But the component count is a choice, and the caterpillar makes it badly**
+(§9.3). Severing spatial edges creates components, each of which may then carry
+its own temporal edge; a spanning forest has `Fn − c` edges however they are
+split, so space and time trade one for one and every point stays exact. Cutting
+the tree below depth 1 — **12 spatial edges out of ~1020** — gains **+87 nats
+per sequence** *and* takes coherence from 5.2× worse than real video to 3.3×.
+Both axes improve at once, because cross-scale spatial correlation is weak
+(ρ ≈ 0.2–0.3) while temporal correlation under motion is not (ρ_time = 0.999).
+So the honest headline is not "exact video costs 5×" — that was measured on a
+suboptimal member of the exact class — but that **the component count is a
+design parameter the budget makes measurable**, and choosing it well matters
+more than the exactness constraint costs.
 
 ---
 
@@ -828,6 +836,61 @@ makes the **loopy comparison the interesting experiment** rather than a
 formality. The question is no longer "can we do video exactly" (yes, and here is
 the ceiling) but "what does approximate BP on the fully coupled graph buy against
 exact BP on the best tree", which is now well-posed and quantitative.
+
+### 9.3 The caterpillar is not the best exact model — cutting beats it
+
+§9.2 says at most one temporal edge per connected component. The caterpillar has
+one component per orientation, so it couples the root and nothing else. But the
+component count is **a choice**: severing spatial edges makes more components,
+and each new one may carry its own temporal edge. The edge budget is exact — a
+spanning forest on *F* frames of *n* coefficients with *c* components has
+`Fn − c` edges, `F(n−c)` spatial and `c(F−1)` temporal — so space and time trade
+one for one, and **every point on the trade stays loop-free and exact**.
+
+Cutting below depth *c* leaves the top piece plus one subtree under each
+depth-*c* node, so all 4^c depth-*c* coefficients become couplable.
+`video_bp.cut_caterpillar_bp` implements it as a set of independent
+caterpillars, verified against a dense Gaussian solve built from the cut model's
+own recursion (posterior 10⁻⁸, evidence 10⁻⁷).
+
+I expected a trade-off — coherence bought at the likelihood's expense, since
+cutting removes real spatial dependence. **That is not what happens.**
+
+| cut | held-out loglik/seq | coherence | floor | ρ_time(sub) | edges cut |
+|---|---|---|---|---|---|
+| 0 (caterpillar) | −5946.5 | 1.090 | 1.127 | — | 0 |
+| **1** | **−5859.3** | **0.693** | 0.692 | 0.873 | 12 |
+| **2** | **−5850.0** | 0.847 | 0.804 | 0.674 | 48 |
+| 3 | −5948.9 | 0.960 | 0.895 | 0.369 | 192 |
+| 4 | −5965.4 | 1.053 | 0.989 | 0.300 | 768 |
+
+**Both axes improve, and the caterpillar is beaten on its own metric.** Cutting
+12 spatial edges out of ~1020 gains **+87 nats per sequence** *and* takes
+coherence from 1.090 to 0.693 — from 5.2× worse than real video to 3.3×. The
+likelihood optimum (cut 2, +96 nats) sits one level deeper than the coherence
+optimum (cut 1).
+
+The reason is visible in the fitted parameters and is specific to this data
+rather than universal. Cross-scale spatial correlation at the coarsest levels is
+weak (ρ ≈ 0.2–0.3, §5.1), while temporal correlation under rigid translation is
+enormous (ρ_time = 0.999 at the root, 0.873 at the depth-1 subtree roots).
+Trading a weak edge for a strong one is simply a good trade, and the budget says
+it is available one-for-one. On data with strong spatial structure and weak
+motion the curve would run the other way — which is the point: **the optimum is
+a property of the data, and the budget makes it measurable rather than
+guessed.**
+
+The measured coherence tracks the predicted floor closely (0.693 against 0.692
+at cut 1), so the model is again saturating its structural capacity — just at a
+better structure.
+
+**This revises §9.2's conclusion.** The ceiling on *any* loop-free model stands,
+but the caterpillar is not the model that attains it. "Exact BP on video costs
+5× the coherence" was measured on a suboptimal member of the exact class; the
+right statement is 3.3×, and finding it required treating the component count as
+a parameter rather than as given.
+
+---
 
 **What remains**: real video data; the loopy-BP comparison above; and measuring
 where on the space-time edge-budget curve the best trade-off sits.
