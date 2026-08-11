@@ -157,6 +157,26 @@ case "$MODE" in
         --set n_frames=6 --set t_resolve=0.05 --set n_generate=4000
     ;;
 
+  imagefit)
+    # exp_24 at full size. It is not part of `images` and was not part of any
+    # other mode either, so on 2026-08-12 it was the single experiment in the
+    # package with no outputs/ directory at all -- only the few seconds of it the
+    # smoke gate runs. That is the wrong thing to have missing: exp_24 is the
+    # Gaussian tree baseline, the second-order closure every non-Gaussian result
+    # on images is quoted against, and its own docstring calls it "worth having
+    # on its own".
+    #
+    # Defaults (n_train=2000, n_test=500, n_iters=25, families gaussian+mixture)
+    # rather than anything larger, because the point is the baseline, and
+    # `_factory` in exp_24 accepts only those two families -- it raises on
+    # anything else. exp_25 gained a third family (`scale_mixture`, on the
+    # src/scale_kernel.py added in the wavelet merge) and exp_24 did not follow.
+    # Whether the baseline should be extended to that kernel is a real question
+    # about the argument, not a submission detail, so it is left for a human.
+    "$PYTHON" -u experiments/exp_24_wavelet_fit.py \
+        --output-dir "$ROOT/outputs/exp_24_wavelet_fit"
+    ;;
+
   images)
     # Everything on real CIFAR in one slot: the gate, then each kernel family.
     # Sequential because the QOS cap makes an array unaffordable, not because
