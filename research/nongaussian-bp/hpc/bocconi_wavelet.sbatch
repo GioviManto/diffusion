@@ -91,8 +91,8 @@ if [ ! -s "$ARCHIVE" ]; then
     echo "missing $ARCHIVE" >&2
     echo "fetch it once on the login node:" >&2
     echo "  mkdir -p $(dirname "$ARCHIVE")" >&2
-    echo "  curl -L -o $ARCHIVE https://cave.cs.toronto.edu/kriz/cifar-10-python.tar.gz" >&2
-    echo "  md5sum $ARCHIVE   # expect c58f30108f718f92721af3b95e74349a" >&2
+    echo "  curl -L -o $ARCHIVE https://www.cs.toronto.edu/~kriz/cifar-10-python.tar.gz" >&2
+    echo "  md5sum $ARCHIVE   # expect c58f30108f718f92721af3b95e74349a -- REFUSE the file if it differs" >&2
     exit 2
 fi
 
