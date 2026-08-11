@@ -56,15 +56,22 @@ To re-execute one end to end and confirm it still reproduces:
 | [`06_pointwise_vs_generative.ipynb`](06_pointwise_vs_generative.ipynb) | **The headline.** Pointwise score accuracy does not determine generative fidelity. One estimator gets monotonically better at the first while its generated law collapses to a Gaussian. Includes the mechanism rebuilt in six lines, and a paired check that the corrected protocol touched only the arms it was meant to. |
 | [`07_when_the_prior_fails.ipynb`](07_when_the_prior_fails.ipynb) | **The boundary.** What happens when the Markov assumption is false. Rank-one contamination is survivable to $\beta=1.0$; long-range coupling is fatal by $\gamma\approx0.1$. Quantifies its own error bar from two zero-strength control cells, and says which conclusions survive it. |
 
+**Beyond the chain**
+
+| | |
+|---|---|
+| [`08_video_buying_time_with_space.ipynb`](08_video_buying_time_with_space.ipynb) | **The extension, and its price.** Exact BP needs a loop-free graph, so on video every temporal edge must be paid for by severing a spatial one. The held-out likelihood curve turns over — the optimum is interior — and the two axes you might optimise disagree about where it is (likelihood peaks at cut depth 2, generated coherence at depth 1). Ends with the limit stated plainly: the best model still generates motion $3.2\times$ more energetic than real video. |
+
 ---
 
 ## What is not here yet
 
 Honest gaps, so nobody assumes coverage that does not exist:
 
-- **The image and video extension** (`exp_23`–`exp_26`) has no notebook. The wavelet hidden
-  Markov tree on CIFAR, the per-depth grids, and the video cut-curve are documented in
-  `IMAGE_EXTENSION_STAGE1.md` and have committed outputs, but the narrative version is missing.
+- **The image side of the extension** (`exp_23`–`exp_25`) has no notebook. The wavelet hidden
+  Markov tree on CIFAR and the per-depth grids are documented in `IMAGE_EXTENSION_STAGE1.md`
+  and have committed outputs, but the narrative version is missing. Notebook 08 covers only the
+  video half (`exp_26`).
 - **Capacity and shape convergence** (`exp_16` components, `exp_22`, `exp_27`) — the saturation
   result ($C \approx 8$) and the settling behaviour live only in `CLAIMS_TO_UPDATE.md`.
 - **`exp_24`** (the Gaussian tree baseline on images) had no full run at all until 2026-08-12
