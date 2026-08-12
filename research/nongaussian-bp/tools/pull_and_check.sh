@@ -68,7 +68,13 @@ if [[ -d outputs/final_em ]]; then
     roots=$(ls -d outputs/final_em/*/ 2>/dev/null | wc -l | tr -d ' ')
     reps=$(ls outputs/final_em/*/.ok_reps_* 2>/dev/null | wc -l | tr -d ' ')
     rec=$(ls outputs/final_em/*/.ok_recovery_* 2>/dev/null | wc -l | tr -d ' ')
-    shp=$(find outputs/final_em/*/shape -name .ok_cell 2>/dev/null | wc -l | tr -d ' ')
+    # Exclude rerun cells (<tag>_u<N>) from the 18-cell baseline. They are extra
+    # traces of cells already counted, so folding them in reported "19/18" --
+    # which is not a completeness figure, it is two different things added up.
+    shp=$(find outputs/final_em/*/shape -name .ok_cell 2>/dev/null \
+          | grep -v '_u[0-9]*/' | wc -l | tr -d ' ')
+    rerun=$(find outputs/final_em/*/shape -name .ok_cell 2>/dev/null \
+            | grep -c '_u[0-9]*/' || true)
     printf "  run roots %s\n" "$roots"
     for spec in "reps:$reps:16" "recovery:$rec:4" "shape cells:$shp:18"; do
         name=${spec%%:*}; rest=${spec#*:}; have=${rest%%:*}; want=${rest##*:}
@@ -78,6 +84,10 @@ if [[ -d outputs/final_em ]]; then
             printf "  \033[33mpartial \033[0m  %-12s %s/%s\n" "$name" "$have" "$want"
         fi
     done
+    if [[ "${rerun:-0}" -gt 0 ]]; then
+        printf "  \033[36mextra   \033[0m  %-12s %s cell(s) at a non-default trace length\n" \
+               "reruns" "$rerun"
+    fi
     if [[ "$roots" -gt 1 ]]; then
         echo "  note: $roots dated run roots -- any tool reading one of them sees a subset."
     fi

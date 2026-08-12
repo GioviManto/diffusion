@@ -132,7 +132,10 @@ head_ "5. Sweep completeness -- is a run root silently half-present?"
 if [[ -d outputs/final_em ]]; then
     reps=$(ls outputs/final_em/*/.ok_reps_* 2>/dev/null | wc -l | tr -d ' ')
     rec=$(ls outputs/final_em/*/.ok_recovery_* 2>/dev/null | wc -l | tr -d ' ')
-    shp=$(find outputs/final_em/*/shape -name .ok_cell 2>/dev/null | wc -l | tr -d ' ')
+    # Rerun cells (<tag>_u<N>) are extra traces of cells already counted; folding
+    # them into the total reported "19/18", which is two things added together.
+    shp=$(find outputs/final_em/*/shape -name .ok_cell 2>/dev/null \
+          | grep -v '_u[0-9]*/' | wc -l | tr -d ' ')
     roots=$(ls -d outputs/final_em/*/ 2>/dev/null | wc -l | tr -d ' ')
     echo "        run roots=$roots  reps=$reps/16  recovery=$rec/4  shape cells=$shp/18"
     [[ "$reps" -eq 16 ]] && ok "reps complete (16 seeds across $roots roots)" \
