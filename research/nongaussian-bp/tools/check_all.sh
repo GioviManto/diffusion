@@ -109,6 +109,21 @@ else
     bad "README experiment range (disk has $n_exp experiments)"
 fi
 
+# A notebook written but never added to the index is invisible; an index entry
+# whose file was renamed is a dead link a reader hits before they hit the work.
+# Both are silent, and both have happened here.
+unlisted=0; broken=0
+for nb in notebooks/*.ipynb; do
+    grep -q "$(basename "$nb")" notebooks/README.md 2>/dev/null \
+        || { echo "        not in index: $(basename "$nb")"; unlisted=1; }
+done
+for link in $(grep -oE '\]\([0-9]{2}_[a-z_]+\.ipynb\)' notebooks/README.md 2>/dev/null \
+              | tr -d '])(' | sort -u); do
+    [[ -f "notebooks/$link" ]] || { echo "        dead index link: $link"; broken=1; }
+done
+[[ $unlisted -eq 0 && $broken -eq 0 ]] && ok "notebook index complete, links resolve" \
+                                       || bad "notebook index out of sync"
+
 # ---------------------------------------------------------------------------
 head_ "5. Sweep completeness -- is a run root silently half-present?"
 # ---------------------------------------------------------------------------
