@@ -54,14 +54,14 @@ To re-execute one end to end and confirm it still reproduces:
 | | |
 |---|---|
 | [`06_pointwise_vs_generative.ipynb`](06_pointwise_vs_generative.ipynb) | **The headline.** Pointwise score accuracy does not determine generative fidelity — shown inside a single estimator, where the MLP's pointwise error improves while its generated law collapses toward a Gaussian. Includes the mechanism rebuilt in six lines, a paired check that the corrected protocol touched only the arms it was meant to, and a confound section: the *between-arm* ranking holds only at `em_components=4` and reverses at `C=8`. **Read with 09.** |
-| [`09_how_much_capacity.ipynb`](09_how_much_capacity.ipynb) | **The knob underneath 06.** Held-out evidence saturates by $C\approx8$ and cost is flat, but the fitted innovation shape is still moving at $C=16$, and the generated law is blunter than the fitted kernel at every capacity. The arm ordering flips at exactly the $C$ that likelihood-based selection picks. Ends on the `em_iters=40` confound the project's own audit note raises. |
 | [`07_when_the_prior_fails.ipynb`](07_when_the_prior_fails.ipynb) | **The boundary.** What happens when the Markov assumption is false. Rank-one contamination is survivable to $\beta=1.0$; long-range coupling is fatal by $\gamma\approx0.1$. Quantifies its own error bar from two zero-strength control cells, and says which conclusions survive it. |
+| [`09_how_much_capacity.ipynb`](09_how_much_capacity.ipynb) | **The knob underneath 06.** Held-out evidence saturates by $C\approx8$ and cost is flat, but the fitted innovation shape is still moving at $C=16$, and the generated law is blunter than the fitted kernel at every capacity. The arm ordering flips at exactly the $C$ that likelihood-based selection picks. Ends on the `em_iters=40` confound the project's own audit note raises. |
 
 **Beyond the chain**
 
 | | |
 |---|---|
-| [`08_video_buying_time_with_space.ipynb`](08_video_buying_time_with_space.ipynb) | **The extension, and its price.** Exact BP needs a loop-free graph, so on video every temporal edge must be paid for by severing a spatial one. The held-out likelihood curve turns over — the optimum is interior — and the two axes you might optimise disagree about where it is (likelihood peaks at cut depth 2, generated coherence at depth 1). Ends with the limit stated plainly: the best model still generates motion $3.2\times$ more energetic than real video. |
+| [`08_video_buying_time_with_space.ipynb`](08_video_buying_time_with_space.ipynb) | **The extension, and its price.** Exact BP needs a loop-free graph, so on video every temporal edge must be paid for by severing a spatial one. The held-out likelihood curve turns over — the optimum is interior — and the two axes you might optimise disagree about where it is (likelihood peaks at cut depth 2, generated coherence at depth 1). Ends with the limit stated plainly: the best model still generates motion $3.2\times$ more energetic than the reference sequences, which are CIFAR frames with synthetic rigid motion rather than video. |
 
 ---
 
