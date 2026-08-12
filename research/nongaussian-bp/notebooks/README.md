@@ -73,8 +73,13 @@ To re-execute one end to end and confirm it still reproduces:
 Honest gaps, so nobody assumes coverage that does not exist:
 
 - **`exp_24`, the Gaussian tree baseline in *pixel* coordinates**, is the one image arm still
-  uncovered — notebook 10 works in the wavelet domain and uses `exp_23`/`exp_25`. Its first full
-  run was submitted 2026-08-12; check `outputs/exp_24_wavelet_fit/` before writing about it.
+  without a notebook — notebook 10 works in the wavelet domain and uses `exp_23`/`exp_25`. Its
+  first full run completed 2026-08-12 and the results are committed under
+  `outputs/exp_24_wavelet_fit/` (fit) and `exp_24_wavelet_fit_long/` (fit + denoise). Headline:
+  the tree denoiser beats the raw observation by 4x at t=0.2 and 42x at t=1.5 at noise levels it
+  was never fitted at, and the `mixture` kernel changes almost nothing either way — 3.5
+  nats/image worse at the fitting level, ~0.5% better on denoising MSE away from it. Consistent
+  with notebook 10: a flexible innovation shape does not help where the dependence is not.
 - **Notebook 09's capacity numbers should be read against notebook 12**, which measures the
   convergence confound 09 names. 09 has not been rewritten in light of it: the honest status of
   the capacity result is "not established", and saying so in 12 is more useful than quietly
