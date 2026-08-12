@@ -63,6 +63,7 @@ To re-execute one end to end and confirm it still reproduces:
 |---|---|
 | [`10_images_dependence_a_linear_kernel_cannot_see.ipynb`](10_images_dependence_a_linear_kernel_cannot_see.ipynb) | **First contact with real data.** CIFAR wavelet subbands are non-Gaussian by tens of standard errors, but the cross-scale dependence sits in *magnitude*, where a linear-AR kernel is structurally blind — measured against a matched linear-AR null. The flexible `mixture` kernel captures 0.9% of it and *loses* 48 nats/image against plain Gaussian; `scale_mixture` is the only one that moves the hierarchy, and reaches 25%. Diagnosis confirmed, cure partial. |
 | [`11_does_the_channel_destroy_shape_fastest.ipynb`](11_does_the_channel_destroy_shape_fastest.ipynb) | **A claim the project could not support, re-measured.** The original evidence compared two *second-order* quantities in a model with no shape parameter, so it could not speak to shape at all — an external review was right. With a genuine shape coordinate and nuisance-projected (efficient) information, the claim survives by 112×–1222×, two orders beyond what the old number suggested. The nuisance projection changes $\rho$'s decay fivefold and $\beta$'s barely at all. |
+| [`12_how_long_does_em_need.ipynb`](12_how_long_does_em_need.ipynb) | **The confound in 09, measured — and the measurement's own limit.** 93% of seed-rows had not settled in the innovation-shape coordinate by iteration 40, the budget every `exp_16` number uses. Convergence time is set by the *design*, not $N$ or $C$. And on the `high` design the 800-update trace ran out before the answer appeared — 17 of 72 rows censored, all of them in the one coordinate the generative metrics measure. Says plainly that the capacity result is *not yet established*, and is not refuted either. |
 | [`08_video_buying_time_with_space.ipynb`](08_video_buying_time_with_space.ipynb) | **The extension, and its price.** Exact BP needs a loop-free graph, so on video every temporal edge must be paid for by severing a spatial one. The held-out likelihood curve turns over — the optimum is interior — and the two axes you might optimise disagree about where it is (likelihood peaks at cut depth 2, generated coherence at depth 1). Ends with the limit stated plainly: the best model still generates motion $3.2\times$ more energetic than the reference sequences, which are CIFAR frames with synthetic rigid motion rather than video. |
 
 ---
@@ -74,9 +75,13 @@ Honest gaps, so nobody assumes coverage that does not exist:
 - **`exp_24`, the Gaussian tree baseline in *pixel* coordinates**, is the one image arm still
   uncovered — notebook 10 works in the wavelet domain and uses `exp_23`/`exp_25`. Its first full
   run was submitted 2026-08-12; check `outputs/exp_24_wavelet_fit/` before writing about it.
-- **Shape convergence** (`exp_27`) — the experiment built to settle whether `em_iters=40` is
-  enough was still running when notebook 09 was written, so 09 ends by naming the confound
-  rather than resolving it. When `outputs/final_em/*/shape/` is complete, 09 should be revisited.
+- **Notebook 09's capacity numbers should be read against notebook 12**, which measures the
+  convergence confound 09 names. 09 has not been rewritten in light of it: the honest status of
+  the capacity result is "not established", and saying so in 12 is more useful than quietly
+  restating 09.
+- **The `high`-design convergence time is still unknown** — the 800-update trace censored it. A
+  2400-update rerun was submitted 2026-08-12 (`623904`, `623905`); re-execute notebook 12 when
+  `outputs/final_em/*/shape/*_u2400/` lands and its final cell will fill in.
 
 ## Conventions
 
