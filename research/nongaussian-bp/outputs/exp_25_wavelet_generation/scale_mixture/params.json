@@ -2,39 +2,43 @@
   "settings": {
     "archive": "data/cifar-10-python.tar.gz",
     "levels": 5,
-    "n_train": 1000,
-    "n_test": 1000,
-    "n_frames": 6,
-    "max_speed": 1,
+    "n_train": 2000,
+    "n_test": 5000,
     "t_train": [
-      0.6
+      0.3,
+      0.6,
+      1.0
     ],
-    "t_likelihood": 0.6,
-    "n_iters": 12,
+    "t_likelihood": 0.05,
+    "n_iters": 20,
     "t_resolve": 0.05,
     "half_width": 8.0,
     "n_components": 4,
-    "spatial_family": "gaussian",
-    "n_generate": 4000,
-    "cuts": [
-      2
+    "families": [
+      "scale_mixture"
     ],
-    "chunk": 16,
+    "n_generate": 10000,
+    "n_reverse": 128,
+    "reverse_steps": 150,
+    "chunk": 64,
     "seed": 0
   },
   "parts": [
-    "cutcurve"
+    "fit",
+    "generate",
+    "sampler",
+    "grid"
   ],
   "provenance": {
-    "timestamp": "2026-08-12 16:18:44",
+    "timestamp": "2026-08-12 17:00:34",
     "git_commit": "",
     "git_branch": "",
     "git_dirty": "",
     "python": "3.13.11",
     "numpy": "2.5.1",
     "platform": "Linux-5.14.0-687.5.3.el9_8.x86_64-x86_64-with-glibc2.34",
-    "hostname": "cnode02",
-    "slurm_job_id": "623283",
+    "hostname": "cnode03",
+    "slurm_job_id": "623282",
     "slurm_array_task_id": "",
     "cpu_count": "24",
     "blas_threads": "8"

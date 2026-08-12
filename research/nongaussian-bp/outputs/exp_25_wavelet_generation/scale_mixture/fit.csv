@@ -1,0 +1,2 @@
+family,n_train,seconds,em_iters,monotone_violation,final_train_log_evidence,t_likelihood_requested,t_likelihood_used,min_resolved_t,min_points_per_std_at_requested_t,heldout_loglik_per_image,magnitude_ratio_d0,magnitude_ratio_d1,magnitude_ratio_d2,magnitude_ratio_d3
+scale_mixture,2000,6233.898892517202,20,0.0,-14093896.549231539,0.05,0.05,0.04997732519165315,3.0007150626064854,-470.88040320300513,1.3281558299979894,1.5502279694656511,1.4934267448333032,1.2674455974469365

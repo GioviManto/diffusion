@@ -1,0 +1,2 @@
+family,n_generate,kurtosis_mean_abs_gap,kurtosis_mean_signed_gap,kurtosis_worst_abs_gap,magnitude_excess_mean_abs_gap,magnitude_excess_mean_signed_gap,mean_magnitude_excess_generated,mean_magnitude_excess_real
+scale_mixture,10000,1.3404968793305885,-1.2971760053439274,4.018832157968687,0.6858119622582723,-0.6596160389678108,0.3099348873404599,0.9695509263082708
