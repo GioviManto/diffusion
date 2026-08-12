@@ -53,7 +53,8 @@ To re-execute one end to end and confirm it still reproduces:
 
 | | |
 |---|---|
-| [`06_pointwise_vs_generative.ipynb`](06_pointwise_vs_generative.ipynb) | **The headline.** Pointwise score accuracy does not determine generative fidelity. One estimator gets monotonically better at the first while its generated law collapses to a Gaussian. Includes the mechanism rebuilt in six lines, and a paired check that the corrected protocol touched only the arms it was meant to. |
+| [`06_pointwise_vs_generative.ipynb`](06_pointwise_vs_generative.ipynb) | **The headline.** Pointwise score accuracy does not determine generative fidelity — shown inside a single estimator, where the MLP's pointwise error improves while its generated law collapses toward a Gaussian. Includes the mechanism rebuilt in six lines, a paired check that the corrected protocol touched only the arms it was meant to, and a confound section: the *between-arm* ranking holds only at `em_components=4` and reverses at `C=8`. **Read with 09.** |
+| [`09_how_much_capacity.ipynb`](09_how_much_capacity.ipynb) | **The knob underneath 06.** Held-out evidence saturates by $C\approx8$ and cost is flat, but the fitted innovation shape is still moving at $C=16$, and the generated law is blunter than the fitted kernel at every capacity. The arm ordering flips at exactly the $C$ that likelihood-based selection picks. Ends on the `em_iters=40` confound the project's own audit note raises. |
 | [`07_when_the_prior_fails.ipynb`](07_when_the_prior_fails.ipynb) | **The boundary.** What happens when the Markov assumption is false. Rank-one contamination is survivable to $\beta=1.0$; long-range coupling is fatal by $\gamma\approx0.1$. Quantifies its own error bar from two zero-strength control cells, and says which conclusions survive it. |
 
 **Beyond the chain**
@@ -72,8 +73,10 @@ Honest gaps, so nobody assumes coverage that does not exist:
   Markov tree on CIFAR and the per-depth grids are documented in `IMAGE_EXTENSION_STAGE1.md`
   and have committed outputs, but the narrative version is missing. Notebook 08 covers only the
   video half (`exp_26`).
-- **Capacity and shape convergence** (`exp_16` components, `exp_22`, `exp_27`) — the saturation
-  result ($C \approx 8$) and the settling behaviour live only in `CLAIMS_TO_UPDATE.md`.
+- **Shape convergence** (`exp_27`) — the experiment built to settle whether `em_iters=40` is
+  enough was still running when notebook 09 was written, so 09 ends by naming the confound
+  rather than resolving it. When `outputs/final_em/*/shape/` is complete, 09 should be revisited.
+- **Higher-order information** (`exp_22`) has no notebook.
 - **`exp_24`** (the Gaussian tree baseline on images) had no full run at all until 2026-08-12
   and its outputs may still be landing; check `outputs/exp_24_wavelet_fit/` before writing
   anything that depends on it.
