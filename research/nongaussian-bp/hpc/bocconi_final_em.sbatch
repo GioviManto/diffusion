@@ -144,6 +144,10 @@ mode_min_minutes() {
 slurm_time_to_minutes() {
     local t="$1" d=0 h=0 m=0 s=0
     if [ "$t" = "UNLIMITED" ] || [ -z "$t" ]; then echo 999999; return; fi
+    # Reject anything that is not digits, colons and dashes before it reaches the
+    # arithmetic. A bad $(( )) is a fatal shell error under `set -e` that no
+    # `|| echo 0` at the call site can catch, so it has to be refused here.
+    case "$t" in *[!0-9:-]*) echo 0; return ;; esac
     case "$t" in *-*) d=${t%%-*}; t=${t#*-} ;; esac
     local IFS=:
     # shellcheck disable=SC2086
@@ -157,22 +161,40 @@ slurm_time_to_minutes() {
              + ( 10#${s:-0} > 0 ? 1 : 0 ) ))
 }
 
+# `head -n1` is load-bearing. For an array job `squeue -j` can print one row per
+# task, and without it the values concatenate: on 2026-08-12 task 622854_2 read
+# its own limit as "6:00:006:00:006:00:00", parsed that as 0 minutes, and refused
+# to start a job whose walltime was in fact correct. Its two siblings, which
+# happened to query at a moment when only one row matched, ran fine.
 GRANTED_RAW=$(squeue -h -j "${SLURM_JOB_ID:-0}" -o "%l" 2>/dev/null \
-              | tr -d '[:space:]' || true)
+              | head -n1 | tr -d '[:space:]' || true)
 if [ -n "${GRANTED_RAW:-}" ]; then
-    GRANTED=$(slurm_time_to_minutes "$GRANTED_RAW")
+    # `|| echo 0` so a string the parser cannot handle at all becomes the
+    # fail-open case below rather than an arithmetic error that aborts under
+    # `set -e` -- which would be the same false positive by another route.
+    GRANTED=$(slurm_time_to_minutes "$GRANTED_RAW" 2>/dev/null || echo 0)
+    GRANTED=${GRANTED:-0}
     NEED=$(mode_min_minutes "$MODE")
-    if [ "$GRANTED" -lt "$NEED" ]; then
+    if [ "$GRANTED" -le 0 ]; then
+        # Unparseable. This guard exists to catch a mis-parameterised submission,
+        # so it must not become an independent way to lose a good one: a real
+        # too-short walltime parses fine, and anything that does not parse is a
+        # bug here rather than evidence about the allocation. Warn and proceed.
+        echo "preflight: could not parse walltime '${GRANTED_RAW}' -- proceeding" \
+             "unchecked (mode=$MODE, partition=${SLURM_JOB_PARTITION:-unknown})" >&2
+    elif [ "$GRANTED" -lt "$NEED" ]; then
         echo "REFUSING TO START: mode=$MODE was granted ${GRANTED_RAW}" \
              "(${GRANTED} min) on partition ${SLURM_JOB_PARTITION:-unknown}," \
              "but needs at least ${NEED} min." >&2
         echo "  Nothing here checkpoints. Starting would burn the allocation" \
              "and write no usable output. Resubmit on a partition that can" \
-             "grant it: compute has MaxTime=3-00:10:00, defq only 1-00:10:00." >&2
+             "grant it: compute has MaxTime=3-00:10:00, medium_cpu 06:10:00," \
+             "defq only 1-00:10:00." >&2
         exit 78
+    else
+        echo "preflight ok: mode=$MODE granted=${GRANTED_RAW} (${GRANTED} min)" \
+             "partition=${SLURM_JOB_PARTITION:-unknown}"
     fi
-    echo "preflight ok: mode=$MODE granted=${GRANTED_RAW} (${GRANTED} min)" \
-         "partition=${SLURM_JOB_PARTITION:-unknown}"
 fi
 
 echo "host=$(hostname) mode=$MODE task=$TASK cpus=${SLURM_CPUS_PER_TASK:-?} \
