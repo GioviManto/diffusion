@@ -62,6 +62,7 @@ To re-execute one end to end and confirm it still reproduces:
 | | |
 |---|---|
 | [`10_images_dependence_a_linear_kernel_cannot_see.ipynb`](10_images_dependence_a_linear_kernel_cannot_see.ipynb) | **First contact with real data.** CIFAR wavelet subbands are non-Gaussian by tens of standard errors, but the cross-scale dependence sits in *magnitude*, where a linear-AR kernel is structurally blind — measured against a matched linear-AR null. The flexible `mixture` kernel captures 0.9% of it and *loses* 48 nats/image against plain Gaussian; `scale_mixture` is the only one that moves the hierarchy, and reaches 25%. Diagnosis confirmed, cure partial. |
+| [`11_does_the_channel_destroy_shape_fastest.ipynb`](11_does_the_channel_destroy_shape_fastest.ipynb) | **A claim the project could not support, re-measured.** The original evidence compared two *second-order* quantities in a model with no shape parameter, so it could not speak to shape at all — an external review was right. With a genuine shape coordinate and nuisance-projected (efficient) information, the claim survives by 112×–1222×, two orders beyond what the old number suggested. The nuisance projection changes $\rho$'s decay fivefold and $\beta$'s barely at all. |
 | [`08_video_buying_time_with_space.ipynb`](08_video_buying_time_with_space.ipynb) | **The extension, and its price.** Exact BP needs a loop-free graph, so on video every temporal edge must be paid for by severing a spatial one. The held-out likelihood curve turns over — the optimum is interior — and the two axes you might optimise disagree about where it is (likelihood peaks at cut depth 2, generated coherence at depth 1). Ends with the limit stated plainly: the best model still generates motion $3.2\times$ more energetic than the reference sequences, which are CIFAR frames with synthetic rigid motion rather than video. |
 
 ---
@@ -76,7 +77,6 @@ Honest gaps, so nobody assumes coverage that does not exist:
 - **Shape convergence** (`exp_27`) — the experiment built to settle whether `em_iters=40` is
   enough was still running when notebook 09 was written, so 09 ends by naming the confound
   rather than resolving it. When `outputs/final_em/*/shape/` is complete, 09 should be revisited.
-- **Higher-order information** (`exp_22`) has no notebook.
 
 ## Conventions
 
