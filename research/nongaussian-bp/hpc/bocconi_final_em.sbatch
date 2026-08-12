@@ -14,18 +14,27 @@
 # and 10 RUNNING tasks per user, so no single submission may exceed 30 and the
 # waves below are sized to stay under it together.
 #
+# Pin the run root ONCE, before wave 1, and pass it to every wave. See the
+# RUN_STAMP note further down for what happens if you do not.
+#   S=$(date +%Y%m%d)
+#
 # Wave 1 (submit together, 20 tasks):
 #   GATE=$(sbatch --parsable --partition=medium_cpu --time=00:45:00 \
-#          --export=ALL,MODE=smoke hpc/bocconi_final_em.sbatch)
+#          --export=ALL,RUN_STAMP=$S,MODE=smoke hpc/bocconi_final_em.sbatch)
 #   sbatch --dependency=afterok:$GATE --array=0-15%8 --cpus-per-task=4 --mem=12G \
-#          --export=ALL,MODE=reps hpc/bocconi_final_em.sbatch
+#          --export=ALL,RUN_STAMP=$S,MODE=reps hpc/bocconi_final_em.sbatch
 #   sbatch --dependency=afterok:$GATE --array=0-3%4 --time=1-12:00:00 \
-#          --export=ALL,MODE=recovery hpc/bocconi_final_em.sbatch
+#          --export=ALL,RUN_STAMP=$S,MODE=recovery hpc/bocconi_final_em.sbatch
 #
 # Wave 2 (all 18 shape cells, packed 6 to a job -- only 3 tasks):
 #   sbatch --array=0-2 --cpus-per-task=12 --mem=64G --time=1-00:00:00 \
-#          --nice=200 --export=ALL,MODE=shape,CELLS_PER_TASK=6 \
+#          --nice=200 --export=ALL,RUN_STAMP=$S,MODE=shape,CELLS_PER_TASK=6 \
 #          hpc/bocconi_final_em.sbatch
+#
+# `shape` also runs happily on medium_cpu (PriorityJobFactor 200 against
+# compute's 10, and a far shorter queue): six cells in parallel finish well
+# inside the 6:10:00 cap. Use --partition=medium_cpu --time=06:00:00 when
+# compute is congested -- that is what got wave 2 started on 2026-08-12.
 #
 # The --nice=200 is deliberate: wave 2 must yield to wave 1. Both waves fit
 # under the 30-submit ceiling at once now (20 + 3), but the 10-RUNNING ceiling
@@ -81,7 +90,27 @@ export MKL_NUM_THREADS="$OMP_NUM_THREADS"
 
 TASK=${SLURM_ARRAY_TASK_ID:-0}
 MODE=${MODE:-smoke}
-STAMP=$(date +%Y%m%d)
+# ---------------------------------------------------------------------------
+# The run root, and a trap it set on 2026-08-12.
+#
+# STAMP used to be an unconditional `date +%Y%m%d`, evaluated inside each task at
+# the moment that task started. A sweep whose tasks are throttled (%8) does not
+# start all at once, so the 16-task `reps` array straddled midnight and wrote 12
+# seeds into outputs/final_em/20260811/ and 4 into 20260812/. Nothing failed and
+# nothing warned; the sweep is simply in two places. Anything that globs a single
+# date silently reads 12 of 16 seeds and reports a complete-looking table.
+#
+# RUN_STAMP makes the root an input rather than a side effect of when a node
+# happened to free up. Pass the same value to every wave of one sweep:
+#
+#   S=$(date +%Y%m%d)
+#   sbatch --export=ALL,RUN_STAMP=$S,MODE=reps ...
+#
+# The default is kept so an un-exported submission still works, but a sweep that
+# matters should set it. Merge steps should glob outputs/final_em/*/ regardless,
+# since the split runs already on disk cannot be un-split.
+# ---------------------------------------------------------------------------
+STAMP=${RUN_STAMP:-$(date +%Y%m%d)}
 RUN_ROOT="outputs/final_em/${STAMP}"
 
 # ---------------------------------------------------------------------------
