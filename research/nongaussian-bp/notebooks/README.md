@@ -61,6 +61,7 @@ To re-execute one end to end and confirm it still reproduces:
 
 | | |
 |---|---|
+| [`10_images_dependence_a_linear_kernel_cannot_see.ipynb`](10_images_dependence_a_linear_kernel_cannot_see.ipynb) | **First contact with real data.** CIFAR wavelet subbands are non-Gaussian by tens of standard errors, but the cross-scale dependence sits in *magnitude*, where a linear-AR kernel is structurally blind — measured against a matched linear-AR null. The flexible `mixture` kernel captures 0.9% of it and *loses* 48 nats/image against plain Gaussian; `scale_mixture` is the only one that moves the hierarchy, and reaches 25%. Diagnosis confirmed, cure partial. |
 | [`08_video_buying_time_with_space.ipynb`](08_video_buying_time_with_space.ipynb) | **The extension, and its price.** Exact BP needs a loop-free graph, so on video every temporal edge must be paid for by severing a spatial one. The held-out likelihood curve turns over — the optimum is interior — and the two axes you might optimise disagree about where it is (likelihood peaks at cut depth 2, generated coherence at depth 1). Ends with the limit stated plainly: the best model still generates motion $3.2\times$ more energetic than the reference sequences, which are CIFAR frames with synthetic rigid motion rather than video. |
 
 ---
@@ -69,17 +70,13 @@ To re-execute one end to end and confirm it still reproduces:
 
 Honest gaps, so nobody assumes coverage that does not exist:
 
-- **The image side of the extension** (`exp_23`–`exp_25`) has no notebook. The wavelet hidden
-  Markov tree on CIFAR and the per-depth grids are documented in `IMAGE_EXTENSION_STAGE1.md`
-  and have committed outputs, but the narrative version is missing. Notebook 08 covers only the
-  video half (`exp_26`).
+- **`exp_24`, the Gaussian tree baseline in *pixel* coordinates**, is the one image arm still
+  uncovered — notebook 10 works in the wavelet domain and uses `exp_23`/`exp_25`. Its first full
+  run was submitted 2026-08-12; check `outputs/exp_24_wavelet_fit/` before writing about it.
 - **Shape convergence** (`exp_27`) — the experiment built to settle whether `em_iters=40` is
   enough was still running when notebook 09 was written, so 09 ends by naming the confound
   rather than resolving it. When `outputs/final_em/*/shape/` is complete, 09 should be revisited.
 - **Higher-order information** (`exp_22`) has no notebook.
-- **`exp_24`** (the Gaussian tree baseline on images) had no full run at all until 2026-08-12
-  and its outputs may still be landing; check `outputs/exp_24_wavelet_fit/` before writing
-  anything that depends on it.
 
 ## Conventions
 
