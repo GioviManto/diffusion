@@ -1,0 +1,2 @@
+cut_depth,components_per_orientation,spatial_edges_severed_per_frame,coupled_variance_fraction,coherence_floor,rho_time_top,rho_time_sub,monotone_violation,t_likelihood_used,heldout_loglik_per_sequence,frame_diff_energy_generated,frame_diff_energy_real,seconds
+3,65,192,0.5762715319489168,0.8474569361021664,0.993273047241762,0.5060287088850374,0.0,0.6,-5926.892697892597,0.9167152414014139,0.2107949713472501,6023.975129830651

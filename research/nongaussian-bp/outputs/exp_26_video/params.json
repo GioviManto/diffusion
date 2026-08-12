@@ -17,7 +17,7 @@
     "spatial_family": "gaussian",
     "n_generate": 4000,
     "cuts": [
-      2
+      3
     ],
     "chunk": 16,
     "seed": 0
@@ -26,7 +26,7 @@
     "cutcurve"
   ],
   "provenance": {
-    "timestamp": "2026-08-12 16:18:44",
+    "timestamp": "2026-08-12 18:07:25",
     "git_commit": "",
     "git_branch": "",
     "git_dirty": "",
