@@ -173,8 +173,14 @@ case "$MODE" in
     # src/scale_kernel.py added in the wavelet merge) and exp_24 did not follow.
     # Whether the baseline should be extended to that kernel is a real question
     # about the argument, not a submission detail, so it is left for a human.
+    # IMAGEFIT_OUT lets a second, longer-walltime attempt run alongside the first
+    # without the two writing to one directory. exp_24 accumulates both families
+    # before writing its fit CSV, so a walltime kill loses the completed family
+    # too -- there is no partial credit here, which is why a backup attempt is
+    # worth a slot. Measured 2026-08-12: the gaussian fit alone had not finished
+    # after 2h at 357% CPU on medium_cpu's 6h cap.
     "$PYTHON" -u experiments/exp_24_wavelet_fit.py \
-        --output-dir "$ROOT/outputs/exp_24_wavelet_fit"
+        --output-dir "$ROOT/outputs/${IMAGEFIT_OUT:-exp_24_wavelet_fit}"
     ;;
 
   images)
