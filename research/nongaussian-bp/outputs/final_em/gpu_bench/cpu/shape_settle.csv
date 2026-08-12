@@ -1,0 +1,2 @@
+n_chains,n_components,design,seed,n_updates,final_log_evidence,monotone_violations,settle_rho,settle_innovation_var,settle_innovation_excess_kurtosis,final_innovation_excess_kurtosis,final_innovation_var,final_rho,final_abs_rho_score,final_min_sd_over_dx,final_min_component_mass,final_effective_components
+512,8,uniform,0,60,-20873.280683235473,0,53,49,58,2.646282501970309,0.2715521893620554,0.856106213212028,0.0004285564275121211,8.305511648864845,0.07747277952130419,7.590558302531126

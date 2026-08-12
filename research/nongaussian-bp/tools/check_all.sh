@@ -136,7 +136,10 @@ if [[ -d outputs/final_em ]]; then
     # them into the total reported "19/18", which is two things added together.
     shp=$(find outputs/final_em/*/shape -name .ok_cell 2>/dev/null \
           | grep -v '_u[0-9]*/' | wc -l | tr -d ' ')
-    roots=$(ls -d outputs/final_em/*/ 2>/dev/null | wc -l | tr -d ' ')
+    # Only 8-digit dated directories are run roots. final_em/ also holds
+    # gpu_bench/ from the GPU parity benchmark, which is not a sweep.
+    roots=$(ls -d outputs/final_em/*/ 2>/dev/null \
+            | grep -E '/[0-9]{8}/$' | wc -l | tr -d ' ')
     echo "        run roots=$roots  reps=$reps/16  recovery=$rec/4  shape cells=$shp/18"
     [[ "$reps" -eq 16 ]] && ok "reps complete (16 seeds across $roots roots)" \
                          || bad "reps incomplete: $reps/16"

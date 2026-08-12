@@ -1,0 +1,2 @@
+family,n_train,seconds,em_iters,monotone_violation,final_train_log_evidence,t_likelihood_requested,t_likelihood_used,min_resolved_t,min_points_per_std_at_requested_t,heldout_loglik_per_image,magnitude_ratio_d0,magnitude_ratio_d1,magnitude_ratio_d2,magnitude_ratio_d3
+gaussian,2000,6160.535751287825,20,0.0,-14109316.179126244,0.05,0.05,0.04997732519165315,3.0007150626064854,-512.1967935151719,nan,nan,nan,nan

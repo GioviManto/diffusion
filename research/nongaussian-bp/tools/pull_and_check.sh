@@ -31,7 +31,20 @@ cd "$(dirname "$0")/.."
 HOST=${BP_CLUSTER_HOST:-lnode01-da.hpc.unibocconi.it}
 USER_AT=${BP_CLUSTER_USER:-3164542}
 REMOTE=${BP_CLUSTER_ROOT:-nongaussian-bp}
-BASE="$USER_AT@$HOST:/home/$USER_AT/$REMOTE/research/nongaussian-bp/outputs"
+# THERE ARE TWO OUTPUTS TREES ON THE CLUSTER, and which one a result lands in
+# depends on which sbatch produced it:
+#
+#   bocconi_final_em.sbatch   RUN_ROOT="outputs/final_em/..." -- relative to its
+#                             WorkDir, so research/nongaussian-bp/outputs/
+#   bocconi_wavelet.sbatch    "$ROOT/outputs/..." where ROOT=~/nongaussian-bp,
+#                             so ~/nongaussian-bp/outputs/ -- one level up
+#
+# This script pulled only the first for its whole life, which is why exp_24
+# reported "0 files" for six hours while fit.csv sat on the login node. Both are
+# searched now. Fixing the sbatch scripts to agree would be better and is a
+# change to paths that running jobs depend on, so it is not done here.
+BASE_RESEARCH="$USER_AT@$HOST:/home/$USER_AT/$REMOTE/research/nongaussian-bp/outputs"
+BASE_ROOT="$USER_AT@$HOST:/home/$USER_AT/$REMOTE/outputs"
 
 RUN_CHECKS=1
 [[ "${1:-}" == "--no-check" ]] && RUN_CHECKS=0
@@ -44,19 +57,26 @@ DIRS=(final_em exp_24_wavelet_fit exp_23_wavelet_statistics
 echo "pulling from $HOST"
 rc=0
 for d in "${DIRS[@]}"; do
-    if ! ssh -o BatchMode=yes -o ConnectTimeout=20 "$USER_AT@$HOST" \
-            "test -d /home/$USER_AT/$REMOTE/research/nongaussian-bp/outputs/$d" 2>/dev/null; then
+    found=0; total=0
+    for base in "$BASE_RESEARCH" "$BASE_ROOT"; do
+        remote_dir="${base#*:}/$d"
+        ssh -o BatchMode=yes -o ConnectTimeout=20 "$USER_AT@$HOST" \
+            "test -d '$remote_dir'" 2>/dev/null || continue
+        found=1
+        mkdir -p "outputs/$d"
+        # --stats, not --info=stats2: the latter is unsupported here and fails.
+        n=$(rsync -az --stats "$base/$d/" "outputs/$d/" 2>/dev/null \
+            | awk '/Number of files transferred|Number of regular files transferred/ {print $NF; exit}')
+        if [[ -z "${n:-}" ]]; then
+            printf "  %-28s \033[31mPULL FAILED\033[0m from %s\n" "$d" "${base##*:}"; rc=1
+        else
+            total=$(( total + n ))
+        fi
+    done
+    if [[ $found -eq 0 ]]; then
         printf "  %-28s not on cluster yet\n" "$d"
-        continue
-    fi
-    mkdir -p "outputs/$d"
-    # --stats, not --info=stats2: the latter is unsupported here and fails.
-    n=$(rsync -az --stats "$BASE/$d/" "outputs/$d/" 2>/dev/null \
-        | awk '/Number of files transferred|Number of regular files transferred/ {print $NF; exit}')
-    if [[ -z "${n:-}" ]]; then
-        printf "  %-28s \033[31mPULL FAILED\033[0m\n" "$d"; rc=1
     else
-        printf "  %-28s %s file(s) transferred\n" "$d" "$n"
+        printf "  %-28s %s file(s) transferred\n" "$d" "$total"
     fi
 done
 
@@ -65,7 +85,10 @@ echo
 echo "sweep completeness (globbing ALL run roots -- see the midnight note above)"
 # ---------------------------------------------------------------------------
 if [[ -d outputs/final_em ]]; then
-    roots=$(ls -d outputs/final_em/*/ 2>/dev/null | wc -l | tr -d ' ')
+    # Only 8-digit dated directories are run roots. final_em/ also holds
+    # gpu_bench/ from the GPU parity benchmark, which is not a sweep.
+    roots=$(ls -d outputs/final_em/*/ 2>/dev/null \
+            | grep -E '/[0-9]{8}/$' | wc -l | tr -d ' ')
     reps=$(ls outputs/final_em/*/.ok_reps_* 2>/dev/null | wc -l | tr -d ' ')
     rec=$(ls outputs/final_em/*/.ok_recovery_* 2>/dev/null | wc -l | tr -d ' ')
     # Exclude rerun cells (<tag>_u<N>) from the 18-cell baseline. They are extra

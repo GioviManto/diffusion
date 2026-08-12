@@ -2,16 +2,35 @@
   "settings": {
     "archive": "data/cifar-10-python.tar.gz",
     "levels": 5,
-    "n_images": 10000,
-    "n_boot": 400,
+    "n_train": 2000,
+    "n_test": 5000,
+    "t_train": [
+      0.3,
+      0.6,
+      1.0
+    ],
+    "t_likelihood": 0.05,
+    "n_iters": 20,
+    "t_resolve": 0.05,
+    "half_width": 8.0,
+    "n_components": 4,
+    "families": [
+      "gaussian"
+    ],
+    "n_generate": 10000,
+    "n_reverse": 128,
+    "reverse_steps": 150,
+    "chunk": 64,
     "seed": 0
   },
   "parts": [
-    "subbands",
-    "crossscale"
+    "fit",
+    "generate",
+    "sampler",
+    "grid"
   ],
   "provenance": {
-    "timestamp": "2026-08-12 10:43:53",
+    "timestamp": "2026-08-12 12:48:37",
     "git_commit": "",
     "git_branch": "",
     "git_dirty": "",
