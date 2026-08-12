@@ -153,6 +153,36 @@ image-like data, and is recorded rather than glossed.
 Requirements: Python >= 3.12, numpy, scipy, matplotlib, pandas (analysis),
 pytest (tests), jupyter/nbformat (notebooks). `pip install -r requirements.txt`.
 
+### Start here: one command for every check
+
+```bash
+./tools/check_all.sh --quick    # ~1 min, before a commit
+./tools/check_all.sh            # ~25 min, before a merge
+```
+
+Eight checks: the test suite, the provenance auditor, whether advertised paths
+actually exist, whether the counts in this README match the disk, whether a
+sweep is silently half-present, whether the cluster still holds both branches'
+files, whether all the notebooks still re-execute, and cross-process
+reproducibility.
+
+The unglamorous ones are there deliberately. The defects that actually reached
+this repository in August 2026 were not unit-testable: documentation that
+outlived the runs it described, a cluster tree assembled from two branches, a
+sweep split across two dated output roots by a timestamp evaluated per task.
+Each check in that script carries the incident that motivated it.
+
+To bring cluster results back and confirm what arrived:
+
+```bash
+./tools/pull_and_check.sh       # additive pull, then counts what landed
+```
+
+It reports whether the sweep is *complete*, not whether rsync exited zero — a
+pull has already reported success here while transferring nothing.
+
+### Individual pieces
+
 ```bash
 python -m pytest tests/ -q                     # verify the core
 python experiments/exp_01_grid_validation.py   # each writes to outputs/<name>/
@@ -167,7 +197,11 @@ python experiments/exp_14_memorization_collapse.py
 ```
 
 `tests/test_em_bp.py` runs many small EM fits and `tests/test_hierarchy.py` a
-few tree ones; the whole suite takes ~3.7 min. Experiments 06, 07, 13 and 14
+few tree ones; the whole suite takes **~11-12 min** (measured 2026-08-12:
+309 passed, 12 skipped in 11:42 on an M-series laptop). It was ~3.7 min before
+the wavelet and video suites merged in, and both this file and
+`REPRODUCIBILITY.md` carried the old figure for a while. The 12 skips are the
+CUDA backend-parity tests, which pass on the cluster's H200 nodes. Experiments 06, 07, 13 and 14
 take roughly an hour each at full settings — use `--quick` for a minutes-scale
 smoke run.
 

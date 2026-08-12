@@ -39,8 +39,12 @@ node with no working cuBLAS, so probing it would report a GPU that then fails mi
 OMP_NUM_THREADS=4 python3 -m pytest tests/ -q
 ```
 
-Expected: `236 passed, 12 skipped` (Python 3.12.5, NumPy 2.5.2, SciPy 1.18.0; ~2 min on four CPU
-threads). The skips are the CuPy parity tests, which are skipped when no GPU is present. These tests are the evidence behind several numbers quoted in the note —
+Expected: `309 passed, 12 skipped` (measured 2026-08-12, 11:42 on an M-series laptop; Python
+3.13, NumPy 2.5.1, SciPy 1.18.0). This file previously said `236 passed, 12 skipped` in ~2 min,
+which was correct before the wavelet and video suites merged in and stale for some days
+afterwards — the count is the first thing to drift after a merge, so treat a mismatch as a
+prompt to re-measure rather than as a failure. The skips are the CuPy parity tests, skipped when
+no GPU is present; they pass 12/12 on the cluster's H200 nodes. These tests are the evidence behind several numbers quoted in the note —
 the brute-force enumeration check, the message-normalisation convention, the Fisher-identity
 gradient check — so a failure here invalidates part of the write-up, not just the code.
 
