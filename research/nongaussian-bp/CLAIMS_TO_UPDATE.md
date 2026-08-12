@@ -44,6 +44,21 @@ where the exact endpoint law moves the ratio 1.927 → 1.163.
 
 ## 2. Capacity — the sweep is now complete in five coordinates, and it saturates
 
+> **Added 2026-08-12, and it qualifies everything in this section.** All of these fits use
+> `em_iters=40`. `exp_27` has now measured how long EM actually needs, and 40 is not a converged
+> fit: across 72 seed-rows, **93% had not settled in the innovation-shape coordinate** by
+> iteration 40, and the slowest design needs roughly **2000 updates** — a factor of about 50.
+> Because a larger C has more shape parameters to move in the same fixed budget,
+> under-iteration produces a monotone-looking capacity effect whether or not capacity is doing
+> anything. `audit/AUDIT_NOTE.md` already attributes ~96% of this effect to convergence rate.
+>
+> The *evidence* and *runtime* columns below are the least affected — held-out evidence is an
+> average over the whole density and saturates early — while anything resting on the fitted or
+> generated **shape** is not currently separable from convergence rate. The right fix is to
+> rerun `exp_16` to a convergence criterion rather than a count; `exp_27` is what makes it
+> possible to choose one. Nothing below is withdrawn, and nothing below should be quoted
+> without this paragraph. See `notebooks/12_how_long_does_em_need.ipynb`.
+
 **Currently:** pointwise error and generated tail fidelity both improve monotonically in C, with
 likelihood and runtime listed as missing.
 
