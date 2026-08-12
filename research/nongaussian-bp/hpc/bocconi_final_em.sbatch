@@ -276,10 +276,24 @@ shape)
     # if one cell dies, the other five have still produced valid traces and the
     # merge must be able to see them. The task still exits nonzero so the failure
     # is visible, but it does not retract its siblings' work.
-    SIZES=(512 2048)
-    COMPS=(4 8 16)
-    DESIGNS=(low uniform high)
-    N_CELLS=18
+    # Overridable, because the first run of this sweep could not answer its own
+    # question. At n_updates=800 every `high` design cell settled at 788-797 --
+    # that is the trace running out, not a settling time, so for that design the
+    # answer is ">= 800" and no more. `low` and `uniform` settled at 30-418 and
+    # are not censored. Rerunning only the censored design at a longer trace is
+    # much cheaper than rerunning the grid.
+    #
+    #   SHAPE_DESIGNS="high" SHAPE_UPDATES=2400 CELLS_PER_TASK=3
+    #
+    # Defaults reproduce the original 18-cell sweep exactly.
+    IFS=' ' read -r -a SIZES   <<< "${SHAPE_SIZES:-512 2048}"
+    IFS=' ' read -r -a COMPS   <<< "${SHAPE_COMPS:-4 8 16}"
+    IFS=' ' read -r -a DESIGNS <<< "${SHAPE_DESIGNS:-low uniform high}"
+    N_UPDATES=${SHAPE_UPDATES:-800}
+    N_SEEDS=${SHAPE_SEEDS:-4}
+    N_CELLS=$(( ${#SIZES[@]} * ${#COMPS[@]} * ${#DESIGNS[@]} ))
+    N_DES=${#DESIGNS[@]}
+    N_CD=$(( ${#COMPS[@]} * N_DES ))
     CPT=${CELLS_PER_TASK:-6}
 
     THREADS=$(( ${SLURM_CPUS_PER_TASK:-1} / CPT ))
@@ -298,9 +312,12 @@ shape)
     for (( k = 0; k < CPT; k++ )); do
         cell=$(( first + k ))
         if [ "$cell" -ge "$N_CELLS" ]; then break; fi
-        si=$(( cell / 9 )); ci=$(( (cell % 9) / 3 )); di=$(( cell % 3 ))
+        si=$(( cell / N_CD )); ci=$(( (cell % N_CD) / N_DES )); di=$(( cell % N_DES ))
         N=${SIZES[$si]}; C=${COMPS[$ci]}; D=${DESIGNS[$di]}
         tag="N${N}_C${C}_${D}"
+        # A longer rerun must not overwrite the 800-update trace it is checking:
+        # both are wanted, and comparing them is the point.
+        if [ "$N_UPDATES" -ne 800 ]; then tag="${tag}_u${N_UPDATES}"; fi
         cell_out="$RUN_ROOT/shape/$tag"
         echo "cell $cell -> N=$N C=$C design=$D threads=$THREADS out=$cell_out"
         (
@@ -308,7 +325,7 @@ shape)
             $PYTHON experiments/exp_27_shape_convergence.py --only trace \
                 --set "sizes=($N,)" --set "components=($C,)" \
                 --set "designs=('$D',)" \
-                --set n_seeds=4 --set n_updates=800 \
+                --set "n_seeds=$N_SEEDS" --set "n_updates=$N_UPDATES" \
                 --output-dir "$cell_out" \
                 > "$ROOT/logs/shape_${tag}_${SLURM_JOB_ID:-0}.log" 2>&1
             mkdir -p "$cell_out"
