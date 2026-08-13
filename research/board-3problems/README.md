@@ -220,7 +220,8 @@ regime.
 
 ## Ledger
 
-Classes as in `docs/RESULT_LEDGER.md`.
+Classes as in `docs/RESULT_LEDGER.md` (archived Aug 2026; see
+`research/nongaussian-bp/CLAIMS_TO_UPDATE.md` for the project's current live claim ledger).
 
 | # | Claim | Class | Evidence |
 |---|-------|-------|----------|

@@ -370,7 +370,8 @@ case means they do not differ at all (§5, result 7).
 
 ## 5. What the experiments showed
 
-Full tables are in `docs/EM_BP_LEARNING_COMPENDIUM.md` §4.13 and the CSVs under
+Full tables are in `../compendium/` (the current compendium; the Aug 6 draft this
+section originally cited is archived) and the CSVs under
 `research/nongaussian-bp/outputs/`. The four results, in the order they matter:
 
 **1. The speciation ladder exists and sits where predicted.** Depth-5 tree,

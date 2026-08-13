@@ -9,7 +9,7 @@ open.
 Sources of the questions:
 
 - **[R]** `research/gaussian-ar1-bp/markov_gaussian_approx/report/bp_markov_diffusion_gaussian_approx.pdf`, §"Interpretation and next steps" — the five numbered next steps of the report we discussed.
-- **[F]** `docs/RESULT_LEDGER.md`, §"Explicitly future" — F1–F5.
+- **[F]** `docs/RESULT_LEDGER.md` (archived Aug 2026, see `research/nongaussian-bp/CLAIMS_TO_UPDATE.md`), §"Explicitly future" — F1–F5.
 - **[E]** The Marc/Jérôme email of 2026-07-30 — the two suggestions.
 - **[C]** The 2026-07-29 call with Jérôme, preceding the email — concerns raised about the grid BP and the Gaussian BP.
 - **[L]** Questions that arose *during* the Layer-5 work itself.
@@ -35,7 +35,7 @@ Both axes were pushed and, more usefully, *quantified*.
 
 > **Rule adopted from this:** any rate claim needs replicates in the tens, not the units. It is now in the agent handoff so it is not relearned.
 
-*Evidence:* compendium §4.9; `outputs/exp_06_rate_highrep/`; `docs/AGENT_HANDOFF_EM_BP.md` §7.
+*Evidence:* compendium §4.9; `outputs/exp_06_rate_highrep/`; `docs/AGENT_HANDOFF_EM_BP.md` §7 (archived Aug 2026, see `research/nongaussian-bp/REPRODUCIBILITY.md`).
 
 ### R2. "Explore different ρ — stronger correlations make messages more informative and potentially more non-Gaussian." — **ANSWERED, and the sign is the opposite of the conjecture**
 
