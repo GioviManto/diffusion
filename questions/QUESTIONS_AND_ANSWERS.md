@@ -413,10 +413,10 @@ destroys locality. Identifying the right scalar is open.
 
 ### E1. "Introduce learning — regress BP parameters by EM rather than train a neural network." — **ANSWERED**
 
-This is the whole of Layer 5. The theory is in
-`research/nongaussian-bp/report/em_bp_learning.pdf` (14 pp, five propositions);
-the implementation is `src/em.py`, `src/kernels.py`, `src/denoiser.py`; the
-results are compendium §4.
+This is the whole of Layer 5. The theory was originally in
+`research/nongaussian-bp/report/em_bp_learning.pdf` (14 pp, five propositions; archived, now
+superseded by `research/nongaussian-bp/paper/main.tex`); the implementation is `src/em.py`,
+`src/kernels.py`, `src/denoiser.py`; the results are compendium §4.
 
 Four structural points, none of which was obvious at the outset:
 
@@ -472,13 +472,13 @@ would likely close part of the gap.
 
 ### E4. "Start an Overleaf write-up in paper format." — **PARTIAL**
 
-`report/em_bp_learning.tex` was written paper-shaped on purpose: context,
+`report/em_bp_learning.tex` (archived) was written paper-shaped on purpose: context,
 numbered propositions with proofs, detailed calculation pushed into remarks and
 appendices, limitations as a first-class section. It compiles clean to 14 pp.
 
-**Gap:** it has no results section — the numbers live in the compendium and the
-CSVs — and no Overleaf project exists. Converting it is mechanical; §4 of the
-compendium is the raw material.
+**Resolved since this was written.** `research/nongaussian-bp/paper/main.tex` is exactly
+this conversion: a results section, an Overleaf project (`overleaf/`), and the compendium's
+§4 numbers incorporated directly.
 
 ### E5. (implicit, from the follow-up chat) "Does this require moving BP into an autodiff framework?" — **ANSWERED: no**
 
@@ -660,7 +660,8 @@ complete until an architecture with its own locality prior has been tried.
 
 ## [P] Questions raised by the two papers (Layer 6)
 
-Context and the access caveat are in `docs/PAPER_CONNECTIONS.md`: **neither PDF
+Context and the access caveat are in `research/nongaussian-bp/docs/PAPER_CONNECTIONS.md`
+(this file's own copy, at the repo root, is archived): **neither PDF
 could be opened from this environment** (gateway 403 on arxiv, nature, PMC, HAL,
 PMLR and every mirror tried), so the papers were identified and their content
 established through web search alone. Nothing mathematical below is quoted from

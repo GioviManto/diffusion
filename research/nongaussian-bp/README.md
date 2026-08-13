@@ -35,7 +35,8 @@ Continuation of the `bp_markov_diffusion_gaussian_approx` project. Research ques
 Everything above hands BP the true prior. Layer 5 removes it: the transition
 kernel of the clean chain becomes an unknown parameter, only *noised* sequences
 are observed, and the kernel is estimated by maximum marginal likelihood with
-EM. The theory is written up in `report/em_bp_learning.tex`.
+EM. The theory is written up in `paper/main.tex` (the report this line originally pointed to,
+`report/em_bp_learning.tex`, was an early draft and is now archived).
 
 The structural points, in one place:
 
