@@ -42,3 +42,27 @@ is used).
   minimal dynamic object is visibly coupled across frames.
 All 8 figures produced by thesis/figures/make_figures.py (matplotlib,
 vector PDF, white background, colourblind-safe or monochrome).
+
+## v5 (2026-07-26) — Chapter 9, rotating ring
+
+All produced by `thesis/figures/make_ring_figures.py`, same style contract as
+`make_figures.py` (matplotlib, white background, vector PDF, serif with cm
+mathtext, navy/red/olive palette, no top/right spines). Closed-form panels are
+recomputed at build time; measured panels read the curated CSVs of
+`research/experiment1-rotating-ring/data/`. Deterministic (seeds fixed).
+
+| File | Distinct claim it supports |
+|---|---|
+| fig_ring_model.pdf | the model: polar coordinates and moving frame, the confining force as -V'(r), one clean trajectory, and the same trajectory after the channel |
+| fig_ring_joint_vs_marginal.pdf | as graphical models, the joint score conditions on all observations while the per-frame marginal severs every cross-frame path |
+| fig_ring_gauge.pdf | a known rotation is an orthogonal change of frame; after de-rotation the circulation is gone and a ring-anchored random walk remains |
+| fig_ring_surrogate_response.pdf | the exact surrogate response splits into a near-diagonal chain term and a rank-one anchor term |
+| fig_ring_diagnostics.pdf | reach rises to the finite-chain ceiling while intensity falls; the weighted reach is non-monotone and turns where the measured receptive radius does |
+| fig_ring_score_field.pdf | the joint conditional field is displaced towards the inferred phase; the one-frame marginal field stays ring-symmetric |
+| fig_ring_taylor.pdf | the linearisation is accurate while the posterior angular spread stays below ~0.32 rad, and degrades after it |
+
+Eighteen further figures exist in the standalone note
+(`research/experiment1-rotating-ring/figures/`) and are deliberately not
+carried into the thesis: the register rule is one figure per distinct result,
+and the note's extra panels are either duplicates of the seven above or
+intermediate diagnostics whose content is stated in Tables 9.2 and 9.3.

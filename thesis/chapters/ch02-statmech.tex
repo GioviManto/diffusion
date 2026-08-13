@@ -339,6 +339,25 @@ energy, its second the energy fluctuations; the latter equals
 $k_B T^2 C_V$ with $C_V$ the heat capacity. This is a
 \emph{fluctuation--dissipation} relation: how a system responds to
 heating is determined by its spontaneous equilibrium fluctuations.
+
+The same identity holds for any observable coupled linearly to a field. If the
+Gibbs weight carries a factor $e^{h \cdot a}$, then
+$Z(h) = \int \nu(a) e^{h\cdot a}\,\dd a$ is a cumulant generating function and
+\begin{equation}
+  \frac{\partial \langle a_k \rangle}{\partial h_j}
+  = \frac{\partial^2 \log Z}{\partial h_j \partial h_k}
+  = \operatorname{Cov}(a_k, a_j) ,
+  \label{eq:static-response}
+\end{equation}
+so a susceptibility is a covariance. Susceptibilities defined this way are the
+standard probe of phase transitions, and they are the instrument used by
+\citet{bachtis2024cascade} to locate the transitions discussed in
+Section~\ref{sec:statmech-learning}. Chapter~\ref{ch:ring} shows that the
+response of a diffusion score to its own observations is exactly of the form
+\eqref{eq:static-response}, with the observation playing the role of the field.
+Equation~\eqref{eq:static-response} is a static identity within one fixed
+measure, and is not the two-time dynamical fluctuation--dissipation theorem of
+non-equilibrium statistical mechanics.
 Finally, rewriting the Gibbs--Shannon entropy of $\rho_\beta$:
 \begin{equation*}
   S[\rho_\beta]
@@ -597,6 +616,21 @@ Section~\ref{sec:cascade}, shows that RBM training is an entire
 \emph{cascade} of second-order phase transitions, one per learned
 feature. Learning, like memory, turns out to be a sequence of symmetry
 breakings.
+
+The order of a transition is the order of the derivative of the free energy
+that first misbehaves, and the distinction matters for reading these results.
+At a \emph{first-order} transition the first derivative jumps: the order
+parameter is discontinuous, latent heat is absorbed, the two phases coexist at
+the transition, and correlation lengths stay finite. At a \emph{second-order}
+transition the first derivative is continuous and the second diverges: the
+order parameter grows continuously from zero, the susceptibility
+\eqref{eq:static-response} and the correlation length diverge, and observables
+acquire power laws. The cascade above is of the second kind, which is why it is
+detected through susceptibilities rather than through jumps. Both notions
+require the thermodynamic limit; in the finite models of
+Chapters~\ref{ch:gaussian} to~\ref{ch:ring} a correlation length that grows
+until it reaches the size of the system and then stops is a finite-size
+ceiling, not a divergence.
 
 \section{What this thesis takes from physics}
 

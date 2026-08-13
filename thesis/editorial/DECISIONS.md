@@ -73,3 +73,29 @@ Standing rules unchanged: one topic in one place, no ping-pong, no
 em-dash decoration, no O(K) complexity talk (new, this pass), figures
 sober matplotlib, never call numerics proof, App B stays only while
 fully verified.
+
+## v5 structure decision (2026-07-26, author request)
+The rotating-ring research (first board model) is integrated as a full
+Chapter 9, between Laplace and the conclusions, which move to Chapter 10.
+Standing rules apply unchanged, with three points settled for this pass:
+
+1. The standalone working note in `research/experiment1-rotating-ring/` is
+   **not cited**: it is unpublished, and the chapter presents the work as the
+   thesis's own. The note remains the reproducible deliverable behind the
+   chapter (code, data, validation) and is referenced only through
+   Appendix C's reproducibility protocol.
+2. Background needed by the chapter goes **into the chapter that owns the
+   topic**, never into the chapter that uses it: linear response and the order
+   of phase transitions into Ch. 2, total variation into Ch. 3, the
+   H-theorem and the non-equilibrium-thermodynamics reading into Ch. 4,
+   deployment examples into Ch. 1. Chapter 9 cross-references them.
+3. Diagnostics: reach, intensity, and receptive field are reported as three
+   separate observables, each against its structureless finite-chain ceiling,
+   plus one combined intensity-weighted reach. A normalised correlation length
+   is never quoted alone, and no diagnostic is read as an infinite-volume
+   correlation length.
+
+Notation for the chapter: thesis notation throughout (a clean frames, x noisy,
+K frames, e^{-t} and Delta_t, S(x,t) score), with frames two-dimensional so the
+score has K blocks of size two. The min(i,j) matrix of the surrogate is written
+G, since K is the frame count.

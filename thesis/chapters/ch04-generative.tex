@@ -127,6 +127,44 @@ The partition-function problem has not been solved; it has been
 side-stepped, by working only with objects (scores) from which $Z$ has
 already been differentiated away.
 
+\subsection{The thermodynamic reading, and the direction of the arrow}
+\label{sec:diffusion-thermo}
+
+The appeal to non-equilibrium thermodynamics in \citet{sohl2015deep} is
+structural rather than decorative. Their forward process is a chain of small
+perturbations converting a structured distribution into a simple one, that is
+an annealing schedule, and the objective they derive is a variational bound of
+the same algebraic form as the work identities of non-equilibrium statistical
+mechanics: the log-likelihood is bounded by an average of log-ratios along the
+forward path, exactly as free-energy differences are bounded in Jarzynski-type
+equalities and estimated in annealed importance sampling. That analogy is what
+supplies the training objective, and it is the reason the field speaks of
+temperature, annealing and entropy at all.
+
+The direction of the forward process is fixed by the second law, which for the
+Fokker--Planck equation \eqref{eq:fokker-planck} takes an exact form. Let $p_t$
+evolve with a gradient drift and stationary law $p_\infty \propto e^{-V}$, and
+consider the free energy $\mathcal F[p_t] = \kl{p_t}{p_\infty}$, which is the
+mean energy minus the entropy up to a constant. Writing the dynamics as
+$\partial_t p = \nabla \cdot \big(p \nabla \log (p/p_\infty)\big)$ and
+integrating by parts,
+\begin{equation}
+  \frac{\dd \mathcal F}{\dd t}
+  = \int \partial_t p \, \log \frac{p}{p_\infty}
+  = -\int p \,\Big\| \nabla \log \frac{p}{p_\infty} \Big\|^2 \;\le\; 0 ,
+  \label{eq:h-theorem}
+\end{equation}
+with equality only at $p_t = p_\infty$. This is the H-theorem: the free energy
+decreases monotonically and the relative entropy is consumed at a rate given by
+a relative Fisher information. The forward channel therefore destroys
+information about the data monotonically and irreversibly, and
+\eqref{eq:h-theorem} identifies the rate. The reverse direction is not
+forbidden, but it is not free either: by Anderson's theorem it requires the
+score of the intermediate laws to be supplied from outside. The entire
+modelling effort of a diffusion model is the estimation of that one object, and
+Chapters~\ref{ch:gaussian} to~\ref{ch:ring} are concerned with what that object
+looks like when the data are trajectories.
+
 \section{Denoising diffusion probabilistic models}\label{sec:ddpm}
 
 The discrete-time formulation \citep{sohl2015deep, ho2020denoising}

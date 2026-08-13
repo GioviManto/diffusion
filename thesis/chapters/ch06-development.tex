@@ -56,9 +56,12 @@ deterministic: points on a circle rotated by a fixed angle per frame,
 observed through noise. These models have precisely the structure the
 thesis is about (an internal time with a simple dynamical rule, coupled
 to a diffusion time), but they are nonlinear in the coordinates in which
-the diffusion acts, and no closed form for their joint score was in
-reach. They set the target; something simpler had to supply the
-intuition.
+the diffusion acts, so no closed form for their joint score was available
+at that stage. They set the target, and something simpler had to supply the
+intuition first. Chapter~\ref{ch:ring} returns to the first of them once the
+solvable case is in place, and shows that a Cartesian surrogate of it is
+exactly solvable while the model as drawn is solvable numerically to a
+measured accuracy.
 
 \section{The toy models}\label{sec:dev-toys}
 
@@ -156,8 +159,9 @@ computable: one coupling parameter $\alpha$ for the internal dynamics
 against one noise parameter $t$ for the corruption, linear algebra
 available at every step, and every structural question (coupling range,
 locality, message passing) posable in closed form. The nonlinear board
-models were set aside, deliberately and explicitly, as targets for
-after the solvable case was understood.
+models were set aside at that point, deliberately and explicitly, as targets
+for after the solvable case was understood. Chapter~\ref{ch:ring} takes up the
+first of them.
 
 \section{The message-passing programme and its bottleneck}
 \label{sec:dev-bottleneck}

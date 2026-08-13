@@ -294,12 +294,27 @@ $\E\big[ (\int_0^t g\,\dd W)^2 \big] = \int_0^t g(s)^2\,\dd s$, both
 because cross terms $\E[g(s_j)(W_{s_{j+1}}-W_{s_j})]$ vanish by
 independence.
 
+It is worth recording why no convention-free definition is available, since
+the same two sums reappear in Chapter~\ref{ch:ring}. Fix $[0,t]$ and a
+partition of mesh tending to zero. The \emph{quadratic variation}
+$Q_n = \sum_j (W_{s_{j+1}} - W_{s_j})^2$ has mean
+$\sum_j \Delta s_j = t$ and variance $2\sum_j (\Delta s_j)^2$, which vanishes
+in the limit, so $Q_n \to t$ in mean square. The \emph{total variation}
+$V_n = \sum_j |W_{s_{j+1}} - W_{s_j}|$ instead diverges, because
+$Q_n \le (\max_j |W_{s_{j+1}} - W_{s_j}|)\, V_n$ and the maximum increment
+tends to zero by continuity: a bounded $V_n$ would force $Q_n \to 0$,
+contradicting $Q_n \to t > 0$. A Riemann--Stieltjes integral $\int f \dd g$
+requires $g$ to have bounded variation, precisely so that the limit does not
+depend on where inside each subinterval $f$ is evaluated. For Brownian motion
+that guarantee is absent, different evaluation points give genuinely different
+limits, and a convention must be fixed.
+
 The price of the construction is a new chain rule. Its origin is the
-\emph{quadratic variation} of Brownian motion: increments scale as
+quadratic variation just computed: increments scale as
 $\dd W_t \sim \sqrt{\dd t}$, so second-order terms in $\dd W$ are
 first-order in $\dd t$ and cannot be discarded.
 
-\begin{toolbox}{It\^o's lemma, and where the extra term comes from}
+\begin{toolbox}[tb:ito-lemma]{It\^o's lemma, and where the extra term comes from}
 Let $Y_t = \phi(X_t, t)$ with $\phi$ twice differentiable and $X_t$
 solving \eqref{eq:generic-sde}. Taylor-expand $\phi$ to second order:
 \begin{equation*}
@@ -483,6 +498,14 @@ The first term transports probability along the drift (as in Liouville);
 the second spreads it diffusively. The diffusive term is the macroscopic
 footprint of the It\^o correction. \hfill$\square$
 \end{toolbox}
+
+In vector form, and for later reference, the Fokker--Planck equation of
+\eqref{eq:generic-sde} reads
+\begin{equation}
+  \partial_t p_t = -\nabla \cdot \big( f\, p_t \big)
+  + \tfrac{1}{2} g^2\, \nabla^2 p_t .
+  \label{eq:fokker-planck}
+\end{equation}
 
 \subsection{Stationary law of Langevin dynamics: closing the loop}
 

@@ -42,3 +42,43 @@ board photos); the board content is used as narrative source only, not
 quoted or presented as evidence. The two restyled appendix figures
 recompute the same audited formulas; the new toy-model figure evaluates
 elementary Gaussian-mixture identities on a grid.
+
+## v5 additions (2026-07-26) — Chapter 9
+
+Classified in Table 9.5 of the chapter itself. Summary of status:
+
+- Exact: the joint-minus-marginal gap (9.11); the posterior response identity
+  (9.14, Proposition 9.1); the gauge reduction and score transformation
+  (Lemma 9.2); the exact surrogate score and its rank-one response
+  (Proposition 9.3); the exact one-step radial and wrapped angular transitions
+  (Toolboxes 9.2, 9.3); the clean scales 1/(kappa h) and 1/(D_theta h) and the
+  closed-form reach (9.36), for the infinite chain.
+- Assumption-conditional: the first-order linearisation and its
+  phi ~ 0.32 rad validity threshold, conditional on a unimodal angular
+  posterior within one branch.
+- Numerical, within a validated regime: the polar joint score on the 41x128
+  grid, validated against a 51x192 grid (3.0e-11) and against finite
+  differences of the score through the response identity (6.6e-9); the analytic
+  surrogate Jacobian against finite differences (9.2e-6); the gauge round trip
+  (2.2e-16); the exact vanishing of the clean surrogate score on a co-rotating
+  ring path (0). A deliberately coarse 11x24 grid does deviate visibly, so the
+  production grid is converged for these parameters and not trivially
+  grid-independent.
+- Numerical, one parameter set: every entry of Tables 9.2 and 9.3 and every
+  number quoted in Section 9.7. K = 20 (polar) and K = 30 (surrogate),
+  28 to 36 trajectories per diffusion time, only kappa and D_theta swept.
+  Nothing is claimed about scaling in K.
+- Numerical, observed in the tested regime: the non-monotonicity of the
+  weighted reach and of the receptive radius in diffusion time. The two turn in
+  the same region but their peaks do not coincide (surrogate: weighted reach at
+  t = 1, receptive radius at t = 0.7), and this is stated in the text.
+- Interpretation: the receptive-field reading for architecture, flagged as a
+  possible reading of a controlled model.
+- Not claimed: any two-time dynamical fluctuation--dissipation theorem; any
+  divergent correlation length (the reach diagnostics saturate at a finite-size
+  ceiling, reported alongside every measurement); any statement about trained
+  networks.
+
+Every number in the chapter was checked against the CSVs of
+`research/experiment1-rotating-ring/data/` before being typed, and the figures
+read the same files.

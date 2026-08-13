@@ -5,7 +5,11 @@
 Generative diffusion models have become the dominant paradigm for
 synthesising high-dimensional data: they power state-of-the-art systems
 for images, audio, video, and molecular structures \citep{sohl2015deep,
-ho2020denoising, song2021scorebased, karras2022elucidating}. Their
+ho2020denoising, song2021scorebased, karras2022elucidating}. The same
+construction underlies the image and video generators deployed at scale by the
+large technology companies, from latent diffusion \citep{rombach2022latent}
+onwards, and reaches beyond media: structure prediction in AlphaFold~3 places
+atomic coordinates with a diffusion module \citep{abramson2024alphafold3}. Their
 central object is the \emph{score function}, the gradient of the
 log-density of progressively noised data,
 \begin{equation}

@@ -187,3 +187,55 @@ keep one-topic-one-place discipline and contain no em-dash decoration.
   placeholder with a plain one for the author to overwrite.
 - Rebuild: 125 pp, 0 overfull, 0 undefined references, body starts
   p. 11 (odd).
+
+## v5 (2026-07-26) — new Chapter 9: the rotating ring
+
+Integrates the first of the board models of Section~2 of Ch. 6, previously
+recorded as set aside, as a full research chapter. Original work of this
+thesis; no external source is cited for its derivations, diagnostics, or
+measurements, and the standalone working note in
+`research/experiment1-rotating-ring/` is deliberately *not* cited, being
+unpublished.
+
+Added
+- `chapters/ch09-rotating-ring.tex` (new Ch. 9, ~26 pp). Model and polar
+  coordinates; the joint-minus-marginal gap; the posterior response identity
+  (Toolbox 9.1, five steps) with a Hessian-symmetry consistency check; four
+  diagnostics including the new intensity-weighted reach; the exactly solvable
+  Cartesian surrogate (rotation matrix, orthogonality, gauge lemma with proof,
+  unrolled recursion, Kronecker conditional law, exact score and rank-one
+  response); the polar process (Toolboxes 9.2 and 9.3 deriving the exact radial
+  and wrapped angular one-step laws from the SDEs); forward--backward
+  evaluation on a polar grid; the first-order linearisation with an explicit
+  validity threshold; measurements; validation; classified-claims table;
+  limitations.
+- `figures/make_ring_figures.py` and seven `fig_ring_*.pdf` (register updated
+  in FIGURES.md), same paper style as `make_figures.py`.
+- Two bib entries for Ch. 1 deployment examples: `rombach2022latent`,
+  `abramson2024alphafold3`.
+
+Changed, to keep one explanation per concept
+- Ch. 1: the opening deployment sentence now names latent diffusion and the
+  AlphaFold 3 diffusion module.
+- Ch. 2 (§ free energy): the static linear-response identity
+  `\eqref{eq:static-response}` added next to the existing
+  fluctuation--dissipation paragraph, since Ch. 9 uses that form; explicit
+  statement that it is static, not the two-time dynamical FDT.
+- Ch. 2 (§ statistical mechanics of learning): first- against second-order
+  phase transitions defined, and the finite-size caveat stated once, here.
+- Ch. 3 (§ It\^o calculus): total variation shown to diverge alongside the
+  existing quadratic-variation argument, which is why no convention-free
+  integral exists; the It\^o-lemma toolbox given the label `tb:ito-lemma` and
+  the Fokker--Planck equation the label `eq:fokker-planck`, both referenced
+  from Ch. 9.
+- Ch. 4 (§ the diffusion idea): new subsection on the thermodynamic reading of
+  \citet{sohl2015deep} and the H-theorem `\eqref{eq:h-theorem}` for
+  Fokker--Planck, fixing the direction of the forward process.
+- Ch. 6: the two passages stating that the board models had no closed form in
+  reach and were set aside now point forward to Ch. 9, and are phrased as
+  statements about that stage of the work rather than about the models.
+- `chapters/ch09-conclusions.tex` renamed `ch10-conclusions.tex`; `main.tex`
+  input list updated.
+
+Rebuild: 156 pp, 0 undefined references, 0 undefined citations, no overfull box
+above 11 pt in the new chapter.
