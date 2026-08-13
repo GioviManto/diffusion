@@ -88,6 +88,17 @@ Honest gaps, so nobody assumes coverage that does not exist:
   2400-update rerun was submitted 2026-08-12 (`623904`, `623905`); re-execute notebook 12 when
   `outputs/final_em/*/shape/*_u2400/` lands and its final cell will fill in.
 
+## Standalone notebooks
+
+[`standalone/`](standalone/) holds notebooks that define their own implementation
+instead of importing `src/`. They are excluded from `check_all.sh` because they need
+dependencies the project venv does not carry (`torch`), so **their outputs are not
+verified against a fresh run** the way everything above is. See
+[`standalone/README.md`](standalone/README.md).
+
+- **`EM_BP_theory_and_experiments.ipynb`** — the full derivation plus ten experiments,
+  from-scratch and self-contained. The long-form companion to notebook 05.
+
 ## Conventions
 
 - Executed with the project venv (`../.venv`), Python 3.13, numpy 2.x, matplotlib 3.11.
