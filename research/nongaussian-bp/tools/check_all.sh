@@ -19,7 +19,7 @@
 # advertised files exist, do the counts in the README match reality -- alongside
 # the real test suite.
 #
-#   ./tools/check_all.sh            # everything (~15 min, notebooks dominate)
+#   ./tools/check_all.sh            # everything (~40 min, notebooks run twice)
 #   ./tools/check_all.sh --quick    # skip notebooks and reproducibility (~1 min)
 #
 # Exits non-zero if any check fails. Run from research/nongaussian-bp.
@@ -188,7 +188,28 @@ else
 fi
 
 # ---------------------------------------------------------------------------
-head_ "8. Cross-process reproducibility"
+head_ "8. Notebooks are FRESH, not merely green"
+# ---------------------------------------------------------------------------
+# Step 7 asks whether each notebook runs. This asks whether what it displays is
+# still what the data says. A cluster job overwrote outputs/exp_26_video/fit.csv
+# in place on 2026-08-13 and notebook 08 went on showing pre-overwrite numbers
+# while executing cleanly -- green and stale at the same time, which is the worse
+# of the two because a stale notebook still looks authoritative.
+if [[ $QUICK -eq 1 ]]; then
+    skip "notebook freshness" "--quick"
+elif [[ ! -f tools/check_notebooks_fresh.py ]]; then
+    skip "notebook freshness" "tools/check_notebooks_fresh.py not found"
+else
+    if out=$($PY tools/check_notebooks_fresh.py 2>&1); then
+        ok "notebook outputs reproduce -- $(tail -1 <<<"$out")"
+    else
+        bad "notebook outputs are stale"
+        grep -E "^  FAIL" <<<"$out" | head -5 | sed 's/^/      /'
+    fi
+fi
+
+# ---------------------------------------------------------------------------
+head_ "9. Cross-process reproducibility"
 # ---------------------------------------------------------------------------
 # rng_for once seeded from builtin hash(), which PEP 456 salts per process: every
 # run drew different data while looking deterministic inside one interpreter.
