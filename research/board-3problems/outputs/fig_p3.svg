@@ -1,0 +1,61 @@
+<svg width="100%" viewBox="0 0 680 382" role="img">
+<title>How far back a terminal-frame reward reaches, under two priors</title>
+<desc>Line chart of the fractional variance reduction per frame caused by a quadratic reward on the last of sixteen frames. Under the ring-anchored random walk the reduction is large everywhere, rising roughly linearly from 0.22 at the first frame to 0.82 at the last. Under the stationary autoregressive prior it is confined to the final frames, falling by a factor alpha squared per frame going backwards, from 0.71 at the last frame to 0.0009 at the first, a 251-fold difference at the first frame.</desc>
+<defs><marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse"><path d="M2 1L8 5L2 9" fill="none" stroke="context-stroke" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></marker></defs>
+<text class="th" x="40" y="26">Reward on the last frame: how far back it reaches</text>
+<text class="ts" x="40" y="44">Fractional variance reduction per frame, T = 16, quadratic reward, s² = 0.4</text>
+<line x1="96.0" y1="258.0" x2="636.0" y2="258.0" stroke="var(--b)" stroke-width="0.5"/>
+<text class="ts" x="86" y="262.0" text-anchor="end">0.0</text>
+<line x1="96.0" y1="192.7" x2="636.0" y2="192.7" stroke="var(--b)" stroke-width="0.5"/>
+<text class="ts" x="86" y="196.7" text-anchor="end">0.3</text>
+<line x1="96.0" y1="127.3" x2="636.0" y2="127.3" stroke="var(--b)" stroke-width="0.5"/>
+<text class="ts" x="86" y="131.3" text-anchor="end">0.6</text>
+<line x1="96.0" y1="62.0" x2="636.0" y2="62.0" stroke="var(--b)" stroke-width="0.5"/>
+<text class="ts" x="86" y="66.0" text-anchor="end">0.9</text>
+<text class="ts" x="96.0" y="276" text-anchor="middle">0</text>
+<text class="ts" x="276.0" y="276" text-anchor="middle">5</text>
+<text class="ts" x="456.0" y="276" text-anchor="middle">10</text>
+<text class="ts" x="636.0" y="276" text-anchor="middle">15</text>
+<text class="ts" x="366" y="296" text-anchor="middle">frame index u</text>
+<polyline points="96.0,257.8 132.0,257.7 168.0,257.5 204.0,257.3 240.0,256.9 276.0,256.2 312.0,255.2 348.0,253.6 384.0,251.2 420.0,247.3 456.0,241.3 492.0,231.9 528.0,217.2 564.0,194.3 600.0,158.4 636.0,102.4" fill="none" stroke="#D85A30" stroke-width="1.8" stroke-dasharray="5 3" stroke-linejoin="round"/>
+<polyline points="96.0,209.6 132.0,200.9 168.0,192.2 204.0,183.5 240.0,174.8 276.0,166.0 312.0,157.3 348.0,148.6 384.0,139.9 420.0,131.2 456.0,122.5 492.0,113.8 528.0,105.1 564.0,96.4 600.0,87.6 636.0,78.9" fill="none" stroke="#7F77DD" stroke-width="1.8" stroke-linejoin="round"/>
+<circle cx="96.0" cy="209.6" r="2.2" fill="#7F77DD"/>
+<circle cx="132.0" cy="200.9" r="2.2" fill="#7F77DD"/>
+<circle cx="168.0" cy="192.2" r="2.2" fill="#7F77DD"/>
+<circle cx="204.0" cy="183.5" r="2.2" fill="#7F77DD"/>
+<circle cx="240.0" cy="174.8" r="2.2" fill="#7F77DD"/>
+<circle cx="276.0" cy="166.0" r="2.2" fill="#7F77DD"/>
+<circle cx="312.0" cy="157.3" r="2.2" fill="#7F77DD"/>
+<circle cx="348.0" cy="148.6" r="2.2" fill="#7F77DD"/>
+<circle cx="384.0" cy="139.9" r="2.2" fill="#7F77DD"/>
+<circle cx="420.0" cy="131.2" r="2.2" fill="#7F77DD"/>
+<circle cx="456.0" cy="122.5" r="2.2" fill="#7F77DD"/>
+<circle cx="492.0" cy="113.8" r="2.2" fill="#7F77DD"/>
+<circle cx="528.0" cy="105.1" r="2.2" fill="#7F77DD"/>
+<circle cx="564.0" cy="96.4" r="2.2" fill="#7F77DD"/>
+<circle cx="600.0" cy="87.6" r="2.2" fill="#7F77DD"/>
+<circle cx="636.0" cy="78.9" r="2.2" fill="#7F77DD"/>
+<circle cx="96.0" cy="257.8" r="2.2" fill="#D85A30"/>
+<circle cx="132.0" cy="257.7" r="2.2" fill="#D85A30"/>
+<circle cx="168.0" cy="257.5" r="2.2" fill="#D85A30"/>
+<circle cx="204.0" cy="257.3" r="2.2" fill="#D85A30"/>
+<circle cx="240.0" cy="256.9" r="2.2" fill="#D85A30"/>
+<circle cx="276.0" cy="256.2" r="2.2" fill="#D85A30"/>
+<circle cx="312.0" cy="255.2" r="2.2" fill="#D85A30"/>
+<circle cx="348.0" cy="253.6" r="2.2" fill="#D85A30"/>
+<circle cx="384.0" cy="251.2" r="2.2" fill="#D85A30"/>
+<circle cx="420.0" cy="247.3" r="2.2" fill="#D85A30"/>
+<circle cx="456.0" cy="241.3" r="2.2" fill="#D85A30"/>
+<circle cx="492.0" cy="231.9" r="2.2" fill="#D85A30"/>
+<circle cx="528.0" cy="217.2" r="2.2" fill="#D85A30"/>
+<circle cx="564.0" cy="194.3" r="2.2" fill="#D85A30"/>
+<circle cx="600.0" cy="158.4" r="2.2" fill="#D85A30"/>
+<circle cx="636.0" cy="102.4" r="2.2" fill="#D85A30"/>
+<line x1="110.0" y1="78.0" x2="140.0" y2="78.0" stroke="#7F77DD" stroke-width="1.8"/>
+<text class="t" x="148.0" y="82.0">ring-anchored walk (non-stationary)</text>
+<line x1="110.0" y1="100.0" x2="140.0" y2="100.0" stroke="#D85A30" stroke-width="1.8" stroke-dasharray="5 3"/>
+<text class="t" x="148.0" y="104.0">stationary AR(1), α = 0.8</text>
+<rect class="box" x="40" y="310" width="600" height="52" rx="4"/>
+<text class="t" x="56" y="331">The prior’s memory alone decides the reach: 0.22 vs 0.0009 at the first frame.</text>
+<text class="ts" x="56" y="349">AR(1) decays by exactly α² per frame going backwards, range ξ = 4.5 frames. The walk reaches every frame.</text>
+</svg>

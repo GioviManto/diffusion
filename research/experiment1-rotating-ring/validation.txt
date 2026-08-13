@@ -1,0 +1,14 @@
+Experiment 1 validation
+=======================
+status: PASS
+
+surrogate_jacobian_fd_max_abs: 9.18281976192e-06  (threshold 0.0001)
+gauge_roundtrip_max_abs: 2.22044604925e-16  (threshold 1e-12)
+perfect_clean_path_score_max_abs: 0  (threshold 1e-12)
+polar_fdt_relative_error_max: 6.63063859253e-09  (threshold 1e-07)
+polar_response_grid_relative_error_max: 3.04390222572e-11  (threshold 1e-07)
+figure_pdf_count: 18
+csv_count: 16
+
+All CSV inputs contain finite numerical values.
+Verified 18 curated figure PDFs and 16 CSV data files.

@@ -1,0 +1,1701 @@
+\documentclass[11pt,a4paper]{article}
+
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage[margin=2.4cm]{geometry}
+\usepackage{amsmath,amssymb,amsthm}
+\usepackage{booktabs}
+\usepackage{longtable}
+\usepackage{array}
+\usepackage{xcolor}
+\usepackage{titlesec}
+\usepackage{enumitem}
+\usepackage[hidelinks,colorlinks=true,linkcolor=BlueLink,urlcolor=BlueLink]{hyperref}
+\usepackage{fancyhdr}
+\usepackage{tcolorbox}
+\tcbuselibrary{skins,breakable}
+
+\definecolor{BlueLink}{HTML}{1A4F8A}
+\definecolor{GoodGreen}{HTML}{1B6B3A}
+\definecolor{WarnAmber}{HTML}{9A6100}
+\definecolor{BadRed}{HTML}{9B2226}
+\definecolor{SoftGrey}{HTML}{F4F4F2}
+\definecolor{RuleGrey}{HTML}{BBBBBB}
+
+\newcommand{\done}{\textcolor{GoodGreen}{\textbf{DONE}}}
+\newcommand{\partialx}{\textcolor{WarnAmber}{\textbf{PARTIAL}}}
+\newcommand{\open}{\textcolor{BadRed}{\textbf{OPEN}}}
+\usepackage[htt]{hyphenat}
+\newcommand{\code}[1]{\texttt{\small\hyphenchar\font=`\-\relax #1}}
+
+\titleformat{\section}{\Large\bfseries}{\thesection}{0.7em}{}[\vspace{-0.6em}\rule{\textwidth}{0.8pt}]
+\titleformat{\subsection}{\large\bfseries}{\thesubsection}{0.7em}{}
+
+\pagestyle{fancy}
+\fancyhf{}
+\lhead{\small BP for diffusion scores --- research compendium}
+\rhead{\small\thepage}
+\renewcommand{\headrulewidth}{0.4pt}
+
+\newtcolorbox{keybox}[1][]{
+  breakable, colback=SoftGrey, colframe=RuleGrey, boxrule=0.5pt,
+  left=6pt, right=6pt, top=5pt, bottom=5pt, #1}
+
+\setlist[itemize]{leftmargin=1.4em, itemsep=2pt, topsep=3pt}
+\setlist[enumerate]{leftmargin=1.6em, itemsep=2pt, topsep=3pt}
+
+\title{\vspace{-1.5cm}\textbf{Belief propagation for diffusion scores}\\[0.3em]
+\large A complete record of the research: questions, answers, code, and what is missing}
+\author{Compiled for Giovanni Mantovani\\[0.2em]
+\small Advisors: Marc M\'ezard (supervisor), J\'er\^ome Garnier-Brun}
+\date{\today}
+
+\begin{document}
+\maketitle
+\thispagestyle{fancy}
+
+\begin{keybox}
+\textbf{Purpose.} This document exists because the research spread across several
+packages, two machines and a branch that was never merged, and the thread became hard to
+hold. It collects \emph{every} question posed by J\'er\^ome in the call of 29 July 2026 and
+by Marc in the follow-up email, together with every question the project posed to itself,
+and states for each one what was done analytically, what was measured, where the code and
+outputs live, and what is still missing.
+
+\medskip
+\textbf{Reading order if you have twenty minutes.} \S\ref{sec:orient} (where everything
+lives), \S\ref{sec:arc} (the story in one page), \S\ref{sec:scoreboard} (the scoreboard),
+\S\ref{sec:missing} (what is missing).
+\end{keybox}
+
+\tableofcontents
+\newpage
+
+%======================================================================
+\section{Orientation: where everything actually lives}
+\label{sec:orient}
+
+This section exists first because it is the part that was lost.
+
+\subsection{The repository and the branch}
+
+\begin{center}
+\begin{tabular}{@{}ll@{}}
+\toprule
+Remote & \url{https://github.com/GioviManto/diffusion} \\
+Local clone & \code{/Users/gloriabagnato/Code/Thesis/Diffusion} \\
+\textbf{Research branch} & \code{claude/em-bp-denoiser-learning-e07ike} \\
+Default branch & \code{main} --- 49 commits \emph{behind} the research branch \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\begin{keybox}
+\textbf{The single most important navigational fact.} Essentially all of the research
+lives on \code{claude/em-bp-denoiser-learning-e07ike} and has \textbf{never been merged
+into \code{main}}. The branch is 49 commits ahead; \code{main} contains nothing the branch
+lacks. If you check out \code{main} --- which is the default --- you will not see the EM
+work, the neural baselines, the reverse-diffusion code, the hierarchical experiments, or
+any of the reports.
+
+\medskip
+To see the work:
+\code{git fetch origin \&\& git checkout claude/em-bp-denoiser-learning-e07ike}
+\end{keybox}
+
+\subsection{Map of the branch}
+
+\begin{center}
+\begin{tabular}{@{}p{6.4cm}p{8.8cm}@{}}
+\toprule
+\textbf{Path} & \textbf{What is there} \\
+\midrule
+\code{research/nongaussian-bp/} & \textbf{The main package.} Layers 2--6: all 15
+experiments, the EM implementation, the neural baselines, the reverse SDE, the hierarchy
+code, 101 tests. \\
+\code{\quad src/} & 20 modules --- \code{em.py}, \code{kernels.py}, \code{denoiser.py},
+\code{reverse.py}, \code{nnet.py}, \code{hierarchy.py}, \code{bp\_grid.py},
+\code{bp\_mixture.py}, \code{discrete.py}, \code{local\_head.py}, \dots \\
+\code{\quad experiments/} & \code{exp\_01} \dots \code{exp\_15}, each self-contained and
+documented in its own docstring. \\
+\code{\quad outputs/} & One directory per experiment; CSVs and PNGs, all committed. \\
+\code{\quad tests/} & 10 test files, 101 tests. \\
+\code{\quad report/} & \code{em\_bp\_learning.pdf} (14\,pp, five propositions);
+\code{layer6\_session\_report.pdf} (15\,pp --- the Layer-6 account, including its own
+corrections section); \code{updated\_report.pdf}. \\
+\code{\quad hpc/} & SLURM templates --- \textbf{never adapted, never run}. See \S\ref{sec:hpc}. \\
+\code{\quad tools/} & \code{merge\_replicates.py}; \code{check\_reproducible.py}, written
+after the \code{rng\_for} bug (\S\ref{sec:corrections}) to verify that a fresh interpreter
+reproduces a run bit-for-bit. \\
+\midrule
+\code{questions/}\newline\code{\quad QUESTIONS\_AND\_ANSWERS.md} & \textbf{798 lines.} Every
+question from every source, with status. The primary source for \S\ref{sec:questions} of
+this document. \\
+\code{docs/}\newline\code{\quad EM\_BP\_LEARNING\_COMPENDIUM.md} & 872 lines. The Layer-5/6
+results in detail. \\
+\code{docs/RESULT\_LEDGER.md} & Every thesis claim classified
+EXACT / NUMERICAL / HEURISTIC / SPECULATIVE / FUTURE. \\
+\code{docs/PAPER\_CONNECTIONS.md} & Relation to the advisor papers: how they were read, two
+corrections that followed, the derivations in this package's conventions, and a ranked
+untried list (reproduced in \S\ref{sec:missing}). \\
+\code{docs/AGENT\_HANDOFF\_EM\_BP.md} & Practical notes for resuming work. \\
+\midrule
+\code{research/gaussian-ar1-bp/} & Layer 1--2, the Gaussian AR(1) baseline and the report
+that was discussed in the July call. \\
+\code{research/bp-from-scratch/}, \code{research/gaussian-bp/},
+\code{research/unified-note/} & Earlier analytic packages; \code{numerical\_audit.py} in
+the latter two (72/72 and 55/55 passing). \\
+\code{thesis/} & The thesis itself --- \code{main.tex}, 9 chapters, figures, bibliography. \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\subsection{The HPC --- and an important distinction}
+\label{sec:hpc}
+
+\begin{keybox}
+\textbf{The branch's experiments all ran locally.} \code{research/nongaussian-bp/hpc/}
+contains four SLURM array scripts (\code{slurm\_exp06}, \code{slurm\_exp07},
+\code{slurm\_layer6}, \code{slurm\_replicates} --- the last a 32-task array) plus a README.
+Its own README states they are \textbf{templates}: the lines marked \code{\# SITE} need the
+cluster's account, partition and module names, and \textbf{those were never filled in}.
+There is no \code{nongaussian-bp} directory on the Bocconi cluster.
+
+\medskip
+So every number in \S\ref{sec:questions} --- the 6-seed headline, the 12-replicate rate
+study, the 4-seed architecture comparison, all of Layer 6 --- was computed \textbf{on the
+laptop}. That is worth knowing both because it bounds what was affordable, and because the
+cluster path is available and unused if any of it needs scaling up.
+\end{keybox}
+
+\noindent
+Separately, there \emph{is} a live cluster project --- but it belongs to the
+\code{research/em-learning/} re-implementation (\S\ref{sec:duplication}), not to this
+branch:
+
+\begin{center}
+\begin{tabular}{@{}ll@{}}
+\toprule
+Host & \code{lnode01-da.hpc.unibocconi.it} \\
+User & \code{3164542} \\
+Scheduler & SLURM. QOS caps: \textbf{30 submitted, 10 running} per user. \\
+Disk & 144\,G used of a 180\,G soft / 200\,G hard quota. \\
+\midrule
+\code{\textasciitilde/bp-em-diffusion/} & 175\,M. Dedicated project directory. \\
+\code{\quad .venv/} & Dedicated venv: Python 3.13.11, numpy 2.3.5, matplotlib 3.10.7. \\
+\code{\quad code/} & The sweep code (a \emph{separate}, smaller re-implementation --- see
+\S\ref{sec:duplication}). \\
+\code{\quad outputs/} & Three completed sweeps, merged. \\
+\code{\quad logs/}, \code{STATUS.md} & Job logs and a status note. \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\noindent
+The three cluster sweeps are \textbf{complete}: 5{,}530 rows, \textbf{zero failed cells},
+48 CPU-hours. Merge and retrieve with:
+
+\begin{keybox}
+\code{ssh lnode01-da.hpc.unibocconi.it}\\
+\code{\textasciitilde/bp-em-diffusion/.venv/bin/python \textasciitilde/bp-em-diffusion/code/merge\_shards.py \textbackslash}\\
+\code{\quad --root \textasciitilde/bp-em-diffusion/outputs}\\[0.4em]
+\code{rsync -az 'lnode01-da.hpc.unibocconi.it:bp-em-diffusion/outputs/*/*\_all.csv' outputs/}
+\end{keybox}
+
+\noindent
+Lines beginning \code{!!} in the merge output mean missing or failed cells. On the last run
+every line began \code{OK}.
+
+\subsection{A duplication you should know about}
+\label{sec:duplication}
+
+There are \textbf{two} EM implementations in the project, and this is worth understanding
+because it is confusing otherwise.
+
+\begin{center}
+\begin{tabular}{@{}p{4.6cm}p{5.1cm}p{5.5cm}@{}}
+\toprule
+& \textbf{\code{research/nongaussian-bp/}} & \textbf{\code{research/em-learning/}} \\
+\midrule
+Where & the research branch & untracked, local only \\
+Status & \textbf{authoritative} & superseded \\
+Scope & 15 experiments, 4 kernel rungs, neural baselines, reverse SDE, hierarchies & 3 modules, 1 kernel rung, one MLP \\
+Tests & 101 & 4 suites \\
+Contributes & everything & the 5{,}530-row cluster sweep \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\noindent
+\code{research/em-learning/} was built from scratch in a later session without noticing the
+existing package. It reproduces a subset of the same physics with a different
+implementation. Its one durable contribution is the large cluster sweep, whose value is
+that it \textbf{independently replicates} the branch's central correction on separate code
+(\S\ref{sec:cluster}). Everything else in it should be regarded as superseded.
+
+%======================================================================
+\newpage
+\section{The story in one page}
+\label{sec:arc}
+
+\subsection{The scientific problem}
+
+In generative diffusion, a model is trained to denoise. The optimal denoiser is the
+posterior mean $\mathbb{E}[a \mid x, t]$, and the score follows from it by Tweedie's
+identity
+\[
+s_i(x,t) \;=\; -\,\frac{x_i - \alpha_t\, \mathbb{E}[a_i \mid x]}{\Delta_t},
+\qquad \alpha_t = e^{-t}, \quad \Delta_t = 1 - e^{-2t}.
+\]
+The difficulty that motivates everything: \textbf{for essentially no interesting data
+distribution is the exact score computable}. The field therefore cannot separate
+``the network learned the wrong score'' from ``the score itself is hard here''.
+
+There is a second, sharper motivation which J\'er\^ome supplied in the call and which
+belongs at the front of the thesis. The global minimiser of the diffusion training loss is
+the \emph{empirical} score --- a Gaussian mixture centred on the training points. A model
+that attained it would reproduce its training set exactly. That diffusion models
+nevertheless generalise is the central open puzzle, and studying it requires data
+distributions where the exact score is known.
+
+\subsection{The project's answer}
+
+Take the clean data to be a \textbf{first-order Markov chain}. Then:
+
+\begin{enumerate}
+\item Coordinatewise OU noising leaves the posterior a chain --- the likelihood factorises
+      sitewise and adds no edges.
+\item A chain is a tree.
+\item Sum-product belief propagation is \emph{exact} on a tree.
+\end{enumerate}
+
+\noindent
+So BP computes the exact diffusion score for a non-trivial, non-Gaussian, correlated data
+model. That is the asset the whole project is built on, and it is what J\'er\^ome called
+``the most important argument'' --- an efficient exact score where the field has almost none.
+
+\subsection{The six layers}
+
+\begin{center}
+\begin{tabular}{@{}p{1.1cm}p{6.0cm}p{8.1cm}@{}}
+\toprule
+& \textbf{What it established} & \textbf{Where} \\
+\midrule
+L1 & Gaussian AR(1): exact score in closed form; BP $=$ Kalman + RTS smoother. & \code{gaussian-ar1-bp/}, \code{gaussian-bp/} \\
+L2 & Grid BP as a calibrated numerical ground truth; the Gaussian closure characterised. & \code{exp\_01}, \code{exp\_02} \\
+L3 & Non-Gaussian innovations: when and how the Gaussian closure fails. & \code{exp\_03}, \code{exp\_09}, \code{exp\_11} \\
+L4 & Approximate Markovianity: the non-Markov correction is exactly rank one. & \code{exp\_04} \\
+L5 & \textbf{Learning.} The kernel becomes unknown and is estimated by EM through exact BP. & \code{exp\_06}--\code{exp\_08}, \code{exp\_10}, \code{exp\_12} \\
+L6 & Hierarchical priors, speciation ladders, memorisation. & \code{exp\_13}--\code{exp\_15} \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\noindent
+Layers 1--4 assume the prior is \emph{known}. Layer 5 is the one Marc asked for: remove that
+assumption.
+
+%======================================================================
+\newpage
+\section{The scoreboard}
+\label{sec:scoreboard}
+
+Every question from every source, in one table. Details in \S\ref{sec:questions}.
+
+\begin{center}
+\small
+\begin{longtable}{@{}p{1.0cm}p{9.6cm}p{4.4cm}@{}}
+\toprule
+\textbf{ID} & \textbf{Question} & \textbf{Status} \\
+\midrule
+\endhead
+\multicolumn{3}{@{}l}{\textbf{[E] Marc's email, 30 July 2026}}\\
+\midrule
+E1 & Introduce learning: regress BP parameters by EM instead of training a network & \done \\
+E2 & ``This does not require noising at all, I think'' & \done\ (sharpened) \\
+E3 & Efficient denoiser learning by EM vs a vanilla network $\Rightarrow$ publishable & \done \\
+E4 & Start an Overleaf write-up in paper format & \partialx \\
+E5 & Does this require autodiff through BP? & \done\ (no) \\
+\midrule
+\multicolumn{3}{@{}l}{\textbf{[C] J\'er\^ome's call, 29 July 2026}}\\
+\midrule
+C-i & Gaussian BP ``doing something strange, not just mean/variance'' & \done\ --- he was right \\
+C-ii & Problems in the definition of Gaussian BP & \done\ --- changes an interpretation \\
+C-iii & Re-run both the grid BP and the Gaussian case & \done \\
+C-iv & Then do the learning Marc asked for & \done \\
+C-v & Match BP's Gaussian closure to $\alpha_t\Sigma_0\Sigma_t^{-1}x$ analytically & \done \\
+C-vi & Check probability mass at the grid boundary & \done \\
+C-vii & Posterior mean is the better metric, not relative score & \done \\
+C-viii & Compare \emph{generated data}, not just scores (reverse diffusion) & \partialx \\
+C-ix & Train an MLP on the Laplace chain, compare to BP & \done \\
+C-x & How deep must a network be to implement BP on a chain? & \partialx\ (see N2) \\
+C-xi & Vary $\rho$ to see the effect of correlation & \done \\
+C-xii & Thesis framing: exact vs empirical score & \open\ (not written) \\
+\midrule
+\multicolumn{3}{@{}l}{\textbf{[R] The report's own ``next steps''}}\\
+\midrule
+R1 & More trials and larger grids & \done \\
+R2 & Explore different $\rho$ & \done\ --- \emph{sign is opposite} to the conjecture \\
+R3 & Laplace, Student, mixture, bounded-support innovations & \done \\
+R4 & Mixture \emph{message} approximations: how many components? & \done \\
+R5 & Do neural message approximators need BP structure? & \partialx \\
+\midrule
+\multicolumn{3}{@{}l}{\textbf{[F] The result ledger's ``explicitly future'' list}}\\
+\midrule
+F1 & Mixture-of-Gaussians message closure & \done\ ($=$ R4) \\
+F2 & Discrete-alphabet chain, exact vector messages & \done \\
+F3 & Chain $+$ global latent; hybrid BP $+$ learned residual & \partialx \\
+F4 & Reverse-SDE dynamics under exact / closed / truncated scores & \partialx \\
+F5 & Non-Gaussian locality laws & \done \\
+\midrule
+\multicolumn{3}{@{}l}{\textbf{[L] Questions raised during Layer 5}}\\
+\midrule
+L1 & Does the literal \emph{gradient} route work? & \done\ --- not one-sided \\
+L2 & Is the observed EM behaviour trustworthy? & \done\ --- five cross-checks \\
+L3 & Discretization artifacts? & \done\ --- two, both Laplace-only \\
+L4 & Can an unknown innovation law be recovered from noisy data alone? & \done\ --- yes \\
+\midrule
+\multicolumn{3}{@{}l}{\textbf{[P] Questions from the two advisor papers (Layer 6)}}\\
+\midrule
+P1 & Does a hierarchical prior show a \emph{ladder} of speciation times? & \done\ --- six of them \\
+P2 & Does our chain sit in that regime? & \done\ --- \textbf{no}; bounds generalisation \\
+P3 & Does memorisation/collapse apply to a BP score? & \done\ --- the axis does not exist \\
+P4 & Can EM through exact BP run on a tree? & \done\ --- yes, M-step unchanged \\
+P5 & Does the network acquire hierarchy levels in order? & \done\ --- no (data-limited) \\
+P6 & Does the EM-BP advantage grow with correlation range? & \partialx\ --- confounded \\
+\midrule
+\multicolumn{3}{@{}l}{\textbf{[N] New questions opened by the answers}}\\
+\midrule
+N1 & What scalar governs locality? & \done\ --- negentropy, not kurtosis \\
+N2 & Does a \emph{structured} architecture close the EM-BP gap? & \done\ --- most of it, but the rest \emph{grows} \\
+\bottomrule
+\end{longtable}
+\end{center}
+
+\begin{keybox}
+\textbf{Summary.} Of 33 questions: \textbf{25 answered}, \textbf{7 partial with the gap
+stated}, \textbf{1 open} (the thesis framing, which is writing rather than research).
+No original question is unaddressed.
+\end{keybox}
+
+%======================================================================
+\newpage
+\section{Theory: what was proved}
+\label{sec:theory}
+
+Five propositions, in \code{research/nongaussian-bp/report/em\_bp\_learning.tex}
+$\rightarrow$ \code{.pdf} (14\,pp, compiles clean).
+
+\begin{center}
+\small
+\begin{tabular}{@{}p{0.5cm}p{7.2cm}p{7.3cm}@{}}
+\toprule
+\# & \textbf{Statement} & \textbf{Why it matters} \\
+\midrule
+1 & \textbf{The E-step is exact.} Sitewise likelihood factors reweight node potentials
+without adding edges, so the posterior is still a chain; BP returns exact single-site
+\emph{and pairwise} marginals. &
+In a generic latent-variable model the E-step is approximate and the monotonicity
+guarantee dies with it. Here nothing is approximated but the message representation. \\
+\addlinespace
+2 & \textbf{The whole E-step is one matrix.} Everything compresses into an $M\times M$
+matrix $\Xi$ --- the continuum analogue of Baum-Welch's expected transition counts. &
+The M-step never touches the data again (cost $O(PM^2)$ regardless of $N$); observations at
+different noise levels simply \emph{add} into one $\Xi$; changing kernel family changes only
+the M-step. \\
+\addlinespace
+3 & \textbf{Fisher's identity $\Rightarrow$ no autodiff.}
+$\nabla L(\theta) = \langle \Xi(\theta), \nabla \log K_\theta\rangle$ is the exact gradient
+of the marginal log-likelihood. &
+BP is never differentiated through --- it \emph{supplies} the expectation. Everything is
+pure numpy. Verified against finite differences to $\sim 10^{-9}$. \\
+\addlinespace
+4 & \textbf{Noising never destroys identifiability.}
+$\varphi_{t,\theta}(\xi) = \varphi_\theta(\alpha_t\xi)\exp(-\Delta_t\|\xi\|^2/2)$; the
+Gaussian factor has no zeros and $\alpha_t>0$ for finite $t$. &
+Makes Marc's ``does not require noising'' precise: identifiability survives \emph{any}
+finite $t$. What degrades is \emph{information}. Injective but ill-conditioned. \\
+\addlinespace
+5 & \textbf{Denoiser sensitivity is a posterior covariance.}
+$\partial m_i/\partial\theta_p = \mathrm{Cov}(a_i, \sum_l \partial_{\theta_p}\log K(a_l|a_{l-1}))$. &
+One $N^{-1/2}$-consistent parameter fit gives an $N^{-1/2}$-accurate denoiser
+\emph{uniformly in $t$}. The network gets no such statement --- its error must be paid for
+separately in every region of $(x,t)$. \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\begin{keybox}
+\textbf{The structural argument in one sentence.} The learned parameters live on the
+\emph{clean} chain; the noise level lives in the \emph{likelihood}. So one fit serves every
+$t$, and the risk decomposition carries no function-class approximation term --- given a
+prior, BP returns the exact Bayes denoiser.
+\end{keybox}
+
+\subsection{The four kernel rungs}
+
+All consume the same $\Xi$. In \code{src/kernels.py}.
+
+\begin{enumerate}
+\item \textbf{Gaussian AR(1)} $(\rho,q)$ --- closed-form M-step (belief-weighted
+Yule--Walker). The correctness harness, since everything is analytically available.
+\item \textbf{Laplace AR(1)} $(\rho,b)$ --- closed form \emph{despite} non-differentiability:
+profile out $b$, and maximising over $\rho$ becomes weighted least-absolute-deviations,
+solved exactly by a weighted median of grid ratios. \emph{This rung has a lattice-bias
+pathology --- see \S\ref{sec:corrections}.}
+\item \textbf{Mixture innovation} $(\rho, \{\pi,\mu,\sigma^2\}_c)$ --- the honest ``we know
+it is Markov but not the model'' estimator. Has never heard of the Laplace density it must
+recover. Closed-form ECM via an inner latent.
+\item \textbf{Mixture-density network} --- a small MLP emitting a state-dependent mixture.
+By Fisher's identity it is evaluated and backpropagated \emph{only at the $M$ grid points},
+once per EM iteration, regardless of dataset size.
+\end{enumerate}
+
+%======================================================================
+\newpage
+\section{The questions, answered in full}
+\label{sec:questions}
+
+\subsection{[E] Marc's email}
+
+\subsubsection*{E1. EM instead of a neural network --- \done}
+
+This is the whole of Layer 5. Theory in \code{report/em\_bp\_learning.pdf};
+implementation in \code{src/em.py}, \code{src/kernels.py}, \code{src/denoiser.py}.
+
+Four structural points, none obvious at the outset: the E-step is \emph{exact}, not
+variational; the entire E-step compresses to one $M\times M$ matrix; \textbf{no autodiff is
+needed anywhere}; and one fit serves every noise level, because the learned object lives on
+$\mathbb{R}\times\mathbb{R}$ and carries no $t$.
+
+\subsubsection*{E2. ``Does not require noising at all'' --- \done, and sharpened}
+
+Marc's remark conflated two things, and separating them is the useful answer.
+
+\begin{itemize}
+\item \textbf{Identifiability is never destroyed by noising} (Prop.~4). The model is
+identifiable at any finite $t$ exactly when it is identifiable from clean data.
+\item \textbf{Information is destroyed, and fast.} Injective does not mean stable --- this is
+Gaussian deconvolution and the inverse map is unbounded. Measured per chain: $J[q,q]$ falls
+\textbf{142$\times$} from $t=0.05$ to $t=1.6$ while $J[\rho,\rho]$ falls \textbf{26$\times$}.
+\end{itemize}
+
+\noindent
+So the remark is right --- clean data is the $t\to 0$ limit and the most informative case,
+and \code{fit\_clean} does exactly that with no BP required. But the reason is not that
+noise breaks identification; it is that noise costs \emph{information}, and it hits the
+innovation \emph{shape} about 5$\times$ harder than the correlation.
+\textbf{Non-Gaussianity is the first thing the channel destroys} --- which is precisely the
+property this project cares about.
+
+\subsubsection*{E3. The publishable claim --- \done}
+
+Six independent training seeds, extended to $N=4096$. Test set and its exact-BP reference
+held fixed across seeds. Relative score error averaged over the noise schedule, $\pm 1$
+standard error:
+
+\begin{center}
+\begin{tabular}{@{}rrrr@{}}
+\toprule
+$N$ chains & best network & \textbf{EM-BP} & ratio \\
+\midrule
+32   & $0.6363 \pm 0.0043$ & $\mathbf{0.0651 \pm 0.0031}$ & 9.8$\times$ \\
+128  & $0.5117 \pm 0.0025$ & $\mathbf{0.0333 \pm 0.0035}$ & 15.4$\times$ \\
+512  & $0.2813 \pm 0.0013$ & $\mathbf{0.0211 \pm 0.0022}$ & 13.3$\times$ \\
+1024 & $0.2154 \pm 0.0009$ & $\mathbf{0.0182 \pm 0.0021}$ & 11.8$\times$ \\
+2048 & $0.1756 \pm 0.0009$ & $\mathbf{0.0142 \pm 0.0009}$ & 12.4$\times$ \\
+4096 & $0.1643 \pm 0.0009$ & $\mathbf{0.0124 \pm 0.0005}$ & 13.2$\times$ \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\noindent
+EM-BP uses \textbf{13 parameters}; the network \textbf{25{,}248}. EM-BP on \textbf{32}
+chains beats the network on \textbf{4096} by a factor of 2.5, with non-overlapping error
+bars --- so the network needs \textbf{more than 128$\times$ the data}, and that is a lower
+bound, since 32 was the smallest budget tried.
+
+\medskip
+\textbf{Three controls make this more than a favourable setup:}
+\begin{itemize}
+\item \emph{Capacity is not the explanation.} 24 configurations from 3.2k to 297k
+parameters; the best network reaches 0.208 against EM-BP's 0.022, and error \emph{degrades}
+with capacity.
+\item \emph{The yardstick is verified.} The reference denoiser everything is scored against
+agrees with 6M-sample importance sampling to $1.1\times 10^{-3}$ relative.
+\item \emph{The baseline works.} Trained on a Gaussian chain where the exact denoiser is
+closed-form and linear, it reaches 0.099 --- so the gap is a sample-efficiency effect, not a
+broken competitor.
+\end{itemize}
+
+\begin{keybox}
+\textbf{Two things stated against the claim.}
+\begin{enumerate}
+\item BP inference is \textbf{211--320$\times$ slower} per evaluation. Reverse diffusion
+calls the denoiser at every integration step, so this is the weakest point of the story.
+\item The baseline is a \emph{vanilla} MLP, as the email specified. A locality-respecting
+architecture closes most of the gap --- see N2, where the honest margin is
+\textbf{4.1$\times$}, not 10$\times$.
+\end{enumerate}
+\end{keybox}
+
+\subsubsection*{E4. The Overleaf write-up --- \partialx}
+
+\code{report/em\_bp\_learning.tex} was written paper-shaped on purpose: context, numbered
+propositions with proofs, detailed calculation delegated to remarks and appendices,
+limitations as a first-class section. It compiles clean to 14\,pp.
+
+\textbf{Gap:} it has \textbf{no results section} --- the numbers live in the compendium and
+the CSVs --- and \textbf{no Overleaf project exists}. Converting it is mechanical; \S4 of
+the compendium is the raw material. \emph{This is the item with the deadline attached.}
+
+\subsubsection*{E5. Does this need autodiff through BP? --- \done: no}
+
+Advice received elsewhere held that EM here ``will require moving the grid BP
+forward-backward passes into an automatic differentiation framework''. That is wrong, and
+it is the single most useful practical finding of the layer. Fisher's identity gives the
+gradient of the \emph{exact} marginal log-likelihood from one BP pass, with nothing
+differentiated through the recursion. BP is not a computation graph to backpropagate; it is
+the oracle that supplies the expectation. Verified against finite differences to
+$\sim 10^{-9}$. The entire implementation is pure numpy.
+
+\subsection{[C] J\'er\^ome's call}
+
+\subsubsection*{C-i, C-ii, C-iii. The Gaussian BP was wrong --- \done, he was right}
+
+J\'er\^ome's concern in the call was that Gaussian-projected BP was ``not updating just the
+mean and variance \dots but doing something strange'', and that Figure~2 ought to beat
+Figure~1 because it carries no discretization. He was right, and the bug was worse than a
+bug --- \textbf{it invented information}.
+
+The old routine evaluated each Gaussian message \emph{on the grid}, pushed it through the
+exact grid update, then moment-matched. At weakly informative $t$ the outgoing message is a
+near-flat ramp whose maximiser lies outside $[-A,A]$; moment-matching that \emph{truncated}
+function drags the mean toward the boundary, and the next update pushes it further ---
+positive feedback, ending with the message pinned at the edge. Equivalently: an infinite
+variance became $(2A)^2/12 \approx 21$ on a truncated grid, injecting spurious precision
+$\sim 3/A^2$.
+
+The replacement does exactly what the call asked: \textbf{analytic information form},
+carrying only precision $\lambda$ and information $h$, closed-form updates, no grid
+anywhere. A flat message is $\lambda=0$ exactly, so nothing is ever truncated.
+
+\begin{center}
+\begin{tabular}{@{}rrr@{}}
+\toprule
+$t$ & information form & legacy grid projection \\
+\midrule
+0.2 & $1.2\times10^{-15}$ & $3.9\times10^{-6}$ \\
+0.6 & $1.0\times10^{-15}$ & $9.4\times10^{-3}$ \\
+1.0 & $4.4\times10^{-16}$ & $1.1\times10^{-1}$ \\
+1.3 & $6.7\times10^{-16}$ & $4.9\times10^{-1}$ \\
+1.8 & $4.4\times10^{-16}$ & $\mathbf{9.1\times10^{-1}}$ \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\noindent
+(max absolute error in the posterior mean). Exact to machine precision at every noise level;
+the legacy form up to six orders of magnitude worse, and worsening precisely as the
+likelihood stops being informative --- the signature of the mechanism above.
+
+\medskip
+\textbf{C-ii changes an interpretation.} For \emph{linear-transition} chains with Gaussian
+OU likelihoods, moment-matched single-Gaussian BP is \emph{mathematically identical} to
+exact Gaussian BP on the covariance-matched AR(1) model: the transition step maps
+$N(m,v)$ to something with first two moments $(\rho m, \rho^2 v + q)$ \emph{regardless of
+innovation shape}. So ``Gaussian \textbf{message} approximation error'' and ``Gaussian
+\textbf{model} approximation error'' are the same object at the single-Gaussian level. What
+the old package reported as a message-representation error was a model error. The values
+were right; the label was not. This is exactly why R4 (mixture-message closure) was the
+open question worth doing --- it is the first place the two are separable.
+
+\textbf{C-iii: both re-run}, under corrected code \emph{and} fixed seeding. Grid BP is
+spectrally accurate at the working default: worst relative error $9.2\times10^{-15}$ at
+$M=401$, $A=8$. Gaussian BP is clean, monotone, artifact-free, with the score/mean identity
+holding to $\le 2.9\times10^{-12}$ on every row.
+
+\subsubsection*{C-v. Match the Gaussian closure to $\alpha_t\Sigma_0\Sigma_t^{-1}x$ --- \done, exceeded}
+
+J\'er\^ome asked whether one could show explicitly that propagating BP's Gaussian messages
+to their fixed point reproduces the closed-form Gaussian score. It does, and the result is
+stronger than asked: the closure uses \emph{only} the innovation's first two moments, so it
+returns the LMMSE denoiser for \textbf{any} additive innovation with mean 0 and variance
+$q$, not just Gaussian. Verified to $\sim 6\times10^{-16}$ across five families, and
+independently confirmed by the cluster sweep, where the Gaussian column is machine epsilon
+(\S\ref{sec:cluster}).
+
+\subsubsection*{C-vi. Boundary mass --- \done}
+
+J\'er\^ome: ``you could add something in the code that checks that the support at the borders
+of the grid is small enough.'' Implemented as \code{boundary\_mass()} and recorded per cell.
+Grid widened $[-8,8]\to[-12,12]$; boundary mass $7.4\times10^{-7} \to 5.3\times10^{-10}$.
+Worst value over all 160 sweep cells: $2.0\times10^{-5}$. Truncation drives nothing.
+
+\subsubsection*{C-vii. Posterior mean is the better metric --- \done}
+
+Adopted throughout. The denoising loss is additionally framed against its \emph{Bayes-risk
+floor}, since raw loss reduction is meaningless --- an earlier test demanded a $>40\%$
+reduction when the arithmetic maximum was 39\%.
+
+\subsubsection*{C-viii. Compare generated data, not scores --- \partialx}
+
+This is the point J\'er\^ome returned to most often: ``the error on the score \dots and the
+distribution of data you end up generating \dots is not trivial, because you accumulate the
+errors of the scores, and not all times are equal.''
+
+\code{exp\_05} ran it. Under the Gaussian score on a Laplace chain: second-order statistics
+are reproduced, but heavy tails are \textbf{washed out} --- excess kurtosis \textbf{0.12}
+against a true \textbf{2.7--2.9}. The score error is dynamically stable in $L^2$ (trajectory
+divergence 0.11 despite pointwise deviation 0.49 at small $t$) yet \emph{distributionally
+decisive} in higher moments. That is the sharpest available statement of why score error and
+sampling error are different quantities.
+
+\textbf{Gap:} never run with a \emph{learned} score. Now that Layer 5 produces one, the
+obvious experiment is reverse dynamics under the EM-learned kernel versus the network ---
+which is also where BP's 211--320$\times$ inference penalty would actually bite.
+
+\subsubsection*{C-ix, C-x. MLP vs BP, and the depth question --- \done\ / \partialx}
+
+J\'er\^ome asked for the Laplace chain specifically, and for good reason: in the Gaussian
+case BP is linear and he called Markovianity there ``completely useless \dots basically like
+doing covariance''. \code{exp\_07} does exactly this on the Laplace chain (E3 above).
+
+On depth --- ``the biggest question at the moment is what is the required depth of a neural
+network that you need to learn it?'' --- \code{exp\_12} answers the adjacent and more
+tractable question of \emph{receptive field} rather than depth. See N2 and
+\S\ref{sec:receptive}. The literal depth question, in the form J\'er\^ome posed it (can a
+narrow-but-deep network implement the two BP sweeps, and how many layers does it need?),
+\textbf{has not been tested}.
+
+\subsubsection*{C-xi. Vary $\rho$ --- \done, and the sign is a surprise}
+
+See R2 below. Stronger correlation \emph{helps} the Gaussian closure, contrary to the
+conjecture in the report.
+
+\subsubsection*{C-xii. Thesis framing --- \open}
+
+J\'er\^ome handed over the whole narrative arc in the call: the empirical-score mystery
+motivates needing exact scores on controllable data $\to$ Markov chains are such a model
+$\to$ BP computes the exact score $\to$ compare against trained networks. \textbf{Not a line
+of it is written down.} This is writing, not research, and it is on the critical path.
+
+\subsection{[R] The report's own next steps}
+
+\subsubsection*{R1. More trials and larger grids --- \done}
+
+Grid: relative error against an $M=1201$ reference is $1.9\times10^{-5}$ ($M=201$),
+$4.1\times10^{-6}$ ($M=401$), $1.5\times10^{-6}$ ($M=601$). $M=401$, $A=8$ is the working
+default, four orders of magnitude below any learning error in the project.
+
+Trials: this mattered more than expected. The $N^{-1/2}$ rate study at \textbf{4} replicates
+gave slopes $-0.26, -0.69, -0.25, -0.41$ against a predicted $-0.50$ and did \emph{not}
+support the rate. Re-run at \textbf{12} replicates it gives a combined slope of
+$\mathbf{-0.500 \pm 0.048}$, excluding $-0.25$ and $-0.75$ at $5.2\sigma$.
+
+\begin{keybox}
+\textbf{Rule adopted:} any rate claim needs replicates in the \emph{tens}, not the units.
+An RMSE over 4 samples cannot resolve a slope better than about $\pm 0.2$.
+\end{keybox}
+
+\subsubsection*{R2. Explore different $\rho$ --- \done, sign opposite to the conjecture}
+
+\begin{center}
+\begin{tabular}{@{}lrrr@{}}
+\toprule
+family & $\rho=0.5$ & $\rho=0.85$ & $\rho=0.95$ \\
+\midrule
+Laplace          & 0.520 & 0.354 & 0.270 \\
+Student-$t$(5)   & 0.317 & 0.241 & 0.135 \\
+mixture $\kappa=0.9$ & 0.939 & 0.714 & 0.368 \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\noindent
+(median relative score error at small $t$.) The report conjectured stronger correlation
+would make messages \emph{more} non-Gaussian and so harder. The measurement says the
+reverse: \textbf{a more informative message is closer to Gaussian, because it concentrates}.
+
+\subsubsection*{R3. Four innovation families --- \done, with a genuine negative}
+
+Laplace, Student-$t$ ($\nu=5,8$), symmetric Gaussian mixture ($\kappa=0.3,0.6,0.9$),
+spanning excess kurtosis $-1.62$ to $+6.00$; plus bounded support (\code{UniformAR1},
+excess kurtosis $-1.20$).
+
+The bounded case was the interesting one because it fails a Gaussian closure through
+\emph{support} rather than shape --- the true posterior is exactly zero outside a finite
+interval and no Gaussian message can represent that edge. The question was whether
+$|$excess kurtosis$|$ survives as the one-number summary when the failure mode changes in
+kind. \textbf{It does.} Fitting
+$\log_{10}(\text{error}) = 0.801|\text{kurt}| - 2.234$ on the three mixtures alone and
+extrapolating to the uniform prior predicts $5.33\times10^{-2}$; measured
+$\mathbf{6.07\times10^{-2}}$, a factor of 1.14. A qualitatively different failure mode did
+\emph{not} produce a qualitatively different error.
+
+\subsubsection*{R4 / F1. Mixture-message closure --- \done}
+
+Messages are Gaussian mixtures; multiply, forward-push and backward-push are exact and
+closed; component count multiplies at every step, so Runnalls' KL-based pairwise merge
+collapses back to $C$. \textbf{That merge is the only approximation in the recursion.}
+
+\begin{center}
+\begin{tabular}{@{}lrr@{}}
+\toprule
+prior & $C$ for 10$\times$ over single-Gaussian & $C$ for 100$\times$ \\
+\midrule
+$\kappa=0.3$ (kurt $-0.18$) & 2 & 4 \\
+$\kappa=0.6$ (kurt $-0.72$) & 2 & 4 \\
+$\kappa=0.9$ (kurt $-1.62$) & 3 & 6 \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\noindent
+\textbf{Two to three components buy an order of magnitude; four to twelve buy two.}
+
+And --- the separation the project wanted since C-ii --- on a Laplace chain, which the
+mixture family \emph{cannot} represent exactly, the curve flattens onto a floor. That floor
+is \textbf{model} error; everything above it is \textbf{representation} error:
+
+\begin{center}
+\begin{tabular}{@{}lrr@{}}
+\toprule
+kernel fitted with & $C=1$ & floor reached \\
+\midrule
+2 components & $5.28\times10^{-2}$ & $9.25\times10^{-3}$ \\
+4 components & $5.44\times10^{-2}$ & $3.33\times10^{-3}$ \\
+8 components & $5.76\times10^{-2}$ & $1.68\times10^{-3}$ \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\noindent
+This is the first place in the project where the two error sources are visible as separate
+quantities rather than the single conflated number.
+
+\subsubsection*{R5. Do neural message approximators need BP structure? --- \partialx}
+
+Three data points, pointing the same way but with a twist:
+
+\begin{itemize}
+\item \emph{Layer 4:} a residual MLP on a \emph{frozen} Markov-BP score beats a direct score
+MLP by ${\sim}20\times$. Structure preserved $\to$ large gain.
+\item \emph{Layer 5:} EM-learned BP beats a vanilla score network by ${\sim}10\times$.
+Structure preserved $\to$ large gain.
+\item \emph{The other direction:} a mixture-density network placed \emph{inside} the BP
+recursion --- maximal structure preservation --- is \textbf{dominated} by a 13-parameter
+mixture kernel (held-out score error 0.052 vs 0.026).
+\end{itemize}
+
+\noindent
+So the sharper reading is that \textbf{structure preservation is necessary, not
+sufficient}: rung 4 preserves it perfectly and still loses, because the extra flexibility
+buys nothing and costs optimisation difficulty. \emph{Gap:} all three use chain priors where
+a low-dimensional family is adequate.
+
+\subsection{[F] The ledger's future list}
+
+\subsubsection*{F2. Discrete alphabet --- \done, and it is the cleanest result in the project}
+
+\code{src/discrete.py}, \code{exp\_10}. The clean chain takes finitely many values; noising
+is still the continuous OU channel, so observations are real-valued, but messages are
+$S$-vectors. \textbf{BP is exact up to roundoff} --- verified against explicit enumeration
+of all $S^n$ configurations: $\Xi$ to $4.4\times10^{-15}$, posterior means to
+$2.9\times10^{-15}$, log-evidence to \emph{exactly} zero difference.
+
+Every discretization caveat disappears simultaneously: no quadrature, no truncation, no
+resolution condition, and in particular no ratio-lattice quantization.
+
+\textbf{The Baum-Welch analogy becomes an identity.} Here $\Xi$ \emph{is} the expected
+transition-count matrix and the M-step is exactly Baum-Welch's: normalise the counts.
+Monotonicity violation is \textbf{exactly 0.0}.
+
+\textbf{A confound-free retest of the headline}, with the reference exact rather than a
+fine-grid approximation ($S=5$, 20 learned parameters vs 25{,}248):
+
+\begin{center}
+\begin{tabular}{@{}rrrr@{}}
+\toprule
+$N$ & best network & \textbf{EM-BP} & ratio \\
+\midrule
+32   & 0.761 & \textbf{0.184} & 4.1$\times$ \\
+128  & 0.641 & \textbf{0.085} & 7.5$\times$ \\
+512  & 0.398 & \textbf{0.052} & 7.7$\times$ \\
+2048 & 0.263 & \textbf{0.032} & 8.3$\times$ \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\noindent
+EM-BP on 32 chains again beats the network on 2048, reproducing the $\ge 64\times$ gap with
+\textbf{zero grid error}.
+
+\begin{keybox}
+\textbf{Two honest findings that qualify the headline.}
+
+\emph{The advantage erodes as the model grows.} At $N=512$, the ratio over the best network
+falls $15.4\times$ ($S=3$, 6 params) $\to 17.7\times$ ($S=4$) $\to 8.0\times$ ($S=6$)
+$\to 5.7\times$ ($S=8$) $\to 4.4\times$ ($S=12$, 132 params). Still ahead, but the trend is
+unambiguous: \textbf{the sample-efficiency advantage is tied to the parametric dimension
+being small}, exactly as Prop.~5 predicts. Nothing here says a structured estimator wins
+once its parameter count approaches the network's.
+
+\emph{The recovery rate degrades with $S$, and it is not a metric artifact.} Slopes go
+$-0.55$ ($S=3$) to $-0.18$ ($S=8$); re-run with a per-entry metric the degradation persists.
+The mechanism is \textbf{level crowding}: at fixed unit variance the $S$ levels sit
+${\sim}1/S$ apart while the channel resolves only $\sqrt{\Delta_t}/\alpha_t$. At $S=8$ that
+ratio is already $0.93 < 1$ at the \emph{lowest} training noise --- adjacent levels are not
+distinguishable through the channel at all. An identifiability limit imposed by the channel,
+not a failure of the estimator.
+\end{keybox}
+
+\subsubsection*{F3. Chain $+$ global latent --- \partialx}
+
+Layer 4 established the operator-level result: for AR(1)-plus-global-latent priors the
+non-Markov score correction is \textbf{exactly rank one} (Woodbury), and a residual MLP on a
+frozen Markov-BP score is ${\sim}20\times$ more efficient than a direct score net.
+
+\textbf{Gap:} that used the \emph{true} chain prior. A \emph{learned} chain kernel carrying
+a learned low-rank correction is untouched. This is the single most natural next piece of
+research the repository contains.
+
+\subsubsection*{F5. Non-Gaussian locality --- \done}
+
+Six families at matched $(\rho,q)$, so they differ only beyond second moments. Ratio of
+fitted locality decay rate to the Gaussian rate:
+
+\begin{center}
+\begin{tabular}{@{}lrrrrr@{}}
+\toprule
+$\rho$ & $t=0.05$ & $t=0.10$ & $t=0.20$ & $t=0.40$ & $t=0.80$ \\
+\midrule
+0.50 & \textbf{2.08} & 1.65 & 1.19 & 1.05 & 0.99 \\
+0.85 & \textbf{1.47} & 1.19 & 1.06 & 1.02 & 1.00 \\
+0.95 & 1.10 & 1.01 & 1.01 & 1.00 & 1.00 \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\noindent
+Non-Gaussian chains are \textbf{less local} than their covariance-matched Gaussian, and the
+excess vanishes in both limits --- largest at low noise and weak correlation, gone by
+$t\gtrsim 0.4$ or $\rho\gtrsim 0.95$.
+
+\textbf{Architectural consequence:} since $r \sim \log(1/\epsilon)/\log(1/q)$, a receptive
+field sized on Gaussian intuition is too small by up to $\mathbf{2.45\times}$ for bimodal
+data at low noise.
+
+\subsection{[L] Questions raised during Layer 5}
+
+\subsubsection*{L1. Does the literal gradient route work? --- \done, not one-sided}
+
+Marc's email described \emph{gradient} ascent, not EM, so both were measured. They share the
+E-step and $\Xi$ and differ only in what they do with it. \textbf{The split is not the one
+intuition suggests:}
+
+\begin{itemize}
+\item \textbf{Smooth (Gaussian) kernel:} gradient ascent converges to \emph{exactly} EM's
+optimum (log-likelihoods matching to $2\times10^{-9}$ nats at $\eta=0.5$). At $\eta=2$ it
+diverges (527 nats of monotonicity violation); at $\eta=8$ it leaves the admissible set.
+\textbf{Nothing gained over EM, and a step size must be tuned to lose nothing.}
+\item \textbf{Laplace kernel:} gradient ascent is genuinely \textbf{better} --- higher
+likelihood ($-8064.7$ vs $-8066.6$) and better on both parameters. Because there EM's M-step
+is exactly optimal \emph{for the discretized model} and lands on a lattice point (L3).
+\end{itemize}
+
+\noindent
+\textbf{Recommendation:} exact M-step where it exists \emph{and} the kernel is smooth;
+gradient route where the M-step has no closed form or where its exact solution is a
+discretization artifact.
+
+\subsubsection*{L2. Is the EM behaviour trustworthy? --- \done, five independent cross-checks}
+
+These deliberately take routes sharing no code with what they test.
+
+\begin{center}
+\small
+\begin{tabular}{@{}p{5.4cm}p{6.0cm}p{3.4cm}@{}}
+\toprule
+\textbf{check} & \textbf{route} & \textbf{result} \\
+\midrule
+$\Xi$ vs brute force & enumerate all $M^n$ discretized configurations and marginalise by
+summation --- no messages anywhere & $\mathbf{1.0\times10^{-14}}$ \\
+Evidence vs Monte Carlo & importance sampling on the \emph{Laplace} chain, where no closed
+form exists & $\mathbf{0.59}$ s.e. (4M samples) \\
+EM fixed point is stationary & Fisher's identity, independent of how the M-step chose its
+update & $\|\nabla L\|$ falls $\mathbf{8.1\times10^{6}}\times$ \\
+Reference denoiser vs importance sampling & the yardstick every exp\_07 number is measured
+against & $\mathbf{1.1\times10^{-3}}$ relative \\
+Baseline network can learn & trained on a Gaussian chain with a closed-form linear target &
+best error $\mathbf{0.099}$ \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\noindent
+Plus \textbf{monotonicity violation of exactly 0} in every EM run across every experiment ---
+the sharpest single test, since an error anywhere in the recursion, the accumulation or the
+M-step generically breaks it.
+
+\subsubsection*{L3. Discretization artifacts --- \done: two, both Laplace-only}
+
+\textbf{Lattice quantization.} The Laplace M-step minimises $\sum \Xi|u_k - \rho u_j|$, whose
+minimiser is a \emph{breakpoint} --- one of the ratios $u_k/u_j$, i.e.\ a rational. On a
+uniform grid through the origin, low-denominator values like $4/5$ have many aliases
+($8/10$, $12/15$, \dots) pooling weight onto them. \textbf{$4/5$ is an attractor.} For
+$\rho^*=0.7913$, chosen deliberately off the lattice, $\hat\rho$ is pinned at exactly
+$0.8000$ across an \textbf{8$\times$ grid refinement}, holding a constant $0.0087$ bias. It
+is a \emph{bias}, not a resolution limit --- more grid points do not help. It contaminates
+$b$ by 3--4$\times$ where $\rho$ is snapped.
+
+\textbf{Gradient quadrature.} $\partial_\rho \log K$ carries $\mathrm{sign}(e)$; trapezoidal
+quadrature of a discontinuous integrand loses the spectral accuracy the rest of the package
+enjoys --- off ${\sim}13\%$ at $M=201$, still ${\sim}0.1\%$ at $M=1601$. The $b$ direction,
+being smooth, is exact to machine precision --- confirming Prop.~3 is fine and the
+quadrature is not.
+
+\begin{keybox}
+\textbf{Consequence adopted:} every rate and accuracy claim in the project uses the Gaussian
+or mixture kernel, \textbf{never the Laplace one}.
+\end{keybox}
+
+\subsubsection*{L4. Can an unknown innovation law be recovered from noisy data? --- \done: yes}
+
+The mixture kernel has never heard of the Laplace density it must recover. Fitted to
+\textbf{noisy observations only} ($N=1024$, one noisy realisation per chain, noise up to
+$t=1.6$, never a clean sample):
+
+\begin{center}
+\begin{tabular}{@{}lrrrr@{}}
+\toprule
+$C$ & $\hat\rho$ & innov.\ var & excess kurtosis & $\log L$ \\
+\midrule
+2 & 0.806 & 0.363 & 1.95 & $-42659.4$ \\
+3 & 0.807 & 0.360 & 2.23 & $-42658.4$ \\
+5 & 0.808 & 0.360 & 2.62 & $-42655.7$ \\
+8 & 0.807 & 0.361 & \textbf{2.71} & $-42655.5$ \\
+\emph{true} & \emph{0.800} & \emph{0.360} & \emph{3.00} & \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\noindent
+Variance recovered essentially exactly from $C=3$; the heavy tail climbs monotonically
+toward its true value; monotonicity violation exactly 0 throughout.
+
+\textbf{Caveat, recorded because it was first got wrong:} the \emph{kurtosis} estimate is
+high-variance. At one replicate per $N$ it reads $2.91, 3.45, 3.70, 3.29, 2.64$ for
+$N=128\dots2048$ --- non-monotone, and overshooting the true 3.0. What improves monotonically
+is the quantity that matters, the denoiser error ($0.083 \to 0.037$).
+
+\subsection{[P] Questions from the two advisor papers}
+
+\begin{keybox}
+\textbf{Access status, stated precisely --- this changed partway through the work.}
+
+\medskip
+\textbf{P1 (hierarchical filtering, arXiv:2408.15138) has been read in full.} Direct HTTP is
+blocked at the environment's gateway (403 on arXiv, Nature, PMC, HAL, PMLR), but the Hugging
+Face Hub exposes \code{hf://papers/2408.15138/paper.md} through a server-side route
+returning the complete LaTeXML rendering including appendices. Everything about P1 is from
+the source.
+
+\medskip
+\textbf{P2 (dynamical regimes, Nat.\ Commun.) has \emph{not} been read.} It is not on that
+route and every direct route is blocked. What is said about it comes from web search at
+abstract level, and \textbf{nothing mathematical is quoted from it}. The speciation crossover
+used throughout is derived from scratch in this package's conventions and checked against
+40{,}000 sampled forward trajectories. \emph{One search summary rendered the condition with a
+reciprocal, $t_S = \tfrac12\log(1/\Lambda)$, contradicting its own statement that $t_S$
+diverges with dimension --- deriving it independently avoided importing that slip.}
+\textbf{Read P2 before citing it.}
+\end{keybox}
+
+\noindent
+\textbf{Reading P1 overturned two substantive things}, both corrected in place:
+
+\begin{enumerate}
+\item \textbf{The filtering construction was wrong.} ``Filter at level $k$'' had been
+implemented as $b^k$ \emph{independent} subtrees. P1 §2.2 instead draws the depth-$k$ nodes
+\textbf{conditionally independently given the root}, with the marginals the unfiltered model
+gives them. The blocks therefore stay correlated \emph{through the root}; at $k=L$ the leaves
+become conditionally i.i.d.\ given the root --- the regime where P1 notes a Naive Bayes
+classifier is optimal and attention is superfluous. Independent blocks would have put a zero
+where the correct construction puts $\rho^{2L}$. A test now pins the distinction.
+
+\item \textbf{The claim that the hierarchy\,$\times$\,diffusion intersection was
+``untouched by either paper'' was false.} Sclocchi, Favero and Wyart, \emph{A phase
+transition in diffusion models reveals the hierarchical nature of data}, PNAS 122(1)
+e2408799121 (2025), arXiv:2402.16991 --- \textbf{cited by P1 itself} --- studies exactly
+diffusion on hierarchically generated data. The measurements here turn out to be
+\emph{consistent with} that picture rather than novel against it.
+\end{enumerate}
+
+\begin{keybox}
+\textbf{Consequence for the thesis:} that third paper is the closest prior work and must be
+read before anything about hierarchy and diffusion is written. An earlier version of the
+project's own notes claimed its territory was empty.
+\end{keybox}
+
+\medskip
+\noindent
+\textbf{A methodological correction that follows.} P1's probe for sequential learning is
+\emph{not} ``resolve the error onto levels and watch it move'' --- which is what
+\code{exp\_13 ordering} did, finding nothing. It is to compare the model's predictions
+against the \emph{family} of mismatched oracles $\mathrm{BP}_k$ and ask which one it
+currently agrees with. \code{exp\_15} implements that; see P5.
+
+\subsubsection*{P1. A ladder of speciation times --- \done: six of them}
+
+The balanced-tree prior has an ultrametric leaf covariance with exactly $L+1$ distinct
+eigenvalues, so it has $L+1$ speciation times. On a depth-5 binary tree, $\rho=0.9$:
+predicted $t_S = \tfrac12\log(1+\Lambda)$ against the measured crossing of the commitment
+curve through $1/\sqrt2$ gives
+$1.363/1.368$, $0.707/0.732$, $0.516/0.521$, $0.346/0.340$, $0.202/0.208$, $0.087/0.087$ ---
+agreeing to $\le 3.5\%$ at every level. The reverse SDE driven by exact tree BP reproduces
+the same ladder and therefore \textbf{resolves the hierarchy coarse-to-fine}.
+
+\emph{Reported rather than trimmed:} the reverse crossing at the finest level lands at 0.125
+against 0.087 predicted --- the Euler--Maruyama step and the $t_{\min}=0.02$ floor, which
+bite hardest exactly there.
+
+\subsubsection*{P2. Does our chain sit in that regime? --- \done: no, and this bounds the project}
+
+The AR(1) top eigenvalue is bounded by $(1+\rho)/(1-\rho)$ at any length: 64$\times$ the
+chain length moves it under 2$\times$ ($\rho=0.85$: $5.49 \to 12.32$ against a limit of
+12.33). So its speciation time \textbf{saturates}: a stationary Markov chain has no diverging
+speciation time and \textbf{no cascade}. Only the hierarchy produces them.
+
+\begin{keybox}
+\textbf{This is the most important limiting result in the project.} Any claim transferred
+from this chain model to image-like or hierarchically structured data has to cross that gap
+\emph{explicitly}. It should appear in the thesis as a scope statement, not be discovered by
+an examiner.
+\end{keybox}
+
+\subsubsection*{P3. Does memorisation/collapse apply to a BP score? --- \done: the axis does not exist}
+
+Not a matter of degree. The empirical score's sufficient statistic \emph{is} the training set
+--- $N\times n$ numbers --- which is why it must collapse onto that set. A BP score's
+sufficient statistic is the fitted kernel, a fixed-size object independent of $N$. There is
+no mechanism by which it can memorise, because it never retains the samples. This supplies
+the \emph{mechanism} behind the Layer-5 headline: the sample-efficiency advantage and the
+absence of memorisation are the same fact seen from two sides.
+
+\subsubsection*{P4. Can EM through exact BP run on a tree? --- \done: yes, M-step unchanged}
+
+\code{tree\_e\_step} produces the \textbf{same $\Xi$} as the chain E-step. That is where the
+topology stops being visible, so every kernel consumes it without modification --- a
+chain-trained and a tree-trained M-step are the same code. Verified against the closed-form
+Gaussian marginal likelihood to relative $10^{-6}$.
+
+\textbf{But convergence is much slower, and this matters practically.}
+$\hat\rho = 0.7360 \to 0.7483 \to 0.7487$ at 50/100/150 iterations (true 0.75), zero
+monotone violation throughout. Internal nodes are never observed, so the missing-information
+fraction is far larger than on a chain. \emph{An estimate read at 40 iterations looks like a
+broken M-step and is merely unconverged --- this cost real time.}
+
+\subsubsection*{P5. Does the network acquire hierarchy levels in order? --- \done: no}
+
+\textbf{Two probes, and the second is the right one.} The first
+(\code{exp\_13 ordering}) resolved the error onto hierarchy levels and watched it move. It
+found nothing --- and, per the methodological correction above, \emph{could not have} answered
+the question. It is retained only as a record of that.
+
+\textbf{The correct probe} (\code{exp\_15 alignment}) trains a denoiser on unfiltered data and
+tracks which mismatched oracle $\mathrm{BP}_k$ it is closest to. Result: \textbf{a weak
+version of the effect, not the staircase.} The argmin moves in the predicted direction at the
+two intermediate noise levels --- $2\to2\to0$ at $t=0.4$ and $2\to1\to1$ at $t=0.8$ over the
+first ${\sim}1000$ gradient steps --- then \textbf{saturates for the remaining 31{,}000}. At
+$t=0.1$, $0.2$ and $1.6$ it never leaves $k=0$.
+
+So the direction is right, the effect is early and small, and nothing like the clean staircase
+P1 reports. Three plausible reasons, none verified here: P1's oracles are far more
+distinguishable (a discrete non-overlapping transition tensor versus a Gaussian edge); a
+denoising regression loss converges in far fewer steps than their masked-language objective,
+which needs ${\sim}10^3$ epochs; and the architecture and task differ.
+\textbf{The honest summary is that this setting is too easy to resolve the phenomenon}, not
+that the phenomenon is absent.
+
+\medskip
+\textbf{The per-level error is flat} across levels \emph{and} across training budget
+(250 $\to$ 16{,}000 gradient steps), consistent with the above.
+
+\textbf{But the level-resolved error is decisive about something else.} Against the right
+null --- a method with uniform per-mode error --- the concentration ratio spreads across
+levels by \textbf{1.6--2.2$\times$ for the $\epsilon$-network} (flat: as if the hierarchy did
+not exist), 2.8--12.6$\times$ for the $x_0$-network, and \textbf{224--6957$\times$ for
+EM-BP}, migrating from the finest levels at small $t$ to the coarsest mode at large $t$.
+That is a quantitative sense in which BP inherits the hierarchy from the graph and the
+network does not.
+
+\emph{Methodological note already paid for:} per-level error must be reported
+\textbf{absolutely}, not only relatively. A relative error divides by the reference magnitude
+in that subspace, which shrinks with the level's eigenvalue, so fine levels look worse for
+\emph{every} method --- including one with uniform absolute error. The first version of this
+measurement showed a clean coarse-to-fine gradient that was entirely the normalisation.
+
+\subsubsection*{Filtering removes rungs from the ladder --- a derivation worth keeping}
+
+This is where P1's knob and P2's time scale meet in one formula, and it is the most
+self-contained new piece of mathematics in Layer 6. Under the \emph{correct} filtering, the
+leaf covariance is block-diagonal-plus-constant: the depth-$(L-k)$ subtree covariance inside
+each of the $b^k$ blocks, and $\rho^{2L}$ between them. Its eigenvectors are
+
+\begin{enumerate}
+\item \textbf{within-block contrasts} --- the subtree's own non-uniform modes, each
+multiplicity multiplied by $b^k$;
+\item \textbf{between-block contrasts}, constant on each block and summing to zero across
+blocks, with the single eigenvalue
+$\Lambda_{\rm between} = S_0^{(L-k)} - b^{L-k}\rho^{2L}$, multiplicity $b^k - 1$;
+\item the \textbf{uniform mode}, $\Lambda = S_0^{(L-k)} + (b^k-1)b^{L-k}\rho^{2L}$.
+\end{enumerate}
+
+\noindent
+So \textbf{the top $k$ rungs merge into one}, and the number of distinct speciation times
+falls from $L+1$ to $L-k+2$, reaching 2 at $k=L$ where the covariance is equicorrelated.
+Measured at $L=4$: \textbf{5, 5, 4, 3, 2} rungs for $k=0\dots4$.
+
+Two checks fall out for free. The analytic spectrum matches \code{eigh} of the dense
+covariance to $\mathbf{10^{-15}}$ at every $(L,k)$ tried, and $\mathrm{BP}_k$ matches a dense
+linear solve to $\mathbf{10^{-15}}$. And $k=0$ and $k=1$ giving the \emph{same} count
+independently reproduces P1's remark that those two cases share a tree topology and differ
+only in the top transition probabilities --- which in the Gaussian case means they do not
+differ at all.
+
+\subsubsection*{P6. Does the advantage grow with correlation range? --- \partialx: confounded}
+
+\begin{center}
+\begin{tabular}{@{}rrrrrr@{}}
+\toprule
+$k$ & block & $\hat\rho$ & EM-BP abs err & network abs err & advantage \\
+\midrule
+1 & 2  & 0.8796 & 0.0154 & 0.4143 & 28.7$\times$ \\
+2 & 4  & 0.8926 & 0.0085 & 0.3702 & 49.2$\times$ \\
+3 & 8  & 0.9010 & 0.0038 & 0.3640 & 99.0$\times$ \\
+4 & 16 & 0.9041 & 0.0084 & 0.3470 & 39.4$\times$ \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\noindent
+\textbf{The confound, which is why this is partial.} Fixing the number of \emph{sequences}
+does not fix the number of \emph{edges}: a $k$-filtered depth-4 tree has $32 - 32/2^k$ edges,
+i.e.\ 16, 24, 28, 30. Larger $k$ therefore hands EM more data at the same nominal budget.
+The sweep moves two things at once, so the \emph{rising} advantage cannot be attributed to
+correlation range. What the table supports without qualification is the negative: the
+advantage \emph{does not shrink} as correlations reach further.
+
+\subsection{[N] New questions opened by the answers}
+
+\subsubsection*{N1. What scalar governs locality? --- \done: negentropy, not kurtosis}
+
+\begin{sloppypar}
+Candidates screened against the measured locality excess: $|$excess kurtosis$|$, negentropy
+($\mathrm{KL}(f\|N(0,q))$), $L^1$ and $L^\infty$ distance to that Gaussian, and mode count.
+Negentropy wins decisively --- pooled Pearson $\mathbf{+0.738}$ (Spearman $+0.842$) against
+$-0.043$ for $|$kurtosis$|$.
+\end{sloppypar}
+
+\begin{center}
+\begin{tabular}{@{}lrrr@{}}
+\toprule
+family & negentropy & $|$excess kurt$|$ & locality excess \\
+\midrule
+gauss\_mix $\kappa=0.6$ & 0.026 & 0.72 & 1.12 \\
+Student-$t$ $\nu=5$ & 0.045 & \textbf{6.00} & 1.25 \\
+laplace & 0.072 & 3.00 & 1.62 \\
+uniform & 0.177 & 1.20 & 1.46 \\
+gauss\_mix $\kappa=0.9$ & \textbf{0.462} & 1.62 & \textbf{4.94} \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\noindent
+Student-$t$ has the largest kurtosis of any family and the second-\emph{smallest} negentropy:
+heavy tails carry huge fourth moments but very little probability mass, so they sit close to
+a Gaussian in KL. \textbf{Bimodality moves mass}, so $\kappa=0.9$ is 10$\times$ further in KL
+than Student-$t$ while having a quarter of its kurtosis. That locality --- an information-flow
+property --- is governed by an information-theoretic distance rather than a moment is the
+natural answer in hindsight, and it is a \emph{different} scalar from the one governing
+closure error, where kurtosis works well enough to extrapolate (R3). Two mechanisms, two
+summaries.
+
+\subsubsection*{N2. Does a structured architecture close the gap? --- \done: most of it, but the rest grows}
+\label{sec:receptive}
+
+This was the most important \emph{unasked} question in the project --- the one a reviewer
+asks first. 4 seeds, oracle over both receptive-field radius and parameterisation for both
+networks:
+
+\begin{center}
+\begin{tabular}{@{}rrrr@{}}
+\toprule
+$N$ & \textbf{EM-BP} (13 params) & global MLP (25{,}505) & local CNN, oracle $r$ (6{,}081) \\
+\midrule
+128  & $\mathbf{0.0368 \pm 0.0067}$ & $0.3595 \pm 0.0044$ & $0.0774 \pm 0.0024$ \\
+512  & $\mathbf{0.0174 \pm 0.0017}$ & $0.1794 \pm 0.0035$ & $0.0570 \pm 0.0007$ \\
+2048 & $\mathbf{0.0123 \pm 0.0009}$ & $0.1246 \pm 0.0027$ & $0.0505 \pm 0.0015$ \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\begin{center}
+\begin{tabular}{@{}rrr@{}}
+\toprule
+$N$ & vs global MLP & vs local CNN \\
+\midrule
+128  & $9.76 \pm 1.79$ & $2.10 \pm 0.39$ \\
+512  & $10.29 \pm 1.02$ & $3.27 \pm 0.32$ \\
+2048 & $10.15 \pm 0.75$ & $\mathbf{4.11 \pm 0.32}$ \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\noindent
+Two things this settles, one in each direction.
+
+\textbf{The structured architecture really does close most of the gap.} Against the vanilla
+MLP the margin is ${\sim}10\times$ and flat in $N$; against the locality-respecting CNN it is
+2--4$\times$. Roughly \textbf{60\% of the vanilla deficit was the architecture}, not the
+estimator.
+
+\textbf{But the remaining margin \emph{grows} with data rather than closing.}
+$2.10 \to 3.27 \to 4.11$, well outside the standard errors. The mechanism is visible in the
+columns: EM-BP falls $0.0368 \to 0.0123$ (a factor 3.0 over 16$\times$ data) while the CNN
+falls $0.0774 \to 0.0505$ (a factor 1.5) and is visibly flattening. The structured network
+converges to a floor set by its \emph{approximation} error; the estimator keeps paying down
+\emph{parametric} error.
+
+\begin{keybox}
+``More data will close the gap'' is the natural guess and \textbf{it is wrong here}. The
+honest headline against a well-chosen architecture is \textbf{4.1$\times$ at $N=2048$ and
+rising} --- not the $10\times$ of the vanilla comparison.
+\end{keybox}
+
+\subsubsection*{The optimal receptive field is finite, and exceeding it hurts}
+
+A separate finding from the same experiment, worth stating because it corrects the project's
+own earlier reading. Ledger item B15 read the Gaussian locality law as ``a local head is
+near-optimal once $r \gtrsim \xi\log(1/\epsilon)$'' --- a \emph{lower} bound on the radius.
+The sweep says something sharper: the error is \textbf{U-shaped in $r$}.
+
+\begin{center}
+\begin{tabular}{@{}lrrrrrrr@{}}
+\toprule
+$r$ & 1 & 2 & \textbf{3} & 4 & 8 & 12 & 16 \\
+\midrule
+error & 0.229 & 0.100 & \textbf{0.065} & 0.087 & 0.094 & 0.125 & 0.125 \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\noindent
+(Gaussian chain, $t=0.1$, interior sites.) Doubling the radius past the optimum roughly
+doubles the error --- an ordinary bias-variance trade. The optimum \emph{grows with noise
+level} (3, 3, 6, 12, 16 for $t=0.1 \dots 1.6$), which the locality law predicts, and
+non-Gaussian families need a \emph{wider} field than the Gaussian at matched $(\rho,t)$,
+in the direction and roughly the magnitude F5 predicted.
+
+%======================================================================
+\newpage
+\section{The experiment catalogue}
+\label{sec:experiments}
+
+All under \code{research/nongaussian-bp/} on the research branch. Each has a self-contained
+docstring; each writes to \code{outputs/<name>/}.
+
+\begin{center}
+\small
+\begin{longtable}{@{}p{2.9cm}p{9.0cm}p{2.9cm}@{}}
+\toprule
+\textbf{Experiment} & \textbf{What it establishes} & \textbf{Answers} \\
+\midrule
+\endhead
+\code{exp\_01\_grid\_} \code{validation} & Grid BP as calibrated numerical ground truth against the known Gaussian score. Worst rel.\ error $9.2\times10^{-15}$ at $M=401$, $A=8$. & R1, C-iii, B10 \\
+\code{exp\_02\_laplace\_} \code{gaussian\_message} & Gaussian-message error on the Laplace chain, done right. Median rel.\ score error $0.39$ at $t=0.02 \to 7.6\times10^{-5}$ at $t=2.4$. & C-i, C-iii \\
+\code{exp\_03\_nongaussian\_} \code{innovation\_sweep} & Six innovation families at identical second-order structure. Noise level dominates; error \emph{decreases} with $\rho$. & R2, R3 \\
+\code{exp\_04\_approx\_} \code{markovianity} & Chain $+$ global latent. The non-Markov correction is \emph{exactly rank one}. Residual MLP on frozen BP ${\sim}20\times$ more efficient. & F3, R5 \\
+\code{exp\_05\_reverse\_} \code{dynamics} & Reverse SDE under exact / closed / truncated scores. Gaussian score washes out heavy tails: kurtosis 0.12 vs true 2.7--2.9. & \textbf{C-viii}, F4 \\
+\code{exp\_06\_em\_parameter\_} \code{recovery} & EM correctness: monotonicity, Fisher information, misspecification, rates, quantization. & E1, L2, L3, R1 \\
+\code{exp\_07\_em\_vs\_} \code{score\_network} & \textbf{The headline.} EM-BP vs a score network: sample efficiency, capacity control, transfer across $t$, inference cost. & \textbf{E3}, C-ix \\
+\code{exp\_08\_gradient\_vs\_} \code{exact\_mstep} & The literal gradient route vs the exact M-step. Split is not the intuitive one. & \textbf{L1} \\
+\code{exp\_09\_mixture\_} \code{message\_closure} & Mixture \emph{message} closure. Separates representation error from model error for the first time. & \textbf{R4/F1}, R3 \\
+\code{exp\_10\_discrete\_} \code{alphabet} & Discrete alphabet: headline retested with \emph{zero} grid error. Baum-Welch identity. & \textbf{F2} \\
+\code{exp\_11\_nongaussian\_} \code{locality} & Is the locality law second-order universal? No --- rate is not, excess up to 2.45$\times$. & \textbf{F5}, N1 \\
+\code{exp\_12\_receptive\_} \code{field} & How big a receptive field a score head needs. U-shaped in $r$; CNN closes 60\% of the gap. & \textbf{N2}, C-x, R5 \\
+\code{exp\_13\_speciation\_} \code{cascade} & Hierarchical priors: the speciation ladder, and where each method's error sits. & \textbf{P1}, P2, P5 \\
+\code{exp\_14\_memorization\_} \code{collapse} & Collapse/memorisation, and why a BP score cannot collapse. & \textbf{P3} \\
+\code{exp\_15\_bp\_oracles} & Which BP oracle a learned diffusion score agrees with. & P5 \\
+\bottomrule
+\end{longtable}
+\end{center}
+
+\subsection{Tests}
+
+101 tests across 10 files in \code{research/nongaussian-bp/tests/}, all passing:
+
+\begin{center}
+\small
+\begin{tabular}{@{}ll@{}}
+\toprule
+\code{test\_em\_bp.py} (23 tests) & \code{test\_hierarchy.py} (51 tests) \\
+\code{test\_bp\_mixture.py} & \code{test\_discrete.py} \\
+\code{test\_gaussian\_bp\_equivalence.py} & \code{test\_gaussian\_precision\_score.py} \\
+\code{test\_grid\_convergence.py} & \code{test\_local\_head.py} \\
+\code{test\_message\_normalization.py} & \code{test\_score\_mean\_error\_identity.py} \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\noindent
+Separately, the earlier analytic packages carry their own audits, both re-executed
+2026-07-14:
+
+\begin{center}
+\small
+\begin{tabular}{@{}ll@{}}
+\toprule
+\code{research/gaussian-bp/code/numerical\_audit.py} & \textbf{72/72 pass} \\
+\code{research/unified-note/code/numerical\_audit.py} & \textbf{55/55 pass} \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+%======================================================================
+\newpage
+\section{The cluster sweep}
+\label{sec:cluster}
+
+Run on the Bocconi HPC, 30 July -- 4 August 2026. Three sweeps, \textbf{5{,}530 rows}, zero
+failed cells, 48 CPU-hours. This is the \emph{separate} implementation
+(\S\ref{sec:duplication}), so it functions as independent replication.
+
+\begin{center}
+\begin{tabular}{@{}lrl@{}}
+\toprule
+sweep & rows & design \\
+\midrule
+\code{identifiability} & 4{,}320 & 5 families $\times$ 4 $\rho$ $\times$ 3 $n$ $\times$ 8 $t$ $\times$ 3 $M$ $\times$ 3 reps \\
+\code{sample\_efficiency} & 1{,}050 & 5 families $\times$ 2 $\rho$ $\times$ 7 $M$ $\times$ 3 $t_{\rm eval}$ $\times$ 5 reps \\
+\code{nonlinearity\_gap} & 160 & 5 families $\times$ 4 $\rho$ $\times$ 8 $t$ \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\subsection{The closure gap is largest at \emph{small} $t$}
+
+Relative score error of the Gaussian closure against exact grid BP, $\rho=0.85$, $n=40$:
+
+\begin{center}
+\begin{tabular}{@{}lrrrrr@{}}
+\toprule
+$t$ & gaussian & uniform & laplace & mixture & student \\
+\midrule
+0.08 & $7.0\times10^{-16}$ & 0.176 & \textbf{0.200} & 0.140 & 0.180 \\
+0.15 & $4.0\times10^{-16}$ & 0.092 & 0.127 & 0.069 & 0.108 \\
+0.30 & $2.7\times10^{-16}$ & 0.036 & 0.060 & 0.027 & 0.056 \\
+0.50 & $1.8\times10^{-16}$ & 0.015 & 0.030 & 0.013 & 0.032 \\
+0.80 & $1.2\times10^{-16}$ & 0.006 & 0.013 & 0.005 & 0.013 \\
+1.20 & $8.4\times10^{-17}$ & 0.002 & 0.005 & 0.002 & 0.006 \\
+1.80 & $5.5\times10^{-17}$ & $3.5\times10^{-4}$ & $7.9\times10^{-4}$ & $2.6\times10^{-4}$ & $1.2\times10^{-3}$ \\
+2.40 & $4.4\times10^{-17}$ & $3.8\times10^{-5}$ & $9.2\times10^{-5}$ & $2.7\times10^{-5}$ & $1.5\times10^{-4}$ \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\noindent
+The \textbf{gaussian column is Proposition~C-v holding at machine precision} across 32
+independent cells. The gap decays \emph{monotonically} in $t$ for every family --- confirming
+on separate code that the rise-with-$t$ J\'er\^ome found suspicious in the call was the bug,
+not physics. Peak gap over the whole sweep: 0.46 (uniform, $\rho=0.5$, $t=0.08$).
+
+\begin{keybox}
+\textbf{Interpretation, and why it makes C-viii \emph{more} urgent.} Large $t$ Gaussianises
+everything, so the closure becomes exact; the prior's non-Gaussianity survives only where
+the likelihood is weak, i.e.\ small $t$. But J\'er\^ome's own argument in the call is that
+small-$t$ score errors are \emph{cheap} --- $\alpha_t\approx 1$, the denoiser barely acts.
+So we do not currently know whether the 20\% closure gap costs anything in generated
+samples. Only reverse diffusion under a learned score can say.
+\end{keybox}
+
+\subsection{EM parameter recovery, and where it breaks}
+
+Median $|\hat\rho - \rho|$, pooled over families, $\rho$, $n$, reps:
+
+\begin{center}
+\begin{tabular}{@{}lrrrr@{}}
+\toprule
+$t$ & $M=250$ & $M=1000$ & $M=4000$ & EM converged \\
+\midrule
+0.08 & 0.0039 & 0.0021 & 0.0009 & 100\% \\
+0.15 & 0.0046 & 0.0024 & 0.0011 & 100\% \\
+0.30 & 0.0059 & 0.0028 & 0.0013 & 100\% \\
+0.50 & 0.0071 & 0.0036 & 0.0020 & 95\% \\
+0.80 & 0.0102 & 0.0075 & 0.0037 & 52\% \\
+1.20 & 0.0284 & 0.0243 & 0.0211 & 16\% \\
+1.80 & 0.0961 & 0.0749 & 0.0725 & 11\% \\
+2.40 & 0.1563 & 0.1422 & 0.1232 & 27\% \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\noindent
+More data barely helps past $t=1.2$. That signature --- error plateaus in $M$, convergence
+flag collapses --- is an \textbf{optimiser} failure, not an information failure, and it is
+confirmed directly: at $M=100{,}000$, $t=1.8$, EM from a random start lands \textbf{735.6
+nats worse in total} than EM from the truth, and only 2 of 24 restarts find the right basin.
+A moment-based initialiser fixes this up to $t\approx 2.4$ and then fails honestly at
+$t=3.5$, where the signal $\alpha^2 = 9.1\times10^{-4}$ really is below the sampling error
+$3.5\times10^{-3}$. \emph{Two different regimes, both real.}
+
+\begin{keybox}
+\textbf{Not usable from this sweep:} \code{ridge\_width} is censored in 1{,}889 of 4{,}320
+cells (44\%). Do not quote it. The censoring flag is in the CSV.
+\end{keybox}
+
+%======================================================================
+\newpage
+\section{Errors found and corrected}
+\label{sec:corrections}
+
+This section exists because a research record that lists only successes cannot be trusted.
+Each of these was found \emph{after} a result had been reported from it.
+
+\begin{center}
+\small
+\begin{longtable}{@{}p{4.3cm}p{6.4cm}p{4.2cm}@{}}
+\toprule
+\textbf{What was wrong} & \textbf{Consequence} & \textbf{Resolution} \\
+\midrule
+\endhead
+\code{rng\_for} not reproducible across processes & Seeded from Python's builtin \code{hash}, salted per process (PEP 456). \textbf{No experiment in the package was bit-reproducible from a fresh interpreter}, contrary to the README. & blake2b digest. Pairing \emph{within} a run held, so exp\_01--05 numbers stand as measurements. \\
+\addlinespace
+Score-network baseline handicapped & It predicted the clean signal only, whereas the standard recipe predicts the \emph{noise}. Not equivalent in finite samples. The headline rested on a crippled competitor. & Both parameterisations now trained and reported; $\epsilon$ wins at small $t$, $x_0$ at large $t$, so the result rests on neither. \\
+\addlinespace
+MDN M-step broke EM's guarantee & A fixed Adam step is not an ascent step: likelihood rose overall while violating monotonicity by 547 nats. & Backtrack until $Q$ actually increases. Zero violation, negligible cost. \\
+\addlinespace
+exp\_06 Part 5 seeding confound & Seed keyed on grid size, so every cell drew different data. Reported ``at $M=201$ three true values all return 0.750''. & Re-run with data held fixed: the collapse is real but lands on \textbf{0.800}. The phenomenon survived; that number did not. \\
+\addlinespace
+$N^{-1/2}$ rate declared unsupported & 4 replicates gave slopes $-0.26,-0.69,-0.25,-0.41$; conclusion ``rate not established''. Correct \emph{for that data}. & 12 replicates $\Rightarrow$ $-0.500\pm0.048$. The lesson is about replicate counts. \\
+\addlinespace
+Per-level error normalisation & Relative error divides by a magnitude that shrinks with level, so fine levels look worse for \emph{every} method. First version showed a clean coarse-to-fine gradient that was \textbf{entirely the normalisation}. & All three forms (relative, absolute, share of squared error) now written. \\
+\addlinespace
+exp\_13 \code{ordering} probe & Wrong measurement for the question. & Replaced by \code{exp\_15}, which uses the probe the paper actually uses. \\
+\addlinespace
+Transfer-across-$t$ premise & The experiment was designed around ``the network must extrapolate in $t$''. There is \textbf{no cliff} at the schedule boundary. & The extrapolation claim was withdrawn. The difficulty is in $x$-space, not $t$-space. \\
+\addlinespace
+Single-seed architecture figures & 3.3$\times$ / 2.75$\times$ quoted from one seed at $N=1024$. & Replaced by the 4-seed oracle-fair run: 4.11$\times$ at $N=2048$. \\
+\addlinespace
+P1's filtering construction & Implemented as $b^k$ \emph{independent} subtrees. The paper draws depth-$k$ nodes conditionally independently \emph{given the root}, so blocks stay correlated through it. Independent blocks put a \textbf{zero} where the truth puts $\rho^{2L}$. & Found by reading P1 in full. Reimplemented; a test now pins the distinction. \\
+\addlinespace
+``The hierarchy $\times$ diffusion intersection is untouched'' & False. Sclocchi, Favero and Wyart (PNAS 2025, arXiv:2402.16991), \textbf{cited by P1 itself}, studies exactly that. & Claim withdrawn. The measurements are \emph{consistent with} that work, not novel against it --- which is more useful than what it replaced. \\
+\bottomrule
+\end{longtable}
+\end{center}
+
+\subsection{Two artifacts that are real, not bugs}
+
+\textbf{The Laplace M-step is exact but lattice-quantized} (L3). $4/5$ is an attractor;
+$\rho^*=0.7913$ pins at $0.8000$ across an 8$\times$ grid refinement with constant $0.0087$
+bias. Real for the discretized model, a \emph{bias} rather than a resolution limit.
+Consequence: every rate claim uses the Gaussian or mixture kernel.
+
+\textbf{More expressive is not better.} At $N=400$ the neural kernel (873 params) is dominated
+on \emph{both} axes by the 13-parameter mixture kernel: training log-likelihood $-16781$ vs
+$-16656$, held-out score error $0.052$ vs $0.026$. The efficiency argument applies to the
+structured method's own internals, not only to the baseline it is compared against.
+
+%======================================================================
+\newpage
+\section{Limitations}
+\label{sec:limitations}
+
+Stated as they are recorded in the package, not softened.
+
+\begin{enumerate}
+\item \textbf{Inference cost is the honest loss.} Grid BP is $O(nM^2)$ per chain per
+evaluation; a network forward pass is a few matmuls. Measured slowdown \textbf{211--320$\times$}
+at $M=401$. Since reverse diffusion evaluates the denoiser at every integration step, this is
+not a detail. Distilling the fitted BP denoiser into a network, or using Gaussian-projected
+BP at inference, is the obvious remedy --- \emph{not something claimed here}.
+
+\item \textbf{EM is slower to train here.} 443\,s at $N=2048$ vs ${\sim}37$\,s for the
+network, and EM's cost grows linearly in $N$ while the network's is fixed by its step count.
+\textbf{The win is in data, not wall-clock.}
+
+\item \textbf{Everything rests on the chain assumption.} If the prior is not Markov the
+estimator is misspecified in a way no amount of data fixes. Layer 4 showed the correction is
+exactly rank one for AR(1)$+$global-latent priors, suggesting a hybrid --- untested (F3).
+
+\item \textbf{The margin against a well-chosen architecture is 4$\times$, not 10$\times$.}
+The 10$\times$ figure is against a vanilla MLP as the email specified. See N2.
+
+\item \textbf{One chain family, $n=32$.} Linear AR(1) with non-Gaussian innovations. The
+claim is demonstrated in this setting, not in general.
+
+\item \textbf{The chain has no speciation cascade} (P2). Its top eigenvalue is bounded, so
+results here do not transfer to hierarchically structured data without an explicit argument.
+
+\item \textbf{The Layer-6 paper connections were established without reading the papers}
+(access blocked). Everything is re-derived and verified internally, but the correspondence to
+what the papers actually claim is unverified.
+
+\item \textbf{The sample-efficiency advantage is tied to small parametric dimension} (F2). At
+$S=12$ / 132 parameters it is down to 4.4$\times$ and falling.
+\end{enumerate}
+
+%======================================================================
+\newpage
+\section{What is missing, in priority order}
+\label{sec:missing}
+
+\begin{center}
+\begin{tabular}{@{}p{0.6cm}p{5.4cm}p{6.4cm}p{2.6cm}@{}}
+\toprule
+& \textbf{Item} & \textbf{Why it matters} & \textbf{Cost} \\
+\midrule
+1 & \textbf{The paper / Overleaf} (E4, C-xii) & The only item with the 16 Sep deadline. The
+theory document exists and is paper-shaped; it needs a results section and the narrative arc
+J\'er\^ome supplied. & days, no compute \\
+\addlinespace
+2 & \textbf{Reverse diffusion under a \emph{learned} score} (C-viii, F4) & The one metric that
+says whether \emph{any} of the score gaps matter. Unblocked now that Layer 5 produces a
+learned score. Also where the 211--320$\times$ inference cost bites. & ${\sim}1$ day $+$ compute \\
+\addlinespace
+3 & \textbf{Learned kernel $+$ rank-one correction} (F3) & Turns ``the prior is Markov'' from
+an assumption into an approximation with a measured correction. The natural product of Layers
+4 and 5. & compute \\
+\addlinespace
+4 & \textbf{The literal depth question} (C-x) & J\'er\^ome's stated ``biggest question'': can
+a narrow, deep network implement the two BP sweeps, and in how many layers? exp\_12 answered
+receptive field, not depth. & open-ended \\
+\addlinespace
+5 & Distillation of the BP denoiser & Directly addresses limitation 1. & ${\sim}1$ day \\
+\addlinespace
+6 & Nonparametric collapse test & Answers the obvious objection to the P3 memorisation result. & compute \\
+\addlinespace
+7 & P6 with edge count fixed & Removes the confound; would let the correlation-range claim be
+made. & compute \\
+\addlinespace
+8 & \textbf{Read P2 and Sclocchi--Favero--Wyart} & P1 is read; P2 is not, and a write-up
+citing it must use its symbols. Sclocchi et al.\ (arXiv:2402.16991) is the closest prior work
+on hierarchy $\times$ diffusion. & hours \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\subsection{The Layer-6 package's own ranked list}
+
+Reproduced from \code{docs/PAPER\_CONNECTIONS.md} §6, because it is more specific than the
+table above about what would move Layer 6 forward:
+
+\begin{enumerate}
+\item \textbf{Read P2}, and \textbf{read Sclocchi, Favero and Wyart (arXiv:2402.16991)}
+before writing anything about hierarchy and diffusion.
+\item \textbf{The nonparametric collapse test.} The obvious objection to P3 is that a
+two-parameter kernel \emph{cannot} memorise. \code{exp\_14 --set include\_mdn=True} runs the
+same comparison with a mixture-density kernel of several hundred parameters and the same
+$n$-independent statistic, which \textbf{separates the mechanism from the parameter count}.
+\item \textbf{A discrete-alphabet tree} --- closest to the actual data model of the
+hierarchical-filtering paper. \code{src/discrete.py} does chains, \code{src/hierarchy.py}
+does continuous trees; \textbf{the two have never been crossed}.
+\item \textbf{The cascade under a learned score} rather than the exact one: which levels of
+the ladder each method gets right \emph{dynamically}.
+\item \textbf{A non-Gaussian tree.} \code{tree\_bp\_grid} and \code{fit\_em\_tree} already
+support it with no new machinery; the Layer-3 question --- recover an unknown innovation law
+from noisy data alone --- transfers directly.
+\end{enumerate}
+
+\noindent
+Item 2 is the one a referee asks first, and it is a one-flag run.
+
+\subsection{Repository housekeeping}
+
+\begin{itemize}
+\item \textbf{Merge the branch, or at least stop working off \code{main}.} 49 commits of
+research sit unmerged. This is how the thread was lost.
+\item \code{research/em-learning/} is untracked and duplicative. Keep \code{outputs/} as a
+replication artifact; the code is superseded.
+\item Stale docstrings in \code{research/em-learning/code/}: \code{bp\_core.py} cites a
+non-existent \code{analytics.py}; \code{chain\_models.py} cites a non-existent
+\code{sampling.py}; \code{run\_sweep.py} claims a network ``cannot match without
+retraining'', which is false and which \code{nn\_baseline.py}'s own docstring contradicts.
+\end{itemize}
+
+%======================================================================
+\newpage
+\section{How to reproduce anything here}
+
+\subsection{Get the code}
+
+\begin{keybox}
+\code{cd /Users/gloriabagnato/Code/Thesis/Diffusion}\\
+\code{git fetch origin}\\
+\code{git checkout claude/em-bp-denoiser-learning-e07ike}
+\end{keybox}
+
+\subsection{Run an experiment}
+
+Each experiment is standalone and writes to \code{outputs/<name>/}:
+
+\begin{keybox}
+\code{cd research/nongaussian-bp}\\
+\code{python experiments/exp\_07\_em\_vs\_score\_network.py}
+\end{keybox}
+
+\subsection{Run the tests}
+
+\begin{keybox}
+\code{cd research/nongaussian-bp \&\& python -m pytest tests/ -q}
+\end{keybox}
+
+\noindent
+Expect 101 passing. The five cross-checks of L2 are permanent tests, not one-off scripts.
+
+\subsection{The cluster}
+
+\begin{keybox}
+\code{ssh lnode01-da.hpc.unibocconi.it}\\
+\code{cd \textasciitilde/bp-em-diffusion}\\
+\code{sbatch --array=0-19 code/sweep.sbatch}\quad\emph{(QOS cap: 30 submitted, 10 running)}
+\end{keybox}
+
+\noindent
+Validation runs first with \code{--dependency=afterok}, so bad foundations cannot burn
+compute. Sharding shuffles the cell list with a fixed seed (12345) before the modulo split,
+because the raw ordering has period-9 inner loops that alias badly against shard counts.
+
+\subsection{Build the reports}
+
+\begin{keybox}
+\code{cd research/nongaussian-bp/report \&\& latexmk -pdf em\_bp\_learning.tex}
+\end{keybox}
+
+\noindent
+(Or \code{tectonic em\_bp\_learning.tex} --- no TeX Live is installed on the laptop.)
+
+\vspace{2em}
+\begin{keybox}
+\textbf{Provenance of this document.} Compiled 4 August 2026 from:
+\code{questions/QUESTIONS\_AND\_ANSWERS.md} (798 lines),
+\code{docs/EM\_BP\_LEARNING\_COMPENDIUM.md} (872 lines),
+\code{docs/PAPER\_CONNECTIONS.md} (499 lines),
+\code{docs/RESULT\_LEDGER.md}, \code{docs/AGENT\_HANDOFF\_EM\_BP.md},
+\code{report/layer6\_session\_report.tex}, the experiment docstrings,
+\code{research/nongaussian-bp/hpc/README.md}, and the merged cluster CSVs.
+
+\medskip
+\textbf{Scope.} This covers the 49 commits that constitute the
+\code{claude/em-bp-denoiser-learning-e07ike} branch --- 175 files, 22{,}749 insertions,
+essentially all of \code{research/nongaussian-bp/} plus the four \code{docs/} files. Work
+that predates the branch and already sits on \code{main} --- the thesis chapters, the
+Gaussian AR(1) analytic packages, the AMP/TAP appendix, the conjecture-15 experiments --- is
+referenced where relevant but is \emph{not} catalogued here.
+The transcript of the 29 July call and the PDF of Marc's email were re-read in full for the
+question inventory. Numbers are quoted from those sources; where this document states a
+limitation or a correction, it is because the source states it, not because it was inferred.
+\end{keybox}
+
+\end{document}

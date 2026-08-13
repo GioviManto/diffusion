@@ -1,0 +1,20 @@
+{
+  "status": "PASS",
+  "checks": {
+    "surrogate_jacobian_fd_max_abs": 9.182819761921479e-06,
+    "gauge_roundtrip_max_abs": 2.220446049250313e-16,
+    "perfect_clean_path_score_max_abs": 0.0,
+    "polar_fdt_relative_error_max": 6.6306385925263385e-09,
+    "polar_response_grid_relative_error_max": 3.0439022257156123e-11,
+    "figure_pdf_count": 18.0,
+    "csv_count": 16.0
+  },
+  "thresholds": {
+    "surrogate_jacobian_fd_max_abs": 0.0001,
+    "gauge_roundtrip_max_abs": 1e-12,
+    "perfect_clean_path_score_max_abs": 1e-12,
+    "polar_fdt_relative_error_max": 1e-07,
+    "polar_response_grid_relative_error_max": 1e-07
+  },
+  "failures": {}
+}
