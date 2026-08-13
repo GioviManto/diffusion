@@ -1,0 +1,130 @@
+\chapter{Discussion and Conclusions}\label{ch:conclusions}
+
+\section{Findings}\label{sec:conclusions-findings}\label{sec:conclusions-amp}
+
+\paragraph{Derived exactly.} For the stationary AR(1) chain under
+coordinatewise OU corruption, the joint score is $\score(x,t) = -\Qt x$
+with $\Qt = (e^{-2t}\Sigz + \Deltat I)^{-1}$, equal by the
+score--posterior identity to $(e^{-t}\E[a|x] - x)/\Deltat$ (RQ1). Its
+coupling structure has a closed-form lifecycle: exactly tridiagonal at
+$t = 0$, filling one diagonal per order in $t$ by the band-fill law
+\eqref{eq:g-bandfill}, and returning to the identity at rate $e^{-2t}$.
+In the bulk, the single quantity $q(\alpha, t) \in (0, |\alpha|]$ governs
+both the posterior correlation length and the geometric decay of evidence
+influence, with limits $q \to 0$ as $t \to 0$ and $q \to |\alpha|$ as
+$t \to \infty$. The posterior of the noisy chain lives on a tree-shaped
+factor graph, on which one forward and one backward BP sweep compute all
+smoothing marginals; on the Gaussian chain the messages close
+algebraically in the Gaussian family, and the recursion is the Kalman
+filter followed by the RTS smoother (RQ2). The
+error of a radius-$r$ local score estimator decays exactly as $q^r$
+(RQ4). On the same model, the per-node AMP/TAP closure returns the exact
+score (the mean fixed point is closure-independent) but a different
+variance, with existence boundary, breakdown time $t_c(\alpha)$, and
+critical coupling $\alpha_c = \sqrt{2} - 1$ in closed form
+(Appendix~\ref{app:amp}); all of these formulas were re-verified
+independently.
+
+\paragraph{Measured numerically.} The two Gaussian score routes agree to
+$10^{-15}$--$10^{-14}$ across the tested $(K, \alpha, t)$ grid, with an
+independently written implementation reproducing the agreement. On
+Laplace chains, Gaussian-projected BP measured against validated grid
+quadrature has median relative score error $0.39$ at $t = 0.02$,
+decaying below $10^{-3}$ for $t \gtrsim 0.9$; the error is amplified at
+small $t$ by the exact factor $e^{-t}/\Deltat$, is worst for bimodal
+innovation laws, and decreases with stronger chain correlation, while
+the score direction remains accurate (median cosine $\geq 0.92$
+throughout) (RQ3). At equal locality budget, truncating the inference is
+more accurate than truncating the score matrix at small $t$ ($12.3\%$
+against $21.0\%$ at $t = 0.05$).
+
+\paragraph{The Gaussian-to-Laplace comparison.} The structural lesson is
+where exactness is lost: the tree, the two-sweep schedule, and the
+score--posterior identity survive any innovation law; what breaks is the
+representability of messages in a finite-dimensional family. The
+practical lesson is when it matters: the Gaussian closure is essentially
+free at moderate and large diffusion times, and expensive precisely in
+the small-$t$ regime where the score magnitude is amplified, though even
+there the score direction is preserved much better than its magnitude.
+
+\paragraph{Learning the innovation law.} Chapters~\ref{ch:em-method}
+and~\ref{ch:em-results} relax the assumption, held throughout the rest of
+this thesis, that the innovation law is known. An EM procedure built
+directly on the exact chain inference of Chapter~\ref{ch:gaussian} estimates
+a mixture innovation from noised data alone, with an exact E-step for any
+innovation law and a generalised M-step; the resulting estimator reduces the
+data needed for accurate denoising by $9$--$14\times$ against an unstructured
+neural network and $2$--$4\times$ against a locality-matched one. That
+pointwise advantage does not transfer to generation: the sharpest evidence
+is a single trained network becoming simultaneously more accurate pointwise
+and less faithful generatively as its own training data grows, so pointwise
+accuracy does not determine generative fidelity even within one estimator.
+Mixture capacity saturates, on held-out evidence and on paired pointwise
+error, at roughly eight components. The chain-Markov assumption itself
+tolerates a violation it can absorb into its own fitted parameters (a
+shared global latent, up to the point where it accounts for half the
+marginal variance) and fails, well before generic intuition about
+misspecification would suggest, on one it structurally cannot represent
+(long-range coupling, by a coupling strength of roughly one tenth).
+
+\section{What the model suggests but does not establish}
+
+Within the Gaussian benchmark, local score computations are near-optimal
+away from intermediate diffusion times, the required receptive field
+scales as $\xi \log(1/\varepsilon)$ with $\xi = 1/\log(1/q)$, and a
+local algorithm is preferable to a banded linear readout. These are
+properties of exact inference in one controlled model. Whether trained
+score networks on real sequence data inherit them is untested here and
+would require learning experiments.
+
+\section{Limitations}
+
+(i) The exact solutions concern one-dimensional state per frame and
+linear AR(1) dynamics, extended to a two-dimensional nonlinear state only
+in Chapter~\ref{ch:ring}. (ii) The non-Gaussian results are numerical: grid
+BP is a reference only within its validated resolution regime
+($\sqrt{2t} \gtrsim 3\,\dd x$), and the Laplace closure error is a
+measured curve, not a formula. (iii) The locality laws are proved for
+the Gaussian bulk; their non-Gaussian counterparts are only structurally
+delimited. (iv) An earlier conjecture on low-rank structure of the Laplace
+$K = 2$ posterior Hessian failed outside a narrow regime and is not
+asserted. (v) The EM-learning results of Chapters~\ref{ch:em-method}
+and~\ref{ch:em-results} use a fixed, generous but ultimately insufficient
+iteration budget for several of the reported sweeps; any conclusion in
+those chapters resting on fitted or generated \emph{shape} at that budget
+is flagged explicitly as confounded with convergence rate rather than
+resolved. (vi) The misspecification results of
+Section~\ref{sec:em-nonmarkov} probe exactly two violations of the Markov
+assumption; they establish that the two are not interchangeable in effect,
+not a general theory of how much non-Markov structure a chain estimator
+tolerates. (vii) The image and video extensions of the EM/BP estimator,
+explored in the underlying research package, are outside the scope of
+this thesis and are not reported here.
+
+\section{Future work}
+
+Two of the three directions identified earlier in this project have since
+been carried out and are reported in Chapters~\ref{ch:em-method}
+and~\ref{ch:em-results}: mixture messages, in the form of a fully estimated
+$C$-component innovation kernel rather than a fixed two-component closure;
+and reverse dynamics, in the form of the generative comparison of
+Section~\ref{sec:em-generative}, which integrates the reverse SDE under the
+estimated EM/BP score and under two trained neural scores. Discrete chains
+remain untouched by this thesis: with a finite alphabet the BP messages are
+finite vectors and inference is exact with no closure at all, which would
+give a second solvable benchmark alongside the Gaussian one.
+
+What the new chapters measured opens further directions of their own.
+Re-running the capacity sweep of Section~\ref{sec:em-capacity} to a
+convergence criterion rather than a fixed iteration count, now that
+Section~\ref{sec:em-convergence} has measured what that criterion should be,
+would settle the one result in this thesis that is explicitly flagged as
+confounded. The misspecification study of Section~\ref{sec:em-nonmarkov}
+probes two violations at a time; a paired design across violation strengths,
+and further violation types beyond a global latent and long-range coupling,
+would generalise the finding that the two mechanisms are not
+interchangeable. And the reverse-dynamics comparison itself used a fixed,
+small chain length and one innovation family; whether the pointwise/generative
+dissociation of Section~\ref{sec:em-generative} scales with sequence length,
+and whether it appears under other non-Gaussian innovation laws, remain
+open.
