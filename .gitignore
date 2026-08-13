@@ -34,3 +34,9 @@ research/nongaussian-bp/ANSWERS_AND_QUESTIONS_FOR_ADVISORS.tex
 
 # Overleaf upload bundle: regenerate from overleaf/ (see overleaf/README.md)
 research/nongaussian-bp/overleaf-bp-diffusion.zip
+
+# --- kept locally for reference, not for a reviewer's eyes ---
+# Internal revision/process notes -- not thesis content.
+thesis/editorial/
+# The university's own copyrighted guide PDFs -- no reason to redistribute.
+thesis/official-guides/*.pdf

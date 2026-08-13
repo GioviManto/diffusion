@@ -127,8 +127,9 @@ in the tested range; at $C=16$ the estimator leads on both simultaneously.
 
 Four items that stood here until 2026-08-12 have been measured since this section was written
 and are listed under *Resolved* below instead. They are called out rather than silently deleted
-because this document is the one `EMAIL_TO_JEROME.md` recommends reading first, and it spent
-several days understating what the project had done.
+because this document is the one an earlier email to Jérôme (archived, superseded by
+`RESULTS_FOR_JEROME_AND_MARC.md`) recommended reading first, and it spent several days
+understating what the project had done.
 
 - Identifiability of the kernel is assumed, not proved.
 - Inference costs $O(nN_g^2)$ per sequence — measured at 211–320× a network forward pass
@@ -166,5 +167,6 @@ several days understating what the project had done.
 ---
 
 *Full derivations: `compendium/main.pdf` (43 pp). Results and protocol: `paper/main.pdf`.
-Claim-level audit against the implementation: `REVISION_AUDIT.md`. Commands and environment:
+Claim-level audit against the implementation: `CLAIMS_TO_UPDATE.md` (supersedes the archived
+`REVISION_AUDIT.md`). Commands and environment:
 `REPRODUCIBILITY.md`.*

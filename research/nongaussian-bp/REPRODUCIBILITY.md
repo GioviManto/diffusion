@@ -150,5 +150,6 @@ rsync -avz 3164542@lnode01-da.hpc.unibocconi.it:'~/nongaussian-bp/outputs/exp_16
 ## Which output supports which claim
 
 `paper/appendix.tex`, Appendix J, is the claim-to-script-to-output table, and
-`REVISION_AUDIT.md` records the audit that produced it, including the one number found not to be
-traceable to any committed run and what replaced it.
+`REVISION_AUDIT.md` (archived; see `CLAIMS_TO_UPDATE.md` for the current claim ledger) records
+the audit that produced it, including the one number found not to be traceable to any committed
+run and what replaced it.
