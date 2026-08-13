@@ -20,7 +20,40 @@ must be represented approximately. This script studies two numerical questions:
 1. How accurate is grid BP?  We validate it in the Gaussian AR(1) case, where the
    exact score is available by linear algebra: s(x,t) = -Sigma_t^{-1} x.
 2. In a non-Gaussian Laplace-innovation AR(1) chain, how large is the error caused
-   by forcing BP messages to be Gaussian and projecting by moment matching?
+   by forcing BP messages to be Gaussian?
+
+Gaussian message closure
+------------------------
+Gaussian closure is implemented in ``gaussian_closure_bp`` as a pure information-form
+(lambda, h) recursion with no grid at all.  This matters, and it is the correct way to
+do it:  a Gaussian is fully characterised by two scalars, so introducing a grid can only
+add error.
+
+Two consequences are worth stating explicitly.
+
+* In the Gaussian AR(1) case the recursion is exact and reproduces the precision-matrix
+  score to machine precision at every diffusion time.
+* For *any* additive innovation a_{i+1} = rho a_i + eps with E[eps]=0, Var(eps)=q, moment
+  matching only ever uses the first two moments of eps.  A Gaussian message convolved
+  with the true kernel has mean rho*mu and variance q + rho^2*v regardless of the shape
+  of eps.  Gaussian closure is therefore *blind to the non-Gaussianity of the
+  innovations*: it collapses exactly onto the linear (LMMSE) denoiser
+  m = alpha Sigma_0 Sigma_t^{-1} x.  What this script measures as "Gaussian message
+  error" is thus precisely the excess error of the best linear denoiser over the exact
+  one -- i.e. the nonlinearity that a learned score has to supply.
+
+``gaussian_projected_bp_grid`` retains the earlier grid-based projection as an explicit
+ablation.  It is *wrong*, on purpose, and quantifying how wrong is one of the outputs:
+see its docstring for the failure mechanism.
+
+Grid diagnostics
+----------------
+Grid BP truncates the state space to [grid_min, grid_max].  Beliefs and forward messages
+are genuine probability densities, so a non-negligible probability mass at the grid edges
+means the interval is too narrow and the results cannot be trusted.  ``grid_bp`` accumulates
+this boundary mass and ``run_all`` reports the worst value seen; exceeding
+``boundary_mass_tol`` raises.  (Backward messages R_i are likelihoods, not densities, and
+are legitimately near-flat at large t, so they are excluded from the check.)
 
 Outputs
 -------
@@ -28,6 +61,7 @@ The script writes CSV files and PNG figures to the output directory:
 
     gaussian_grid_validation.csv
     gaussian_grid_validation_rel_error.png
+    gaussian_closure_sanity_rel_error.png
     laplace_grid_convergence.csv
     laplace_grid_convergence_rel_error.png
     laplace_gaussian_message_error.csv
@@ -67,17 +101,25 @@ import matplotlib.pyplot as plt
 
 @dataclass
 class ExperimentConfig:
+    # Grid sizes below are chosen so that the spacing is 0.16 / 0.08 / 0.04 on the
+    # [-12,12] interval. The interval is wider than the [-8,8] used in the first version
+    # of the report: at [-8,8] the boundary-mass diagnostic reached 7.4e-7, which is only
+    # marginally acceptable, whereas [-12,12] brings it to 3e-11 at the same resolution.
     n: int = 50
     rho: float = 0.85
-    grid_min: float = -8.0
-    grid_max: float = 8.0
-    validation_grid_sizes: tuple[int, ...] = (101, 201, 401)
-    convergence_coarse_grid_size: int = 201
-    ref_grid_size: int = 401
-    n_trials: int = 6
+    grid_min: float = -12.0
+    grid_max: float = 12.0
+    validation_grid_sizes: tuple[int, ...] = (151, 301, 601)
+    convergence_coarse_grid_size: int = 301
+    ref_grid_size: int = 601
+    n_trials: int = 50
     seed: int = 11
     output_dir: str = "bp_markov_diffusion_outputs"
     t_values: tuple[float, ...] = (0.08, 0.12, 0.18, 0.27, 0.40, 0.60, 0.90, 1.30, 1.80, 2.40)
+    # Fraction of a density allowed to sit in the outermost grid cells before the
+    # truncation is considered to be corrupting the result.
+    boundary_mass_tol: float = 1e-6
+    boundary_edge_points: int = 3
 
 
 # -----------------------------------------------------------------------------
@@ -127,6 +169,45 @@ def gaussian_message_values(grid: np.ndarray, mean: float, var: float) -> np.nda
     if np.isinf(var):
         return np.ones_like(grid)
     return normal_pdf(grid, mean, var)
+
+
+def boundary_mass(values: np.ndarray, weights: np.ndarray, n_edge: int) -> float:
+    """Fraction of a density's mass sitting in the outermost ``n_edge`` cells per side.
+
+    A converged BP belief on a wide enough interval has essentially no mass at the grid
+    edges.  A large value means the truncation [grid_min, grid_max] is biting and the
+    interval must be widened.
+    """
+    p = normalize_density(values, weights)
+    mass = p * weights
+    return float(np.sum(mass[:n_edge]) + np.sum(mass[-n_edge:]))
+
+
+class GridDiagnostics:
+    """Accumulate the worst boundary mass seen across a set of BP runs."""
+
+    def __init__(self, tol: float, n_edge: int) -> None:
+        self.tol = tol
+        self.n_edge = n_edge
+        self.worst = 0.0
+        self.worst_context = ""
+
+    def check(self, values: np.ndarray, weights: np.ndarray, context: str) -> None:
+        b = boundary_mass(values, weights, self.n_edge)
+        if b > self.worst:
+            self.worst = b
+            self.worst_context = context
+        if b > self.tol:
+            raise FloatingPointError(
+                f"Grid truncation error: {b:.3e} of the probability mass lies in the "
+                f"outermost {self.n_edge} grid cells ({context}). "
+                f"Tolerance is {self.tol:.1e}. Widen [grid_min, grid_max]."
+            )
+
+    def report(self) -> str:
+        if not self.worst_context:
+            return "no densities checked"
+        return f"worst boundary mass {self.worst:.3e} at {self.worst_context} (tol {self.tol:.1e})"
 
 
 def cosine_similarity(u: np.ndarray, v: np.ndarray) -> float:
@@ -229,6 +310,7 @@ def grid_bp(
     weights: np.ndarray,
     K: np.ndarray,
     ell: np.ndarray,
+    diagnostics: GridDiagnostics | None = None,
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     """Run sum-product BP on a chain by representing messages on a grid.
 
@@ -241,6 +323,12 @@ def grid_bp(
         R_{i-1}(a)  = int K(a'|a) R_i(a') ell_i(a') da'.
 
     Returns posterior means, normalized beliefs, and posterior variances.
+
+    If ``diagnostics`` is supplied, the boundary mass of every forward message and every
+    belief is checked.  Both are genuine probability densities -- L_i is the filtered
+    distribution p(a_i | x_1..x_{i-1}) and b_i is the posterior marginal -- so mass at the
+    grid edges is a truncation artefact.  Backward messages are likelihoods rather than
+    densities and are deliberately not checked.
     """
     n, m = ell.shape
     L = np.empty((n, m))
@@ -254,6 +342,8 @@ def grid_bp(
         incoming = L[i] * ell[i] * weights
         L[i + 1] = K @ incoming
         L[i + 1] = normalize_density(L[i + 1], weights)
+        if diagnostics is not None:
+            diagnostics.check(L[i + 1], weights, f"forward message L[{i + 1}]")
 
     # Backward pass. A flat terminal message is represented by ones.
     R[-1] = np.ones(m)
@@ -267,6 +357,8 @@ def grid_bp(
     variances = np.empty(n)
     for i in range(n):
         b = normalize_density(L[i] * ell[i] * R[i], weights)
+        if diagnostics is not None:
+            diagnostics.check(b, weights, f"belief b[{i}]")
         beliefs[i] = b
         means[i] = float(np.sum(grid * b * weights))
         variances[i] = float(np.sum((grid - means[i]) ** 2 * b * weights))
@@ -275,20 +367,107 @@ def grid_bp(
 
 
 # -----------------------------------------------------------------------------
-# Algorithm 2: Gaussian projected / assumed-density BP
+# Algorithm 2: Gaussian message closure (information form, grid free)
 # -----------------------------------------------------------------------------
 
-def gaussian_projected_bp(
+def gaussian_closure_bp(
+    x: np.ndarray,
+    rho: float,
+    q: float,
+    alpha: float,
+    delta: float,
+) -> tuple[np.ndarray, np.ndarray, dict[str, np.ndarray]]:
+    """Gaussian message closure as a pure (lambda, h) recursion. No grid.
+
+    Every message is written in information form
+
+        m(a) propto exp(-lambda a^2 / 2 + h a),      mean = h / lambda,  var = 1 / lambda,
+
+    which is the finite-dimensional closure of section 7.2 of the report.  Because a
+    Gaussian is exactly characterised by two scalars, no discretisation is involved and
+    no discretisation error can enter.
+
+    Forward.  With L_i * ell_i propto N(mu, v), propagating through
+    a_{i+1} = rho a_i + eps gives mean rho*mu and variance q + rho^2*v.
+
+    Backward.  R_{i-1}(a) = int K(a'|a) R_i(a') ell_i(a') da' propto
+    N(a; mu/rho, (q + v)/rho^2), written below directly in information form so that
+    rho -> 0 stays well behaved.
+
+    Only the first two moments of the innovation are ever used, so this routine is
+    correct for a Gaussian chain and is *the* Gaussian closure for a non-Gaussian one:
+    applied to a Laplace, Student or mixture innovation with the same variance q it
+    returns the identical answer, namely the linear (LMMSE) denoiser.
+
+    Returns posterior means, posterior variances, and the message parameters.
+    """
+    n = len(x)
+    lam_obs = alpha ** 2 / delta          # precision contributed by one observation
+    h_obs = alpha * x / delta             # information contributed by one observation
+
+    lam_L = np.zeros(n)
+    h_L = np.zeros(n)
+    lam_L[0], h_L[0] = 1.0, 0.0           # prior mu(a_1) = N(0,1)
+
+    for i in range(n - 1):
+        lam_t = lam_L[i] + lam_obs        # multiply by the local likelihood
+        h_t = h_L[i] + h_obs[i]
+        mu_t, v_t = h_t / lam_t, 1.0 / lam_t
+        v_out = q + rho ** 2 * v_t        # push through the transition
+        lam_L[i + 1] = 1.0 / v_out
+        h_L[i + 1] = rho * mu_t / v_out
+
+    lam_R = np.zeros(n)
+    h_R = np.zeros(n)
+    lam_R[-1], h_R[-1] = 0.0, 0.0         # flat terminal message: zero precision
+
+    for i in range(n - 1, 0, -1):
+        lam_t = lam_R[i] + lam_obs
+        h_t = h_R[i] + h_obs[i]
+        mu_t, v_t = h_t / lam_t, 1.0 / lam_t
+        denom = q + v_t
+        lam_R[i - 1] = rho ** 2 / denom
+        h_R[i - 1] = rho * mu_t / denom
+
+    lam = lam_L + lam_R + lam_obs
+    h = h_L + h_R + h_obs
+    means = h / lam
+    variances = 1.0 / lam
+
+    params = {
+        "L_mean": np.divide(h_L, lam_L, out=np.zeros(n), where=lam_L > 0),
+        "L_var": np.divide(1.0, lam_L, out=np.full(n, np.inf), where=lam_L > 0),
+        "R_mean": np.divide(h_R, lam_R, out=np.zeros(n), where=lam_R > 0),
+        "R_var": np.divide(1.0, lam_R, out=np.full(n, np.inf), where=lam_R > 0),
+        "belief_lambda": lam,
+        "belief_h": h,
+    }
+    return means, variances, params
+
+
+def gaussian_projected_bp_grid(
     grid: np.ndarray,
     weights: np.ndarray,
     K: np.ndarray,
     ell: np.ndarray,
 ) -> tuple[np.ndarray, np.ndarray, np.ndarray, dict[str, np.ndarray]]:
-    """Gaussian assumed-density BP with moment projection.
+    """Grid-based Gaussian projection. WRONG ON PURPOSE, retained as an ablation.
 
-    Each left and right message is represented as N(mean,var). After applying the exact
-    grid update, the outgoing function is projected back to a Gaussian by matching its
-    first two moments. This isolates the error caused by Gaussian message closure.
+    Each message is stored as N(mean,var) but is evaluated on the grid, updated there,
+    and moment-matched back.  This is the algorithm used in the first version of the
+    report and it fails badly.  The mechanism is worth recording:
+
+    The terminal backward message is flat, stored as ``R_var = inf`` and evaluated as a
+    vector of ones.  A constant function restricted to [-A, A] and then moment-matched
+    yields variance (2A)^2/12 -- about 21 for A = 8 -- rather than infinity.  The
+    projection therefore injects a spurious precision of roughly 1/21 into the backward
+    pass.  The damage grows with diffusion time because alpha_t -> 0 flattens every
+    message, so progressively more of them are effectively fitted to the truncation
+    width rather than to their own shape.
+
+    In the Gaussian AR(1) case, where the answer should be exact, this reaches a relative
+    score error of order 10 at t = 1.8.  Compare ``gaussian_closure_bp``, which is exact
+    to machine precision at every t.
     """
     n, m = ell.shape
     L_mean = np.empty(n)
@@ -335,8 +514,20 @@ def gaussian_projected_bp(
 # Experiment A: Gaussian grid BP validation against exact precision score
 # -----------------------------------------------------------------------------
 
-def run_gaussian_grid_validation(config: ExperimentConfig, rng: np.random.Generator) -> list[dict[str, float]]:
+def run_gaussian_grid_validation(
+    config: ExperimentConfig,
+    rng: np.random.Generator,
+    diagnostics: GridDiagnostics | None = None,
+) -> list[dict[str, float]]:
+    """Validate both algorithms in the Gaussian case, where the exact score is known.
+
+    Grid BP should be accurate to quadrature error.  Gaussian closure should be exact to
+    machine precision, since the Gaussian family is closed under the BP updates.  The
+    grid-projection ablation is run alongside to quantify what the discarded
+    implementation was costing.
+    """
     rows: list[dict[str, float]] = []
+    q = 1.0 - config.rho ** 2
 
     for grid_size in config.validation_grid_sizes:
         grid, weights = make_grid(config, grid_size)
@@ -344,27 +535,32 @@ def run_gaussian_grid_validation(config: ExperimentConfig, rng: np.random.Genera
 
         for t in config.t_values:
             rel_grid_scores = []
-            rel_proj_scores = []
+            rel_closure_scores = []
+            rel_ablation_scores = []
             mean_grid_mses = []
-            mean_proj_mses = []
+            mean_closure_mses = []
 
             for _ in range(config.n_trials):
                 a = sample_clean_chain(rng, config.n, config.rho, prior="gaussian")
                 x, alpha, delta = sample_noisy_observation(rng, a, t)
                 ell = likelihood_matrix(grid, x, alpha, delta)
 
-                mean_grid, _, _ = grid_bp(grid, weights, K, ell)
-                mean_proj, _, _, _ = gaussian_projected_bp(grid, weights, K, ell)
+                mean_grid, _, _ = grid_bp(grid, weights, K, ell, diagnostics)
+                mean_closure, _, _ = gaussian_closure_bp(x, config.rho, q, alpha, delta)
+                mean_ablation, _, _, _ = gaussian_projected_bp_grid(grid, weights, K, ell)
 
                 score_grid = score_from_mean(x, mean_grid, alpha, delta)
-                score_proj = score_from_mean(x, mean_proj, alpha, delta)
+                score_closure = score_from_mean(x, mean_closure, alpha, delta)
+                score_ablation = score_from_mean(x, mean_ablation, alpha, delta)
                 score_exact = gaussian_precision_score(x, config.rho, alpha, delta)
                 mean_exact = gaussian_posterior_mean_exact(x, config.rho, alpha, delta)
 
-                rel_grid_scores.append(float(np.linalg.norm(score_grid - score_exact) / np.linalg.norm(score_exact)))
-                rel_proj_scores.append(float(np.linalg.norm(score_proj - score_exact) / np.linalg.norm(score_exact)))
+                norm_exact = float(np.linalg.norm(score_exact))
+                rel_grid_scores.append(float(np.linalg.norm(score_grid - score_exact) / norm_exact))
+                rel_closure_scores.append(float(np.linalg.norm(score_closure - score_exact) / norm_exact))
+                rel_ablation_scores.append(float(np.linalg.norm(score_ablation - score_exact) / norm_exact))
                 mean_grid_mses.append(float(np.mean((mean_grid - mean_exact) ** 2)))
-                mean_proj_mses.append(float(np.mean((mean_proj - mean_exact) ** 2)))
+                mean_closure_mses.append(float(np.mean((mean_closure - mean_exact) ** 2)))
 
             rows.append({
                 "prior": "gaussian",
@@ -372,10 +568,11 @@ def run_gaussian_grid_validation(config: ExperimentConfig, rng: np.random.Genera
                 "t": float(t),
                 "rel_score_error_grid_mean": float(np.mean(rel_grid_scores)),
                 "rel_score_error_grid_std": float(np.std(rel_grid_scores, ddof=1)) if len(rel_grid_scores) > 1 else 0.0,
-                "rel_score_error_gauss_projected_mean": float(np.mean(rel_proj_scores)),
-                "rel_score_error_gauss_projected_std": float(np.std(rel_proj_scores, ddof=1)) if len(rel_proj_scores) > 1 else 0.0,
+                "rel_score_error_gauss_closure_mean": float(np.mean(rel_closure_scores)),
+                "rel_score_error_gauss_closure_std": float(np.std(rel_closure_scores, ddof=1)) if len(rel_closure_scores) > 1 else 0.0,
+                "rel_score_error_grid_projection_ablation_mean": float(np.mean(rel_ablation_scores)),
                 "posterior_mean_mse_grid_mean": float(np.mean(mean_grid_mses)),
-                "posterior_mean_mse_gauss_projected_mean": float(np.mean(mean_proj_mses)),
+                "posterior_mean_mse_gauss_closure_mean": float(np.mean(mean_closure_mses)),
             })
 
     return rows
@@ -385,7 +582,11 @@ def run_gaussian_grid_validation(config: ExperimentConfig, rng: np.random.Genera
 # Experiment B: Laplace grid convergence and Gaussian-message approximation error
 # -----------------------------------------------------------------------------
 
-def run_laplace_grid_convergence(config: ExperimentConfig, rng: np.random.Generator) -> list[dict[str, float]]:
+def run_laplace_grid_convergence(
+    config: ExperimentConfig,
+    rng: np.random.Generator,
+    diagnostics: GridDiagnostics | None = None,
+) -> list[dict[str, float]]:
     rows: list[dict[str, float]] = []
     coarse_size = config.convergence_coarse_grid_size
     fine_size = 2 * coarse_size - 1
@@ -407,8 +608,8 @@ def run_laplace_grid_convergence(config: ExperimentConfig, rng: np.random.Genera
             ell_c = likelihood_matrix(coarse_grid, x, alpha, delta)
             ell_f = likelihood_matrix(fine_grid, x, alpha, delta)
 
-            mean_c, _, _ = grid_bp(coarse_grid, coarse_weights, K_coarse, ell_c)
-            mean_f, _, _ = grid_bp(fine_grid, fine_weights, K_fine, ell_f)
+            mean_c, _, _ = grid_bp(coarse_grid, coarse_weights, K_coarse, ell_c, diagnostics)
+            mean_f, _, _ = grid_bp(fine_grid, fine_weights, K_fine, ell_f, diagnostics)
 
             score_c = score_from_mean(x, mean_c, alpha, delta)
             score_f = score_from_mean(x, mean_f, alpha, delta)
@@ -433,9 +634,21 @@ def run_laplace_grid_convergence(config: ExperimentConfig, rng: np.random.Genera
     return rows
 
 
-def run_laplace_gaussian_message_error(config: ExperimentConfig, rng: np.random.Generator) -> tuple[list[dict[str, float]], dict[str, object]]:
+def run_laplace_gaussian_message_error(
+    config: ExperimentConfig,
+    rng: np.random.Generator,
+    diagnostics: GridDiagnostics | None = None,
+) -> tuple[list[dict[str, float]], dict[str, object]]:
+    """Measure what Gaussian message closure loses on a non-Gaussian chain.
+
+    Because closure is provably identical to the linear denoiser (see the module
+    docstring), this quantity is the excess error of the best linear estimator over the
+    exact one.  The column ``lmmse_gap`` verifies that identity numerically: it should be
+    at machine precision.
+    """
     rows: list[dict[str, float]] = []
     example: dict[str, object] | None = None
+    q = 1.0 - config.rho ** 2
 
     grid, weights = make_grid(config, config.ref_grid_size)
     K = build_transition_matrix(grid, config.rho, prior="laplace")
@@ -446,14 +659,15 @@ def run_laplace_gaussian_message_error(config: ExperimentConfig, rng: np.random.
         rel_s_list = []
         cos_s_list = []
         identity_error_list = []
+        lmmse_gap_list = []
 
         for trial in range(config.n_trials):
             a = sample_clean_chain(rng, config.n, config.rho, prior="laplace")
             x, alpha, delta = sample_noisy_observation(rng, a, t)
             ell = likelihood_matrix(grid, x, alpha, delta)
 
-            mean_ref, beliefs_ref, _ = grid_bp(grid, weights, K, ell)
-            mean_g, beliefs_g, _, params_g = gaussian_projected_bp(grid, weights, K, ell)
+            mean_ref, beliefs_ref, _ = grid_bp(grid, weights, K, ell, diagnostics)
+            mean_g, var_g, params_g = gaussian_closure_bp(x, config.rho, q, alpha, delta)
 
             score_ref = score_from_mean(x, mean_ref, alpha, delta)
             score_g = score_from_mean(x, mean_g, alpha, delta)
@@ -468,20 +682,29 @@ def run_laplace_gaussian_message_error(config: ExperimentConfig, rng: np.random.
             predicted = (alpha / delta) * (mean_g - mean_ref)
             identity_error = float(np.linalg.norm(direct - predicted) / (np.linalg.norm(direct) + 1e-14))
 
+            # Gaussian closure should coincide *exactly* with the linear denoiser built
+            # from the AR(1) covariance, even though the chain is Laplace.
+            mean_lmmse = gaussian_posterior_mean_exact(x, config.rho, alpha, delta)
+            lmmse_gap = float(np.linalg.norm(mean_g - mean_lmmse) / (np.linalg.norm(mean_lmmse) + 1e-14))
+
             mse_m_list.append(mse_m)
             mse_s_list.append(mse_s)
             rel_s_list.append(rel_s)
             cos_s_list.append(cos_s)
             identity_error_list.append(identity_error)
+            lmmse_gap_list.append(lmmse_gap)
 
             if example is None and abs(t - 0.40) < 1e-12 and trial == 0:
                 site = config.n // 2
+                belief_g = normalize_density(
+                    normal_pdf(grid, mean_g[site], var_g[site]), weights
+                )
                 example = {
                     "t": float(t),
                     "site": site,
                     "grid": grid.copy(),
                     "belief_ref": beliefs_ref[site].copy(),
-                    "belief_g": beliefs_g[site].copy(),
+                    "belief_g": belief_g,
                     "x": x.copy(),
                     "a": a.copy(),
                     "mean_ref": mean_ref.copy(),
@@ -506,6 +729,7 @@ def run_laplace_gaussian_message_error(config: ExperimentConfig, rng: np.random.
             "score_cosine_mean": float(np.mean(cos_s_list)),
             "score_cosine_std": float(np.std(cos_s_list, ddof=1)) if len(cos_s_list) > 1 else 0.0,
             "score_error_identity_rel_residual_mean": float(np.mean(identity_error_list)),
+            "closure_vs_lmmse_rel_gap_mean": float(np.mean(lmmse_gap_list)),
         })
 
     return rows, (example if example is not None else {})
@@ -550,20 +774,29 @@ def plot_gaussian_validation(rows: list[dict[str, float]], output_dir: Path) -> 
     plt.savefig(output_dir / "gaussian_grid_validation_rel_error.png", dpi=220)
     plt.close()
 
+    # Gaussian closure is grid free, so it has a single curve. The discarded grid
+    # projection is overlaid to show what the discretisation was costing.
+    floor = 1e-18
     plt.figure(figsize=(7.2, 4.6))
+    sub0 = [r for r in rows if int(r["grid_size"]) == sizes[0]]
+    t = rows_to_arrays(sub0, "t")
+    y = np.maximum(rows_to_arrays(sub0, "rel_score_error_gauss_closure_mean"), floor)
+    plt.plot(t, y, marker="o", color="C2", linewidth=2,
+             label="Gaussian closure, information form (grid free)")
     for size in sizes:
         sub = [r for r in rows if int(r["grid_size"]) == size]
-        t = rows_to_arrays(sub, "t")
-        y = rows_to_arrays(sub, "rel_score_error_gauss_projected_mean")
-        plt.plot(t, y, marker="o", label=f"Gaussian projected M={size}")
+        ta = rows_to_arrays(sub, "t")
+        ya = np.maximum(rows_to_arrays(sub, "rel_score_error_grid_projection_ablation_mean"), floor)
+        plt.plot(ta, ya, marker="x", linestyle="--", alpha=0.75,
+                 label=f"ablation: grid projection M={size}")
     plt.yscale("log")
     plt.xlabel("diffusion time t")
     plt.ylabel("relative score error vs exact matrix score")
-    plt.title("Gaussian AR(1): Gaussian projected BP sanity check")
+    plt.title("Gaussian AR(1): Gaussian closure is exact; grid projection is not")
     plt.grid(True, alpha=0.3)
-    plt.legend()
+    plt.legend(fontsize=8)
     plt.tight_layout()
-    plt.savefig(output_dir / "gaussian_projected_sanity_rel_error.png", dpi=220)
+    plt.savefig(output_dir / "gaussian_closure_sanity_rel_error.png", dpi=220)
     plt.close()
 
 
@@ -606,12 +839,14 @@ def plot_laplace_gaussian_message(rows: list[dict[str, float]], output_dir: Path
     plt.savefig(output_dir / "laplace_posterior_mean_mse.png", dpi=220)
     plt.close()
 
+    # The corrected closure spans several decades in t, so this needs a log axis.
     plt.figure(figsize=(7.2, 4.6))
     plt.errorbar(t, rel_s, yerr=rel_s_std, marker="o", capsize=3)
+    plt.yscale("log")
     plt.xlabel("diffusion time t")
     plt.ylabel("relative score error")
-    plt.title("Laplace chain: Gaussian-message score error")
-    plt.grid(True, alpha=0.3)
+    plt.title("Laplace chain: Gaussian-message (= linear denoiser) score error")
+    plt.grid(True, alpha=0.3, which="both")
     plt.tight_layout()
     plt.savefig(output_dir / "laplace_relative_score_error.png", dpi=220)
     plt.close()
@@ -635,8 +870,8 @@ def plot_examples(config: ExperimentConfig, example: dict[str, object], output_d
     site = int(example["site"])
 
     plt.figure(figsize=(7.2, 4.6))
-    plt.plot(grid, example["belief_ref"], label="reference grid BP")
-    plt.plot(grid, example["belief_g"], linestyle="--", label="Gaussian projected BP")
+    plt.plot(grid, example["belief_ref"], label="reference grid BP (exact)")
+    plt.plot(grid, example["belief_g"], linestyle="--", label="Gaussian closure (= LMMSE)")
     plt.axvline(float(example["mean_ref"][site]), linestyle=":", label="reference mean")
     plt.axvline(float(example["mean_g"][site]), linestyle=":", label="Gaussian-message mean")
     plt.xlabel(f"a_{site}")
@@ -675,7 +910,8 @@ def plot_gaussian_example(config: ExperimentConfig, rng: np.random.Generator, ou
     plt.close()
 
 
-def write_summary(config: ExperimentConfig, output_dir: Path) -> None:
+def write_summary(config: ExperimentConfig, output_dir: Path, diagnostics: GridDiagnostics | None = None) -> None:
+    diag_line = f"\nGrid diagnostics: {diagnostics.report()}\n" if diagnostics is not None else ""
     summary = f"""# BP Markov diffusion experiment outputs
 
 Configuration used for this run:
@@ -689,10 +925,18 @@ Configuration used for this run:
 - n_trials = {config.n_trials}
 - seed = {config.seed}
 - diffusion times = {config.t_values}
+- boundary mass tolerance = {config.boundary_mass_tol} over {config.boundary_edge_points} edge cells
+{diag_line}
+The Gaussian validation compares grid BP with the exact precision-matrix score, and
+checks that Gaussian closure reproduces that score to machine precision. The retained
+grid-projection ablation shows what the earlier discretised projection was costing.
 
-The Gaussian validation compares grid BP with the exact precision-matrix score.
 The Laplace convergence compares grid BP at two resolutions.
-The Laplace Gaussian-message experiment compares Gaussian projected BP with reference grid BP.
+
+The Laplace Gaussian-message experiment compares Gaussian closure with reference grid BP.
+Because closure coincides exactly with the linear (LMMSE) denoiser, the reported error is
+the excess error of the best linear estimator over the exact one. The column
+`closure_vs_lmmse_rel_gap_mean` verifies that identity numerically.
 """
     (output_dir / "README_outputs.md").write_text(summary, encoding="utf-8")
 
@@ -705,26 +949,34 @@ def run_all(config: ExperimentConfig) -> None:
     output_dir = Path(config.output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
     rng = np.random.default_rng(config.seed)
+    diagnostics = GridDiagnostics(config.boundary_mass_tol, config.boundary_edge_points)
 
     print("Running Gaussian grid validation...")
-    gaussian_rows = run_gaussian_grid_validation(config, rng)
+    gaussian_rows = run_gaussian_grid_validation(config, rng, diagnostics)
     write_csv(output_dir / "gaussian_grid_validation.csv", gaussian_rows)
     plot_gaussian_validation(gaussian_rows, output_dir)
 
     print("Running Laplace grid convergence...")
-    convergence_rows = run_laplace_grid_convergence(config, rng)
+    convergence_rows = run_laplace_grid_convergence(config, rng, diagnostics)
     write_csv(output_dir / "laplace_grid_convergence.csv", convergence_rows)
     plot_laplace_convergence(convergence_rows, output_dir)
 
     print("Running Laplace Gaussian-message approximation error...")
-    laplace_rows, example = run_laplace_gaussian_message_error(config, rng)
+    laplace_rows, example = run_laplace_gaussian_message_error(config, rng, diagnostics)
     write_csv(output_dir / "laplace_gaussian_message_error.csv", laplace_rows)
     plot_laplace_gaussian_message(laplace_rows, output_dir)
     plot_examples(config, example, output_dir)
 
     print("Writing Gaussian visual example...")
     plot_gaussian_example(config, rng, output_dir)
-    write_summary(config, output_dir)
+    write_summary(config, output_dir, diagnostics)
+
+    print(f"Grid diagnostics: {diagnostics.report()}")
+
+    max_closure_err = max(r["rel_score_error_gauss_closure_mean"] for r in gaussian_rows)
+    max_lmmse_gap = max(r["closure_vs_lmmse_rel_gap_mean"] for r in laplace_rows)
+    print(f"Gaussian closure vs exact matrix score, worst over t: {max_closure_err:.3e} (expect ~1e-15)")
+    print(f"Closure vs LMMSE on the Laplace chain, worst over t: {max_lmmse_gap:.3e} (expect ~1e-15)")
 
     print("Finished all experiments.")
     print(f"Outputs written to: {output_dir.resolve()}")
@@ -749,9 +1001,9 @@ def config_from_args(args: argparse.Namespace) -> ExperimentConfig:
     if args.mode == "quick":
         cfg = ExperimentConfig(
             n=25,
-            validation_grid_sizes=(81, 161),
-            convergence_coarse_grid_size=101,
-            ref_grid_size=201,
+            validation_grid_sizes=(121, 241),
+            convergence_coarse_grid_size=151,
+            ref_grid_size=301,
             n_trials=2,
             output_dir="bp_markov_diffusion_outputs_quick",
             t_values=(0.12, 0.27, 0.60, 1.30),
@@ -759,10 +1011,10 @@ def config_from_args(args: argparse.Namespace) -> ExperimentConfig:
     elif args.mode == "report":
         cfg = ExperimentConfig(
             n=50,
-            validation_grid_sizes=(101, 201, 401),
-            convergence_coarse_grid_size=201,
-            ref_grid_size=401,
-            n_trials=6,
+            validation_grid_sizes=(151, 301, 601),
+            convergence_coarse_grid_size=301,
+            ref_grid_size=601,
+            n_trials=50,
             output_dir="bp_markov_diffusion_outputs_report",
         )
     else:

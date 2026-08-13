@@ -63,7 +63,7 @@ This note generalizes the Gaussian AR(1) belief-propagation derivation to arbitr
 \[
   \nabla_{x_i}\log p_t(x) = -\frac{x_i-\alpha_t\E[a_i\mid x]}{\Delta_t}.
 \]
-Gaussianity only gives a finite-dimensional closure of the continuous BP messages. Outside the Gaussian case, messages are continuous probability functions and must be represented numerically or approximated. We therefore design two algorithms: reference grid BP and Gaussian projected BP. The grid is validated in the Gaussian AR(1) case against the exact precision-matrix score, and then used as a numerical proxy for the true score in a Laplace-innovation non-Gaussian chain. The experiments quantify the Gaussian-message approximation error at the posterior-mean and score levels.
+Gaussianity only gives a finite-dimensional closure of the continuous BP messages. Outside the Gaussian case, messages are continuous probability functions and must be represented numerically or approximated. We therefore design two algorithms: reference grid BP, and Gaussian message closure carried out directly on the two information parameters. A proposition below shows that the latter is exactly the linear (LMMSE) denoiser, so the error it incurs is the excess error of the best linear estimator over the exact one. The grid is validated in the Gaussian AR(1) case against the exact precision-matrix score, and then used as a numerical proxy for the true score in a Laplace-innovation non-Gaussian chain. The experiments quantify the Gaussian-message approximation error at the posterior-mean and score levels.
 \end{abstract}
 
 \tableofcontents
@@ -115,7 +115,7 @@ The code implements the following experimental pipeline:
 \begin{enumerate}[label=\arabic*.]
   \item Validate grid BP in the Gaussian AR(1) case, where the exact score is known by linear algebra.
   \item In a Laplace-innovation AR(1) chain, estimate grid discretization error by comparing a coarse grid with a fine grid.
-  \item In the same Laplace chain, compare Gaussian projected BP with reference grid BP.
+  \item In the same Laplace chain, compare Gaussian message closure with reference grid BP.
   \item Convert all posterior-mean errors into score errors using the exact OU identity.
 \end{enumerate}
 
@@ -574,6 +574,7 @@ Hence
 \end{align}
 
 \subsection{Gaussian message closure}
+\label{sec:closureforms}
 
 A Gaussian BP message can be written in information form as
 \begin{equation}
@@ -601,6 +602,7 @@ Thus multiplying a Gaussian message by the likelihood updates information parame
   \widetilde\lambda_i=\lambda_i+\frac{\alpha_t^2}{\Delta_t},
   \qquad
   \widetilde h_i=h_i+\frac{\alpha_t x_i}{\Delta_t}.
+  \label{eq:likelihoodupdate}
 \end{equation}
 The resulting temporary mean and variance are
 \begin{equation}
@@ -663,7 +665,7 @@ The simplest hierarchy of approximations is:
 Approximation & Message representation & Comment \\
 \midrule
 Grid BP & values on \(M\) grid points & reference numerical method \\
-Gaussian projected BP & mean and variance & tests Gaussian closure error \\
+Gaussian closure & mean and variance & tests Gaussian closure error \\
 Gaussian mixture BP & mixture weights, means, variances & handles multimodality \\
 Particle BP & weighted samples & Monte Carlo approximation \\
 Basis expansion & coefficients in basis & Hermite/spline/Fourier style \\
@@ -672,7 +674,7 @@ Neural messages & amortized function/embedding & most flexible, but harder to ju
 \end{tabular}
 \end{center}
 
-In this project we focus first on the two cleanest algorithms: grid BP and Gaussian projected BP.
+In this project we focus first on the two cleanest algorithms: grid BP and Gaussian message closure.
 
 \section{Approximation error and score error}
 
@@ -790,52 +792,168 @@ The grid score is
 \end{equation}
 The cost is roughly \(O(nM^2)\), because each forward/backward step applies an \(M\times M\) transition matrix.
 
-\section{Algorithm 2: Gaussian projected BP}
+\subsection{Truncation diagnostic}
+\label{sec:diagnostics}
 
-Gaussian projected BP forces every message to be Gaussian:
+Grid BP restricts the state space to \([-A,A]\), and nothing in the recursion detects when
+that interval is too narrow: the messages are renormalized at each step, so mass that
+should have escaped is quietly redistributed over the retained support. Since the
+algorithm is used here as the \emph{reference} against which everything else is measured,
+this needs an explicit check rather than a plausibility argument.
+
+The forward messages and the beliefs are genuine probability densities --- \(L_i\) is the
+filtered law \(p(a_i\mid x_1,\dots,x_{i-1})\) and \(b_i\) is the posterior marginal --- so
+after normalization we monitor the mass they place in the outermost cells,
+\begin{equation}
+  \beta
+  =
+  \sum_{k\le K_{\rm edge}} b(u_k)w_k
+  +
+  \sum_{k>M-K_{\rm edge}} b(u_k)w_k ,
+\end{equation}
+and abort if \(\beta\) exceeds a tolerance. Backward messages are excluded: \(R_i\) is a
+likelihood \(p(x_{i+1},\dots,x_n\mid a_i)\) rather than a density, and it is legitimately
+almost flat at large \(t\), so a boundary-mass criterion does not apply to it.
+
+For the settings of Section~\ref{sec:results} the worst value observed over the whole
+sweep is \(\beta=5.3\times10^{-10}\), three orders of magnitude inside the reference
+accuracy, so the truncation is not contributing to any of the reported errors.
+
+\section{Algorithm 2: Gaussian message closure}
+\label{sec:closure}
+
+Gaussian message closure forces every message to be Gaussian:
 \begin{equation}
   L_i(a)\approx \Normal(a;\mu_i^L,v_i^L),
   \qquad
   R_i(a)\approx \Normal(a;\mu_i^R,v_i^R).
 \end{equation}
 
-For the forward step, first form the exact outgoing message on the grid:
+The essential point is that \emph{no grid is involved}. A Gaussian is exactly determined
+by two scalars, so the update can and must be carried out on those two scalars directly.
+We work in information form,
 \begin{equation}
-  \widetilde L_{i+1}(u_k)
-  =
-  \sum_{\ell=1}^M K(u_k\mid u_\ell)
-  \Normal(u_\ell;\mu_i^L,v_i^L)
-  \ell_i(u_\ell;x_i)w_\ell.
+  m(a)\propto\exp\!\left(-\tfrac12\lambda a^2+ha\right),
+  \qquad
+  \text{mean}=\frac{h}{\lambda},\quad \text{variance}=\frac1\lambda,
 \end{equation}
-Then project \(\widetilde L_{i+1}\) back to a Gaussian by moment matching:
-\begin{equation}
-  \mu_{i+1}^L
-  = \sum_{k=1}^M u_k\bar L_{i+1}(u_k)w_k,
-\end{equation}
-\begin{equation}
-  v_{i+1}^L
-  = \sum_{k=1}^M (u_k-\mu_{i+1}^L)^2\bar L_{i+1}(u_k)w_k,
-\end{equation}
-where \(\bar L_{i+1}\) is the normalized version of \(\widetilde L_{i+1}\).
+which is the finite-dimensional closure already derived in Section~\ref{sec:closureforms}.
 
-The backward step is analogous. The approximate belief is
+\paragraph{Forward step.} Multiplying by the local likelihood updates the parameters as
+in \eqref{eq:likelihoodupdate},
 \begin{equation}
-  b_i^{\rm GMsg}(a)
-  \propto
-  \Normal(a;\mu_i^L,v_i^L)\ell_i(a;x_i)\Normal(a;\mu_i^R,v_i^R).
+  \widetilde\lambda_i=\lambda_i^L+\frac{\alpha_t^2}{\Delta_t},
+  \qquad
+  \widetilde h_i=h_i^L+\frac{\alpha_t x_i}{\Delta_t},
+  \qquad
+  \widetilde\mu_i=\frac{\widetilde h_i}{\widetilde\lambda_i},
+  \quad
+  \widetilde v_i=\frac1{\widetilde\lambda_i}.
 \end{equation}
-The posterior mean is computed by grid quadrature:
+Pushing through the transition \(a_{i+1}=\rho a_i+\varepsilon_{i+1}\) gives
 \begin{equation}
-  m_i^{\rm GMsg}
-  = \sum_{k=1}^M u_k b_i^{\rm GMsg}(u_k)w_k.
+  \lambda_{i+1}^L=\frac1{q+\rho^2\widetilde v_i},
+  \qquad
+  h_{i+1}^L=\frac{\rho\widetilde\mu_i}{q+\rho^2\widetilde v_i}.
+  \label{eq:forwardclosure}
 \end{equation}
-The approximate score is
+
+\paragraph{Backward step.} Since
+\(R_{i-1}(a)=\int K(a'\mid a)R_i(a')\ell_i(a';x_i)\dint a'
+\propto\Normal\!\left(a;\widetilde\mu_i/\rho,(q+\widetilde v_i)/\rho^2\right)\),
+the information-form update is
+\begin{equation}
+  \lambda_{i-1}^R=\frac{\rho^2}{q+\widetilde v_i},
+  \qquad
+  h_{i-1}^R=\frac{\rho\widetilde\mu_i}{q+\widetilde v_i},
+\end{equation}
+written this way so that \(\rho\to0\) remains well behaved. The flat terminal message is
+represented exactly by \(\lambda_{n}^R=0,\ h_n^R=0\), which is the correct encoding of
+infinite variance; this is the step at which a grid representation would fail.
+
+\paragraph{Belief.} Information parameters simply add:
+\begin{equation}
+  \lambda_i=\lambda_i^L+\lambda_i^R+\frac{\alpha_t^2}{\Delta_t},
+  \qquad
+  h_i=h_i^L+h_i^R+\frac{\alpha_t x_i}{\Delta_t},
+  \qquad
+  m_i^{\rm GMsg}=\frac{h_i}{\lambda_i},
+\end{equation}
+and the approximate score is
 \begin{equation}
   s_i^{\rm GMsg}
   = -\frac{x_i-\alpha_t m_i^{\rm GMsg}}{\Delta_t}.
 \end{equation}
 
-In the Gaussian AR(1) case, this projection is exact in principle. In a non-Gaussian chain, it is an approximation. The goal of the experiments is to measure the induced error.
+In the Gaussian AR(1) case this recursion is exact, and numerically it reproduces the
+precision-matrix score to machine precision at every diffusion time. In a non-Gaussian
+chain it is an approximation, and the next proposition identifies exactly which one.
+
+\subsection{Closure is the linear denoiser}
+
+\begin{proposition}[Gaussian closure is blind to non-Gaussian innovations]
+\label{prop:lmmse}
+Let the clean chain be \(a_{i+1}=\rho a_i+\varepsilon_{i+1}\) with i.i.d.\ innovations
+satisfying \(\E[\varepsilon]=0\) and \(\Var(\varepsilon)=q\), and otherwise arbitrary.
+Then the Gaussian message closure above produces the same posterior means as it would for
+a Gaussian chain with the same \(\rho\) and \(q\); that is,
+\begin{equation}
+  m^{\rm GMsg}(x,t)=\alpha_t\Sigma_0\Sigma_t^{-1}x=m_{\rm G}(x,t),
+\end{equation}
+the linear minimum mean-square-error (LMMSE) estimator.
+\end{proposition}
+
+\begin{proof}
+Both message operations preserve Gaussianity of the \emph{representation} by fiat, so the
+only question is which moments the updates use. Multiplication by the likelihood is a
+product of two Gaussians and is exact. For the transition step, let the incoming message
+be \(\Normal(\widetilde\mu,\widetilde v)\). The exact outgoing function is the density of
+\(\rho A+\varepsilon\) with \(A\sim\Normal(\widetilde\mu,\widetilde v)\) independent of
+\(\varepsilon\). Whatever the law of \(\varepsilon\), independence gives
+\begin{equation}
+  \E[\rho A+\varepsilon]=\rho\widetilde\mu,
+  \qquad
+  \Var(\rho A+\varepsilon)=\rho^2\widetilde v+q .
+\end{equation}
+Moment matching retains precisely these two numbers and discards everything else, so the
+outgoing parameters are \eqref{eq:forwardclosure} irrespective of the shape of
+\(\varepsilon\). The same argument applies to the backward step. Hence every message, and
+therefore every belief, coincides with the one obtained from the Gaussian chain with
+matching \(\rho\) and \(q\); for that chain BP is exact and returns
+\(\alpha_t\Sigma_0\Sigma_t^{-1}x\), which is the LMMSE estimator because the AR(1)
+second-order structure \(\Cov(a_i,a_{i-k})=\rho^k\) is shared by both models.
+\end{proof}
+
+This reframes the experiments of Section~\ref{sec:results}. The quantity we measure is
+not a numerical approximation error at all: it is the excess error of the \emph{best
+possible linear denoiser} relative to the exact one. Equivalently, it is exactly the
+amount of nonlinearity that a learned score has to supply in order to beat a linear
+model. The column \texttt{closure\_vs\_lmmse\_rel\_gap\_mean} in the output CSV verifies
+Proposition~\ref{prop:lmmse} numerically; it sits at \(10^{-16}\) at every diffusion
+time.
+
+\subsection{The discarded grid projection}
+\label{sec:ablation}
+
+An earlier version of this note implemented the closure differently: each message was
+stored as \(\Normal(\mu,v)\) but was \emph{evaluated on the grid}, updated there, and
+moment-matched back. That algorithm is retained in the code as
+\texttt{gaussian\_projected\_bp\_grid} and is reported as an ablation, because its failure
+mode is instructive.
+
+The terminal backward message is flat. Represented on \([-A,A]\) and moment-matched, a
+constant function returns variance \((2A)^2/12\) rather than infinity, so the projection
+injects a spurious precision of order \(3/A^2\) into the backward pass. The damage grows
+with diffusion time, because \(\alpha_t\to0\) flattens every message and so progressively
+more of them are fitted to the width of the truncation rather than to their own shape. In
+the Gaussian case, where the answer should be exact, the resulting relative score error
+reaches \(1.8\times10^{-1}\) at \(t=2.4\) --- see Figure~\ref{fig:closuresanity}. This is
+the origin of the anomalous growth with \(t\), and of the non-monotonic behaviour, in the
+first version of this report.
+
+The lesson is worth stating plainly: a Gaussian approximation should never be routed
+through a grid. Doing so combines the bias of the Gaussian assumption with a truncation
+error that the Gaussian assumption was introduced to avoid.
 
 \section{Experimental models}
 
@@ -930,6 +1048,7 @@ The code also verifies the residual of the identity
 which should be at numerical precision.
 
 \section{Numerical results from the report run}
+\label{sec:results}
 
 The report run uses:
 \begin{center}
@@ -939,15 +1058,22 @@ Parameter & Value \\
 \midrule
 Chain length & \(n=50\) \\
 Correlation & \(\rho=0.85\) \\
-Grid interval & \([-8,8]\) \\
-Validation grid sizes & \(101,201,401\) \\
-Laplace convergence grids & \(201\) vs \(401\) \\
-Reference grid size & \(401\) \\
-Trials per time & \(12\) \\
+Grid interval & \([-12,12]\) \\
+Validation grid sizes & \(151,301,601\) \\
+Laplace convergence grids & \(301\) vs \(601\) \\
+Reference grid size & \(601\) \\
+Trials per time & \(50\) \\
 Diffusion times & \(0.08,0.12,0.18,0.27,0.40,0.60,0.90,1.30,1.80,2.40\) \\
+Boundary-mass tolerance & \(10^{-6}\) over 3 edge cells \\
 \bottomrule
 \end{tabular}
 \end{center}
+
+The grid sizes correspond to spacings \(0.16,0.08,0.04\), the same resolutions used in the
+first version of this report, but on a wider interval. The widening was prompted by the
+boundary-mass diagnostic described in Section~\ref{sec:diagnostics}: on \([-8,8]\) the
+worst observed boundary mass was \(7.4\times10^{-7}\), uncomfortably close to tolerance,
+whereas on \([-12,12]\) at equal resolution it falls to \(5.3\times10^{-10}\).
 
 \subsection{Gaussian validation of grid BP}
 
@@ -960,13 +1086,27 @@ Figure \ref{fig:gaussian-validation} compares grid BP with the exact Gaussian pr
   \label{fig:gaussian-validation}
 \end{figure}
 
-Figure \ref{fig:gaussian-projected-sanity} shows the Gaussian projected BP sanity check in the Gaussian case. In principle, Gaussian projection is exact for Gaussian transitions and Gaussian likelihoods; remaining deviations are numerical effects from finite grid support and quadrature.
+Figure \ref{fig:closuresanity} checks Gaussian message closure in the Gaussian case, where
+it should be exact. The information-form recursion of Section~\ref{sec:closure} sits at
+\(2\times10^{-16}\) uniformly in \(t\), confirming that the Gaussian family really is closed
+under the BP updates and that nothing is lost by storing only two scalars per message.
+
+The same figure overlays the discarded grid projection of Section~\ref{sec:ablation}.
+Although structurally it makes the same Gaussian assumption, its error grows by fifteen
+orders of magnitude across the time range, reaching \(1.8\times10^{-1}\) at \(t=2.4\), and
+is essentially independent of \(M\) --- confirming that the failure comes from the width of
+the truncation rather than from its resolution.
 
 \begin{figure}[H]
   \centering
-  \includegraphics[width=0.88\textwidth]{../outputs/gaussian_projected_sanity_rel_error.png}
-  \caption{Gaussian AR(1) sanity check for Gaussian projected BP against the exact matrix score. The projection is structurally correct in the Gaussian case; numerical deviations are due to finite-grid implementation details.}
-  \label{fig:gaussian-projected-sanity}
+  \includegraphics[width=0.88\textwidth]{../outputs/gaussian_closure_sanity_rel_error.png}
+  \caption{Gaussian AR(1): Gaussian message closure against the exact matrix score. The
+  grid-free information-form recursion (solid) is exact to machine precision at every
+  diffusion time. The discarded grid projection (dashed) is shown as an ablation; its
+  error grows with \(t\) because \(\alpha_t\to0\) flattens the messages and the moment
+  matching then measures the width of the grid rather than the shape of the message. The
+  three dashed curves nearly coincide, showing the failure is insensitive to \(M\).}
+  \label{fig:closuresanity}
 \end{figure}
 
 \subsection{Laplace grid convergence}
@@ -986,10 +1126,10 @@ Representative values from the Laplace grid-convergence CSV are:
 \toprule
 \(t\) & Relative score difference & Posterior mean MSE & Score cosine \\
 \midrule
-0.08 & \(1.07\times 10^{-4}\) & \(9.54\times 10^{-10}\) & 0.999999994 \\
-0.40 & \(2.55\times 10^{-5}\) & \(5.77\times 10^{-10}\) & 0.9999999997 \\
-1.30 & \(3.98\times 10^{-6}\) & \(2.02\times 10^{-10}\) & 0.99999999999 \\
-2.40 & \(6.86\times 10^{-7}\) & \(5.91\times 10^{-11}\) & 0.9999999999998 \\
+0.08 & \(1.25\times 10^{-4}\) & \(1.23\times 10^{-9}\) & 0.99999999 \\
+0.40 & \(2.91\times 10^{-5}\) & \(7.92\times 10^{-10}\) & 0.9999999996 \\
+1.30 & \(4.48\times 10^{-6}\) & \(2.37\times 10^{-10}\) & 0.99999999999 \\
+2.40 & \(7.81\times 10^{-7}\) & \(8.67\times 10^{-11}\) & 1.0000000000 \\
 \bottomrule
 \end{tabular}
 \end{center}
@@ -998,46 +1138,63 @@ The key interpretation is that the grid-discretization error is much smaller tha
 
 \subsection{Gaussian-message approximation error in the Laplace chain}
 
+By Proposition~\ref{prop:lmmse} the Gaussian closure applied to this chain returns exactly
+the linear denoiser, so the quantities plotted here are the excess error of the best
+linear estimator relative to the exact one. The identity is confirmed numerically: the
+relative gap between the closure output and \(\alpha_t\Sigma_0\Sigma_t^{-1}x\) is at most
+\(8.5\times10^{-16}\) across the whole time range.
+
 Figure \ref{fig:laplace-mean-mse} shows posterior-mean MSE. Figure \ref{fig:laplace-rel-score} shows relative score error. Figure \ref{fig:laplace-cosine} shows score cosine similarity.
 
 \begin{figure}[H]
   \centering
   \includegraphics[width=0.88\textwidth]{../outputs/laplace_posterior_mean_mse.png}
-  \caption{Laplace chain: posterior-mean MSE between Gaussian projected BP and reference grid BP.}
+  \caption{Laplace chain: posterior-mean MSE between Gaussian message closure and reference grid BP.}
   \label{fig:laplace-mean-mse}
 \end{figure}
 
 \begin{figure}[H]
   \centering
   \includegraphics[width=0.88\textwidth]{../outputs/laplace_relative_score_error.png}
-  \caption{Laplace chain: relative score error of Gaussian projected BP compared with reference grid BP. Errors are largest at small noise, where the amplification factor \(\alpha_t/\Delta_t\) is large. Some large-time variability appears because the posterior becomes weakly informative and the Gaussian projection can occasionally behave poorly.}
+  \caption{Laplace chain: relative score error of Gaussian message closure compared with reference grid BP. The error decreases monotonically with diffusion time: as \(t\) grows the posterior is increasingly dominated by the Gaussian likelihood and the linear estimator becomes correspondingly better. The non-monotonic behaviour reported in the first version of this note was an artefact of the grid projection discussed in Section~\ref{sec:ablation}.}
   \label{fig:laplace-rel-score}
 \end{figure}
 
 \begin{figure}[H]
   \centering
   \includegraphics[width=0.88\textwidth]{../outputs/laplace_score_cosine_similarity.png}
-  \caption{Laplace chain: cosine similarity between Gaussian-message score and reference grid-BP score. Even when the norm error is non-negligible, the direction can remain close for many diffusion times.}
+  \caption{Laplace chain: cosine similarity between Gaussian-message score and reference grid-BP score. Even when the norm error is non-negligible, the direction remains close at all diffusion times.}
   \label{fig:laplace-cosine}
 \end{figure}
 
-Representative values for Gaussian-message approximation error are:
+Representative values, over 50 trials per time:
 \begin{center}
-\begin{tabular}{rrrr}
+\begin{tabular}{rrrrr}
 \toprule
-\(t\) & Posterior mean MSE & Relative score error & Score cosine \\
+\(t\) & Posterior mean MSE & Relative score error & Score cosine & Closure vs LMMSE \\
 \midrule
-0.08 & \(3.26\times 10^{-3}\) & 0.195 & 0.982 \\
-0.12 & \(3.92\times 10^{-3}\) & 0.157 & 0.987 \\
-0.40 & \(1.98\times 10^{-3}\) & 0.0419 & 0.999 \\
-0.90 & \(3.87\times 10^{-3}\) & 0.0246 & 0.9996 \\
-1.80 & \(7.10\times 10^{-1}\) & 0.0825 & 0.992 \\
-2.40 & \(1.08\times 10^{-1}\) & 0.0197 & 0.9996 \\
+0.08 & \(3.15\times 10^{-3}\) & 0.199 & 0.9806 & \(8.5\times10^{-16}\) \\
+0.12 & \(3.37\times 10^{-3}\) & 0.147 & 0.9887 & \(6.8\times10^{-16}\) \\
+0.40 & \(1.94\times 10^{-3}\) & 0.0418 & 0.9990 & \(4.9\times10^{-16}\) \\
+0.90 & \(1.66\times 10^{-3}\) & 0.0133 & 0.9999 & \(3.6\times10^{-16}\) \\
+1.80 & \(2.07\times 10^{-5}\) & \(7.50\times10^{-4}\) & 1.0000 & \(4.0\times10^{-16}\) \\
+2.40 & \(1.03\times 10^{-6}\) & \(8.68\times10^{-5}\) & 1.0000 & \(6.2\times10^{-16}\) \\
 \bottomrule
 \end{tabular}
 \end{center}
 
-These are preliminary Monte Carlo estimates. The script is designed to increase \texttt{--n-trials}, \texttt{--ref-grid-size}, or the grid interval for heavier runs.
+Two features of this table are worth recording. First, both error measures now decrease
+monotonically in \(t\); the large values previously reported at \(t=1.80\) and \(t=2.40\)
+were entirely due to the grid projection. Second, the largest discrepancy occurs at
+\emph{small} diffusion times, where the posterior is sharp and the non-Gaussian shape of
+the Laplace innovations is least washed out by the observation noise.
+
+It does not follow that small times are the ones that matter for generation. The score
+error and the sampling error are different quantities, related by the whole backward
+trajectory rather than pointwise, and the accumulated effect of a score error at time
+\(t\) is not proportional to its size. Settling this requires running the reverse process
+with the exact and approximate scores and comparing the generated distributions; that is
+the natural next experiment and it is listed first in Section~\ref{sec:nextsteps}.
 
 \subsection{Example beliefs}
 
@@ -1046,7 +1203,7 @@ Figure \ref{fig:laplace-belief} compares a posterior belief at one site. This is
 \begin{figure}[H]
   \centering
   \includegraphics[width=0.88\textwidth]{../outputs/example_laplace_belief_comparison.png}
-  \caption{Example posterior marginal in the Laplace chain. The reference grid BP belief is compared with the Gaussian projected BP belief. The vertical lines show the corresponding posterior means.}
+  \caption{Example posterior marginal in the Laplace chain. The reference grid BP belief is compared with the Gaussian closure belief, which by Proposition~\ref{prop:lmmse} is the linear denoiser. The vertical lines show the corresponding posterior means.}
   \label{fig:laplace-belief}
 \end{figure}
 
@@ -1145,21 +1302,45 @@ means[i] = np.sum(grid * b * weights)
 \end{lstlisting}
 This is exactly the discrete quadrature version of the exact BP belief formula.
 
-\subsection{Gaussian projected BP implementation}
+\subsection{Gaussian message closure implementation}
 
-The function \texttt{gaussian\_projected\_bp} stores each message by a mean and variance. For each step, it evaluates the current Gaussian message on the grid, applies the exact grid update, then moment-matches the outgoing density:
+The function \texttt{gaussian\_closure\_bp} takes only \((x,\rho,q,\alpha_t,\Delta_t)\) --- no
+grid, no transition matrix --- and propagates the two information scalars directly:
+\begin{lstlisting}[style=pythonstyle]
+lam_t = lam_L[i] + lam_obs           # multiply by the local likelihood
+h_t   = h_L[i]   + h_obs[i]
+mu_t, v_t = h_t / lam_t, 1.0 / lam_t
+v_out = q + rho ** 2 * v_t           # push through the transition
+lam_L[i + 1] = 1.0 / v_out
+h_L[i + 1]   = rho * mu_t / v_out
+\end{lstlisting}
+The flat terminal right message is represented by zero precision, which is the exact
+encoding of infinite variance and costs nothing:
+\begin{lstlisting}[style=pythonstyle]
+lam_R[-1], h_R[-1] = 0.0, 0.0
+\end{lstlisting}
+Beliefs are then formed by adding information parameters, and the posterior mean is
+\(h_i/\lambda_i\).
+
+\subsection{The grid-projection ablation}
+
+\texttt{gaussian\_projected\_bp\_grid} retains the earlier implementation, in which the same
+Gaussian assumption is routed through the grid:
 \begin{lstlisting}[style=pythonstyle]
 L_values = gaussian_message_values(grid, L_mean[i], L_var[i])
 incoming = L_values * ell[i] * weights
 outgoing = K @ incoming
 L_mean[i + 1], L_var[i + 1] = density_moments(outgoing, grid, weights)
 \end{lstlisting}
-A flat terminal right message is represented by infinite variance:
+with the flat terminal message written as
 \begin{lstlisting}[style=pythonstyle]
 R_mean[-1] = 0.0
 R_var[-1] = np.inf
 \end{lstlisting}
-The helper \texttt{gaussian\_message\_values} returns a vector of ones when the variance is infinite.
+The helper \texttt{gaussian\_message\_values} returns a vector of ones when the variance is
+infinite, and \texttt{density\_moments} then assigns that constant the variance of the
+truncation interval rather than infinity. This single line is the origin of the failure
+analysed in Section~\ref{sec:ablation}.
 
 \subsection{Exact Gaussian score functions}
 
@@ -1186,9 +1367,9 @@ Using \texttt{solve} is numerically preferable to explicitly computing \(\Sigma_
 
 The script has three experiment runners:
 \begin{enumerate}[label=\arabic*.]
-  \item \texttt{run\_gaussian\_grid\_validation}: compares grid BP and Gaussian projected BP against the exact matrix score.
+  \item \texttt{run\_gaussian\_grid\_validation}: compares grid BP, Gaussian closure and the grid-projection ablation against the exact matrix score.
   \item \texttt{run\_laplace\_grid\_convergence}: compares coarse-grid and fine-grid BP in the Laplace chain.
-  \item \texttt{run\_laplace\_gaussian\_message\_error}: compares Gaussian projected BP against reference grid BP in the Laplace chain.
+  \item \texttt{run\_laplace\_gaussian\_message\_error}: compares Gaussian closure against reference grid BP in the Laplace chain, and verifies the LMMSE identity.
 \end{enumerate}
 The final function \texttt{run\_all} executes all experiments, writes CSV files, and generates plots.
 
@@ -1213,6 +1394,7 @@ python code/bp_general_markov_diffusion_experiments.py \
 The cost grows approximately as \(O(nM^2)\), so increasing \(M\) is much more expensive than increasing the number of trials.
 
 \section{Interpretation and next steps}
+\label{sec:nextsteps}
 
 The clean conclusion is:
 \[
