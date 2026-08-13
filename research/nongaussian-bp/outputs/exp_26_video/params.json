@@ -17,16 +17,23 @@
     "spatial_family": "gaussian",
     "n_generate": 4000,
     "cuts": [
+      0,
+      1,
+      2,
+      3,
       4
     ],
     "chunk": 16,
     "seed": 0
   },
   "parts": [
-    "cutcurve"
+    "fit",
+    "coherence",
+    "structure",
+    "strip"
   ],
   "provenance": {
-    "timestamp": "2026-08-12 19:58:21",
+    "timestamp": "2026-08-12 23:57:24",
     "git_commit": "",
     "git_branch": "",
     "git_dirty": "",
