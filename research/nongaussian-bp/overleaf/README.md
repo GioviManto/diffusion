@@ -19,7 +19,7 @@ Then Overleaf → New Project → Upload Project → pick the zip. Overleaf make
 automatically; if it does not, right-click `main.tex` → *Set as main file*.
 
 **Or sync from GitHub** (keeps it updated, needs a premium plan): Overleaf → New Project → Import
-from GitHub → `GioviManto/diffusion`, branch `paper-revision-2026-08-07`. Set the root document to
+from GitHub → `GioviManto/diffusion`, branch `main`. Set the root document to
 `research/nongaussian-bp/overleaf/main.tex`.
 
 ## Settings

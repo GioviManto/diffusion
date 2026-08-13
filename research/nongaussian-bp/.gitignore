@@ -6,3 +6,13 @@ outputs/_determinism/
 # Datasets: fetched per-machine, never committed. cifar-10-python.tar.gz alone
 # is 163 MB, and the cluster copy is the one that matters.
 data/
+
+# overleaf/ is a generated mirror of paper/ (see overleaf/sync.sh and README.md,
+# which stay tracked). Committing the copy alongside the source is what let it
+# go stale before; regenerate with ./overleaf/sync.sh instead.
+overleaf/appendix.tex
+overleaf/bibliography.bib
+overleaf/main.tex
+overleaf/neurips_2023.sty
+overleaf/notation.tex
+overleaf/figures/
