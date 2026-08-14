@@ -30,6 +30,12 @@
 #     sbatch --dependency=afterok:$SMOKE --array=0-4 --export=ALL,MODE=cpoint2 \
 #            bocconi_exp16.sbatch
 #
+#   Capacity vs generated shape, rerun at a converged EM budget (see the mode body for why):
+#     sbatch --partition=defq --time=24:00:00 --array=2 \
+#            --export=ALL,MODE=components_converged bocconi_exp16.sbatch   # calibrate first
+#     sbatch --partition=defq --time=24:00:00 --array=0-14 \
+#            --export=ALL,MODE=components_converged bocconi_exp16.sbatch   # then the rest
+#
 # WHY CALIBRATION COMES FIRST. The reference arm of this experiment is the *exact* score,
 # and a smoke run showed it does not reproduce the true innovation kurtosis at small step
 # counts: 1.78 at 60 steps and 2.32 at 120, against a true 3.0. That is the Euler-Maruyama
@@ -129,6 +135,52 @@ case "$MODE" in
         --set n_steps=400
     ;;
 
+  components_converged)
+    # `components` above, and the fig_capacity curve it feeds, used the default
+    # em_iters=40. audit/AUDIT_NOTE.md's audit_rate_vs_bias.py measured that the innovation
+    # shape needs on the order of 2000 EM iterations to settle -- 40 is a ~50x under-budget
+    # -- and a direct check attributed roughly 96% of the apparent capacity effect at C=40
+    # iterations to convergence rate, not capacity (CLAIMS_TO_UPDATE.md #2). This mode reruns
+    # the same sweep at em_iters=2000 so the generated-shape vs C curve stops being confounded
+    # with under-convergence. The held-out-evidence/runtime curve (`cpoint2`) is NOT
+    # rerun here: CLAIMS_TO_UPDATE.md #2 already argues that one is unaffected, because it
+    # is a paired comparison scored by an average over the whole density that saturates
+    # early in the optimisation.
+    #
+    # One task per (C, seed) rather than per C with 3 seeds looped inside -- at 2000
+    # iterations the EM fit alone is of order 2000 x 14s =~ 7.8h (13.5-14.3s/iter measured
+    # at the old budget, assumed to scale linearly), so 3 seeds in one task would not fit
+    # any partition's walltime cap with margin. 15 tasks (5 C x 3 seeds) instead, each
+    # requesting the whole of defq's 24:10:00 cap for headroom over the generation cost on
+    # top of the EM fit (unmeasured at this iteration count -- this is why cell 0 should be
+    # submitted alone first as a timing check before the other 14; see hpc/README or ask
+    # before blindly submitting the full array).
+    #
+    #   Calibration cell (submit alone, inspect elapsed time before the rest):
+    #     sbatch --partition=defq --time=24:00:00 --array=2 \
+    #            --export=ALL,MODE=components_converged bocconi_exp16.sbatch
+    #
+    #   Full array, once the calibration cell's walltime is known to fit:
+    #     sbatch --partition=defq --time=24:00:00 --array=0-14 \
+    #            --export=ALL,MODE=components_converged bocconi_exp16.sbatch
+    CS=(2 4 8 12 16)
+    NSEED=3
+    CI=$(( TASK / NSEED ))
+    SEED=$(( TASK % NSEED ))
+    C=${CS[$CI]}
+    OUT=$ROOT/outputs/exp_16/components_converged_C${C}_seed${SEED}
+    echo "components_converged: C=$C seed=$SEED em_iters=2000 -> $OUT"
+    "$PYTHON" experiments/exp_16_sampling_validation.py \
+        --only generate \
+        --output-dir "$OUT" \
+        --set sizes="(2048,)" \
+        --set em_components="$C" \
+        --set n_seed=1 \
+        --set seed_offset="$SEED" \
+        --set em_iters=2000 \
+        --set n_steps=400
+    ;;
+
   cpoint2)
     # The two coordinates the capacity sweep never had: marginal likelihood and cost.
     #
@@ -198,7 +250,8 @@ case "$MODE" in
     ;;
 
   *)
-    echo "unknown MODE=$MODE (expected smoke, calibrate, generate, generate2, components or cpoint2)" >&2
+    echo "unknown MODE=$MODE (expected smoke, calibrate, generate, generate2, components," \
+         "components_converged or cpoint2)" >&2
     exit 2
     ;;
 esac

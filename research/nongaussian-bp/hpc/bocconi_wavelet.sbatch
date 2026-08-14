@@ -65,6 +65,12 @@
 #     sbatch --partition=compute --time=12:00:00 --export=ALL,MODE=images   bocconi_wavelet.sbatch
 #     sbatch --partition=compute --time=23:00:00 --export=ALL,MODE=videoall bocconi_wavelet.sbatch
 #
+#   exp_24 with the scale_mixture kernel added -- calibrate on THIS cluster before
+#   guessing the full-size walltime, then submit the full-size run on compute:
+#     sbatch --export=ALL,MODE=imagefit_scale_calibrate bocconi_wavelet.sbatch
+#     sbatch --partition=compute --time=3-00:00:00 \
+#            --export=ALL,MODE=imagefit_scale bocconi_wavelet.sbatch
+#
 # The image array splits by *family* and the video array by *cut depth*, because
 # in both cases the tasks share nothing: each fits its own model and writes its
 # own file, so there is no merge step. Splitting by experiment *part* instead
@@ -167,12 +173,10 @@ case "$MODE" in
     # on its own".
     #
     # Defaults (n_train=2000, n_test=500, n_iters=25, families gaussian+mixture)
-    # rather than anything larger, because the point is the baseline, and
-    # `_factory` in exp_24 accepts only those two families -- it raises on
-    # anything else. exp_25 gained a third family (`scale_mixture`, on the
-    # src/scale_kernel.py added in the wavelet merge) and exp_24 did not follow.
-    # Whether the baseline should be extended to that kernel is a real question
-    # about the argument, not a submission detail, so it is left for a human.
+    # rather than anything larger, because the point is the baseline. This mode
+    # writes gaussian+mixture only, unchanged -- see `imagefit_scale` below for
+    # the scale_mixture extension, kept as a separate output so this baseline
+    # stays reproducible on its own.
     # IMAGEFIT_OUT lets a second, longer-walltime attempt run alongside the first
     # without the two writing to one directory. exp_24 accumulates both families
     # before writing its fit CSV, so a walltime kill loses the completed family
@@ -181,6 +185,37 @@ case "$MODE" in
     # after 2h at 357% CPU on medium_cpu's 6h cap.
     "$PYTHON" -u experiments/exp_24_wavelet_fit.py \
         --output-dir "$ROOT/outputs/${IMAGEFIT_OUT:-exp_24_wavelet_fit}"
+    ;;
+
+  imagefit_scale_calibrate)
+    # `_factory` in exp_24 accepted only gaussian+mixture; `src/scale_kernel.py`'s
+    # ScaleMixtureKernel (added for exp_25) is now wired in too, so the second-order
+    # closure can finally be compared against the family built to capture cross-scale
+    # magnitude dependence -- the gap EXECUTIVE_SUMMARY.md's own limitations section names.
+    #
+    # `imagefit`'s gaussian family alone had not finished after 2h on medium_cpu's 6h cap
+    # at full size (n_train=2000, n_iters=25), and exp_24 fits every family in `families`
+    # sequentially in one process before writing anything -- no partial credit on a
+    # walltime kill. Do not submit the full three-family run at full size blind: this mode
+    # measures actual per-iteration, per-family cost on THIS cluster at a small size first
+    # (n_train=200, n_iters=5), so `imagefit_scale`'s walltime request is sized from a
+    # measurement instead of a guess.
+    "$PYTHON" -u experiments/exp_24_wavelet_fit.py \
+        --output-dir "$ROOT/outputs/exp_24_scale_calibrate" \
+        --set families="('gaussian','mixture','scale_mixture')" \
+        --set n_train=200 --set n_test=100 --set n_iters=5
+    ;;
+
+  imagefit_scale)
+    # The full-size, three-family rerun -- submit only after inspecting
+    # imagefit_scale_calibrate's elapsed time and confirming this walltime request has
+    # margin. Same n_train/n_test/n_iters as `imagefit` (2000/500/25) so the scale_mixture
+    # result is comparable to the committed gaussian+mixture baseline, not a smaller,
+    # different measurement. Writes to its own directory: exp_24_wavelet_fit (the
+    # gaussian+mixture baseline) is not touched.
+    "$PYTHON" -u experiments/exp_24_wavelet_fit.py \
+        --output-dir "$ROOT/outputs/${IMAGEFIT_OUT:-exp_24_wavelet_fit_scale_mixture}" \
+        --set families="('gaussian','mixture','scale_mixture')"
     ;;
 
   images)
@@ -226,7 +261,8 @@ case "$MODE" in
 
   *)
     echo "unknown MODE=$MODE (expected smoke, stats, generate, cutcurve," >&2
-    echo "                    video, images or videoall)" >&2
+    echo "                    video, images, videoall, imagefit," >&2
+    echo "                    imagefit_scale_calibrate or imagefit_scale)" >&2
     exit 2
     ;;
 esac

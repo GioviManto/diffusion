@@ -39,6 +39,7 @@ from common import (
 )
 from src.image_data import load_cifar10_luminance
 from src.kernels import GaussianAR1Kernel, MixtureInnovationKernel
+from src.scale_kernel import ScaleMixtureKernel
 from src.noising import alpha_delta
 from src.utils import ensure_dir, rng_for, write_csv, write_json
 from src.wavelet_model import fit_wavelet_tree
@@ -83,6 +84,10 @@ def _factory(family: str, settings):
         return lambda d, rng: GaussianAR1Kernel(rho=0.2, q=0.8)
     if family == "mixture":
         return lambda d, rng: MixtureInnovationKernel.init(
+            settings["n_components"], rho=0.2, var=0.8, rng=rng
+        )
+    if family == "scale_mixture":
+        return lambda d, rng: ScaleMixtureKernel.init(
             settings["n_components"], rho=0.2, var=0.8, rng=rng
         )
     raise ValueError(f"unknown family {family!r}")
