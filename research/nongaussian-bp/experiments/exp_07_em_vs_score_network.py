@@ -71,14 +71,28 @@ from src.noising import alpha_delta
 from src.plotting import new_figure, save_figure
 from src.priors import LaplaceAR1
 from src.utils import ensure_dir, rng_for, write_csv, write_json
+from frozen_config import FROZEN
 
-N_SITES = 32
-RHO_TRUE = 0.8
-GRID_A = 8.0
-GRID_M = 401
-T_TRAIN = (0.1, 0.2, 0.4, 0.8, 1.6)
-N_COMPONENTS = 4
-N_TEST = 256
+N_SITES = FROZEN.n_sites
+RHO_TRUE = FROZEN.rho   # was 0.8; the two populations are now one
+GRID_A = FROZEN.half_width
+GRID_M = FROZEN.n_grid
+T_TRAIN = tuple(FROZEN.t_grid)
+N_COMPONENTS = FROZEN.n_components   # was 4; 8 is the paired-design optimum
+N_TEST = FROZEN.n_heldout
+
+# Was a hard-coded 120 in four places while the frozen config declared 400 and
+# nothing read it. At 120 the innovation shape is still moving -- exp_27 puts
+# the settling time at a median of 229 updates -- so the estimator was being
+# reported short of convergence.
+EM_ITERS = FROZEN.em_max_iters
+
+# The iteration counts EM-BP is allowed to be stopped at, chosen on the validation
+# bundle exactly as the network's parameterisation is. Log-spaced because the
+# interesting structure is early: exp_27 puts rho settling near 80 and the innovation
+# shape near 229, and the 120-vs-400 reversal measured on array 628943 sits between
+# nseq=256 and 512, so the grid must resolve both ends.
+EM_CHECKPOINTS = {10, 20, 40, 60, 80, 120, 160, 220, 300, EM_ITERS}
 
 
 N_VAL = 256
@@ -174,7 +188,7 @@ def part1_sample_efficiency(grid, weights, sizes, hidden, n_steps, out):
             MixtureInnovationKernel.init(
                 N_COMPONENTS, rho=0.3, var=0.8, rng=train_rng("exp07-init")
             ),
-            grid, weights, noisy_groups(A, T_TRAIN, rng), n_iters=120,
+            grid, weights, noisy_groups(A, T_TRAIN, rng), n_iters=EM_ITERS,
         )
         em_seconds = time.perf_counter() - t0
 
@@ -248,11 +262,12 @@ def part5_sample_efficiency_val(grid, weights, sizes, hidden, n_steps, out):
         # Same keys as part 1, so these are literally the same fitted models.
         rng = train_rng("exp07-p1", n_chains)
         A = np.stack([prior.sample(rng, N_SITES) for _ in range(n_chains)])
-        kernel, _ = fit_em(
+        kernel, _, ckpts = fit_em(
             MixtureInnovationKernel.init(
                 N_COMPONENTS, rho=0.3, var=0.8, rng=train_rng("exp07-init")
             ),
-            grid, weights, noisy_groups(A, T_TRAIN, rng), n_iters=120,
+            grid, weights, noisy_groups(A, T_TRAIN, rng), n_iters=EM_ITERS,
+            checkpoints=EM_CHECKPOINTS,
         )
         nets = train_nets(A, ("exp07-net", n_chains), hidden, n_steps)
 
@@ -273,14 +288,38 @@ def part5_sample_efficiency_val(grid, weights, sizes, hidden, n_steps, out):
             chosen = min(val_err, key=val_err.get)
             oracle = min(test_err, key=lambda m: test_err[m]["score_rel_l2"])
 
-            em = evaluate_denoiser(
-                bp_posterior_mean(kernel, grid, weights, X_test, t), m_test, X_test, t)
+            # The estimator's iteration count is selected the same way, on the same
+            # bundle. Without this the two arms are tuned by different protocols: the
+            # network gets its parameterisation chosen on validation while EM-BP is
+            # pinned to whatever budget the config names. That asymmetry is not neutral
+            # -- the budget is a genuine bias/variance knob here, and a fixed choice
+            # favours one arm or the other depending on nseq.
+            em_val = {
+                it: evaluate_denoiser(
+                    bp_posterior_mean(k, grid, weights, X_val, t),
+                    m_val, X_val, t)["score_rel_l2"]
+                for it, k in ckpts.items()
+            }
+            em_test = {
+                it: evaluate_denoiser(
+                    bp_posterior_mean(k, grid, weights, X_test, t), m_test, X_test, t)
+                for it, k in ckpts.items()
+            }
+            em_it = min(em_val, key=em_val.get)
+            em_it_oracle = min(em_test, key=lambda i: em_test[i]["score_rel_l2"])
+            em = em_test[em_it]
 
             rows.append({
                 "n_chains": n_chains,
                 "t": t,
                 "em_bp_score_rel_l2": em["score_rel_l2"],
                 "em_bp_mean_rel_l2": em["mean_rel_l2"],
+                "em_iters_selected": em_it,
+                "em_iters_oracle": em_it_oracle,
+                "em_iters_agrees": int(em_it == em_it_oracle),
+                # What the pinned budget would have given, so the cost of selecting is
+                # measurable rather than asserted.
+                "em_bp_score_rel_l2_at_cap": em_test[max(em_test)]["score_rel_l2"],
                 "net_score_rel_l2_selected": test_err[chosen]["score_rel_l2"],
                 "net_mean_rel_l2_selected": test_err[chosen]["mean_rel_l2"],
                 "net_score_rel_l2_oracle": test_err[oracle]["score_rel_l2"],
@@ -327,7 +366,7 @@ def part2_capacity(grid, weights, n_chains, archs, step_counts, out):
         MixtureInnovationKernel.init(
             N_COMPONENTS, rho=0.3, var=0.8, rng=train_rng("exp07-init")
         ),
-        grid, weights, noisy_groups(A, T_TRAIN, rng), n_iters=120,
+        grid, weights, noisy_groups(A, T_TRAIN, rng), n_iters=EM_ITERS,
     )
     em_err = float(np.mean([
         evaluate_denoiser(
@@ -394,7 +433,7 @@ def part3_transfer(grid, weights, n_chains, t_probe, hidden, n_steps, out):
         MixtureInnovationKernel.init(
             N_COMPONENTS, rho=0.3, var=0.8, rng=train_rng("exp07-init")
         ),
-        grid, weights, noisy_groups(A, T_TRAIN, rng), n_iters=120,
+        grid, weights, noisy_groups(A, T_TRAIN, rng), n_iters=EM_ITERS,
     )
     nets = train_nets(A, ("exp07-net", n_chains), hidden, n_steps)
 

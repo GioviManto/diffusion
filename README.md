@@ -7,13 +7,30 @@ neural denoisers both pointwise and generatively.
 
 ## Start here
 
-Two documents are the canonical output of this project. Everything else in `research/` is the
-working material behind them.
+Four documents are the output of this project, at four lengths, telling one story. Everything
+else in `research/` is the working material behind them.
+
+**[`overleaf-handover/`](overleaf-handover/) holds all four in one flat, self-contained folder**
+— upload it to Overleaf as a single project and set the main document per compile. It is built
+by [`tools/make_handover.sh`](tools/make_handover.sh), which has a `--check` mode that reports
+drift between the folder and the repo sources. Read that folder's `README.md` first: it says
+which documents are ready to send and which are not.
 
 | Document | What it is |
 |---|---|
-| [`thesis/main.tex`](thesis/main.tex) → `thesis/main.pdf` | The Bocconi MSc thesis, 12 chapters + 3 appendices (178 pp). Chapters 1–5 are background; 6–11 are the research, ending with the EM/non-Gaussian material (Ch. 10–11); 12 is discussion and conclusions. |
-| [`research/nongaussian-bp/paper/main.tex`](research/nongaussian-bp/paper/main.tex) → `paper/main.pdf` | The standalone NeurIPS-format paper on the EM/BP estimator (24 pp). Self-contained Overleaf mirror at `research/nongaussian-bp/overleaf/` — see that folder's `README.md` to share it with Marc and Jérôme; regenerate it with `./overleaf/sync.sh`. |
+| `workshop.tex` | The 4 pp workshop version. **Not sendable yet** — carries an unfilled `\needsdata`. |
+| `paper.tex` | The NeurIPS-format paper on the EM/BP estimator, 9 pp body + appendices (21 pp total). **Not sendable yet** — same placeholder. |
+| `compendium.tex` | Every derivation and every experiment, including the cut ones, plus a corrections chapter (53 pp). |
+| `thesis.tex` | The Bocconi MSc thesis, 12 chapters + 7 appendices (166 pp). Chapters 1–5 are background; 6–11 are the research, ending with the EM/non-Gaussian material (Ch. 10–11); 12 is discussion and conclusions. |
+
+The repo sources these are assembled from live at `thesis/` and
+`research/nongaussian-bp/{paper,compendium}/`. The paper and the workshop version deliberately
+share their setup section, both propositions, the blindness theorem and the efficiency table,
+via `paper/sections/` — that sharing is what stops the two documents disagreeing.
+
+Which results are settled and which are provisional is recorded in
+`research/nongaussian-bp/outputs/CLUSTER_JOBS_FROZEN.md` (the job ledger) and in the
+compendium's status and corrections chapters.
 
 For a guided walkthrough of the theory *and* the code behind Chapters 10–11 — runnable,
 executed notebooks that re-derive every number from committed data rather than transcribing

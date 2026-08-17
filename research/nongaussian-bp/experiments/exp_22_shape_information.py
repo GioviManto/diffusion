@@ -63,9 +63,10 @@ from src.shape_kernel import (
     generalized_gaussian_excess_kurtosis,
 )
 from src.utils import ensure_dir, rng_for, write_csv, write_json
+from frozen_config import FROZEN
 
-N_SITES = 32
-RHO_TRUE = 0.85
+N_SITES = FROZEN.n_sites
+RHO_TRUE = FROZEN.rho
 COORDS = ("rho", "q", "beta")
 
 

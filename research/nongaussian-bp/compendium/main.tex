@@ -19,6 +19,8 @@
 
 \graphicspath{{../paper/figures/}}
 \input{../paper/notation}
+% Radial partition function of the ring model (Chapter 12).
+\newcommand{\Zring}{\mathcal{Z}}
 
 \theoremstyle{plain}
 \newtheorem{proposition}{Proposition}[chapter]
@@ -100,11 +102,10 @@ without it.
 \end{minipage}
 \end{center}
 
+\setcounter{tocdepth}{1}
 \tableofcontents
 
-\input{chapters/ch01-orientation}
-\input{chapters/ch02-probability}
-\input{chapters/ch03-diffusion}
+\input{chapters/ch02-setting}
 \input{chapters/ch04-score}
 \input{chapters/ch05-markov}
 \input{chapters/ch06-graphical}
@@ -113,6 +114,8 @@ without it.
 \input{chapters/ch09-numerics}
 \input{chapters/ch10-estimation}
 \input{chapters/ch11-status}
+\input{chapters/ch12-rotating-ring}
+\input{chapters/ch13-corrections}
 
 \bibliographystyle{unsrtnat}
 \bibliography{../paper/bibliography}

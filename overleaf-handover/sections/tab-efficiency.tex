@@ -1,0 +1,26 @@
+%% SHARED SECTION -- included by paper/main.tex and paper/workshop.tex.
+%% Edit here, never in a copy. This file exists because the four documents
+%% disagreeing with each other is the failure this rebuild was for.
+
+\begin{table}[!htbp]
+\caption{Relative denoising error against grid BP under the true kernel, averaged over the noise
+schedule; sixteen seeds $\pm$ one standard error. The network's parameterisation is chosen on a
+disjoint validation bundle, not the test set, and agrees with the test-set optimum in $99.4\%$ of
+the $1{,}344$ cells. No crossing occurs in the range, so no data-equivalence factor is quoted.
+\needsdata{EM budget: these ran at 120, the configured value is 400 (array 628943)}}
+\label{tab:pointwise}
+\centering
+\begin{tabular}{rccc}
+\toprule
+sequences $\nseq$ & network & EM--BP ($12$ free) & ratio \\
+\midrule
+32   & $0.6613 \pm 0.0026$ & $\mathbf{0.0703 \pm 0.0051}$ & $9.4$ \\
+64   & $0.5896 \pm 0.0029$ & $\mathbf{0.0541 \pm 0.0035}$ & $10.9$ \\
+128  & $0.4942 \pm 0.0015$ & $\mathbf{0.0361 \pm 0.0024}$ & $13.7$ \\
+256  & $0.3473 \pm 0.0012$ & $\mathbf{0.0259 \pm 0.0014}$ & $13.4$ \\
+512  & $0.2359 \pm 0.0010$ & $\mathbf{0.0233 \pm 0.0010}$ & $10.1$ \\
+1024 & $0.1685 \pm 0.0006$ & $\mathbf{0.0185 \pm 0.0011}$ & $9.1$ \\
+2048 & $0.1364 \pm 0.0007$ & $\mathbf{0.0172 \pm 0.0008}$ & $7.9$ \\
+\bottomrule
+\end{tabular}
+\end{table}

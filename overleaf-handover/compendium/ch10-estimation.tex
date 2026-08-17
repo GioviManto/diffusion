@@ -1,0 +1,257 @@
+\chapter{Estimating the transition kernel}
+\label{ch:estimation}
+
+Everything so far assumed the chain is known. This chapter removes that assumption: we observe
+only noised sequences and must estimate $\kernel$ from them, never seeing a clean sample.
+
+\section{The objective}
+
+Write $\params$ for the kernel parameters. The observed-data log-likelihood is
+\begin{equation}
+\label{eq:marginal-lik}
+\Lik(\params) \;=\; \sum_{\mu=1}^{\nseq} \log P_{t_\mu,\params}(x^\mu),
+\qquad
+P_{t,\params}(x) = \int\!\mathrm{d}a\; \Pz^\params(a)\, P(x\mid a,t) .
+\end{equation}
+The integral is the same marginalisation Chapter~\ref{ch:bp} made tractable --- it is the
+evidence, and BP already returns it.
+
+\begin{intuition}
+This is a latent-variable problem in the textbook sense: the clean sequence $a$ is the latent
+variable, the noised $x$ is observed, and the parameters live in the prior. What is unusual is
+that the latent structure is a tree, so the quantities EM needs are available \emph{exactly}
+rather than by approximation --- which is not the typical situation.
+\end{intuition}
+
+\section{Expectation maximisation}
+
+EM alternates two steps. Given a current $\params^{(r)}$, form
+\begin{equation}
+\label{eq:qfun}
+\Qfun(\params\mid\params^{(r)})
+= \sum_\mu \E_{\params^{(r)}}\!\left[\log P_\params(a, x^\mu)\,\middle|\, x^\mu\right],
+\end{equation}
+then set $\params^{(r+1)} = \arg\max_\params \Qfun$.
+
+\begin{proposition}[Monotone ascent]
+$\Lik(\params^{(r+1)}) \ge \Lik(\params^{(r)})$.
+\end{proposition}
+
+\begin{proof}
+For any $\params$, write
+$\log P_\params(x) = \Qfun(\params\mid\params^{(r)}) - H(\params\mid\params^{(r)})$ with
+$H(\params\mid\params^{(r)}) = \E_{\params^{(r)}}[\log P_\params(a\mid x)\mid x]$. By Gibbs'
+inequality $H(\params\mid\params^{(r)}) \le H(\params^{(r)}\mid\params^{(r)})$ for every
+$\params$, since the difference is a Kullback--Leibler divergence. Choosing $\params^{(r+1)}$
+to increase $\Qfun$ therefore increases $\Lik$ by at least as much.
+\end{proof}
+
+\begin{intuition}
+Monotonicity is the reason EM is trustworthy without a step size. It is also the sharpest
+available test of an implementation: an error anywhere --- in the recursion, the accumulation,
+or the maximisation --- generically breaks it. In every run reported in this project the
+violation is exactly zero.
+\end{intuition}
+
+\section{The expectation step is exact}
+
+In a general latent-variable model \eqref{eq:qfun} is intractable and one resorts to a
+variational or sampled approximation, losing monotonicity with it. Here the posterior is a
+tree, so Proposition~\ref{prop:bp-exact} gives the required expectations exactly.
+
+The complete-data log-likelihood is a sum over edges, so the \emph{$\params$-dependent part} of
+$\Qfun$ --- it also contains a site-one term and a likelihood term, both $\params$-free and
+therefore additive constants --- depends on the data only through
+\begin{empheq}[box=\fbox]{equation}
+\label{eq:xi-chapter}
+\Xis_{kl} \;=\; \sum_{\mu=1}^{\nseq}\sum_{i=2}^{\nsites}
+P\!\left(a_{i-1}=u_k,\ a_i=u_l \,\middle|\, x^\mu\right),
+\end{empheq}
+the expected transition mass between grid points, accumulated from the pairwise marginals
+\eqref{eq:pairwise}.
+
+\begin{intuition}
+$\Xis$ is the continuum analogue of the expected transition counts of Baum--Welch. In the
+discrete case it literally counts how often the chain was inferred to move from one state to
+another; here it is a mass on pairs of grid points.
+\end{intuition}
+
+\begin{pitfall}
+Sufficiency holds only under four conditions: a \emph{homogeneous} kernel shared across sites
+and sequences, a fixed grid, an initial law excluded from $\params$, and $\params$-free
+likelihood factors. The last is what licenses observations at several noise levels to
+\emph{add} into one $\Xis$. Relax any of them and \eqref{eq:xi-chapter} is no longer
+sufficient.
+
+Note also what sufficiency does and does not buy. The maximisation step never revisits the
+data, so it costs $O(P\ngrid^2)$ independently of $\nseq$. But \emph{forming} $\Xis$ costs
+$O(\nseq\nsites\ngrid^2)$ per iteration and $O(\ngrid^2)$ storage. ``The whole E-step is one
+matrix'' is a statement about sufficiency, not about inference being cheap.
+\end{pitfall}
+
+\begin{codebox}
+\coderef{src/em.py}{e\_step} accumulates \eqref{eq:xi-chapter};
+\coderef{src/em.py}{ExpectedStatistics} holds it; \coderef{src/em.py}{fit\_em} is the driver
+with the monotonicity trace. \coderef{src/em.py}{clean\_statistics} is the $t\to0$ limit, which
+needs no BP at all --- the clean-data case Marc's original suggestion referred to.
+\end{codebox}
+
+\section{Fisher's identity: a gradient without differentiating the recursion}
+
+There is a second route to the same information. Fisher's identity states
+\begin{empheq}[box=\fbox]{equation}
+\label{eq:fisher-chapter}
+\nabla_\params \Lik(\params)
+= \sum_\mu \E_\params\!\left[\nabla_\params \log P_\params(a,x^\mu)\,\middle|\,x^\mu\right]
+= \big\langle \Xis(\params),\ \nabla_\params \log \kernel_\params\big\rangle .
+\end{empheq}
+
+\begin{proof}
+$\nabla \log P(x) = \nabla P(x)/P(x)$ and
+$\nabla P(x) = \int\!\mathrm{d}a\, \nabla P(a,x)
+= \int\!\mathrm{d}a\, P(a,x)\nabla\log P(a,x)$; dividing by $P(x)$ turns $P(a,x)/P(x)$ into
+the posterior. The second equality follows because $\log P_\params(a,x)$ depends on $\params$
+only through the edge terms.
+\end{proof}
+
+\begin{intuition}
+This says something practically important. BP is not a computation graph to be
+backpropagated through --- it is the oracle that supplies the conditional expectation. The
+exact gradient of the \emph{marginal} likelihood comes out of one forward--backward pass. Advice
+received elsewhere on this project held that EM here would require moving the recursion into an
+automatic-differentiation framework; that is not so, and the entire implementation is plain
+array arithmetic.
+\end{intuition}
+
+\begin{pitfall}
+Fisher's identity is \emph{not} EM. It licenses gradient ascent on $\Lik$; EM maximises
+$\Qfun$ at each step. The two are different algorithms and neither dominates. Measured here:
+on the smooth Gaussian kernel gradient ascent reaches EM's optimum to $2\times10^{-9}$ nats
+while needing a tuned step size (at too large a step it diverges outright); on the Laplace
+kernel it attains a \emph{higher} likelihood than EM, because there the exact maximiser of
+$\Qfun$ is a lattice artefact of the discretisation.
+\end{pitfall}
+
+\begin{codebox}
+\coderef{src/em.py}{q\_gradient} implements \eqref{eq:fisher-chapter};
+\coderef{experiments/exp\_08\_gradient\_vs\_exact\_mstep.py}{} is the comparison. The identity
+is checked against a central finite difference of the exact evidence in
+\codefile{tests/test\_em\_bp.py}, agreeing to a relative $1.5\times10^{-9}$.
+\end{codebox}
+
+\section{The kernel families}
+
+\begin{center}\small
+\begin{tabular}{@{}llp{7.2cm}@{}}
+\toprule
+class & free parameters & maximisation step \\
+\midrule
+\texttt{GaussianAR1Kernel} & $(\corr,\ivar)$, 2 & closed form: belief-weighted Yule--Walker \\
+\texttt{LaplaceAR1Kernel} & $(\corr,b)$, 2 & closed form, via a weighted median \\
+\texttt{MixtureInnovationKernel} & $\corr$ and $C$ triples, $3C$ & inner ECM sweeps \\
+\texttt{MDNKernel} & network weights & gradient, with backtracking \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+The mixture kernel is the one used for the headline results,
+\begin{equation}
+\label{eq:mixture-kernel}
+\kernel_\params(a'\mid a) = \sum_{c=1}^{C}\pi_c\,
+\mathcal{N}\!\left(a'-\corr a;\ \nu_c,\ s_c^2\right),
+\end{equation}
+because it keeps the linear autoregression while leaving the innovation law essentially free.
+It has never been shown the density it is asked to recover.
+
+\paragraph{Counting the parameters.} At $C=4$: $\corr$, four weights, four locations, four
+scales --- thirteen numbers, subject to $\sum_c\pi_c=1$, hence \textbf{twelve free}.
+
+\begin{pitfall}
+Two subtleties in that count. First, the zero-mean condition $\sum_c\pi_c\nu_c=0$ is
+\emph{not} enforced: imposing it by reprojection is not a maximisation step and broke monotone
+ascent in testing, so it is monitored as a diagnostic instead (it lands at the $10^{-3}$
+level). A reader who assumed the model class of \S\ref{sec:matched-covariance} literally would
+compute eleven. Second, and consequently, Proposition~\ref{prop:closure-lmmse} applies to the
+\emph{true} kernel but not automatically to the estimated one, whose innovation is not exactly
+centred.
+
+Third: the mixture M-step is not the exact maximiser of $\Qfun$. The complete-data problem
+carries a second latent variable --- the mixture label --- so the step is itself iterative, run
+as four inner conditional-maximisation sweeps. That makes the algorithm \emph{generalised} EM:
+monotone ascent is preserved, exact maximisation is not.
+\end{pitfall}
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=0.98\textwidth]{fig_em_diagnostics.pdf}
+\caption{Left: the marginal log-likelihood by iteration at $\ncomp=4$, $\nseq=512$, from four
+initialisations of $\corr$; the largest decrease across iterations is zero in all four runs, and
+in the four $\ncomp=8$ runs not shown. Centre: the estimated autoregressive coefficient over the
+same runs, reaching $[0.8517,0.8520]$ against a truth of $0.85$ from initialisations spanning
+$[-0.4,0.6]$ --- which is the direct evidence that $\corr$ is estimated rather than supplied.
+(The eight $\ncomp\in\{4,8\}$ runs together span $[0.8517,0.8529]$.)
+Right: RMSE of $\widehat\corr$ and of the innovation variance against the number of training
+sequences, with an $\nseq^{-1/2}$ reference. Sources \codefile{outputs/exp\_18/em\_trace.csv},
+\codefile{outputs/exp\_06\_em\_parameter\_recovery/em\_rate.csv}.}
+\label{fig:em-compendium}
+\end{figure}
+
+
+\begin{codebox}
+\coderef{src/kernels.py}{MixtureInnovationKernel} --- see its \texttt{m\_step}, whose
+\texttt{n\_inner=4} is the ECM sweep count. \texttt{theta} exposes the flat parameter vector,
+which is what the twelve-versus-thirteen count is read from.
+\end{codebox}
+
+\section{Identifiability}
+
+Two claims must be separated, and confusing them overstates what is proved.
+
+\paragraph{Distribution level.} Gaussian convolution at finite $t$ is injective. In
+characteristic-function terms
+$\varphi_{t,\params}(\xi) = \varphi_\params(e^{-t}\xi)\,e^{-\Dt\|\xi\|^2/2}$; the Gaussian
+factor has no zeros so it divides out, and $e^{-t}>0$ makes $\xi\mapsto e^{-t}\xi$ a bijection.
+So $\Pt$ determines $\Pz$.
+
+\paragraph{Parameter level.} That $\Pz$ is determined does \emph{not} by itself determine
+$\kernel$. That additionally requires: the initial law fixed or separately identifiable; the
+transition family identifiable as a parametric family; the mixture treated modulo label
+permutation; the mixture parameters in the interior --- all $\pi_c>0$ with the $(\nu_c,s_c)$
+distinct, which an over-specified $C$ need not respect; and $\mu$ of full support, since
+$\kernel$ is pinned down only there. We assume these rather than prove them.
+
+\begin{intuition}
+Injective is not the same as stable. This is Gaussian deconvolution, whose inverse is
+unbounded, so identifiability survives at any finite $t$ while the \emph{information} degrades
+rapidly --- and unevenly. Measuring that unevenness needs care about what is being compared. In
+the Gaussian model with parameters $(\rho, q)$ the innovation \emph{scale} $q$ falls by a factor
+$142$ between $t=0.05$ and $t=1.6$ while the correlation falls by $26$, but both of those are
+second-order quantities: $q$ is a scale, not a shape, so the ratio says nothing about
+higher-order structure.
+
+A genuine shape coordinate is needed. On a generalised-Gaussian innovation
+$\varphi_\beta(e)\propto\exp(-(|e|/s)^\beta)$ with $s$ chosen so the variance is exactly $q$,
+$\beta$ moves the fourth moment at fixed second moment. Reporting the \emph{efficient}
+information for each coordinate --- projecting out the other two, since the diagonal ignores
+their coupling --- the decay across the same range is $56$--$87$ for the correlation,
+$235$--$522$ for the variance and $8.7\times10^3$--$6.8\times10^4$ for the shape. Higher-order
+structure is therefore not five times more fragile but $112$ to $1222$ times, which is exactly
+the structure this project cares about.
+\end{intuition}
+
+\begin{codebox}
+\coderef{experiments/exp\_06\_em\_parameter\_recovery.py}{} measures the information decay
+(\texttt{price\_of\_noising.csv}) and the recovery of an unknown innovation law from noisy data
+alone.
+\end{codebox}
+
+\section*{Sources}
+\addcontentsline{toc}{section}{Sources}
+EM is \citet{dempster1977}; the convergence analysis, including what monotone ascent does and
+does not guarantee, is \citet{wu1983}. The generalised and conditional-maximisation variants
+used here --- which is what the mixture M-step actually is --- are \citet{meng1993}. Fisher's
+identity for the gradient of the marginal likelihood goes back to \citet{fisher1925} and is
+given in the latent-variable form used here by \citet{louis1982} and \citet{cappe2005}. The
+transition-count statistic $\Xis$ is the continuum analogue of the one in \citet{baum1970}.
+Identifiability of finite mixtures, which Assumption~1 of the note leans on, is
+\citet{teicher1963} and \citet{yakowitz1968}.

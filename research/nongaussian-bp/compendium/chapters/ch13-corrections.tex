@@ -1,0 +1,240 @@
+\chapter{What we got wrong, and how we found out}
+\label{ch:corrections}
+
+This chapter exists so that the note and the workshop paper do not have to carry it. A reader of
+those documents should meet claims, not retractions of claims; a reader of this one should be
+able to see what was believed, why it was wrong, and --- the part that matters for the next
+mistake --- what diagnostic caught it.
+
+Every entry follows the same shape: the claim as it was made, the correction, and the check that
+now exists so it cannot recur silently. Several of these were live in circulated drafts.
+
+\section{The iteration budget that manufactured a capacity effect}
+\label{sec:corr-capacity}
+
+\paragraph{The claim.} At $\ncomp=4$ the estimator was an order of magnitude better pointwise
+than the convolutional baseline and yet generated a worse residual law; varying $\ncomp$ improved
+both axes monotonically, which identified the deficit as a \textbf{capacity} limit of the
+innovation mixture.
+
+\paragraph{What was wrong.} Every run behind that account used \texttt{em\_iters}${}=40$. EM on
+this kernel converges on $\corr$ far faster than on the innovation \emph{shape}: at $\corr=0.85$,
+$\nseq=512$, $\ncomp=8$ the fitted excess kurtosis reads $0.84$ at 30 iterations, $1.85$ at 60,
+$2.30$ at 120 and $2.29$ at 400, while $\corr$ is flat from iteration ${\sim}25$. Monitoring
+$\corr$ --- which is the natural thing to plot --- gives a converged-looking trace over a kernel
+that is nowhere near converged. Enlarging the mixture at a fixed iteration budget buys
+convergence \emph{rate}, not representational capacity, and roughly $96\%$ of the apparent
+capacity benefit was that.
+
+\paragraph{What replaced it.} Nothing yet, and this is worth stating plainly. The rerun that
+would settle it was submitted as Bocconi array \texttt{627164}, and \textbf{only array task 2
+ever ran} --- \texttt{sacct} lists \texttt{627164\_2} and nothing else. One cell survives,
+$\ncomp=2$ at one seed, in which the estimator is consistent with the reference
+($1.837\pm0.061$ against $1.894\pm0.096$, a gap of $1.20\sigma$). That is suggestive that the
+capacity reading was indeed a convergence artefact --- a two-component mixture would not have
+sufficed under the old account --- but one cell at one capacity cannot replace a withdrawn
+claim. \textbf{The capacity attribution remains withdrawn and unreplaced.}
+
+\paragraph{The check that was supposed to exist, and did not.} This section previously claimed
+that \codefile{experiments/frozen\_config.py} defines a stopping rule on the \emph{shape} --- EM
+stopping when $|\Delta\kappa_4| < 10^{-3}$, with a cap of 400 iterations. \textbf{That was false
+when written and stayed false for a month.} The config declares \texttt{em\_shape\_tol} and
+\texttt{em\_max\_iters}, but a search of the tree finds \emph{no reader of either}: the rule
+actually implemented in \coderef{src/em.py}{fit\_em} is a relative tolerance of $10^{-9}$ on the
+log-evidence, and the cap is whatever the caller passes. \codefile{exp\_07} --- the headline
+experiment --- passed a literal $120$, in four places.
+
+This is the replicate defect of \S\ref{sec:corr-replicates} in another costume, and it is worse
+in one respect: there the compendium recorded the gap once it was found, whereas here the
+compendium asserted a safeguard that did not exist. A document describing its own checks is
+evidence about those checks only if the description is itself checked.
+
+Two mitigating facts, neither of which excuses it. The tolerance that \emph{is} implemented is far
+stricter than the one advertised: replayed against the 800-update traces of
+\codefile{exp\_27}, it fires in one of sixteen seeds, so in practice runs go to the cap rather
+than stopping early on a false plateau. And the direction of the exp\_07 error is conservative ---
+an under-iterated EM makes the estimator look worse, so the efficiency ratio was understated, not
+inflated.
+
+\paragraph{The check that now exists, and what it immediately found.} \codefile{exp\_07} reads
+\texttt{FROZEN.em\_max\_iters}, so the budget is the configured one.
+\codefile{tools/check\_replicates.py} is extended from replicate counts to iteration budgets, and
+--- this is the part that matters --- from settings dictionaries to \emph{call sites}, since
+\texttt{n\_iters=120} is a keyword argument and the dict-only version could never have seen it.
+
+Turned on, it reports sixteen fixed budgets across three paper experiments. Sorting them by
+whether the run reports a coordinate the budget can actually reach:
+
+\begin{center}\small
+\begin{tabular}{@{}llcl@{}}
+\toprule
+experiment & sites & budget & reports \\
+\midrule
+\codefile{exp\_06} & 6 & 80--120 & $\corr$, $\ivar$ only --- settle at $80$, $68$: adequate \\
+\codefile{exp\_06} & 6 & 120 & innovation \emph{moments} --- kurtosis settles at $229$ \\
+\codefile{exp\_18} & 1 & 60 & innovation moments \\
+\codefile{exp\_18} & 1 & 60 & $\corr$ only: adequate \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+So the defect is not confined to \codefile{exp\_07}. Eight of the sixteen budgets are defensible
+because the coordinates they report settle well inside them; \textbf{eight are not}, and every
+number downstream of those is a kernel stopped roughly half-way to its shape. None of them is
+quoted in the note or the workshop paper --- the shape-dependent claims there come from
+\codefile{exp\_07}, which is being rerun --- but the fitted-density material in this document
+does depend on them, and is to be read as provisional until they are rerun at the frozen budget.
+
+\begin{pitfall}
+An iteration budget is not a global property of a run. It is adequate or not \emph{relative to the
+slowest coordinate that run reports}, and the same 120 iterations are ample for $\corr$ and
+insufficient for a fourth cumulant. This is why \codefile{exp\_27} exists and why its settling
+table is a prerequisite for reading any other experiment here, rather than a curiosity about
+convergence.
+\end{pitfall}
+
+\codefile{experiments/exp\_27\_shape\_convergence.py} records the whole diagnostic set at every
+evaluated state, which is what the original experiment never did.
+
+\section{The replicate counts the frozen configuration could not reach}
+\label{sec:corr-replicates}
+
+\paragraph{The claim.} That a frozen configuration file, imported by every experiment, was
+sufficient to guarantee that every number in the paper came from one protocol.
+
+\paragraph{What was wrong.} \codefile{frozen\_config.py} exposes \texttt{n\_seeds}. Four
+experiments carried their own replicate knobs and read none of it:
+
+\begin{center}\small
+\begin{tabular}{@{}llrr@{}}
+\toprule
+experiment & knob & was & protocol \\
+\midrule
+\codefile{exp\_06} & \texttt{n\_rep} & 10 & 16 \\
+\codefile{exp\_06} & \texttt{n\_rep\_rate} & 4 & 16 \\
+\codefile{exp\_06} & \texttt{n\_rep\_clean} & 3 & 16 \\
+\codefile{exp\_27} & \texttt{n\_seeds} & 8 & 16 \\
+\codefile{exp\_07} & \texttt{seed} & one per run, four run & 16 \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\noindent
+All five runs reported \texttt{is\_frozen: true}, because the provenance check compares the
+config against itself and cannot see a knob the experiment never asked about. \emph{A
+configuration that cannot reach the parameter that matters is not freezing anything.}
+
+The consequences were real and different in each case. The rate experiment at four replicates
+gives fitted $\log$--$\log$ slopes of $-0.196$ for $\corr$ and $-0.700$ for $\ivar$ against a
+predicted $-0.500$, with a non-monotone $\corr$ curve --- that is not a confirmation of the
+parametric rate, and the claim was pulled from the note rather than reported with a caveat. The
+clean-versus-noised comparison at three replicates is the same count that produced the withdrawn
+flatness reading of \S\ref{sec:corr-flat}.
+
+\paragraph{The check that now exists.} \codefile{tools/check\_replicates.py} parses each
+experiment's settings dictionaries and fails on any literal replicate count in a paper
+experiment, allowing deviations only with an explicit \texttt{\# frozen-exempt: <reason>}
+comment. It is worth recording that this check was \emph{first written as a shell grep}, and the
+grep missed \codefile{exp\_27} entirely --- a line-based search cannot tell a \texttt{quick} smoke
+dictionary from a \texttt{full} one. The AST version found it immediately. A check that is
+approximately right about where to look is not a check.
+
+\section{The flat curve that was under-replicated, not floored}
+\label{sec:corr-flat}
+
+\paragraph{The claim.} On clean chains the innovation-variance error was flat in $\nseq$
+($0.0041, 0.0039, 0.0059, 0.0046, 0.0040$ from $\nseq=64$ to $1024$), and the flatness was a
+discretisation floor imposed by the grid.
+
+\paragraph{What was wrong.} Both halves. At three replicates an RMSE is estimated from three
+numbers and its own sampling error is comparable to the effect being read off it; at sixteen the
+curve is not flat, running $0.0136, 0.0073, 0.0056, 0.0042, 0.0032$, close to the $\nseq^{-1/2}$
+reference. The $\nseq=64$ entry alone moves by a factor of three between the two replication
+levels.
+
+Nor was the grid ever a plausible culprit. Removing it entirely --- exact clean-data OLS on the
+raw transition pairs, no binning --- gives $0.0135, 0.0071, 0.0057, 0.0043, 0.0032$, statistically
+indistinguishable from the binned fit, with a paired grid-minus-raw discrepancy of a constant
+$4.4\times10^{-4}$ across all budgets. A quantity that small cannot produce a floor at
+$4\times10^{-3}$.
+
+\paragraph{The lesson, which generalises.} The failure mode was reading a \emph{mechanism} into a
+pattern that was noise, and then reaching for the most technically interesting available
+explanation. The discretisation floor was a satisfying story; it was also never tested against
+the alternative that three points are not enough to see a trend.
+
+\section{Two wrong ways to compare a generated law}
+\label{sec:corr-generation}
+
+\paragraph{The claim.} Successive versions compared the generated sample against clean data, and
+then applied a denoising read-out to it.
+
+\paragraph{What was wrong.} Both, in opposite directions. Reverse integration stops at
+$\tmin>0$, so what each estimator produces is a sample of $P_{\tmin}$, not of $\Pz$; comparing it
+against clean data measures the stopping point rather than the score. Concretely, independent
+Gaussian noise of variance $v$ on an innovation of variance $\ivar$ and excess kurtosis $\kappa$
+gives excess kurtosis $\kappa(\ivar/(\ivar+v))^2$, since fourth cumulants add and the variance
+grows. The second version applied a denoising read-out instead, which inverted the bias through
+shrinkage.
+
+\paragraph{What replaced it.} Draw the reference from $\Pz$ and noise it \emph{forward} to the
+same $\tmin$, so both sides are samples of the same law and the target follows in closed form. At
+$\corr=0.85$, $\tmin=0.02$ the residual innovation noise is $v=\Dt(1+\corr^2)$ and the predicted
+target is $1.9098$ against a clean $3.0$. The closed-form target is what identified both errors:
+neither was visible as an anomaly, and both produced plausible numbers.
+
+\section{A sign error in a gradient that a fixed point could not see}
+\label{sec:corr-gradient}
+
+\paragraph{What was wrong.} \coderef{src/kernels.py}{MixtureInnovationKernel.grad\_log\_transition\_matrix}
+carried a sign error in the $\corr$ derivative.
+
+\paragraph{Why it mattered more than it looks.} A fixed-point residual near zero is evidence of a
+stationary point only if the derivative defining it is right. Every convergence diagnostic
+downstream of that function inherited the error, so the runs looked converged for a reason
+unrelated to whether they were.
+
+\paragraph{The check that now exists.} Fisher's identity is verified against finite differences
+of the discretised evidence to ${\sim}10^{-9}$ --- a check that compares two independent routes to
+the same quantity, rather than one that asks a quantity whether it is happy with itself.
+
+\section{The ring normaliser, twice}
+\label{sec:corr-ring}
+
+Recorded in full in \S\ref{sec:blindness} and its surrounding boxes; summarised here because it
+is the most recent and the most instructive.
+
+The ring density is written unnormalised, and its normaliser depends on the parameters of the
+confining well. Omitting it is harmless while only $\psi$ is being estimated --- the term is
+constant and cancels in every responsibility --- and silently fatal the moment $\lambda$ is
+estimated, because a wider well contains more mass and the likelihood grows without bound.
+
+Two things are worth extracting. First, the bug was \emph{introduced by a correct-looking
+port}: the ported code agreed with its audited original bit for bit, because the original only
+ever compared $\psi$ at fixed $\lambda$ and never needed the term. Agreement with a reference
+only certifies the cases the reference was used for. Second, fixing it in
+\coderef{src/ring.py}{log\_pt\_conditional} left it unfixed in
+\coderef{src/ring.py}{log\_pt\_marginal}, where the count differs --- once per frame rather than
+once --- and that second instance was caught not by a test but by an experiment diverging to
+$\hat\lambda = 3.5\times10^{6}$. The test suite now pins both functions and both directions.
+
+\section{What these have in common}
+
+Five of the six were failures of \emph{measurement}, not of derivation. No theorem was wrong. In
+each case a quantity was computed correctly and then read as evidence for something it could not
+support: an iteration budget read as a capacity limit, three replicates read as a floor, a
+stopping point read as a score error, a fixed point read as convergence, a constant read as
+absent.
+
+Two habits follow, and they are the reason this project's checks look the way they do.
+
+\paragraph{Prefer two independent routes to one self-consistent one.} The gradient sign error
+survived every internal diagnostic and died immediately against finite differences. The
+generation comparison survived two revisions and died against a closed-form target. Grid BP is
+checked against a closed form \emph{and} against brute-force enumeration sharing no code with it.
+
+\paragraph{Make the failing direction fail.} It is not enough for a test to pass when the code is
+right; where a bug's signature is known, assert it. \codefile{tests/test\_ring.py} asserts that
+the profile likelihood peaks at the truth \emph{and} that it becomes monotone when the normaliser
+is removed, so deleting the term cannot make the suite greener. Most of the entries above would
+have been caught a good deal sooner by a test of that shape.

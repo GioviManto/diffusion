@@ -1,0 +1,222 @@
+\chapter{Gaussian Vectors and Matrix Tools}
+\label{app:linalg}
+
+The multivariate Gaussian in both parametrisations, the spectral theorem,
+and the matrix-inversion identities used throughout the thesis.
+
+\section{The multivariate Gaussian, in both parametrisations}
+\label{sec:gauss-vectors}
+
+\begin{definition}[Multivariate Gaussian]\label{def:gaussian}
+A random vector $a \in \R^K$ is Gaussian with mean $m$ and (positive
+definite) covariance $\Sigma$, written $a \sim \Nd(m, \Sigma)$, if its
+density is
+\begin{equation}
+  \Nd(a;\, m, \Sigma)
+  \;=\; \frac{1}{(2\pi)^{K/2} \sqrt{\det \Sigma}}
+  \exp\!\Big[ -\tfrac{1}{2} (a - m)^\T \Sigma^{-1} (a - m) \Big] .
+  \label{eq:gauss-density}
+\end{equation}
+\end{definition}
+
+Expanding the quadratic form shows that the same density can be written
+in \emph{natural} (information) parameters,
+\begin{equation}
+  \Nd(a;\, m, \Sigma) \;\propto\;
+  \exp\!\Big[ -\tfrac{1}{2}\, a^\T J\, a + h^\T a \Big],
+  \qquad
+  J = \Sigma^{-1},
+  \qquad
+  h = \Sigma^{-1} m ,
+  \label{eq:gauss-natural}
+\end{equation}
+with $J$ the \emph{precision matrix} and $h$ the precision-weighted mean.
+The two parametrisations are dual, and the duality organises everything
+that follows \citep{bishop2006pattern, koller2009probabilistic}:
+
+\begin{itemize}
+  \item \emph{Linear maps.} If $a \sim \Nd(m, \Sigma)$ then
+  $Aa + b \sim \Nd(Am + b,\, A \Sigma A^\T)$: Gaussianity is preserved by
+  affine transformations, with moments transforming linearly. In
+  particular a sum of independent Gaussians is Gaussian with means and
+  covariances adding.
+  \item \emph{Marginalisation is easy in $\Sigma$.} The marginal of a
+  sub-block $a_1$ of $a = (a_1, a_2)$ is Gaussian with mean $m_1$ and
+  covariance $\Sigma_{11}$: simply read off the block.
+  \item \emph{Conditioning is easy in $J$.} Partitioning
+  $J = \begin{psmallmatrix} J_{11} & J_{12} \\ J_{12}^\T & J_{22}
+  \end{psmallmatrix}$, the conditional law of $a_1$ given $a_2$ is
+  Gaussian with precision $J_{11}$ (read off the block) and mean shifted
+  by $-J_{11}^{-1} J_{12}\, a_2$. Eliminating a variable instead produces
+  the \emph{Schur complement} correction on its neighbours. Proofs of
+  both statements are in Appendix~\ref{app:gauss}.
+  \item \emph{Products are easy in $J$.} Multiplying two Gaussian
+  densities in the same variable adds their natural parameters,
+  $(J, h) \mapsto (J_1 + J_2,\, h_1 + h_2)$. Bayesian updating with
+  Gaussian likelihoods is addition.
+\end{itemize}
+
+The dual reading of zeros is used constantly in this thesis. A
+zero in the \emph{covariance} means marginal independence of two
+coordinates. A zero in the \emph{precision} means \emph{conditional}
+independence given all the others: from the conditioning rule, if
+$J_{ij} = 0$ then $a_i$ and $a_j$ do not interact once the rest is fixed.
+A Gaussian vector can be, and in this thesis always is, globally
+correlated (dense $\Sigma$) while conditionally local (sparse $J$). Which
+matrix one should look at depends on the question, and confusing the
+two is a common source of error in reasoning about Gaussian dependence.
+
+\section{Matrix tools: the spectral theorem and matrix inversion}
+\label{sec:matrix-tools}
+
+Since Gaussian computation is matrix computation, we record the two
+linear-algebra facts the research chapters use constantly.
+
+\begin{theorem}[Spectral theorem for symmetric matrices]
+\label{thm:spectral}
+Every symmetric $A \in \R^{K \times K}$ has an orthonormal basis of
+eigenvectors: $A = U \operatorname{diag}(\omega_1, \dots, \omega_K)
+U^\T$ with $U^\T U = I$ and real eigenvalues $\omega_i$.
+\end{theorem}
+
+Three consequences matter here. First, analytic operations act on
+eigenvalues alone: if no eigenvalue vanishes,
+\begin{equation*}
+  A^{-1} = U \operatorname{diag}(1/\omega_i)\, U^\T,
+  \qquad\text{and more generally}\qquad
+  f(A) = U \operatorname{diag}\big(f(\omega_i)\big)\, U^\T .
+\end{equation*} Second, affine images
+share the eigenbasis: $(cA + dI)\, u_i = (c\,\omega_i + d)\, u_i$, so a
+whole family of matrices of the form $c(t) A + d(t) I$ is diagonalised
+once and for all by the $U$ of $A$. Chapter~\ref{ch:gaussian} uses
+exactly this fact to diagonalise the diffusion problem at every noise
+level simultaneously. Third, for the symmetric
+Toeplitz covariances produced by stationary processes
+(Section~\ref{sec:stationarity}), the eigenvectors are asymptotically the
+Fourier modes of the sequence \citep{brockwell1991time}: stationary
+Gaussian problems decouple, in the large-$K$ limit, into independent
+scalar problems per frequency.
+
+Inversion, when the inverse is not wanted eigenvalue by eigenvalue, has
+two workhorse expansions. The \emph{Neumann series}
+\begin{equation}
+  (I - B)^{-1} \;=\; \sum_{m \geq 0} B^m ,
+  \qquad \text{convergent for } \norm{B} < 1 ,
+  \label{eq:neumann}
+\end{equation}
+expresses the inverse of a near-identity matrix as a sum of powers; it is
+the tool behind the small-$t$ expansions of Chapter~\ref{ch:gaussian},
+where powers of a banded matrix have growing but controlled bandwidth.
+The \emph{Woodbury identity} relates the inverse of a matrix to the
+inverse of a low-rank or structured perturbation of it; its statement,
+proof, and the specific consequence used by the research chapters are
+collected in Appendix~\ref{app:gauss}. Finally, for the tridiagonal
+Toeplitz matrices that Markov chains produce, the inverse is available in
+closed form through a transfer-matrix (geometric-ansatz) computation,
+carried out where it is needed
+(Chapter~\ref{ch:gaussian}).
+
+\section{Gaussian belief propagation and the Kalman filter}
+\label{sec:gaussian-bp}
+
+The Gaussian family is the canonical closed message family, and its
+closure is pure algebra.
+
+\begin{toolbox}[tb:closure]{The two closure lemmas of Gaussian message passing}
+\emph{Lemma 1 (products).} For Gaussians in the same variable,
+\begin{equation*}
+  \Nd(a; m_1, v_1) \times \Nd(a; m_2, v_2)
+  \;\propto\; \Nd(a; m, v),
+  \qquad
+  \frac{1}{v} = \frac{1}{v_1} + \frac{1}{v_2},
+  \qquad
+  \frac{m}{v} = \frac{m_1}{v_1} + \frac{m_2}{v_2} :
+\end{equation*}
+the sum of two quadratics in $a$ is a quadratic in $a$; precisions and
+precision-weighted means add, as the natural-parameter rule of
+Section~\ref{sec:gauss-vectors} requires.
+
+\emph{Lemma 2 (affine marginalisation).} Pushing a Gaussian through a
+linear-Gaussian transition,
+\begin{equation*}
+  \int \Nd(a'; \alpha a, \sigma^2)\; \Nd(a; m, v)\; \dd a
+  \;=\; \Nd(a';\, \alpha m,\, \alpha^2 v + \sigma^2),
+\end{equation*}
+because $a' = \alpha a + \eta$ is a sum of independent Gaussians. Read in
+the reverse direction the same computation gives
+$\Nd\big(a;\, m'/\alpha,\, (v' + \sigma^2)/\alpha^2\big)$.
+
+A model whose factors are Gaussian in each variable performs, in
+\eqref{eq:bp-rules}, only these two operations. For such models every
+message is Gaussian, carried exactly by two numbers, and each update is
+a few arithmetic operations. \hfill$\square$
+\end{toolbox}
+
+The oldest and most famous instance predates factor graphs by decades.
+For linear-Gaussian state-space models (a Gaussian Markov chain observed
+through linear Gaussian noise), the forward sum--product sweep is the
+\emph{Kalman filter} \citep{kalman1960new}, alternating a
+\emph{predict} step (Lemma~2, push the belief through the dynamics) and
+an \emph{update} step (Lemma~1, absorb the new observation, with the
+correction weighted by the Kalman gain); the backward sweep combined with
+the forward one yields the fixed-interval smoother of
+\citet{rauch1965maximum}, which conditions each state on \emph{all}
+observations. That the classical filter and smoother are exactly the
+Gaussian specialisation of sum--product on the chain's factor graph was
+made explicit by \citet{kschischang2001factor}; textbook treatments are
+\citet{bishop2006pattern, koller2009probabilistic}.
+Chapter~\ref{ch:gaussian} derives the filter from the BP sweep, line by
+line, for our diffusion posterior, where the observation factors take a
+specific form (a pseudo-observation whose strength depends on the
+diffusion time), and verifies the equivalence numerically to
+double-precision rounding.
+
+One remark, recorded here because it resolves a doubt raised repeatedly
+in supervision: the Gaussian closure of this section is \emph{algebra},
+valid at any node degree, and invokes no limit theorem. It must not be
+confused with the central-limit justification of the \emph{approximate}
+Gaussian closures of the next section, which does require many incoming
+messages and which a chain, with two neighbours per node, does not
+provide.
+
+\section{From BP to TAP and AMP}\label{sec:amp-intro}
+
+Statistical physics developed its own message-passing calculus for
+\emph{dense} graphs, where every node interacts weakly with many others.
+On such graphs the incoming messages to a node are numerous and nearly
+independent, so their product is governed by a central-limit argument:
+the cavity field is approximately Gaussian, and each message can be
+summarised by a mean and a variance even when the underlying variables
+are not Gaussian. Historically the resulting self-consistency equations
+appeared first as the Thouless--Anderson--Palmer (TAP) equations of the
+Sherrington--Kirkpatrick spin glass \citep{thouless1977solution}, whose
+distinctive ingredient is the Onsager reaction term, the correction that
+removes a node's own influence from the field it feels. Three decades
+later the same structure re-emerged in compressed sensing as
+\emph{approximate message passing} (AMP) \citep{donoho2009message}: a
+reduction of BP on a dense bipartite graph to iterations on means and
+variances, with the Onsager term reappearing as a memory correction. The
+derivation of AMP from BP by moment expansion is carried out for the
+$\ell_2$ minimisation problem by \citet{genovese2026amp}; the general
+technology, its state-evolution analysis, and its phase diagrams are
+reviewed by \citet{zdeborova2016statistical} and, in lecture-note form,
+by \citet{krzakala2024statphys}. \citet{mezard2017meanfield} derived the
+TAP equations of the Hopfield model, connecting this calculus back to the
+networks of Chapter~\ref{ch:statmech}.
+
+The logic of the CLT justification should be kept explicit, because this
+thesis probes exactly its boundary. On a dense graph with $N$ weak
+interactions per node, each message removes one interaction out of $N$,
+message and marginal differ at order $1/N$, and sums of many weak,
+nearly independent terms are Gaussian: the per-node Gaussian closure is
+controlled. On a chain every node has two neighbours: no aggregation
+takes place, each message carries the entire influence of half the
+system, and nothing justifies a Gaussian form for it beyond the special
+cases where it is exact. What happens when one imposes the closure
+anyway is a quantitative question. This thesis answers it on the chain
+in two complementary ways: exactly, for the per-node (AMP/TAP) closure
+on the Gaussian chain, where the breakdown admits a closed-form phase
+boundary (Appendix~\ref{app:amp}); and numerically, for the
+Gaussian-projected messages on genuinely non-Gaussian chains
+(Chapter~\ref{ch:laplace}).
+

@@ -204,7 +204,11 @@
   journal = {The Annals of Mathematical Statistics},
   volume  = {39}, number = {1}, pages = {209--214}, year = {1968}}
 
-% --- Structure in diffusion models ------------------------------------------
+% --- Statistical mechanics of diffusion: memorisation vs generalisation -----
+%
+% This is the group the motivation comes from. The question the whole project
+% is organised around -- why a model whose loss is minimised by the empirical
+% score nonetheless generalises -- is posed and attacked here.
 
 @article{biroli2023,
   title   = {Generative diffusion in very large dimensions},
@@ -217,13 +221,100 @@
   author  = {Biroli, Giulio and Bonnaire, Tony and de Bortoli, Valentin and
              M\'ezard, Marc},
   journal = {Nature Communications},
-  volume  = {15}, pages = {9957}, year = {2024}}
+  volume  = {15}, pages = {9957}, year = {2024},
+  doi     = {10.1038/s41467-024-54281-3}}
+
+@inproceedings{bonnaire2025memorize,
+  title     = {Why diffusion models don't memorize: the role of implicit
+               dynamical regularization in training},
+  author    = {Bonnaire, Tony and Urfin, Rapha{\"e}l and Biroli, Giulio and
+               M\'ezard, Marc},
+  booktitle = {Advances in Neural Information Processing Systems},
+  year      = {2025},
+  note      = {Oral presentation; arXiv:2505.17638}}
+
+@misc{achilli2026speciation,
+  title         = {Theory of speciation transitions in diffusion models with
+                   general class structure},
+  author        = {Achilli, Beatrice and Benedetti, Marco and Biroli, Giulio and
+                   M\'ezard, Marc},
+  year          = {2026}, eprint = {2602.04404}, archivePrefix = {arXiv}}
+
+@misc{achilli2024losing,
+  title         = {Losing dimensions: geometric memorization in generative diffusion},
+  author        = {Achilli, Beatrice and Ventura, Enrico and Silvestri, Gianluigi
+                   and Pham, Bao and Raya, Gabriel and Krotov, Dmitry and
+                   Lucibello, Carlo and Ambrogioni, Luca},
+  year          = {2024}, eprint = {2410.08727}, archivePrefix = {arXiv}}
+
+@inproceedings{raya2023spontaneous,
+  title     = {Spontaneous symmetry breaking in generative diffusion models},
+  author    = {Raya, Gabriel and Ambrogioni, Luca},
+  booktitle = {Advances in Neural Information Processing Systems},
+  volume    = {36}, year = {2023}}
+
+@inproceedings{kadkhodaie2024generalization,
+  title     = {Generalization in diffusion models arises from geometry-adaptive
+               harmonic representations},
+  author    = {Kadkhodaie, Zahra and Guth, Florentin and Simoncelli, Eero P. and
+               Mallat, St\'ephane},
+  booktitle = {International Conference on Learning Representations},
+  year      = {2024},
+  note      = {Outstanding Paper award}}
+
+@article{ghio2024sampling,
+  title   = {Sampling with flows, diffusion, and autoregressive neural networks
+             from a spin-glass perspective},
+  author  = {Ghio, Davide and Dandi, Yatin and Krzakala, Florent and
+             Zdeborov\'a, Lenka},
+  journal = {Proceedings of the National Academy of Sciences},
+  volume  = {121}, number = {27}, pages = {e2311810121}, year = {2024}}
+
+@misc{cui2025solvable,
+  title         = {A solvable model of learning generative diffusion: theory and
+                   insights},
+  author        = {Cui, Hugo and Pehlevan, Cengiz and Lu, Yue M.},
+  year          = {2025}, eprint = {2501.03937}, archivePrefix = {arXiv}}
+
+% --- Tractable structured data, and architectures that implement inference ---
+%
+% These frame the open question the paper deliberately leaves open: WHICH
+% architecture exploits Markovianity, and at what depth.
 
 @article{sclocchi2025phase,
   title   = {A phase transition in diffusion models reveals the hierarchical nature of data},
   author  = {Sclocchi, Antonio and Favero, Alessandro and Wyart, Matthieu},
   journal = {Proceedings of the National Academy of Sciences},
   volume  = {122}, number = {1}, pages = {e2408799121}, year = {2025}}
+
+@inproceedings{sclocchi2025probing,
+  title     = {Probing the latent hierarchical structure of data via diffusion models},
+  author    = {Sclocchi, Antonio and Favero, Alessandro and Levi, Noam Itzhak and
+               Wyart, Matthieu},
+  booktitle = {International Conference on Learning Representations},
+  year      = {2025},
+  note      = {arXiv:2410.13770}}
+
+@inproceedings{favero2025compositional,
+  title     = {How compositional generalization and creativity improve as
+               diffusion models are trained},
+  author    = {Favero, Alessandro and Sclocchi, Antonio and Cagnetta, Francesco
+               and Frossard, Pascal and Wyart, Matthieu},
+  booktitle = {International Conference on Machine Learning},
+  year      = {2025}}
+
+@misc{favero2025bigger,
+  title         = {Bigger isn't always memorizing: early stopping
+                   overparameterized diffusion models},
+  author        = {Favero, Alessandro and Sclocchi, Antonio and Wyart, Matthieu},
+  year          = {2025}, eprint = {2505.16959}, archivePrefix = {arXiv}}
+
+@misc{garnierbrun2026biased,
+  title         = {Biased generalization in diffusion models},
+  author        = {Garnier-Brun, J\'er\^ome and Biggio, Luca and Beltrame, Davide
+                   and M\'ezard, Marc and Saglietti, Luca},
+  year          = {2026}, eprint = {2603.03469}, archivePrefix = {arXiv},
+  note          = {Spotlight, International Conference on Machine Learning}}
 
 @misc{garnierbrun2024transformers,
   title         = {How transformers learn structured data: insights from

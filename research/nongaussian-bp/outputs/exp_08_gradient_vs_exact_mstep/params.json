@@ -1,14 +1,21 @@
 {
-  "n_sites": 24,
-  "rho_true": 0.8,
+  "n_sites": 32,
+  "rho_true": 0.85,
   "grid_size": 301,
   "grid_half_width": 8.0,
   "t_train": [
-    0.1,
-    0.2,
-    0.4,
-    0.8,
-    1.6
+    0.05,
+    0.0725,
+    0.1053,
+    0.1527,
+    0.2216,
+    0.3215,
+    0.4665,
+    0.6769,
+    0.9821,
+    1.425,
+    2.0676,
+    3.0
   ],
   "n_chains": 256,
   "n_iters": 120,
@@ -19,10 +26,10 @@
     8.0
   ],
   "quick": false,
-  "timestamp": "2026-08-10 17:00:00",
-  "git_commit": "60a3080272c75708a05250bead4be62de16d2944",
-  "git_branch": "claude/em-bp-finalization",
-  "git_dirty": "M research/nongaussian-bp/ANSWERS_AND_QUESTIONS_FOR_ADVISORS.md\n M research/nongaussian-bp/EXECUTIVE_SUMMARY.md\n M research/nongaussian-bp/FINAL_REVISION_REPORT.md\n M research/nongaussian-bp/compendium/chapters/ch10-estimation.tex\n M research/nongaussian-bp/experiments/common.py\n M research/nongaussian-bp/experiments/exp_08_gradient_vs_exact_mstep.py\n M research/nongaussian-bp/experiments/exp_16_sampling_validation.py\n M research/nongaussian-bp/outputs/exp_08_gradient_vs_exact_mstep/gradient_vs_exact.csv\n M research/nongaussian-bp/outputs/exp_08_gradient_vs_exact_mstep/gradient_vs_exact.png\n M research/nongaussian-bp/outputs/exp_08_gradient_vs_exact_mstep/params.json\n M research/nongaussian-bp/overleaf/appendix.tex\n M research/nongaussian-bp/overleaf/main.tex\n M research/nongaussian-bp/paper/appendix.tex\n M research/nongaussian-bp/paper/main.tex\n M research/nongaussian-bp/src/kernels.py\n M research/nongaussian-bp/tests/test_em_bp.py\n?? research/nongaussian-bp/.claude/\n?? research/nongaussian-bp/tests/test_gradient_trace_alignment.py\n?? research/nongaussian-bp/tests/test_laplace_rho_lattice.py",
+  "timestamp": "2026-08-16 12:17:59",
+  "git_commit": "39e7564dc5ffad40cd3850e78c7ddb9d7a04d28b",
+  "git_branch": "main",
+  "git_dirty": "M research/nongaussian-bp/experiments/exp_01_grid_validation.py\n M research/nongaussian-bp/experiments/exp_02_laplace_gaussian_message_error.py\n M research/nongaussian-bp/experiments/exp_03_nongaussian_innovation_sweep.py\n M research/nongaussian-bp/experiments/exp_06_em_parameter_recovery.py\n M research/nongaussian-bp/experiments/exp_07_em_vs_score_network.py\n M research/nongaussian-bp/experiments/exp_08_gradient_vs_exact_mstep.py\n M research/nongaussian-bp/experiments/exp_18_revision_diagnostics.py\n M research/nongaussian-bp/experiments/exp_22_shape_information.py\n M research/nongaussian-bp/experiments/exp_27_shape_convergence.py\n M research/nongaussian-bp/outputs/exp_01_grid_validation/RECOMMENDATION.md\n M research/nongaussian-bp/outputs/exp_01_grid_validation/grid_error_vs_A.png\n M research/nongaussian-bp/outputs/exp_01_grid_validation/grid_error_vs_M.png\n M research/nongaussian-bp/outputs/exp_01_grid_validation/grid_error_vs_t.png\n M research/nongaussian-bp/outputs/exp_01_grid_validation/grid_heatmap.csv\n M research/nongaussian-bp/outputs/exp_01_grid_validation/grid_heatmap_raw.csv\n M research/nongaussian-bp/outputs/exp_01_grid_validation/grid_heatmap_t0.005.png\n M research/nongaussian-bp/outputs/exp_01_grid_validation/grid_heatmap_t0.05.png\n M research/nongaussian-bp/outputs/exp_01_grid_validation/grid_heatmap_t0.4.png\n M research/nongaussian-bp/outputs/exp_01_grid_validation/grid_sweep_A.csv\n M research/nongaussian-bp/outputs/exp_01_grid_validation/grid_sweep_A_raw.csv\n M research/nongaussian-bp/outputs/exp_01_grid_validation/grid_sweep_M.csv\n M research/nongaussian-bp/outputs/exp_01_grid_validation/grid_sweep_M_raw.csv\n M research/nongaussian-bp/outputs/exp_01_grid_validation/params.json\n M research/nongaussian-bp/outputs/exp_02_laplace_gaussian_message_error/laplace_closure_vs_grid_budget.png\n M research/nongaussian-bp/outputs/exp_02_laplace_gaussian_message_error/laplace_failure_probability.png\n M research/nongaussian-bp/outputs/exp_02_laplace_gaussian_message_error/laplace_per_trial.csv\n M research/nongaussian-bp/outputs/exp_02_laplace_gaussian_message_error/laplace_summary.csv\n M research/nongaussian-bp/outputs/exp_02_laplace_gaussian_message_error/laplace_worst_case_belief.png\n M research/nongaussian-bp/outputs/exp_02_laplace_gaussian_message_error/legacy_artifact_size.png\n M research/nongaussian-bp/outputs/exp_02_laplace_gaussian_message_error/params.json\nA  research/nongaussian-bp/paper/Things-to-change-paper.md\n M research/nongaussian-bp/paper/appendix.tex\n M research/nongaussian-bp/paper/figures/make_figures.py\n M research/nongaussian-bp/paper/main.pdf\n M research/nongaussian-bp/paper/main.tex\n M research/nongaussian-bp/paper/notation.tex\n?? research/nongaussian-bp/experiments/exp_28_ring_em.py\n?? research/nongaussian-bp/experiments/frozen_config.py\n?? research/nongaussian-bp/outputs/CLUSTER_JOBS_14_15_AUG.md\n?? research/nongaussian-bp/outputs/exp_16_cluster/\n?? research/nongaussian-bp/outputs/exp_21_cluster/\n?? research/nongaussian-bp/outputs/frozen/\n?? research/nongaussian-bp/paper/figures/fig_ring.pdf\n?? research/nongaussian-bp/paper/figures/fig_ring.png\n?? research/nongaussian-bp/src/ring.py\n?? research/nongaussian-bp/tests/test_ring.py\n?? research/nongaussian-bp/tools/check_paper.sh",
   "python": "3.12.5",
   "numpy": "2.5.2",
   "platform": "macOS-14.1.1-arm64-arm-64bit",
@@ -30,5 +37,5 @@
   "slurm_job_id": "",
   "slurm_array_task_id": "",
   "cpu_count": "8",
-  "blas_threads": "4"
+  "blas_threads": ""
 }

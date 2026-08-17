@@ -34,9 +34,10 @@ from src.plotting import new_figure, save_figure
 from src.priors import GaussianMixtureAR1, LaplaceAR1, StudentTAR1
 from src.stationary import invariant_log_density, sample_stationary
 from src.utils import ensure_dir, rng_for, write_csv, write_json
+from frozen_config import FROZEN
 
-N_SITES = 40
-T_VALUES = (0.02, 0.05, 0.1, 0.2, 0.4, 0.8, 1.6, 2.4)
+N_SITES = FROZEN.n_sites
+T_VALUES = tuple(FROZEN.t_grid)
 RHOS = (0.5, 0.85, 0.95)
 
 

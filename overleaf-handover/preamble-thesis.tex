@@ -1,0 +1,111 @@
+% ============================================================
+% Preamble — Bocconi MSc thesis format (Guide to the University §10.3)
+%   A4, left/right margins 2.5 cm, 26–30 lines per page, 12 pt body,
+%   numbered pages, no title page/abstract in body, no personal info.
+% ============================================================
+
+% ---------- encoding & fonts ----------
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage{lmodern}
+\usepackage{microtype}
+
+% ---------- geometry: 2.5 cm side margins, ~29 text lines/page ----------
+\usepackage[a4paper,hmargin=2.5cm,textheight=630pt,vcentering]{geometry}
+\usepackage{setspace}
+\setstretch{1.5}   % 12pt x 1.5 -> ~29 lines per page (within the 26-30 rule)
+
+% ---------- mathematics ----------
+\usepackage{amsmath,amssymb,amsthm,mathtools,bm}
+\allowdisplaybreaks[2]
+
+% ---------- graphics, tables, captions ----------
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage[font=small,labelfont=bf,margin=1em]{caption}
+\usepackage{subcaption}
+\usepackage{xcolor}
+
+% ---------- code listings ----------
+\usepackage{listings}
+\definecolor{codebg}{RGB}{247,247,245}
+\definecolor{codekw}{RGB}{26,58,92}
+\definecolor{codecm}{RGB}{110,110,110}
+\definecolor{codestr}{RGB}{140,60,20}
+\lstset{
+  language=Python,
+  basicstyle=\ttfamily\footnotesize\linespread{1.05}\selectfont,
+  keywordstyle=\color{codekw}\bfseries,
+  commentstyle=\color{codecm}\itshape,
+  stringstyle=\color{codestr},
+  backgroundcolor=\color{codebg},
+  frame=single, framerule=0.3pt, rulecolor=\color{black!25},
+  numbers=left, numberstyle=\tiny\color{black!45}, numbersep=7pt,
+  breaklines=true, showstringspaces=false,
+  aboveskip=1em, belowskip=1em, columns=fullflexible, keepspaces=true
+}
+
+% ---------- toolbox environment (step-by-step derivations) ----------
+\usepackage{etoolbox}
+\usepackage[most]{tcolorbox}
+\newcounter{toolbox}[chapter]
+\renewcommand{\thetoolbox}{\thechapter.\arabic{toolbox}}
+% optional first argument: a label (placed via `phantom' so it survives
+% breakable boxes); mandatory second argument: the title.
+\newtcolorbox{toolbox}[2][]{%
+  breakable, enhanced,
+  colback=black!3, colframe=black!55,
+  boxrule=0.4pt, arc=1.2mm, left=2mm, right=2mm, top=1.5mm, bottom=1.5mm,
+  phantom={\refstepcounter{toolbox}\ifblank{#1}{}{\label{#1}}},
+  title={\small\bfseries Toolbox~\thetoolbox\ --- #2},
+  fonttitle=\normalfont, coltitle=white, colbacktitle=black!55,
+  before skip=1.2em, after skip=1.2em
+}
+
+% ---------- theorem environments ----------
+\theoremstyle{plain}
+\newtheorem{theorem}{Theorem}[chapter]
+\newtheorem{proposition}[theorem]{Proposition}
+\newtheorem{lemma}[theorem]{Lemma}
+\newtheorem{corollary}[theorem]{Corollary}
+\theoremstyle{definition}
+\newtheorem{definition}[theorem]{Definition}
+\newtheorem{example}[theorem]{Example}
+\theoremstyle{remark}
+\newtheorem{remark}[theorem]{Remark}
+
+% ---------- citations: author-date (Bocconi writing guide, Attachment 2) ----------
+\usepackage[round,authoryear]{natbib}
+\setlength{\bibsep}{0.4em}
+
+% ---------- headers / page numbers ----------
+\usepackage{fancyhdr}
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[L]{\small\itshape\nouppercase{\leftmark}}
+\fancyhead[R]{\small\thepage}
+\renewcommand{\headrulewidth}{0.3pt}
+\fancypagestyle{plain}{\fancyhf{}\fancyfoot[C]{\small\thepage}%
+  \renewcommand{\headrulewidth}{0pt}}
+
+% ---------- hyperlinks ----------
+\usepackage[hidelinks]{hyperref}
+\urlstyle{same}
+
+% ---------- notation macros (consistent with the research notes) ----------
+\newcommand{\R}{\mathbb{R}}
+\newcommand{\E}{\mathbb{E}}
+\newcommand{\Prob}{\mathbb{P}}
+\newcommand{\dd}{\mathrm{d}}
+\newcommand{\T}{\mathsf{T}}
+\newcommand{\Nd}{\mathcal{N}}
+\newcommand{\Deltat}{\Delta_t}
+\newcommand{\Sig}{\Sigma}
+\newcommand{\Sigz}{\Sigma_0}
+\newcommand{\Sigt}{\Sigma_t}
+\newcommand{\Qz}{Q_0}
+\newcommand{\Qt}{Q_t}
+\newcommand{\score}{S}
+\newcommand{\kl}[2]{D_{\mathrm{KL}}\!\left(#1 \,\|\, #2\right)}
+\newcommand{\inner}[2]{\left\langle #1, #2 \right\rangle}
+\newcommand{\norm}[1]{\left\lVert #1 \right\rVert}

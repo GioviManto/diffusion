@@ -1,5 +1,5 @@
 {
-  "n_sites": 40,
+  "n_sites": 32,
   "rhos": [
     0.2,
     0.5,
@@ -33,14 +33,17 @@
   ],
   "n_trials": 5,
   "provenance": {
-    "timestamp": "2026-08-01 09:24:27",
-    "python": "3.11.15",
-    "numpy": "2.4.6",
-    "platform": "Linux-6.18.5-x86_64-with-glibc2.39",
-    "hostname": "vm",
+    "timestamp": "2026-08-16 12:17:33",
+    "git_commit": "39e7564dc5ffad40cd3850e78c7ddb9d7a04d28b",
+    "git_branch": "main",
+    "git_dirty": "M research/nongaussian-bp/experiments/exp_01_grid_validation.py\n M research/nongaussian-bp/experiments/exp_02_laplace_gaussian_message_error.py\n M research/nongaussian-bp/experiments/exp_03_nongaussian_innovation_sweep.py\n M research/nongaussian-bp/experiments/exp_06_em_parameter_recovery.py\n M research/nongaussian-bp/experiments/exp_07_em_vs_score_network.py\n M research/nongaussian-bp/experiments/exp_08_gradient_vs_exact_mstep.py\n M research/nongaussian-bp/experiments/exp_18_revision_diagnostics.py\n M research/nongaussian-bp/experiments/exp_22_shape_information.py\n M research/nongaussian-bp/experiments/exp_27_shape_convergence.py\nA  research/nongaussian-bp/paper/Things-to-change-paper.md\n M research/nongaussian-bp/paper/appendix.tex\n M research/nongaussian-bp/paper/figures/make_figures.py\n M research/nongaussian-bp/paper/main.pdf\n M research/nongaussian-bp/paper/main.tex\n M research/nongaussian-bp/paper/notation.tex\n?? research/nongaussian-bp/experiments/exp_28_ring_em.py\n?? research/nongaussian-bp/experiments/frozen_config.py\n?? research/nongaussian-bp/outputs/CLUSTER_JOBS_14_15_AUG.md\n?? research/nongaussian-bp/outputs/exp_16_cluster/\n?? research/nongaussian-bp/outputs/exp_21_cluster/\n?? research/nongaussian-bp/outputs/frozen/\n?? research/nongaussian-bp/paper/figures/fig_ring.pdf\n?? research/nongaussian-bp/paper/figures/fig_ring.png\n?? research/nongaussian-bp/src/ring.py\n?? research/nongaussian-bp/tests/test_ring.py\n?? research/nongaussian-bp/tools/check_paper.sh",
+    "python": "3.12.5",
+    "numpy": "2.5.2",
+    "platform": "macOS-14.1.1-arm64-arm-64bit",
+    "hostname": "MacBook-Air-160.local",
     "slurm_job_id": "",
     "slurm_array_task_id": "",
-    "cpu_count": "4",
-    "blas_threads": "2"
+    "cpu_count": "8",
+    "blas_threads": ""
   }
 }

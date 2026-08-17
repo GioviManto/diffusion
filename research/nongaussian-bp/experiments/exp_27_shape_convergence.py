@@ -51,11 +51,12 @@ from src.kernels import MixtureInnovationKernel
 from src.noising import alpha_delta
 from src.priors import LaplaceAR1
 from src.utils import ensure_dir, rng_for, write_csv, write_json
+from frozen_config import FROZEN
 
-N_SITES = 32
-RHO_TRUE = 0.85
-GRID_A = 8.0
-GRID_M = 401
+N_SITES = FROZEN.n_sites
+RHO_TRUE = FROZEN.rho
+GRID_A = FROZEN.half_width
+GRID_M = FROZEN.n_grid
 
 # Three designs, because information about the innovation shape is not spread
 # evenly over the schedule: low t keeps shape information, high t destroys it
@@ -237,7 +238,10 @@ def main() -> None:
     full = {
         "sizes": (512, 2048), "components": (4, 8, 16),
         "designs": ("low", "uniform", "high"),
-        "n_seeds": 8, "n_updates": 800, "grid_size": GRID_M,
+        # Was 8, set locally. The frozen count is the one every other
+        # experiment reports against, and a convergence curve read off eight
+        # draws is exactly the kind of thing this project has had to withdraw.
+        "n_seeds": FROZEN.n_seeds, "n_updates": 800, "grid_size": GRID_M,
     }
     cfg = apply_overrides(quick if args.quick else full, args.set)
 

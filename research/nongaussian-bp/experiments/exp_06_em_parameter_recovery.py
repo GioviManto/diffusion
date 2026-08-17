@@ -78,12 +78,13 @@ from src.noising import alpha_delta
 from src.plotting import new_figure, save_figure
 from src.priors import GaussianAR1, LaplaceAR1
 from src.utils import ensure_dir, rng_for, write_csv, write_json
+from frozen_config import FROZEN
 
-N_SITES = 32
-RHO_TRUE = 0.8
-GRID_A = 8.0
-GRID_M = 401
-T_TRAIN = (0.1, 0.2, 0.4, 0.8, 1.6)
+N_SITES = FROZEN.n_sites
+RHO_TRUE = FROZEN.rho   # was 0.8; the two populations are now one
+GRID_A = FROZEN.half_width
+GRID_M = FROZEN.n_grid
+T_TRAIN = tuple(FROZEN.t_grid)
 
 
 def noisy_groups(A: np.ndarray, t_values, rng: np.random.Generator):
@@ -119,7 +120,7 @@ def part1_monotonicity(grid, weights, n_chains: int, n_inits: int, out):
         rho0 = float(init_rng.uniform(-0.5, 0.95))
         b0 = float(init_rng.uniform(0.1, 1.5))
         fitted, trace = fit_em(
-            LaplaceAR1Kernel(rho0, b0), grid, weights, groups, n_iters=80
+            LaplaceAR1Kernel(rho0, b0), grid, weights, groups, n_iters=80  # frozen-exempt: reports (rho, q) only; exp_27 puts both at <=80 updates, well inside this budget
         )
         traces.append(trace)
         rows.append({
@@ -196,7 +197,7 @@ def part2_price_of_noise(grid, weights, n_chains, t_values, n_rep, n_info, out):
             X = alpha * A + np.sqrt(delta) * rng.standard_normal(A.shape)
             fitted, _ = fit_em(
                 GaussianAR1Kernel(0.2, 0.8), grid, weights,
-                [(X, alpha, delta)], n_iters=120,
+                [(X, alpha, delta)], n_iters=120,  # frozen-exempt: reports (rho, q) only; exp_27 puts both at <=80 updates, well inside this budget
             )
             errs.append([fitted.rho - RHO_TRUE, fitted.q - q_true])
         errs = np.array(errs)
@@ -264,7 +265,7 @@ def part3_misspecified(grid, weights, n_chains, n_components, t_eval, sizes, out
         k0 = MixtureInnovationKernel.init(
             c, rho=0.3, var=0.8, rng=rng_for("exp06-p3-init", c)
         )
-        fitted, trace = fit_em(k0, grid, weights, groups, n_iters=120)
+        fitted, trace = fit_em(k0, grid, weights, groups, n_iters=120)  # frozen-exempt: PROVISIONAL -- reports innovation moments, whose kurtosis settles at a median 229 updates (exp_27). Compendium-only; see ch13 sec:corr-capacity. Rerun at FROZEN.em_max_iters before any use
         fitted_kernels[c] = fitted
         mom = fitted.innovation_moments
         for t in t_eval:
@@ -290,7 +291,7 @@ def part3_misspecified(grid, weights, n_chains, n_components, t_eval, sizes, out
             MixtureInnovationKernel.init(
                 c_fix, rho=0.3, var=0.8, rng=rng_for("exp06-p3-init", c_fix)
             ),
-            grid, weights, noisy_groups(A_n, T_TRAIN, rng_n), n_iters=120,
+            grid, weights, noisy_groups(A_n, T_TRAIN, rng_n), n_iters=120,  # frozen-exempt: reports (rho, q) only; exp_27 puts both at <=80 updates, well inside this budget
         )
         ev = evaluate_denoiser(
             bp_posterior_mean(fitted, grid, weights, X_test[t_eval[0]], t_eval[0]),
@@ -348,7 +349,7 @@ def part4_rate(grid, weights, sizes, n_rep, out):
             A = np.stack([gauss_prior.sample(rng, N_SITES) for _ in range(n_chains)])
             fit_g, _ = fit_em(
                 GaussianAR1Kernel(0.3, 0.8), grid, weights,
-                noisy_groups(A, T_TRAIN, rng), n_iters=120,
+                noisy_groups(A, T_TRAIN, rng), n_iters=120,  # frozen-exempt: reports (rho, q) only; exp_27 puts both at <=80 updates, well inside this budget
             )
             g_err.append([fit_g.rho - RHO_TRUE, fit_g.q - q_true])
 
@@ -358,7 +359,7 @@ def part4_rate(grid, weights, sizes, n_rep, out):
                 MixtureInnovationKernel.init(
                     4, rho=0.3, var=0.8, rng=rng_for("exp06-p4-init")
                 ),
-                grid, weights, noisy_groups(A, T_TRAIN, rng), n_iters=120,
+                grid, weights, noisy_groups(A, T_TRAIN, rng), n_iters=120,  # frozen-exempt: PROVISIONAL -- reports innovation moments, whose kurtosis settles at a median 229 updates (exp_27). Compendium-only; see ch13 sec:corr-capacity. Rerun at FROZEN.em_max_iters before any use
             )
             m_err.append([
                 fit_m.rho - RHO_TRUE,
@@ -427,7 +428,7 @@ def part5_quantization(grid_sizes, rho_values, n_chains, out):
         for m_size in grid_sizes:
             grid, weights = make_grid(GRID_A, m_size)
             fitted, trace = fit_em(
-                LaplaceAR1Kernel(0.3, 0.8), grid, weights, groups, n_iters=80,
+                LaplaceAR1Kernel(0.3, 0.8), grid, weights, groups, n_iters=80,  # frozen-exempt: reports (rho, q) only; exp_27 puts both at <=80 updates, well inside this budget
             )
             rows.append({
                 "rho_true": rho_true,
@@ -499,7 +500,7 @@ def part6_clean_vs_noised(grid, weights, sizes, n_rep, t_eval, n_components, out
 
             k0 = GaussianAR1Kernel(0.2, 0.8)
             clean_k, _ = fit_clean(k0, grid, A_g)
-            noised_k, _ = fit_em(k0, grid, weights, groups_g, n_iters=120)
+            noised_k, _ = fit_em(k0, grid, weights, groups_g, n_iters=120)  # frozen-exempt: reports (rho, q) only; exp_27 puts both at <=80 updates, well inside this budget
             for arm, k in (("clean", clean_k), ("noised", noised_k)):
                 rows_param.append({
                     "arm": arm, "n_chains": n_chains, "rep": r,
@@ -514,8 +515,8 @@ def part6_clean_vs_noised(grid, weights, sizes, n_rep, t_eval, n_components, out
                 # it just never touches the channel. Same count as the noised arm, so the
                 # comparison is not an optimisation-budget difference in disguise (the lesson
                 # of the em_iters=40 defect found in exp_16).
-                clean_m, _ = fit_clean(m0, grid, A_l, n_iters=120)
-                noised_m, _ = fit_em(m0, grid, weights, groups_l, n_iters=120)
+                clean_m, _ = fit_clean(m0, grid, A_l, n_iters=120)  # frozen-exempt: PROVISIONAL -- reports innovation moments, whose kurtosis settles at a median 229 updates (exp_27). Compendium-only; see ch13 sec:corr-capacity. Rerun at FROZEN.em_max_iters before any use
+                noised_m, _ = fit_em(m0, grid, weights, groups_l, n_iters=120)  # frozen-exempt: PROVISIONAL -- reports innovation moments, whose kurtosis settles at a median 229 updates (exp_27). Compendium-only; see ch13 sec:corr-capacity. Rerun at FROZEN.em_max_iters before any use
                 for arm, k in (("clean", clean_m), ("noised", noised_m)):
                     mom = k.innovation_moments
                     row = {"arm": arm, "n_chains": n_chains, "rep": r, "n_components": c,
@@ -668,11 +669,11 @@ def part7_clean_raw_mle(grid, weights, sizes, n_rep, n_components, out):
                 init_rng = rng_for("exp06-p7-init", c, n_chains, r)
                 # 120 iterations in both arms, matching part 6 exactly: this part audits
                 # part 6's clean arm, so it must not differ from it in optimisation budget.
-                raw = mixture_ecm_raw(A_l, c, init_rng, n_iters=120)
+                raw = mixture_ecm_raw(A_l, c, init_rng, n_iters=120)  # frozen-exempt: PROVISIONAL -- reports innovation moments, whose kurtosis settles at a median 229 updates (exp_27). Compendium-only; see ch13 sec:corr-capacity. Rerun at FROZEN.em_max_iters before any use
                 m0 = MixtureInnovationKernel.init(
                     c, rho=0.3, var=0.8,
                     rng=rng_for("exp06-p6-init", c, n_chains, r))
-                m_grid, _ = fit_clean(m0, grid, A_l, n_iters=120)
+                m_grid, _ = fit_clean(m0, grid, A_l, n_iters=120)  # frozen-exempt: PROVISIONAL -- reports innovation moments, whose kurtosis settles at a median 229 updates (exp_27). Compendium-only; see ch13 sec:corr-capacity. Rerun at FROZEN.em_max_iters before any use
                 mom = m_grid.innovation_moments
                 rows.append({
                     "regime": "mixture", "n_chains": n_chains, "rep": r,
@@ -728,7 +729,7 @@ def main() -> None:
     )
     args = parser.parse_args()
 
-    quick = {
+    quick = {  # frozen-exempt: smoke settings, never a reported number
         "grid_size": 201, "n_chains": 128, "n_inits": 3,
         "t_price": (0.1, 0.4), "n_rep": 3, "n_info": 100, "n_chains_price": 256,
         "components": (2, 4), "t_eval": (0.2, 0.8),
@@ -738,23 +739,35 @@ def main() -> None:
         "sizes_clean": (64, 256), "n_rep_clean": 2, "components_clean": (4,),
         "t_eval_clean": (0.2,), "n_rep_raw": 3,
     }
+    # EVERY replicate count comes from the frozen config.
+    #
+    # These were 10, 4 and 3 respectively, set locally and independently. The
+    # frozen config could not police them -- it exposes `n_seeds`, and this
+    # experiment exposes four separate knobs -- so `provenance()['is_frozen']`
+    # stayed true for runs at three replicates. Three is exactly the count that
+    # produced the withdrawn "flat curve" reading in the previous draft, and the
+    # rate part at four gave fitted slopes of -0.196 and -0.700 against a
+    # predicted -0.500. A configuration that cannot reach the knob that matters
+    # is not freezing anything.
     full = {
         "grid_size": GRID_M, "n_chains": 1024, "n_inits": 6,
-        "t_price": (0.05, 0.1, 0.2, 0.4, 0.8, 1.6), "n_rep": 10, "n_info": 400,
+        "t_price": (0.05, 0.1, 0.2, 0.4, 0.8, 1.6), "n_rep": FROZEN.n_seeds, "n_info": 400,
         "n_chains_price": 256,
         "components": (2, 3, 5, 8), "t_eval": (0.1, 0.2, 0.4, 0.8, 1.6),
         "sizes_kurtosis": (128, 256, 512, 1024, 2048),
-        "sizes_rate": (64, 128, 256, 512, 1024), "n_rep_rate": 4,
+        "sizes_rate": (64, 128, 256, 512, 1024), "n_rep_rate": FROZEN.n_seeds,
         "quantization_grids": (201, 401, 801, 1601),
         "quantization_rhos": (0.8, 0.77, 0.813), "n_chains_quantization": 256,
-        "sizes_clean": (64, 128, 256, 512, 1024), "n_rep_clean": 3,
+        "sizes_clean": (64, 128, 256, 512, 1024), "n_rep_clean": FROZEN.n_seeds,
         # C = 8 only, and two probe levels rather than five: the headline of this part is
         # parameter and shape recovery against N, and the induced denoiser error is a
         # secondary read-out whose 256-chain BP passes otherwise dominate the runtime.
         "components_clean": (8,), "t_eval_clean": (0.2, 0.8),
         # Part 7 is cheap -- no BP, no held-out denoiser passes -- so it can afford the
         # replication Part 6 cannot, which is exactly the point of running it.
-        "n_rep_raw": 32,
+        "n_rep_raw": 32,  # frozen-exempt: part 7 has no BP and no held-out passes,
+        # so it can afford more replication than the frozen count, which is the
+        # whole point of running it -- it is the control on part 6's noise floor.
     }
     cfg = apply_overrides(quick if args.quick else full, args.set)
 

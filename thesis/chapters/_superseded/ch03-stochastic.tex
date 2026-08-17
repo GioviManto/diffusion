@@ -1,0 +1,263 @@
+\chapter{Stochastic Processes, SDEs, and the Ornstein--Uhlenbeck Channel}
+\label{ch:stochproc}\label{ch:sde}
+
+Chapter~\ref{ch:statmech} answered the question ``which distribution?'':
+Boltzmann's. This chapter answers ``how does probability move?'', in
+discrete and in continuous time. Its material enters the thesis in
+three places. Markov chains are the \emph{data} whose diffusion score
+we compute exactly (the AR(1) sequence of Section~\ref{sec:ar1} is the
+running example of every research chapter); stochastic differential
+equations are the \emph{corruption and generation processes} of diffusion
+models (the Ornstein--Uhlenbeck channel of Section~\ref{sec:ou} appears
+on every page of the research chapters); and the Fokker--Planck and
+time-reversal theorems of
+Sections~\ref{sec:fokker-planck}--\ref{sec:reversal} are the
+mathematical basis of the generative programme reviewed in
+Chapter~\ref{ch:diffusion}. Standard references are
+\citet{robert2004monte, brockwell1991time, oksendal2003stochastic,
+gardiner2009stochastic, risken1996fokker}.
+
+\section{Stochastic processes and stationarity}\label{sec:stationarity}
+
+A \emph{stochastic process} is a collection of random variables indexed
+by time, $(X_k)_{k \geq 0}$ in discrete time or $(X_t)_{t \geq 0}$ in
+continuous time, defined on a common probability space; equivalently, a
+probability law on the space of trajectories. Two notions of time
+homogeneity are used constantly in this thesis and are worth stating
+precisely \citep{brockwell1991time}.
+
+\begin{definition}[Strict and weak stationarity]\label{def:stationarity}
+A process $(X_k)$ is \emph{strictly stationary} if all its
+finite-dimensional laws are invariant under time shifts: for every $n$,
+every set of indices $k_1, \dots, k_n$, and every shift $h$,
+\begin{equation*}
+  (X_{k_1}, \dots, X_{k_n})
+  \;\stackrel{d}{=}\;
+  (X_{k_1 + h}, \dots, X_{k_n + h}) .
+\end{equation*}
+It is \emph{weakly (second-order) stationary} if its mean is constant and
+its autocovariance depends only on the lag,
+$\operatorname{Cov}(X_k, X_{k+d}) = \gamma(d)$.
+\end{definition}
+
+Strict stationarity implies weak stationarity whenever second moments
+exist; for \emph{Gaussian} processes the two notions coincide, because a
+Gaussian law is determined by its first two moments. Stationarity has an
+immediate matrix consequence that the research chapters exploit: the
+covariance matrix of $K$ consecutive observations of a weakly stationary
+process, $(\Sigma)_{ij} = \gamma(i - j)$, is constant along diagonals, a
+symmetric \emph{Toeplitz} matrix. Whenever a covariance in this thesis is
+Toeplitz, stationarity is the reason.
+
+\section{Markov chains: kernels, stationarity, reversibility}
+\label{sec:markov}
+
+\begin{definition}[Markov chain]
+A sequence of random variables $(X_k)_{k \geq 0}$ with values in a state
+space $\mathcal{X}$ is a \emph{Markov chain} if for every $k$ and every
+measurable $A \subseteq \mathcal{X}$,
+\begin{equation}
+  \Prob\big(X_{k+1} \in A \,\big|\, X_k, X_{k-1}, \dots, X_0\big)
+  \;=\; \Prob\big(X_{k+1} \in A \,\big|\, X_k\big) .
+  \label{eq:markov-property}
+\end{equation}
+The conditional law is encoded by a \emph{transition kernel}
+$M(x' \,|\, x)$: a density (or matrix, for discrete $\mathcal{X}$) with
+$\int M(x'|x)\,\dd x' = 1$ for every $x$.
+\end{definition}
+
+The Markov property \eqref{eq:markov-property} is exactly a statement
+about \emph{factorisation}: the joint law of the first $K$ states is
+\begin{equation}
+  p(x_0, x_1, \dots, x_{K-1})
+  \;=\; p_0(x_0)\, \prod_{k=0}^{K-2} M(x_{k+1} \,|\, x_k) .
+  \label{eq:chain-factorisation}
+\end{equation}
+This factorisation is the most heavily used equation of the thesis. It says that the joint distribution of a Markov trajectory is a
+product of \emph{local} terms, each touching two consecutive variables:
+the structure that makes the chain a tree in the factor-graph sense of
+Chapter~\ref{ch:graphs}, that makes its precision matrix tridiagonal in
+the Gaussian case of Chapter~\ref{ch:gaussian}, and that makes belief
+propagation exact.
+
+Marginal distributions evolve by integrating the kernel:
+$p_{k+1}(x') = \int M(x'|x)\, p_k(x)\,\dd x$, compactly
+$p_{k+1} = M p_k$. A distribution $\pi$ is \emph{stationary} (invariant)
+for $M$ if $\pi = M\pi$; a chain started in $\pi$ stays in $\pi$ forever,
+and the trajectory is then a strictly stationary process in the sense of
+Definition~\ref{def:stationarity}. The kernel satisfies \emph{detailed
+balance} with respect to $\pi$ if
+\begin{equation}
+  \pi(x)\, M(x' \,|\, x) \;=\; \pi(x')\, M(x \,|\, x')
+  \qquad \text{for all } x, x' :
+  \label{eq:detailed-balance}
+\end{equation}
+the equilibrium probability flux from $x$ to $x'$ equals the reverse
+flux, so the chain, watched in equilibrium, is statistically
+indistinguishable run forwards or backwards. Detailed balance implies
+stationarity (integrate \eqref{eq:detailed-balance} over $x$), and its
+power is practical: it is a local, pointwise condition, checkable without
+computing any integral.
+
+Stationarity alone does not guarantee that the chain \emph{finds} $\pi$;
+for that one needs the chain to be able to reach everywhere
+(\emph{irreducibility}) without getting trapped in cycles
+(\emph{aperiodicity}). Under these conditions the fundamental convergence
+theorem holds \citep{robert2004monte}: the marginal law of $X_k$
+converges to $\pi$ from any initial condition, and time averages converge
+to expectations under $\pi$ (the ergodic theorem),
+\begin{equation}
+  \frac{1}{N} \sum_{k=1}^{N} f(X_k)
+  \;\xrightarrow[N \to \infty]{\text{a.s.}}\;
+  \E_\pi[f] .
+  \label{eq:ergodic}
+\end{equation}
+Equation \eqref{eq:ergodic} is the rigorous form of the ergodic postulate
+invoked in Section~\ref{sec:ensembles}, with the physical dynamics
+replaced by an algorithmic one.
+
+\section{The Ornstein--Uhlenbeck process: the corruption channel}
+\label{sec:ou}
+
+The noising process used by diffusion models, and by every result of this
+thesis, is the \emph{Ornstein--Uhlenbeck process}
+\citep{uhlenbeck1930theory}: Brownian motion pulled back to the origin by
+a linear spring,
+\begin{equation}
+  \dd X_t \;=\; -X_t\,\dd t \;+\; \sqrt{2}\;\dd W_t ,
+  \qquad X_0 = a .
+  \label{eq:ou-sde}
+\end{equation}
+(The drift and diffusion constants are a normalisation choice, the
+variance-preserving convention of the diffusion literature
+\citep{song2021scorebased}; any other choice rescales time.) The OU
+process is the unique Gaussian, Markov, stationary process in continuous
+time, and it is exactly solvable.
+
+\begin{toolbox}{Exact solution of the OU SDE by integrating factor}
+Multiply \eqref{eq:ou-sde} by $e^{t}$ and consider $Y_t = e^{t} X_t$. By
+It\^o's lemma with $\phi(x,t) = e^{t}x$ (here
+$\partial^2 \phi/\partial x^2 = 0$, so no correction term arises):
+\begin{equation*}
+  \dd Y_t
+  = e^{t} X_t\,\dd t + e^{t}\big( -X_t\,\dd t + \sqrt{2}\,\dd W_t \big)
+  = \sqrt{2}\, e^{t}\, \dd W_t .
+\end{equation*}
+The drift cancels exactly; that is what the integrating factor is for.
+Integrate from $0$ to $t$ and undo the substitution:
+\begin{equation*}
+  X_t \;=\; a\, e^{-t} \;+\; \sqrt{2} \int_0^t e^{-(t-s)}\, \dd W_s .
+\end{equation*}
+The integral is Gaussian (limit of Gaussian sums), with mean zero and
+variance given by the It\^o isometry:
+\begin{equation*}
+  \operatorname{Var}(X_t)
+  = 2 \int_0^t e^{-2(t-s)}\, \dd s
+  = 2\, e^{-2t}\, \frac{e^{2t} - 1}{2}
+  = 1 - e^{-2t} .
+\end{equation*}
+Hence the \emph{transition kernel} of the OU channel is
+\begin{equation*}
+  p(x_t \,|\, X_0 = a)
+  \;=\; \Nd\!\big( x_t;\; a\,e^{-t},\; \Deltat \big),
+  \qquad
+  \boxed{\;\Deltat \;=\; 1 - e^{-2t}\;} .
+\end{equation*}
+\hfill$\square$
+\end{toolbox}
+
+The boxed kernel is used on every page of the research chapters, so we
+fix its reading now. Corrupting a data point $a$ for a time $t$ produces
+\begin{equation}
+  x \;=\; a\, e^{-t} \;+\; \sqrt{\Deltat}\;\varepsilon,
+  \qquad \varepsilon \sim \Nd(0, 1):
+  \label{eq:ou-channel}
+\end{equation}
+the signal is \emph{contracted} by $e^{-t}$ while isotropic noise of
+variance $\Deltat$ fills in. At $t = 0$: $x = a$ (no corruption); as
+$t \to \infty$: $x \sim \Nd(0, 1)$ regardless of $a$ (all information
+destroyed, the equilibrium of the spring). The signal-to-noise ratio
+$e^{-2t}/\Deltat$ sweeps continuously from $\infty$ to $0$, and it
+diverges as $1/2t$ for small $t$, a factor that reappears throughout the
+thesis as an error amplifier. The OU channel interpolates between the
+data distribution and a standard Gaussian, which is precisely what a
+diffusion model needs.
+
+Two structural remarks, both load-bearing later. First, the OU kernel is
+Gaussian \emph{in $a$ as well as in $x$}: viewed as a function of the
+clean variable,
+$\Nd(x; a e^{-t}, \Deltat) \propto
+\exp[-(e^{-2t}/2\Deltat)(a - x e^{t})^2]$, a Gaussian likelihood factor
+of precision $e^{-2t}/\Deltat$ centred at the deconvolved observation
+$e^t x$. This is the fact that makes the posteriors of
+Chapter~\ref{ch:gaussian} jointly Gaussian and the messages of the BP
+computation closable. Second, if a random vector
+$a \sim \Nd(\mu, \Sigma_0)$ is pushed through \eqref{eq:ou-channel}
+coordinate-wise with \emph{independent} noises, the output is Gaussian
+with
+\begin{equation}
+  \mu_t = e^{-t}\mu,
+  \qquad
+  \Sigt \;=\; e^{-2t}\, \Sigma_0 \;+\; \Deltat\, I ,
+  \label{eq:ou-cov-map}
+\end{equation}
+since means and covariances transform linearly and the added noise is
+white. Equation \eqref{eq:ou-cov-map}, shrink the covariance and add a
+multiple of the identity, is the entire forward process of this thesis in
+one line.
+
+\section{Time reversal: Anderson's theorem}\label{sec:reversal}
+
+One last piece of SDE theory converts everything above into a generative
+method. Suppose data $X_0 \sim p_0$ are corrupted by a forward SDE
+\eqref{eq:generic-sde} up to time $T$, producing marginals $p_t$. Can the
+corruption be undone? Can we find an SDE which, run from $X_T \sim p_T$
+backwards, reproduces the same marginals? The answer
+\citep{anderson1982reverse} is yes, and the reverse drift needs exactly
+one unknown object:
+\begin{equation}
+  \dd X_t \;=\;
+  \Big[ f(X_t, t) \;-\; g(t)^2\, \nabla_x \log p_t(X_t) \Big]\,\dd t
+  \;+\; g(t)\, \dd \bar W_t ,
+  \label{eq:reverse-sde}
+\end{equation}
+where time runs backwards from $T$ to $0$ and $\bar W$ is a reverse-time
+Wiener process. The correction to the drift is the \emph{score}
+$\nabla_x \log p_t$ of the noised marginal: the object defined in
+\eqref{eq:intro-score} and computed exactly, for Markov-chain data, in
+the research chapters. A heuristic that makes \eqref{eq:reverse-sde}
+plausible follows from the Fokker--Planck equation: rewriting its
+diffusion term as a transport term,
+\begin{equation*}
+  \frac{g^2}{2} \frac{\partial^2 p_t}{\partial x^2}
+  = \frac{\partial}{\partial x}\!\left(
+      \frac{g^2}{2}\, p_t\, \frac{\partial \log p_t}{\partial x}
+    \right),
+\end{equation*}
+one sees that the density evolution of \eqref{eq:generic-sde} is
+\emph{identical} to that of the noise-free ODE with velocity
+$f - \tfrac{g^2}{2} \nabla \log p_t$ (the \emph{probability-flow ODE} of
+\citealp{song2021scorebased}); running that transport backwards, and
+re-injecting noise consistently, yields \eqref{eq:reverse-sde}. The
+rigorous statement and proof are in \citet{anderson1982reverse}.
+
+\section{From algorithmic chains to data chains}
+
+A closing change of perspective, to set up the research problem. In this
+chapter Markov chains began as \emph{algorithms}: their stationary law
+was the target, their trajectory a means to an end. From
+Chapter~\ref{ch:gaussian} onwards the chain \eqref{eq:ar1} plays the
+opposite role: it is the \emph{data-generating process}, its trajectory
+$(a_0, \dots, a_{K-1})$ is one data point (a video of $K$ frames), and
+the object of interest is the probability law of the whole trajectory
+after each frame has been independently corrupted by the OU channel
+\eqref{eq:ou-channel}. The factorisation \eqref{eq:chain-factorisation}
+then stops being a computational convenience and becomes the structure to
+be discovered: the research programme of this thesis asks how much of
+\eqref{eq:chain-factorisation} survives noising, and how an inference
+algorithm, or a neural network, can exploit what survives. In one
+sentence: the OU channel destroys data at a known rate, the
+Fokker--Planck equation describes the destruction at the level of
+densities, and Anderson's theorem says the destruction is invertible by
+anyone who knows the score, which is why the rest of this thesis is about
+computing that score exactly when the data have Markov structure.

@@ -1,0 +1,323 @@
+\chapter{The rotating ring: structure the marginals cannot see}
+\label{ch:ring}
+
+Every model so far has been the AR(1) chain, where what is being estimated --- the
+autoregressive coefficient, the innovation density --- shows up in the data's low-order
+statistics. Look at a histogram of $a_i$ and of $a_i a_{i-1}$ and you have most of it. This
+chapter develops a model where that is false, and where it is false for a reason one can prove
+rather than observe.
+
+The model is Problem~1 of the three panels on Mézard's board, developed in
+\codefile{research/board-3problems}. What follows is self-contained; the port into this
+project's package is \codefile{src/ring.py}, and \S\ref{sec:ring-port} records how it was
+checked against the independently audited original.
+
+\section{The model}
+
+Two clocks, and keeping them apart is the whole setup. \emph{Internal} time
+$u = 0,\dots,T-1$ runs along a trajectory. \emph{Diffusion} time $t$ is the noise level. One
+sample is a \textbf{whole trajectory}, so the ambient dimension is $\nsites = 2T$ and the
+channel hits every frame at once.
+
+Three independent latent variables:
+\begin{equation}
+\label{eq:ring-latents}
+r_0 \sim p_\lambda(\rho) \propto \rho\,e^{-(\rho-r_*)^2/2\lambda},
+\qquad
+\theta_0 \sim \mathrm{Unif}[0,2\pi),
+\qquad
+\psi \sim p(\psi),
+\end{equation}
+and then a rotating random walk in the plane,
+\begin{equation}
+\label{eq:ring-chain}
+z_0 = r_0(\cos\theta_0, \sin\theta_0),
+\qquad
+z_{u+1} = R_\psi z_u + \sigma\,\eta_u,
+\qquad \eta_u \sim \normal{\vect0}{\Id_2}\ \text{i.i.d.}
+\end{equation}
+
+\begin{intuition}
+The factor $\rho$ in $p_\lambda$ is the two-dimensional area element, not part of the physics:
+the density of the \emph{point} $z_0\in\Reals^2$ is $\propto e^{-(\|z\|-r_*)^2/2\lambda}$, and
+converting to a radial marginal picks up the Jacobian. This is why the mode of $p_\lambda$ sits
+slightly outside $r_*$.
+\end{intuition}
+
+\eqref{eq:ring-chain} is the discrete form of the pair written on the board,
+$\mathrm{d}r = (r_* - r)\,\mathrm{d}u + \Gamma\,\mathrm{d}B_u$ together with
+$\dot\theta = \omega$ --- that is, a \textbf{quadratic confining potential}
+$V(r) = (r-r_*)^2/2\lambda$ holding the radius near $r_*$, plus a steady rotation. So the model
+has two kinds of parameter, and the point of this chapter is that they behave completely
+differently: $\lambda$ and $r_*$ describe the well, and $\psi$ describes the dynamics.
+
+\section{The rotation is a gauge}
+\label{sec:ring-gauge}
+
+Let $U_\psi = \mathrm{blockdiag}(R_{-u\psi})_{u=0}^{T-1}$, which rotates frame $u$ backwards by
+$u\psi$. It is orthogonal, so it commutes with the isotropic channel: if
+$\vx = e^{-t}\va + \sqrt{\Dt}\,\vect\xi$ then $U_\psi\vx = e^{-t}U_\psi\va +
+\sqrt{\Dt}\,U_\psi\vect\xi$ and $U_\psi\vect\xi \overset{d}{=} \vect\xi$. Applying it to
+\eqref{eq:ring-chain} turns the rotating walk into a driftless one, so
+\begin{equation}
+\label{eq:ring-gauge}
+P_t(\vx \mid \psi) = P_t^{0}(U_\psi \vx),
+\end{equation}
+with $P_t^0$ the $\psi=0$ density. At known $\psi$ the rotation costs nothing statistically ---
+it is a change of coordinates.
+
+\begin{intuition}
+This is why the model is tractable at any $T$ despite being genuinely non-Gaussian. One does not
+need a separate calculation per rotation angle; one gauges the data and evaluates a single
+density.
+\end{intuition}
+
+\section{The \texorpdfstring{$\psi=0$}{psi=0} density in closed form}
+
+Conditionally on $z_0$ the trajectory is Gaussian with a $z_0$-independent covariance, so $\Pz$
+is a two-parameter \emph{location} mixture of one Gaussian. Write $X\in\Reals^{T\times2}$ for the
+gauged trajectory, $K_{uv} = \min(u,v)$,
+\[
+A_t = e^{-2t}\sigma^2 K + \Dt\,\Id_T,
+\qquad
+g = A_t^{-1}\vect1,
+\qquad
+\kappa = \vect1^\top g,
+\qquad
+\beta = \|X^\top g\| .
+\]
+Then
+\begin{equation}
+\label{eq:ring-density}
+\log P_t^0(X) = -\tfrac12\,\mathrm{tr}\!\left(X^\top A_t^{-1} X\right)
+\;+\; \log \Zring_t(\beta) \;-\; \log|A_t| \;-\; \log C(\lambda, r_*),
+\end{equation}
+with the radial integral and its normaliser
+\begin{equation}
+\label{eq:ring-Z}
+\Zring_t(\beta) = \int_0^\infty\! \rho\, e^{-(\rho-r_*)^2/2\lambda}\,
+e^{-e^{-2t}\kappa\rho^2/2}\, I_0\!\left(e^{-t}\rho\beta\right)\mathrm{d}\rho,
+\qquad
+C(\lambda,r_*) = \int_0^\infty\! \rho\, e^{-(\rho-r_*)^2/2\lambda}\,\mathrm{d}\rho .
+\end{equation}
+A quadratic form plus one one-dimensional Bessel integral. No network, no Monte Carlo, no curse
+of dimension --- which is what makes this a reference rather than a benchmark.
+
+\begin{pitfall}
+$C(\lambda,r_*)$ is \textbf{not optional}, and omitting it fails silently. The ring density in
+\eqref{eq:ring-latents} is written unnormalised, and its normaliser depends on both parameters
+of the well. If one estimates $\psi$ at fixed $(\lambda,r_*)$, the term is a constant and
+cancels in every responsibility --- which is exactly why it can sit missing for a long time
+without anything going wrong. The moment one estimates $\lambda$, it stops being a constant: a
+wider well simply contains more mass, so the likelihood increases without bound in $\lambda$ and
+the estimate pins to the top of whatever grid it is given. Measured on this implementation, with
+the truth at $\lambda=0.05$:
+
+\begin{center}\small
+\begin{tabular}{@{}lrrrrrr@{}}
+\toprule
+$\lambda$ & $0.02$ & $0.03$ & $0.05$ & $0.08$ & $0.11$ & $0.15$ \\
+\midrule
+without $C$ & $-1870$ & $-1435$ & $-911$ & $-476$ & $-218$ & $\mathbf{0}$ \\
+with $C$ & $-43.0$ & $-13.9$ & $\mathbf{-0.6}$ & $-35.3$ & $-96.0$ & $-190$ \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\noindent
+The upper row is smooth, confident and wrong. \codefile{tests/test\_ring.py} pins both
+directions: that the profile likelihood peaks at the truth, \emph{and} that it does not when the
+normaliser is removed --- so deleting the term cannot make the suite greener.
+\end{pitfall}
+
+\begin{pitfall}
+The count differs between the two likelihoods, and this is not a slip. The \emph{joint} model
+invokes the ring density once, for $z_0$, and propagates; it subtracts $\log C$ once. The
+per-frame \emph{marginal} model treats the frames as independent, so it invokes the ring density
+$T$ times and must subtract $T\log C$. The first version of this code fixed the joint likelihood
+and left the marginal one wrong, and the error surfaced only when the blind arm of the potential
+experiment returned $\hat\lambda = 3.5\times10^{6}$.
+\end{pitfall}
+
+\section{Marginal blindness}
+\label{sec:blindness}
+
+\begin{theorem}[Marginal blindness]
+\label{thm:ring-blind}
+For the model \eqref{eq:ring-latents}--\eqref{eq:ring-chain} with uniform initial phase, every
+single-frame marginal is independent of $\psi$, at every noise level. Consequently a model built
+from per-frame marginals carries exactly zero Fisher information about the rotation.
+\end{theorem}
+
+\begin{proof}
+Unrolling \eqref{eq:ring-chain},
+\[
+z_u = R_\psi^{\,u} z_0 + \sigma\sum_{k=1}^{u} R_\psi^{\,u-k}\eta_k .
+\]
+Each $\eta_k$ is isotropic Gaussian and a rotation of an isotropic Gaussian has the same law, so
+$R_\psi^{\,u-k}\eta_k \overset{d}{=} \eta_k$, independently across $k$. And $\theta_0$ is uniform
+on the circle, so $z_0$ has a rotationally invariant law and $R_\psi^{\,u}z_0 \overset{d}{=} z_0$.
+The two terms are independent, hence
+\begin{equation}
+\label{eq:blind-law}
+z_u \overset{d}{=} z_0 + \sigma\sqrt{u}\,\xi,
+\qquad \xi\sim\normal{\vect0}{\Id_2},
+\end{equation}
+in which $\psi$ does not appear. The channel acts coordinatewise and independently of $\psi$, so
+the noised frame is $x_u \overset{d}{=} e^{-t}(z_0 + \sigma\sqrt u\,\xi) + \sqrt{\Dt}\,\xi'$,
+again free of $\psi$. Therefore $\partial_\psi \log P_t(x_u) \equiv 0$ for every $u$ and every
+$t$, so each frame's Fisher information about $\psi$ is exactly zero. A sum of per-frame
+log-densities cannot contain information that no term contains.
+\end{proof}
+
+\begin{intuition}
+It is worth being precise about what this does \emph{not} say. The marginals are not
+uninformative in general --- they determine $\lambda$, $r_*$ and $\sigma$ perfectly well, and the
+per-frame law is a visible, non-Gaussian ring whose radius grows as $\sqrt{u}$ by
+\eqref{eq:blind-law}. They are blind only to the \emph{rotation}. Nor does the theorem say the
+joint is easy: the joint carries the information, and extracting it is what the estimator does.
+
+The sharp form of the statement is that this is not a matter of degree. A per-frame model is not
+\emph{less} informative about the dynamics, or informative only at low noise. It carries zero,
+exactly, at every noise level. Radii are not evidence.
+\end{intuition}
+
+\section{Three estimation targets on one model}
+\label{sec:ring-targets}
+
+The chapter's design follows from the two preceding sections. The same model carries a parameter
+the marginals can see and a parameter they provably cannot, so running both through the same
+estimator isolates the effect of the structure rather than of the method.
+
+\begin{center}\small
+\begin{tabular}{@{}llll@{}}
+\toprule
+ & target & free parameters & visible to marginals? \\
+\midrule
+4a & the confining potential $(\lambda, r_*)$ & two & \textbf{yes} \\
+4b & a single rotation $\psi$ & one & \textbf{no} (Theorem~\ref{thm:ring-blind}) \\
+4c & a law over rotations $p(\psi)$ & a distribution & \textbf{no} \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\noindent
+Each is run in two arms differing only in which likelihood scores a trajectory: the joint
+\eqref{eq:ring-density}, or the product of per-frame marginals. That makes the rung a $3\times2$
+design whose diagonal is the claim.
+
+\paragraph{4a, the potential.} Gradient ascent on $(\log\lambda, r_*)$ from a random
+initialisation, with a numerical gradient --- honest for two parameters, and it avoids a
+hand-derived derivative that could be wrong in the same silent way the normaliser was. This is
+the \emph{easy} case, and it is easy for a reason one can state: by \eqref{eq:blind-law} frame
+$u$'s radial law is the well convolved with a Gaussian of variance $\sigma^2 u$, so every frame
+carries information about it.
+
+\begin{pitfall}
+The iteration budget is doing real work here, exactly as it does for EM on the chain
+(Chapter~\ref{ch:estimation}). At 25 gradient steps this fit reports $\lambda = 0.075$ against a
+truth of $0.05$ and looks perfectly well-behaved doing it; the likelihood plateaus near 150 steps
+and the estimate settles by 300 ($\lambda = 0.0493$, $r_* = 0.9966$ at $n=512$). The experiment
+therefore runs to a plateau criterion with 300 as a cap, and records a \texttt{hit\_cap} flag so
+that a fit which stopped because it ran out of budget cannot be read as one that converged.
+\end{pitfall}
+
+\paragraph{4b, one rotation.} Profile the likelihood over a grid of angles and refine
+parabolically through the peak, so the estimate is not limited by the grid. One scalar --- fewer
+parameters than the potential --- and by Theorem~\ref{thm:ring-blind} no marginal carries any
+information about it.
+
+\paragraph{4c, a law over rotations.} EM for a mixture whose components are indexed by the
+rotation, on a truth of two species $p^*(\psi) = \tfrac12\delta_{+\omega} +
+\tfrac12\delta_{-\omega}$:
+\[
+\text{E:}\quad r_\mu(\psi_k) \propto p(\psi_k)\,P_t(\vx^\mu\mid\psi_k),
+\qquad
+\text{M:}\quad p(\psi_k) \leftarrow \frac{1}{\nseq}\sum_\mu r_\mu(\psi_k).
+\]
+
+\begin{intuition}
+The same sufficiency that makes $\Xis$ a one-shot statistic on the chain appears here. The
+$\psi$-conditional log-likelihood does not depend on $p(\psi)$ --- the thing being estimated ---
+so the $\nseq\times|\psi|$ matrix of log-densities is computed \emph{once} and every EM iteration
+is a reweighting of it. The E-step touches the data one time and the M-step never revisits it.
+\end{intuition}
+
+The blind arm is not a strawman baseline; it is the theorem's own control. Its likelihood is
+constant in $\psi$, so its responsibilities equal $p(\psi)$ exactly, its M-step is the identity,
+and $p(\psi)$ can never leave its uniform initialisation. If the run shows anything else, the
+implementation is wrong rather than the theorem.
+
+\section{What the frozen batch found}
+\label{sec:ring-results}
+
+Sixteen seeds, seven budgets, twelve noise levels, from \codefile{outputs/frozen/exp\_28\_ring\_em}.
+
+\paragraph{The blind arm returns exactly the null.} Across the $1{,}344$ cells of 4c the
+estimate moves $0.0000$ in total variation from its uniform initialisation, and across the $480$
+cells of 4b the profile likelihood in $\psi$ has range $0.00\times10^{0}$ nats. Not a small
+number --- a machine-precision zero, everywhere, which is what a theorem predicting exactly no
+information requires. Reported as $\hat\omega$, the blind arm returns $90.00^\circ$, the value a
+uniform $p(\psi)$ gives, at every budget and every noise level.
+
+\paragraph{The joint arm recovers the rotation, and loses it to the channel.} Estimating a
+single angle, the error is $2.1\pm0.7^\circ$ pooled over the whole schedule. Recovering the
+two-species law, the median error in $\omega$ against a truth of $30^\circ$ and a null of
+$90^\circ$:
+
+\begin{center}\small
+\begin{tabular}{@{}lcccccc@{}}
+\toprule
+$t$ & $0.05$ & $0.32$ & $0.68$ & $0.98$ & $1.43$ & $3.00$ \\
+\midrule
+median $|\hat\omega - \omega|$ & $0.15^\circ$ & $0.24^\circ$ & $0.90^\circ$ & $2.86^\circ$
+& $7.09^\circ$ & $58.8^\circ$ \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\noindent
+Information about the rotation survives until $t\approx1$ and is gone by $t=3$, where the
+estimate has returned to the null. That is the channel doing what a channel does, and it is
+visible here in a way it is not on the chain, because the null is known exactly.
+
+\paragraph{The potential.} \textsc{[pending]} --- the 4a sweep runs 300 gradient steps per cell
+and had not completed when this was written. The preliminary result is that both arms recover
+$(\lambda, r_*)$, which is the expected contrast with 4b: the well is visible to the marginals
+and the rotation is not.
+
+\section{The port, and how it was checked}
+\label{sec:ring-port}
+
+\codefile{src/ring.py} is a port of code in \codefile{research/board-3problems}, which is
+audited there against independent polar quadrature (check \texttt{P1d}, the $\psi$-posterior
+against quadrature at $10^{-9}$). A port is exactly the kind of change that can agree on the
+easy cases and drift somewhere nobody looks, so it is checked rather than assumed:
+
+\begin{itemize}\itemsep2pt
+\item Before the normalisation fix, the two implementations agreed \textbf{bit for bit}: maximum
+      absolute difference $0.0$ over a batch of 400 trajectories.
+\item After it, they differ by exactly $\log|A_t| + \log C$ --- constant across the batch to
+      $3.6\times10^{-15}$, and equal to the intended constant to $2.7\times10^{-15}$. So the
+      change is provably the normalisation and nothing else.
+\item Marginal blindness is confirmed numerically as a distributional statement rather than a
+      pathwise one: per-frame second moments agree across $\psi\in\{0,\pm30^\circ,90^\circ\}$
+      within four standard errors at $n=40{,}000$, and match the closed form
+      $\E\|z_0\|^2 + 2\sigma^2 u$.
+\end{itemize}
+
+\begin{codebox}
+\coderef{src/ring.py}{log\_pt\_conditional} is \eqref{eq:ring-density};
+\coderef{src/ring.py}{log\_pt\_marginal} is the blind model, and takes no $\psi$ argument
+because there is no $\psi$ to take. \codefile{experiments/exp\_28\_ring\_em.py} runs the three
+targets as four parts; \codefile{tests/test\_ring.py} carries eleven checks including both
+directions of the normaliser.
+
+One performance note, because it changed the experiment's feasibility rather than only its
+speed: \coderef{src/ring.py}{log\_pt\_marginal} needs $T$ different values of $\kappa$, one per
+frame, and originally rebuilt the whole Bessel table for each. Since $I_0$ depends only on
+$z = e^{-t}\beta\rho$ and not on $\kappa$, the expensive part can be computed once and shared
+across frames. That is an $11\times$ speed-up ($522\,\mathrm{ms}\to48\,\mathrm{ms}$ per call)
+with identical output. The tell that the cost was in the quadrature and not the data was that
+the marginal likelihood took the same time at $n=512$ and $n=4096$.
+\end{codebox}

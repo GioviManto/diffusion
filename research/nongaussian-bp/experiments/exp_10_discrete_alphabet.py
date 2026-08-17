@@ -204,7 +204,7 @@ def main() -> None:
     args = parser.parse_args()
 
     quick = {
-        "sizes": (64, 256), "alphabet_sizes": (3, 5), "n_rep": 2,
+        "sizes": (64, 256), "alphabet_sizes": (3, 5), "n_rep": 2,  # frozen-exempt: compendium only, not a paper experiment
         "headline_states": 4, "alphabet_n_chains": 256,
         "net_hidden": (64, 64), "net_steps": 2000, "n_test": 128,
     }

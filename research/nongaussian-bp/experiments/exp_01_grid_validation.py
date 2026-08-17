@@ -39,8 +39,9 @@ from src.noising import (
 from src.plotting import new_figure, save_figure
 from src.priors import GaussianAR1
 from src.utils import ensure_dir, rng_for, write_csv, write_json
+from frozen_config import FROZEN
 
-N_SITES = 40
+N_SITES = FROZEN.n_sites
 
 
 def one_setting(

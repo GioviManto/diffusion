@@ -341,6 +341,7 @@ def fit_em(
     log_mu: np.ndarray | None = None,
     tol: float = 1e-9,
     chunk: int = 256,
+    checkpoints: "set[int] | None" = None,
 ):
     """Run EM on noisy observations. Returns (fitted_kernel, EMTrace).
 
@@ -365,8 +366,14 @@ def fit_em(
     trace = EMTrace(log_evidence=[], theta=[], seconds=[])
     current = kernel
     prev = -np.inf
-    for _ in range(n_iters):
+    saved: dict[int, object] = {}
+    for it in range(n_iters):
         t0 = time.perf_counter()
+        # `current` here is the iterate about to be scored, so trace.log_evidence[it]
+        # is its evidence. Snapshotting at this point keeps the same alignment the
+        # return value has: a checkpoint is a kernel whose likelihood was computed.
+        if checkpoints is not None and it in checkpoints:
+            saved[it] = current
         log_k = current.log_transition_matrix(grid)
         stats = e_step_multi(grid, weights, log_k, groups, log_mu, chunk)
         trace.log_evidence.append(stats.log_evidence)
@@ -392,7 +399,15 @@ def fit_em(
         trace.log_evidence.append(stats.log_evidence)
         trace.theta.append(np.asarray(current.theta, dtype=float).copy())
         trace.seconds.append(time.perf_counter() - t0)
+        if checkpoints is not None and n_iters in checkpoints:
+            saved[n_iters] = current
 
+    if checkpoints is not None:
+        # The final iterate is always available under its own index, so a caller asking
+        # for a checkpoint past an early convergence break still gets the best kernel
+        # rather than a KeyError.
+        saved.setdefault(len(trace.log_evidence) - 1, current)
+        return current, trace, saved
     return current, trace
 
 

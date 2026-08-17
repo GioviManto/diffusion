@@ -104,6 +104,21 @@ def _fit(family, settings, train):
     return model, trace, time.perf_counter() - t0
 
 
+def _aligned(rows):
+    """Give every row the same keys, in first-seen order.
+
+    `write_csv` takes its header from the first row alone, and `csv.DictWriter`
+    raises on any later row carrying a key that header does not list. The rho
+    columns differ by family by construction -- a scalar-rho family has no
+    per-component ones and vice versa -- and `families` normally starts with
+    `gaussian`, so the scale_mixture row appended after it is exactly the one
+    that would raise. Missing entries are left empty rather than filled with a
+    number, because "this family has no such parameter" is not a value.
+    """
+    headers = list(dict.fromkeys(key for row in rows for key in row))
+    return [{h: row.get(h, "") for h in headers} for row in rows]
+
+
 def part_fit(settings, out_dir):
     train, test = _splits(settings)
     rows, traces = [], []
@@ -122,7 +137,21 @@ def part_fit(settings, out_dir):
         }
         for d in range(model.depth):
             k = model.kernels[0][d]
-            row[f"rho_d{d}"] = float(getattr(k, "rho", np.nan))
+            # `d` is already the detail level: `kernels[orientation][d]` holds one
+            # kernel per (orientation, level). What varies *inside* one kernel is
+            # the mixture component. GaussianAR1Kernel and MixtureInnovationKernel
+            # carry a scalar `rho` shared by every component; ScaleMixtureKernel
+            # carries one `rho_c` per component, shape (C,), and float() on that
+            # array is what killed job 627175 on 2026-08-14. Give a vector kernel
+            # one column per component instead of collapsing it -- differing
+            # components are the whole point of the family, and a mean over them
+            # would report a number the model never uses.
+            rho = np.atleast_1d(getattr(k, "rho", np.nan)).astype(float)
+            if rho.size == 1:
+                row[f"rho_d{d}"] = float(rho[0])
+            else:
+                for c, value in enumerate(rho):
+                    row[f"rho_d{d}_c{c}"] = float(value)
         rows.append(row)
         traces.extend(
             {"family": family, "iteration": i, "log_evidence": v}
@@ -132,7 +161,7 @@ def part_fit(settings, out_dir):
               f"monotone violation {trace.monotone_violation:.3g}, "
               f"held-out loglik/image {ll / len(test.images):.2f}")
 
-    write_csv(out_dir / "fit.csv", rows)
+    write_csv(out_dir / "fit.csv", _aligned(rows))
     write_csv(out_dir / "em_trace.csv", traces)
     return rows
 

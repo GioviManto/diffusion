@@ -84,7 +84,7 @@ def _f(rows, key):
 # ---------------------------------------------------------------------------
 
 def fig_closure() -> None:
-    rows = read(Path("exp_02_laplace_gaussian_message_error/laplace_summary.csv"))
+    rows = read(Path("frozen/exp_02/laplace_summary.csv"))
     t = _f(rows, "t")
     fig, ax = plt.subplots(1, 3, figsize=(7.2, 2.3))
 
@@ -109,7 +109,7 @@ def fig_closure() -> None:
     ax[2].set_title("direction")
 
     # Second panel: the family sweep, to show it is not a Laplace artefact.
-    sweep = read(Path("exp_03_nongaussian_innovation_sweep/innovation_sweep.csv"))
+    sweep = read(Path("frozen/exp_03/innovation_sweep.csv"))
     fam = defaultdict(list)
     for r in sweep:
         if abs(float(r["rho"]) - 0.85) < 1e-9:
@@ -242,8 +242,8 @@ def fig_pointwise_vs_generative() -> None:
 # ---------------------------------------------------------------------------
 
 def fig_grid_domain() -> None:
-    heat = read(Path("exp_01_grid_validation/grid_heatmap.csv"))
-    bnd = read(Path("exp_18/boundary.csv"))
+    heat = read(Path("frozen/exp_01/grid_heatmap.csv"))
+    bnd = read(Path("frozen/exp_18/boundary.csv"))
     fig, ax = plt.subplots(2, 2, figsize=(6.4, 4.4))
     ax = ax.ravel()
 
@@ -500,8 +500,67 @@ def fig_innovation_density() -> None:
     save(fig, "fig_innovation_density")
 
 
+# ---------------------------------------------------------------------------
+# Rung 4: recovering a rotation that no single-frame marginal can see
+# ---------------------------------------------------------------------------
+
+def fig_ring() -> None:
+    """Three panels: recovered p(psi) on the joint, the same on the blind
+    marginal arm, and recovery error against the noise level.
+
+    The point of the middle panel is that it is empty of structure by theorem,
+    not by underperformance -- so it is drawn on the same y-axis as the left
+    panel, which is the only way the comparison is honest.
+    """
+    dens = read(Path("frozen/exp_28_ring_em/ring_density.csv"))
+    rec = read(Path("frozen/exp_28_ring_em/ring_recovery.csv"))
+
+    # Two panels, not three. The recovery-error-against-noise panel that used to
+    # sit on the right is now a table in the text, and a figure that repeats a
+    # table costs a page without adding anything.
+    fig, ax = plt.subplots(1, 2, figsize=(5.6, 2.3))
+
+    # Pick the lowest noise level present, for the two density panels.
+    t_show = min(float(r["t"]) for r in dens)
+    # The y-limit must cover the truth spikes (0.5 each) as well as the
+    # estimate, or the truth is drawn clipped and looks like a plotting error.
+    ymax = max(
+        max(float(r["p_hat"]) for r in dens if float(r["t"]) == t_show),
+        max(float(r["p_true"]) for r in dens if float(r["t"]) == t_show),
+    )
+
+    for k, (arm, title) in enumerate(
+        [("joint", "joint likelihood"), ("marginal", "per-frame marginals")]
+    ):
+        rows = [r for r in dens if r["arm"] == arm and float(r["t"]) == t_show]
+        rows.sort(key=lambda r: float(r["psi"]))
+        psi = np.degrees(_f(rows, "psi"))
+        ax[k].plot(psi, _f(rows, "p_hat"), color="#0072B2", lw=1.3,
+                   label=r"recovered $\hat p(\psi)$")
+        # The truth is two point masses; draw them as stems so they cannot be
+        # confused with a density.
+        for p_t, val in zip(psi, _f(rows, "p_true")):
+            if val > 0:
+                ax[k].vlines(p_t, 0, val, color="#222222", lw=1.6, zorder=3)
+        ax[k].plot([], [], color="#222222", lw=1.6, label=r"truth $p^*(\psi)$")
+        ax[k].axhline(1.0 / len(rows), color="#999999", ls=":", lw=1.0,
+                      label="uniform (null)")
+        ax[k].set_title(title)
+        ax[k].set_xlabel(r"rotation angle $\psi$ (degrees)")
+        ax[k].set_xlim(-180, 180)
+        ax[k].set_xticks([-180, -90, 0, 90, 180])
+        ax[k].set_ylim(0, ymax * 1.15)
+    ax[0].set_ylabel(r"$p(\psi)$")
+    # One legend for both density panels, placed outside so it never covers
+    # the spikes it is describing.
+    ax[0].legend(loc="upper left", bbox_to_anchor=(0.0, 1.0), fontsize=6.5)
+
+    save(fig, "fig_ring")
+
+
 FIGURES = {
     "fig_closure": fig_closure,
+    "fig_ring": fig_ring,
     "fig_sample_efficiency": fig_sample_efficiency,
     "fig_capacity": fig_capacity,
     "fig_pointwise_vs_generative": fig_pointwise_vs_generative,

@@ -1,19 +1,19 @@
 {
-  "n_sites": 40,
+  "n_sites": 32,
   "rho": 0.85,
   "t_values": [
-    0.02,
     0.05,
-    0.08,
-    0.12,
-    0.18,
-    0.27,
-    0.4,
-    0.6,
-    0.9,
-    1.3,
-    1.8,
-    2.4
+    0.0725,
+    0.1053,
+    0.1527,
+    0.2216,
+    0.3215,
+    0.4665,
+    0.6769,
+    0.9821,
+    1.425,
+    2.0676,
+    3.0
   ],
   "n_trials": 60,
   "ref_grid": {
@@ -21,14 +21,17 @@
     "A": 8.0
   },
   "provenance": {
-    "timestamp": "2026-08-01 09:24:56",
-    "python": "3.11.15",
-    "numpy": "2.4.6",
-    "platform": "Linux-6.18.5-x86_64-with-glibc2.39",
-    "hostname": "vm",
+    "timestamp": "2026-08-16 12:17:46",
+    "git_commit": "39e7564dc5ffad40cd3850e78c7ddb9d7a04d28b",
+    "git_branch": "main",
+    "git_dirty": "M research/nongaussian-bp/experiments/exp_01_grid_validation.py\n M research/nongaussian-bp/experiments/exp_02_laplace_gaussian_message_error.py\n M research/nongaussian-bp/experiments/exp_03_nongaussian_innovation_sweep.py\n M research/nongaussian-bp/experiments/exp_06_em_parameter_recovery.py\n M research/nongaussian-bp/experiments/exp_07_em_vs_score_network.py\n M research/nongaussian-bp/experiments/exp_08_gradient_vs_exact_mstep.py\n M research/nongaussian-bp/experiments/exp_18_revision_diagnostics.py\n M research/nongaussian-bp/experiments/exp_22_shape_information.py\n M research/nongaussian-bp/experiments/exp_27_shape_convergence.py\n M research/nongaussian-bp/outputs/exp_01_grid_validation/RECOMMENDATION.md\n M research/nongaussian-bp/outputs/exp_01_grid_validation/grid_error_vs_A.png\n M research/nongaussian-bp/outputs/exp_01_grid_validation/grid_error_vs_M.png\n M research/nongaussian-bp/outputs/exp_01_grid_validation/grid_error_vs_t.png\n M research/nongaussian-bp/outputs/exp_01_grid_validation/grid_heatmap.csv\n M research/nongaussian-bp/outputs/exp_01_grid_validation/grid_heatmap_raw.csv\n M research/nongaussian-bp/outputs/exp_01_grid_validation/grid_heatmap_t0.005.png\n M research/nongaussian-bp/outputs/exp_01_grid_validation/grid_heatmap_t0.05.png\n M research/nongaussian-bp/outputs/exp_01_grid_validation/grid_heatmap_t0.4.png\n M research/nongaussian-bp/outputs/exp_01_grid_validation/grid_sweep_A.csv\n M research/nongaussian-bp/outputs/exp_01_grid_validation/grid_sweep_A_raw.csv\n M research/nongaussian-bp/outputs/exp_01_grid_validation/grid_sweep_M.csv\n M research/nongaussian-bp/outputs/exp_01_grid_validation/grid_sweep_M_raw.csv\n M research/nongaussian-bp/outputs/exp_01_grid_validation/params.json\nA  research/nongaussian-bp/paper/Things-to-change-paper.md\n M research/nongaussian-bp/paper/appendix.tex\n M research/nongaussian-bp/paper/figures/make_figures.py\n M research/nongaussian-bp/paper/main.pdf\n M research/nongaussian-bp/paper/main.tex\n M research/nongaussian-bp/paper/notation.tex\n?? research/nongaussian-bp/experiments/exp_28_ring_em.py\n?? research/nongaussian-bp/experiments/frozen_config.py\n?? research/nongaussian-bp/outputs/CLUSTER_JOBS_14_15_AUG.md\n?? research/nongaussian-bp/outputs/exp_16_cluster/\n?? research/nongaussian-bp/outputs/exp_21_cluster/\n?? research/nongaussian-bp/outputs/frozen/\n?? research/nongaussian-bp/paper/figures/fig_ring.pdf\n?? research/nongaussian-bp/paper/figures/fig_ring.png\n?? research/nongaussian-bp/src/ring.py\n?? research/nongaussian-bp/tests/test_ring.py\n?? research/nongaussian-bp/tools/check_paper.sh",
+    "python": "3.12.5",
+    "numpy": "2.5.2",
+    "platform": "macOS-14.1.1-arm64-arm-64bit",
+    "hostname": "MacBook-Air-160.local",
     "slurm_job_id": "",
     "slurm_array_task_id": "",
-    "cpu_count": "4",
-    "blas_threads": "2"
+    "cpu_count": "8",
+    "blas_threads": ""
   }
 }

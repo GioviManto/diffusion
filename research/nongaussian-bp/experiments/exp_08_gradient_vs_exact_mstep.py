@@ -37,11 +37,12 @@ from src.noising import alpha_delta
 from src.plotting import new_figure, save_figure
 from src.priors import GaussianAR1, LaplaceAR1
 from src.utils import ensure_dir, rng_for, write_csv, write_json
+from frozen_config import FROZEN
 
-N_SITES = 24
-RHO_TRUE = 0.8
-GRID_A = 8.0
-T_TRAIN = (0.1, 0.2, 0.4, 0.8, 1.6)
+N_SITES = FROZEN.n_sites   # was 24
+RHO_TRUE = FROZEN.rho   # was 0.8
+GRID_A = FROZEN.half_width
+T_TRAIN = tuple(FROZEN.t_grid)
 
 
 def noisy_groups(A, t_values, rng):

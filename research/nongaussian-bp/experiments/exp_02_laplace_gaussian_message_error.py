@@ -34,10 +34,11 @@ from src.noising import log_likelihood_matrix, ou_noise_sample
 from src.plotting import new_figure, save_figure
 from src.priors import LaplaceAR1
 from src.utils import ensure_dir, rng_for, write_csv, write_json
+from frozen_config import FROZEN
 
-N_SITES = 40
-RHO = 0.85
-T_VALUES = (0.02, 0.05, 0.08, 0.12, 0.18, 0.27, 0.4, 0.6, 0.9, 1.3, 1.8, 2.4)
+N_SITES = FROZEN.n_sites
+RHO = FROZEN.rho
+T_VALUES = tuple(FROZEN.t_grid)
 
 
 def main() -> None:

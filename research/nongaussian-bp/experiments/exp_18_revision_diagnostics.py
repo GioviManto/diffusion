@@ -53,12 +53,13 @@ from src.kernels import MixtureInnovationKernel  # noqa: E402
 from src.noising import alpha_delta  # noqa: E402
 from src.priors import LaplaceAR1  # noqa: E402
 from src.utils import rng_for  # noqa: E402
+from frozen_config import FROZEN
 
 OUT = Path(__file__).resolve().parents[1] / "outputs" / "exp_18"
 
-RHO = 0.85
-N_SITES = 32
-T_VALUES = (0.02, 0.05, 0.1, 0.2, 0.4, 0.8, 1.6)
+RHO = FROZEN.rho
+N_SITES = FROZEN.n_sites
+T_VALUES = tuple(FROZEN.t_grid)
 
 # Chains per (t, A, N_g) cell for the forward-message edge-mass diagnostic. One trajectory
 # cannot characterise a distribution over trajectories, and the quantity is a max over sites
@@ -198,7 +199,7 @@ def part_emtrace() -> None:
             kernel = MixtureInnovationKernel.init(
                 n_comp, rho=rho0, var=0.8, rng=rng_for("exp18", "emtrace", n_comp, init_id)
             )
-            fitted, trace = fit_em(kernel, grid, weights, groups, n_iters=60)
+            fitted, trace = fit_em(kernel, grid, weights, groups, n_iters=60)  # frozen-exempt: PROVISIONAL -- reports innovation moments, whose kurtosis settles at a median 229 updates (exp_27). Compendium-only; see ch13 sec:corr-capacity. Rerun at FROZEN.em_max_iters before any use
             mom = fitted.innovation_moments
             for it, (ll, sec) in enumerate(zip(trace.log_evidence, trace.seconds)):
                 rows.append(
@@ -248,7 +249,7 @@ def part_density() -> None:
             kernel = MixtureInnovationKernel.init(
                 n_comp, rho=0.3, var=0.8, rng=rng_for("exp18", "density", "init", n_chains, n_comp)
             )
-            fitted, trace = fit_em(kernel, grid, weights, groups, n_iters=60)
+            fitted, trace = fit_em(kernel, grid, weights, groups, n_iters=60)  # frozen-exempt: reports rho only; settles at <=80 updates (exp_27)
 
             dens = np.zeros_like(e)
             for w, m, s2 in zip(fitted.pi, fitted.mu, fitted.s2):
