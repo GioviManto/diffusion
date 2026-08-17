@@ -211,13 +211,22 @@ print(tuple(list(FROZEN.seeds())[$SHARD::8]))")
       # the obvious control does not rescue it: only 13 of 400 pairs had both
       # arms converged.
       #
-      # That this actually bites was measured, not assumed. Refitting to 2400
-      # steps with the plateau test disabled (scratch cap_probe, n=512,
-      # t=0.2216): the joint arm is identical to eight significant figures from
-      # step 600 onward, while the marginal arm's lam error keeps falling,
-      # 0.482 at 600 -> 0.372 at 1200 -> 0.335 at 2400. So v2 stopped the
-      # marginal arm roughly 30% short of its own optimum while the joint arm
-      # was fully converged.
+      # WHAT THIS RUN CAN AND CANNOT SETTLE. A probe refitting twelve cells to
+      # 2400 steps with the plateau test disabled was first read off its single
+      # first cell (n=512, t=0.2216), where the joint arm is frozen from step 600
+      # and the marginal arm improves 0.482 -> 0.372 -> 0.335. Across all twelve
+      # that does not hold: the joint arm moves in five of six cells and at
+      # n=512, t=0.4665 gets WORSE with more steps (0.029 at 600, 0.060 at 2400),
+      # and the parameter error is non-monotone in four cells while the
+      # log-likelihood rises monotonically in all twelve.
+      #
+      # So more optimisation is not more accuracy -- the finite-sample maximiser
+      # is not at the truth, and the budget is a regularisation knob, the same
+      # thing exp_29 found for EM. This run holds both arms to ONE n-independent
+      # criterion, which removes a defect that was certainly there. It does not
+      # produce converged estimators, and the margin it reports must be read with
+      # that caveat. Selecting each arm's stopping point on held-out data, as
+      # exp_07 now does for both of its arms, is what would actually settle it.
       #
       # The root cause is the stopping rule, not the budget. plateau_tol was an
       # ABSOLUTE tolerance on an objective that sums over sequences, so it was

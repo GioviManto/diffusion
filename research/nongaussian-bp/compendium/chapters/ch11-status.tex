@@ -329,13 +329,6 @@ against the joint arm's $57\%$, so ``joint beats marginal'' partly means ``joint
 marginal did not''. The obvious control does not rescue it: only $13$ of $400$ pairs have both arms
 converged.
 
-That this actually bites was measured rather than assumed. Refitting with the plateau test disabled
-($n{=}512$, $t{=}0.2216$), the joint arm is identical to eight significant figures from step $600$
-onward, while the marginal arm keeps improving: $\lambda$ error $0.482$ at $600$, $0.372$ at $1200$,
-$0.335$ at $2400$. So \texttt{629193} stopped the marginal arm roughly $30\%$ short of its own
-optimum while the joint arm was fully converged --- the same unmatched-budget error as comparing EM
-at a fixed iteration count against a network trained to a fixed length.
-
 The cause was the stopping rule. \texttt{plateau\_tol} was an \emph{absolute} tolerance on an
 objective that sums over sequences, hence eight times stricter at $n{=}4096$ than at $n{=}512$: a
 convergence criterion varying along the very axis this rung reports its scaling on. It is now
@@ -343,6 +336,41 @@ per-sequence, pinned by
 \texttt{tests/test\_ring.py::test\_stopping\_rule\_does\_not\_depend\_on\_sample\_size}, which
 replicates one dataset fourfold and asserts the fit stops at the same step.
 \end{pitfall}
+
+\paragraph{But more optimisation is not more accuracy, and that is the deeper problem.}
+\label{sec:rung4a-nonmonotone}
+Twelve cells were refit to $2400$ steps with the plateau test disabled, to see what the budget was
+costing. The first cell inspected showed exactly the expected picture --- at $n{=}512$,
+$t{=}0.2216$, the joint arm is identical to eight significant figures from step $600$ onward while
+the marginal arm's $\lambda$ error falls from $0.482$ to $0.372$ to $0.335$ --- and it would have
+been easy to stop there and report that the joint arm was converged and the marginal arm cut short.
+Across all twelve cells that is not what happens:
+
+\begin{center}\small
+\begin{tabular}{lccc c}
+\toprule
+cell & \multicolumn{3}{c}{$\lambda$ rel.\ err.\ at $600 / 1200 / 2400$} & log-lik.\ monotone \\
+\midrule
+$n{=}512$, $t{=}0.2216$, joint    & $0.078$ & $0.078$ & $0.078$ & yes \\
+$n{=}512$, $t{=}0.4665$, joint    & $0.029$ & $0.057$ & $0.060$ & yes \\
+$n{=}512$, $t{=}0.2216$, marginal & $0.177$ & $0.066$ & $0.207$ & yes \\
+$n{=}2048$, $t{=}0.2216$, marginal& $0.265$ & $0.075$ & $0.149$ & yes \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\noindent The objective rises monotonically in all twelve cells --- backtracking guarantees it ---
+while the parameter error is non-monotone in four, and in two joint-arm cells the estimate at $2400$
+steps is \emph{worse} than at $600$. Ascending the likelihood harder does not monotonically improve
+recovery, because the finite-sample maximiser is not at the truth. This is the same phenomenon as
+the EM overfitting of \S\ref{sec:em-overfitting}, in a different estimator: the optimisation budget
+is a regularisation knob, not a convergence detail.
+
+So \texttt{629962} should be read for what it is. Holding both arms to one $n$-independent
+criterion removes a defect that was certainly there; it does not deliver two converged estimators,
+and the honest fix --- selecting each arm's stopping point on held-out data, as
+\S\ref{sec:rec-efficiency} now does for EM-BP and the network --- is not implemented for this rung.
+Any joint-versus-marginal margin from \texttt{629962} carries that caveat.
 
 \paragraph{Still out.}
 \begin{itemize}\itemsep3pt

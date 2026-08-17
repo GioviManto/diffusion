@@ -41,13 +41,28 @@ arm. Pinned both ways by
 4.8% and the joint arm recovered its expected ordering, so the joint arm's
 n-scaling is reportable. The joint-versus-marginal *margin* is not: at t ≤ 1 the
 marginal arm hit the 600-step cap in 95% of cells against the joint arm's 57%, so
-the two arms were not converged to the same standard. Measured directly with the
-plateau test disabled (n = 512, t = 0.2216): the joint arm is unchanged to eight
-significant figures from step 600, while the marginal arm's lambda error keeps
-falling — 0.482 at 600, 0.372 at 1200, 0.335 at 2400. `629962` reruns it under a
+the two arms were not stopped by the same standard. `629962` reruns it under a
 per-sequence tolerance, which is what the stopping rule should have been all
 along: the old absolute tolerance was eight times stricter at n = 4096 than at
 n = 512, i.e. it varied along the very axis the rung reports its scaling on.
+
+**A correction, and a caveat on what `629962` can deliver.** The probe behind
+that rerun was first read off its single first cell, which showed the joint arm
+frozen from step 600 while the marginal arm improved to 2400 — a tidy story of
+one arm converged and the other cut short. Across all twelve cells it does not
+hold. The joint arm moves in five of six cells, and at n = 512, t = 0.4665 its
+lambda error gets *worse* with more steps, 0.029 at 600 against 0.060 at 2400.
+The parameter error is non-monotone in four of twelve cells (0.177 → 0.066 →
+0.207 at 600/1200/2400), while the log-likelihood rises monotonically in all
+twelve, as backtracking guarantees.
+
+So more optimisation is not more accuracy: the finite-sample maximiser is not at
+the truth, and the budget is a regularisation knob rather than a convergence
+detail — the same thing exp_29 found for EM. `629962` therefore gives two arms
+*stopped by the same rule*, not two arms *converged*. The fix that would actually
+settle it is to select each arm's stopping point on held-out data, as the
+efficiency experiment now does for both of its arms; that is not implemented for
+this rung, and any margin `629962` reports carries the caveat.
 
 **`629985` — the efficiency comparison, finally symmetric.** `629091` gave EM-BP
 a validation-selected iteration count while the network trained to a fixed
