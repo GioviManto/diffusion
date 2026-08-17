@@ -26,7 +26,7 @@ single noisy realization per chain and never sees the clean chain at all.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field, replace
 
 import numpy as np
 
@@ -89,6 +89,10 @@ class DSMResult:
     seconds: float
     n_params: int
     n_grad_steps: int
+    # {step: net} when `checkpoints` was asked for, otherwise empty. A new field
+    # with a default rather than a wider return type, so the ~30 existing call
+    # sites are untouched.
+    checkpoints: dict[int, MLP] = field(default_factory=dict)
 
 
 def train_dsm_denoiser(
@@ -102,6 +106,7 @@ def train_dsm_denoiser(
     log_every: int = 200,
     parameterization: str = "eps",
     t_range: tuple[float, float] | None = None,
+    checkpoints: "set[int] | None" = None,
 ) -> DSMResult:
     """Vanilla diffusion training, in either standard parameterization.
 
@@ -131,6 +136,13 @@ def train_dsm_denoiser(
               continuum makes the generated-sample comparison measure interpolation
               and extrapolation as much as score quality; see
               `nnet.sample_training_times` for the full argument.
+    checkpoints: training steps at which to keep a copy of the network, returned
+              in `DSMResult.checkpoints`. This exists so the network's training
+              length can be chosen on a validation bundle, the way EM-BP's
+              iteration count is in `exp_07`. Holding one arm's budget fixed
+              while selecting the other's is not neutral: training length is a
+              bias/variance knob for both, so a fixed choice silently favours
+              whichever arm it happens to suit at that sample size.
     """
     import time
 
@@ -146,6 +158,7 @@ def train_dsm_denoiser(
     v_state = [np.zeros_like(p) for p in net.params]
     beta1, beta2, eps_adam = 0.9, 0.999, 1e-8
     history: list[float] = []
+    saved: dict[int, MLP] = {}
 
     t0 = time.perf_counter()
     for step in range(1, n_steps + 1):
@@ -174,6 +187,12 @@ def train_dsm_denoiser(
             net.params[j] = net.params[j] - lr * m_hat / (np.sqrt(v_hat) + eps_adam)
         if step % log_every == 0 or step == 1:
             history.append(float(np.mean(diff**2)))
+        # After the update, so `saved[k]` is the network as it stands having
+        # taken k steps -- the same convention as n_grad_steps. `net.params` is
+        # rebound in place above, so the arrays must be copied or every
+        # checkpoint would alias the final weights.
+        if checkpoints is not None and step in checkpoints:
+            saved[step] = replace(net, params=[p.copy() for p in net.params])
     seconds = time.perf_counter() - t0
 
     return DSMResult(
@@ -183,6 +202,7 @@ def train_dsm_denoiser(
         seconds=seconds,
         n_params=net.n_params,
         n_grad_steps=n_steps,
+        checkpoints=saved,
     )
 
 

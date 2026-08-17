@@ -10,6 +10,7 @@ may be cited is the last column, and `—` means nowhere yet.
 
 | Job | Task range | What | State | Usable | Cited in |
 |---|---|---|---|---|---|
+| `629985` | 110–122 (+123–125) | E9 with **both** budgets validation-selected — the network's training length as well as EM's iteration count | RUNNING | pending | — |
 | `629962` | 90–105 | Rung 4a, matched convergence budget (8 seeds × 2 size groups, cap 3000, per-sequence tolerance) | RUNNING | pending | — |
 | `629193` | 80–87 | Rung 4a v2 — one species, 600 steps, 16 seeds | COMPLETED 8/8 | partly | compendium §Rung 4a |
 | `629091` | 60–75 | E9 sample efficiency, validation-selected EM stopping | COMPLETED 16/16 | not yet | — (protocol still asymmetric) |
@@ -48,8 +49,23 @@ per-sequence tolerance, which is what the stopping rule should have been all
 along: the old absolute tolerance was eight times stricter at n = 4096 than at
 n = 512, i.e. it varied along the very axis the rung reports its scaling on.
 
+**`629985` — the efficiency comparison, finally symmetric.** `629091` gave EM-BP
+a validation-selected iteration count while the network trained to a fixed
+20,000 steps. That is the same fairness error the validation-selection was
+introduced to fix, moved rather than removed: training length is a bias/variance
+knob for *both* arms — exp_29 shows EM's held-out error has an interior minimum
+at every sample size, and SGD's does too — so selecting one budget and pinning
+the other favours the selected arm. It favoured us, which is why it could not
+ship. The network's training length is now chosen on the same bundle, jointly
+with its parameterisation, over {500, 1000, 2000, 3500, 6000, 10000, 14000,
+20000}. Each arm has exactly one selected quantity; the network still selects
+over a 2-D grid against EM-BP's 1-D. Both sides carry `*_at_cap` columns, so the
+effect of selection is measured per arm rather than inferred from the ratio.
+
+Submitted as 13 shards (seeds 0–12) because the QOS submit limit is 30 and
+`629962` already holds 16; seeds 13–15 go in automatically when slots free.
+
 ## Not yet run
 
-- **Network early stopping.** Until the network's training length is chosen the
-  same way EM's stopping point now is, the efficiency comparison tunes one arm
-  and not the other, and the table stays behind a `\needsdata` marker.
+- Nothing blocking. The efficiency table stays behind its `\needsdata` marker
+  until `629985` lands and is checked.

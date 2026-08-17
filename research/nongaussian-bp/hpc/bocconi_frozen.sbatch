@@ -340,6 +340,34 @@ print((list(FROZEN.seeds())[$SEED_IDX],))")
           --only sample_efficiency_val \
           --set "seed=$SEED"
       ;;
+  11[0-9]|12[0-5])
+      # E9 FINAL, actually symmetric this time. Supersedes 629091 (tasks 60-75).
+      #
+      # 629091 selected EM-BP's iteration count on validation while the network
+      # trained to a fixed 20,000 steps. That was the same fairness error the
+      # block above was written to fix, moved rather than removed: training
+      # length is a bias/variance knob for BOTH arms -- exp_29 shows EM's
+      # held-out error has an interior minimum at every sample size, and SGD's
+      # does too -- so selecting one budget and pinning the other favours the
+      # selected arm. It favoured us, which is exactly why it could not ship.
+      #
+      # The network's training length is now chosen on the same bundle, jointly
+      # with its parameterisation, over net_checkpoints(n_steps) =
+      # {500, 1000, 2000, 3500, 6000, 10000, 14000, 20000}. Each arm now has one
+      # selected quantity; if anything the network still has the better deal,
+      # selecting over a 2-D grid against EM-BP's 1-D.
+      #
+      # Cost note: the checkpoints are free in training time -- the grid is
+      # snapshotted from a single run, not eight runs -- but evaluation now
+      # scores 16 network states per noise level instead of 2, so the wall time
+      # is dominated by evaluation rather than by SGD. Sixteen seeds, one per
+      # shard, as before.
+      SEED=$((TASK - 110))
+      run $PYTHON experiments/exp_07_em_vs_score_network.py \
+          $OUT/exp_07_symmetric_seed$SEED \
+          --only sample_efficiency_val \
+          --set "seed=$SEED"
+      ;;
   16) # E5 cont: what the channel costs, against the no-noising baseline.
       run $PYTHON experiments/exp_06_em_parameter_recovery.py $OUT/exp_06 \
           --only clean_vs_noised,clean_raw_mle

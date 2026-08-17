@@ -94,6 +94,33 @@ EM_ITERS = FROZEN.em_max_iters
 # nseq=256 and 512, so the grid must resolve both ends.
 EM_CHECKPOINTS = {10, 20, 40, 60, 80, 120, 160, 220, 300, EM_ITERS}
 
+# The network's training lengths, selected on the same validation bundle as
+# everything else. This is the missing half of the protocol: adding EM_CHECKPOINTS
+# above without this made things WORSE, not better -- EM then had its stopping
+# point tuned on validation while the network was pinned to whatever NET_STEPS
+# said, so the comparison tuned one arm and not the other, in EM's favour. The
+# argument for selecting EM's budget is exactly the argument for selecting the
+# network's, and it does not stop being true when it costs us.
+#
+# Log-spaced over two decades, ending at the configured budget so the pinned
+# choice is always available and "what the fixed budget would have given" stays
+# measurable. Wider than EM's grid because 20k steps is a long way from 500 and
+# early stopping in SGD bites much earlier than the endpoint.
+NET_STEPS = 20000
+_NET_CHECKPOINTS = (500, 1000, 2000, 3500, 6000, 10000, 14000, NET_STEPS)
+
+
+def net_checkpoints(n_steps: int) -> set[int]:
+    """The grid, clipped to a run that trains for `n_steps`.
+
+    Derived from the actual budget rather than fixed, because `--quick` trains
+    for 1500 steps: a hard-coded grid would ask for a 20,000-step checkpoint
+    that the run never reaches, and the smoke path would die on a KeyError
+    instead of smoke-testing anything. `n_steps` is always included so the
+    pinned budget stays available for the at-cap comparison.
+    """
+    return {s for s in _NET_CHECKPOINTS if s < n_steps} | {int(n_steps)}
+
 
 N_VAL = 256
 
@@ -159,12 +186,12 @@ def score_both(kernel, nets, grid, weights, bundle, t_values, tag: dict):
     return rows
 
 
-def train_nets(A, rng_key, hidden, n_steps):
+def train_nets(A, rng_key, hidden, n_steps, checkpoints=None):
     """One network per parameterization, on the same clean chains."""
     return {
         mode: train_dsm_denoiser(
             A, T_TRAIN, train_rng(*rng_key, mode), hidden=hidden,
-            n_steps=n_steps, parameterization=mode,
+            n_steps=n_steps, parameterization=mode, checkpoints=checkpoints,
         )
         for mode in PARAMETERIZATIONS
     }
@@ -252,6 +279,25 @@ def part5_sample_efficiency_val(grid, weights, sizes, hidden, n_steps, out):
     Prediction, recorded before the run: removing an oracle only the networks enjoy should
     move the ratios in EM-BP's favour. If it moves them the other way, the validation
     bundle is too small for its selections to be anything but noise, and N_VAL is the knob.
+
+    BOTH BUDGETS ARE NOW SELECTED, and that correction went the other way.
+    --------------------------------------------------------------------
+    An earlier version of this part selected EM-BP's iteration count on validation while
+    the network trained to a fixed 20,000 steps. That is not a fair protocol, it is the
+    same error in a new place: training length is a bias/variance knob for both arms --
+    EM's held-out error has an interior minimum at every sample size (exp_29), and SGD's
+    does too -- so tuning one arm's and pinning the other's favours the tuned one. It
+    happened to favour us, which is precisely why it needed fixing rather than shipping.
+
+    So the network's training length is now chosen on the same bundle, jointly with its
+    parameterisation, from `net_checkpoints(n_steps)`. Each arm gets exactly one selected
+    quantity: EM-BP its iteration count, the network its (parameterisation, length) pair.
+    If anything the network still has the easier deal, since it selects over a
+    two-dimensional grid and EM-BP over one.
+
+    `*_at_cap` columns on both sides record what the pinned budgets would have given, so
+    the effect of selection is measured on each arm separately rather than inferred from
+    the ratio.
     """
     prior = LaplaceAR1(RHO_TRUE)
     _, test_bundle = make_test_set(prior, grid, weights, T_TRAIN, N_TEST, tag=TEST_TAG)
@@ -269,24 +315,37 @@ def part5_sample_efficiency_val(grid, weights, sizes, hidden, n_steps, out):
             grid, weights, noisy_groups(A, T_TRAIN, rng), n_iters=EM_ITERS,
             checkpoints=EM_CHECKPOINTS,
         )
-        nets = train_nets(A, ("exp07-net", n_chains), hidden, n_steps)
+        ckpt_steps = net_checkpoints(n_steps)
+        nets = train_nets(A, ("exp07-net", n_chains), hidden, n_steps,
+                          checkpoints=ckpt_steps)
 
         for t in T_TRAIN:
             X_val, m_val = val_bundle[t]
             X_test, m_test = test_bundle[t]
 
+            # The network's two free choices -- parameterisation and training
+            # length -- are selected jointly, on validation. Selecting them
+            # separately would be a different (and weaker) protocol: the best
+            # stopping point is not the same for eps and x0, so a mode picked at
+            # one length need not be the mode that wins at its own best length.
+            candidates = [(mode, step) for mode in PARAMETERIZATIONS
+                          for step in sorted(nets[mode].checkpoints)]
             val_err = {
-                mode: evaluate_denoiser(
-                    dsm_posterior_mean(nets[mode], X_val, t), m_val, X_val, t)["score_rel_l2"]
-                for mode in PARAMETERIZATIONS
+                (mode, step): evaluate_denoiser(
+                    dsm_posterior_mean(nets[mode].checkpoints[step], X_val, t, mode),
+                    m_val, X_val, t)["score_rel_l2"]
+                for mode, step in candidates
             }
             test_err = {
-                mode: evaluate_denoiser(
-                    dsm_posterior_mean(nets[mode], X_test, t), m_test, X_test, t)
-                for mode in PARAMETERIZATIONS
+                (mode, step): evaluate_denoiser(
+                    dsm_posterior_mean(nets[mode].checkpoints[step], X_test, t, mode),
+                    m_test, X_test, t)
+                for mode, step in candidates
             }
             chosen = min(val_err, key=val_err.get)
-            oracle = min(test_err, key=lambda m: test_err[m]["score_rel_l2"])
+            oracle = min(test_err, key=lambda k: test_err[k]["score_rel_l2"])
+            chosen_mode, chosen_step = chosen
+            oracle_mode, oracle_step = oracle
 
             # The estimator's iteration count is selected the same way, on the same
             # bundle. Without this the two arms are tuned by different protocols: the
@@ -324,16 +383,26 @@ def part5_sample_efficiency_val(grid, weights, sizes, hidden, n_steps, out):
                 "net_mean_rel_l2_selected": test_err[chosen]["mean_rel_l2"],
                 "net_score_rel_l2_oracle": test_err[oracle]["score_rel_l2"],
                 "net_mean_rel_l2_oracle": test_err[oracle]["mean_rel_l2"],
-                "mode_selected": chosen,
-                "mode_oracle": oracle,
+                "mode_selected": chosen_mode,
+                "mode_oracle": oracle_mode,
+                "net_steps_selected": chosen_step,
+                "net_steps_oracle": oracle_step,
+                "net_steps_agrees": int(chosen_step == oracle_step),
+                # The counterpart of em_bp_score_rel_l2_at_cap: what the network
+                # would have scored trained to the full configured budget in the
+                # mode validation picked. Without it, "early stopping helped the
+                # network" is an assertion rather than a measurement.
+                "net_score_rel_l2_at_cap":
+                    test_err[(chosen_mode, max(ckpt_steps))]["score_rel_l2"],
                 "selection_agrees": int(chosen == oracle),
                 # The headline ratio under each protocol: how many times larger the
                 # network's error is than EM-BP's.
                 "ratio_selected": test_err[chosen]["score_rel_l2"] / em["score_rel_l2"],
                 "ratio_oracle": test_err[oracle]["score_rel_l2"] / em["score_rel_l2"],
             })
-            print(f"  N={n_chains:5d} t={t:4.2f} chose {chosen} "
-                  f"(oracle {oracle}{'' if chosen == oracle else '  DIFFERS'})  "
+            print(f"  N={n_chains:5d} t={t:4.2f} net={chosen_mode}@{chosen_step} "
+                  f"em@{em_it}"
+                  f"{'' if chosen == oracle else '  (net oracle differs)'}  "
                   f"ratio {rows[-1]['ratio_selected']:6.2f} vs oracle "
                   f"{rows[-1]['ratio_oracle']:6.2f}", flush=True)
 
@@ -510,7 +579,9 @@ def main() -> None:
     }
     full = {
         "grid_size": GRID_M, "sizes": (32, 64, 128, 256, 512, 1024, 2048),
-        "net_hidden": (128, 128), "net_steps": 20000,
+        # NET_STEPS, not a repeated literal: the checkpoint grid ends at it, and
+        # a drift between the two would silently drop the at-cap comparison.
+        "net_hidden": (128, 128), "net_steps": NET_STEPS,
         "archs": ((32, 32), (128, 128), (256, 256), (512, 512)),
         "step_counts": (1000, 5000, 20000), "capacity_n": 1024,
         "t_probe": (0.02, 0.05, 0.1, 0.15, 0.2, 0.3, 0.4, 0.6, 0.8, 1.2, 1.6,

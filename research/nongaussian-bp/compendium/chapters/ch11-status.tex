@@ -146,7 +146,9 @@ $\nseq$ & EM at $120$ & EM at $400$ & \\
 Running the optimiser \emph{longer} makes the estimator \emph{worse} at small $\nseq$ and better
 at large $\nseq$, so no fixed budget is neutral between the two arms of the comparison.
 
-\paragraph{The mechanism, measured rather than inferred.} An instrumented run
+\paragraph{The mechanism, measured rather than inferred.}
+\label{sec:em-overfitting}
+An instrumented run
 (\codefile{experiments/exp\_29\_em\_overfitting.py}) records the training marginal log-evidence and
 the held-out score error on the \emph{same} iterates, which is what separates overfitting from a
 bad optimum: overfitting means the training objective keeps improving while generalisation turns
@@ -347,8 +349,16 @@ replicates one dataset fourfold and asserts the fit stops at the same step.
 \item \textbf{Rung 4a at a matched convergence budget} (\texttt{629962}), eight seeds split by
       sample size into sixteen shards, at a $3000$-step cap under the per-sequence tolerance. Until
       it lands, the joint-versus-marginal margin above stays out of every document.
-\item \textbf{Sample efficiency at the configured iteration budget} (\texttt{628943}), which will
-      replace the table in \S\ref{sec:rec-efficiency}.
+\item \textbf{Sample efficiency with both budgets selected} (\texttt{629985}), which will replace
+      the table in \S\ref{sec:rec-efficiency}. \texttt{629091} selected EM-BP's iteration count
+      on validation while the network trained to a fixed $20{,}000$ steps --- the same fairness
+      error that validation selection was introduced to remove, relocated rather than fixed.
+      Training length is a bias/variance knob for both arms: EM's held-out error has an interior
+      minimum at every sample size (\S\ref{sec:em-overfitting}), and SGD's does too. Selecting
+      one budget while pinning the other favours the selected arm, and here it favoured us.
+      The network's training length is now chosen on the same bundle, jointly with its
+      parameterisation. Each arm has one selected quantity; the network selects over a
+      two-dimensional grid and EM-BP over one.
 \end{itemize}
 
 \section{Withdrawn, and not replaced}
