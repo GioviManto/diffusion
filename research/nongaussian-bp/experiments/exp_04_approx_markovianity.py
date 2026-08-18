@@ -114,7 +114,7 @@ def part1_model_a(t_values, n_mc: int, out) -> list[dict]:
         sigma_cl = chow_liu_chain_covariance(sigma_true)
         rng = rng_for("exp04-modelA", beta)
         rows += analyze_model(
-            f"A_beta", sigma_true,
+            "A_beta", sigma_true,
             {"naive_chain": sigma_naive, "chow_liu": sigma_cl},
             beta, t_values, n_mc, rng,
         )

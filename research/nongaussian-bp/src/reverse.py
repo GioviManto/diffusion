@@ -30,7 +30,7 @@ for BP-based scores since they are built from posterior means.
 
 from __future__ import annotations
 
-from typing import Callable, Iterable
+from typing import Callable
 
 import numpy as np
 
@@ -95,7 +95,6 @@ def nested_brownian_path(
     """
     if refine < 1:
         raise ValueError(f"refine must be >= 1, got {refine}.")
-    n_coarse = len(times) - 1
     steps = []
     for t_now, t_next in zip(times[:-1], times[1:]):
         h_fine = float(t_now - t_next) / refine

@@ -48,3 +48,15 @@ that reaches the documents; the rest are exploratory branches.
 - Kernels are immutable; `m_step` returns a new instance.
 - A run that hits its iteration cap is reported as **censored**, not returned
   looking like a converged one.
+
+## Housekeeping
+
+The package is pyflakes-clean: no unused imports, no assigned-and-never-used
+locals, no `f"..."` without a placeholder. Worth keeping that way — three of the
+findings cleared on 18 Aug 2026 were genuine leftovers of removed code, including
+a CSV read in `tools/make_figures.py` that loaded a file for a panel deleted
+months earlier.
+
+```bash
+./.venv/bin/python -m pyflakes src/*.py experiments/*.py tools/*.py
+```

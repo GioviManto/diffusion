@@ -29,15 +29,14 @@ dropped, and the held-out likelihood is a likelihood of the whole image.
 from __future__ import annotations
 
 import time
-from dataclasses import dataclass, replace
+from dataclasses import dataclass
 
 import numpy as np
 
 from .bp_grid import make_grid
-from .em import ExpectedStatistics
 from .hierarchy import TreeIndex
 from .noising import alpha_delta
-from .wavelet import ORIENTATIONS, WaveletQuadtree, images_to_tree, tree_to_images
+from .wavelet import WaveletQuadtree, images_to_tree, tree_to_images
 from .wavelet_bp import stats_by_level, wavelet_tree_bp
 
 _LOG_2PI = float(np.log(2.0 * np.pi))

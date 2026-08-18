@@ -33,7 +33,6 @@ from common import experiment_parser, provenance
 from src.bp_grid import make_grid
 from src.em import e_step_multi, fit_em, q_gradient
 from src.kernels import GaussianAR1Kernel, LaplaceAR1Kernel
-from src.noising import alpha_delta
 from src.plotting import new_figure, save_figure
 from src.protocols import one_view_groups as noisy_groups
 from src.priors import GaussianAR1, LaplaceAR1

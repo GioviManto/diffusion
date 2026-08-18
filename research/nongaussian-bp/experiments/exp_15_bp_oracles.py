@@ -133,7 +133,7 @@ def part1_ladder(cfg, out_dir):
         sub = [r for r in rows if r["rho"] == rho and r["depth"] == deep]
         print(f"  rho={rho}, L={deep}: rungs " +
               " -> ".join(f"k={r['filter_level']}:{r['n_distinct_rungs']}" for r in sub))
-        print(f"    ladder span " +
+        print("    ladder span " +
               " ".join(f"{r['ladder_span']:.1f}x" for r in sub))
 
     import matplotlib.pyplot as plt
@@ -242,7 +242,7 @@ def _plot_alignment(rows, cfg, out_dir):
 def part3_mismatch(cfg, out_dir):
     depth = cfg["depth"]
     oracles = _oracles(cfg)
-    print(f"[mismatch] train on k_train, test on unfiltered data")
+    print("[mismatch] train on k_train, test on unfiltered data")
 
     rng_t = rng_for(NAME, "mismatch-test", depth)
     a_test = oracles[0].sample(rng_t, cfg["n_test"])

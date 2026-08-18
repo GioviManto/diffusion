@@ -50,7 +50,6 @@ import numpy as np
 from common import (
     PACKAGE_ROOT, apply_overrides, experiment_parser, provenance, select_parts,
 )
-from src.hierarchy import TreeIndex
 from src.image_data import load_cifar10_luminance
 from src.sample_metrics import bootstrap_se, excess_kurtosis
 from src.scale_kernel import linear_ar_magnitude_ratio
@@ -146,7 +145,6 @@ def part_subbands(settings, out_dir):
 def part_crossscale(settings, out_dir):
     """Linear correlation vs magnitude dependence across a scale boundary."""
     _, qt, nodes, _ = _load(settings)
-    ti = TreeIndex(depth=qt.depth, branching=4)
     depth = qt.node_depth
     rows = []
 

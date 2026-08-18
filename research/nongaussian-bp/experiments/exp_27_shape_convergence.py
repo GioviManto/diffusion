@@ -48,7 +48,6 @@ from common import apply_overrides, experiment_parser, provenance, select_parts
 from src.bp_grid import make_grid
 from src.em import e_step_multi, q_gradient, q_value
 from src.kernels import MixtureInnovationKernel
-from src.noising import alpha_delta
 from src.protocols import one_view_groups as noisy_groups
 from src.priors import LaplaceAR1
 from src.utils import ensure_dir, rng_for, write_csv, write_json

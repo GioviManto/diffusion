@@ -29,7 +29,7 @@ import numpy as np
 from .bp_grid import make_grid
 from .em import ExpectedStatistics
 from .noising import alpha_delta
-from .video_bp import caterpillar_bp, cut_caterpillar_bp
+from .video_bp import cut_caterpillar_bp
 from .wavelet import images_to_tree, tree_to_images
 from .wavelet_model import SubbandScales, per_depth_grid_sizes
 

@@ -9,6 +9,18 @@
 #SBATCH --output=/home/3164542/nongaussian-bp/logs/%x_%A_%a.out
 #SBATCH --error=/home/3164542/nongaussian-bp/logs/%x_%A_%a.err
 #
+# Do NOT inherit the submitting shell's resource limits. The login node runs with
+# `ulimit -t 600`, and Slurm propagates the submitter's rlimits into the job by
+# default -- so a job with --time=06:00:00 is still killed by SIGXCPU after ten
+# minutes of CPU time, which at --cpus-per-task=4 is about seven minutes of wall
+# clock. Array 630828 lost all six running shards to exactly this, each dying at
+# TotalCPU=10:00.4 with "CPU time limit exceeded (core dumped)" while the log
+# showed nothing wrong.
+#
+# It bites harder the more threads are asked for, and it did not bite the earlier
+# waves only because they finished inside the limit.
+#SBATCH --propagate=NONE
+#
 # THE FROZEN BATCH. Every number in the paper comes from this script.
 #
 # The problem it exists to solve: the previous draft stitched results together

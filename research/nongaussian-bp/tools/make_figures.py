@@ -523,7 +523,6 @@ def fig_ring() -> None:
     panel, which is the only way the comparison is honest.
     """
     dens = read(Path("frozen/exp_28_ring_em/ring_density.csv"))
-    rec = read(Path("frozen/exp_28_ring_em/ring_recovery.csv"))
 
     # Two panels, not three. The recovery-error-against-noise panel that used to
     # sit on the right is now a table in the text, and a figure that repeats a
