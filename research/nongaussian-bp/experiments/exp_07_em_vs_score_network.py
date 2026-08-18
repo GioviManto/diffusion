@@ -308,13 +308,22 @@ def part5_sample_efficiency_val(grid, weights, sizes, hidden, n_steps, out):
         # Same keys as part 1, so these are literally the same fitted models.
         rng = train_rng("exp07-p1", n_chains)
         A = np.stack([prior.sample(rng, N_SITES) for _ in range(n_chains)])
-        kernel, _, ckpts = fit_em(
+        kernel, em_trace, ckpts = fit_em(
             MixtureInnovationKernel.init(
                 N_COMPONENTS, rho=0.3, var=0.8, rng=train_rng("exp07-init")
             ),
             grid, weights, noisy_groups(A, T_TRAIN, rng), n_iters=EM_ITERS,
             checkpoints=EM_CHECKPOINTS,
         )
+        # Resolution and convergence certificate for the EM arm, per selected
+        # checkpoint. Without these the headline ratio has no record of whether
+        # its mixture components were wider than the mesh they live on -- an
+        # under-resolved spike can raise the quadrature likelihood without
+        # corresponding to any feature of the innovation law, so it must never be
+        # able to count as evidence silently.
+        em_certificate = {
+            it: ckpts[it].scale_diagnostics(grid) for it in sorted(ckpts)
+        }
         ckpt_steps = net_checkpoints(n_steps)
         nets = train_nets(A, ("exp07-net", n_chains), hidden, n_steps,
                           checkpoints=ckpt_steps)
@@ -379,6 +388,18 @@ def part5_sample_efficiency_val(grid, weights, sizes, hidden, n_steps, out):
                 # What the pinned budget would have given, so the cost of selecting is
                 # measurable rather than asserted.
                 "em_bp_score_rel_l2_at_cap": em_test[max(em_test)]["score_rel_l2"],
+                # Certificate for the checkpoint this row actually reports.
+                # `em_resolved` false means the narrowest fitted component is
+                # under two grid cells wide, and the row may not be cited.
+                "em_s_min_over_h": em_certificate[em_it]["s_min_over_h"],
+                "em_resolved": int(em_certificate[em_it]["resolved"]),
+                "em_effective_n_components":
+                    em_certificate[em_it]["effective_n_components"],
+                "em_min_weight": em_certificate[em_it]["min_weight"],
+                "em_inner_sweeps": ckpts[em_it].inner_sweeps,
+                "em_inner_converged": int(ckpts[em_it].inner_converged),
+                "em_outer_converged": int(em_trace.converged),
+                "em_outer_stop_reason": em_trace.stop_reason,
                 "net_score_rel_l2_selected": test_err[chosen]["score_rel_l2"],
                 "net_mean_rel_l2_selected": test_err[chosen]["mean_rel_l2"],
                 "net_score_rel_l2_oracle": test_err[oracle]["score_rel_l2"],

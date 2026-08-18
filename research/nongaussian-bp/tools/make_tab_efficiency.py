@@ -49,6 +49,28 @@ if len(seeds) != EXPECTED:
           f"{','.join(seeds)}", file=sys.stderr)
     sys.exit(1)
 
+# Resolution gate. An under-resolved mixture component -- narrower than two grid
+# cells -- can raise the quadrature likelihood without corresponding to anything
+# in the innovation law, so a cell fitted that way is not evidence and must not
+# reach the table. The column is absent from runs made before it was recorded;
+# those are reported as uncertified rather than silently accepted, because
+# "the check did not run" and "the check passed" are different states.
+if "em_resolved" in (rows[0] if rows else {}):
+    bad = [r for r in rows if not int(r["em_resolved"])]
+    if bad:
+        worst = min(float(r["em_s_min_over_h"]) for r in bad)
+        print(f"REFUSING: {len(bad)} of {len(rows)} cells have a mixture "
+              f"component under two grid cells wide (worst s_min/h = "
+              f"{worst:.2f}). Refit on a finer grid or with a stronger variance "
+              f"floor; an unresolved component may not count as evidence.",
+              file=sys.stderr)
+        sys.exit(1)
+    print(f"  resolution gate: all {len(rows)} cells resolved "
+          f"(min s_min/h = {min(float(r['em_s_min_over_h']) for r in rows):.2f})")
+else:
+    print("  resolution gate: NOT CERTIFIED -- these outputs predate "
+          "em_resolved. Rerun exp_07 part5 to certify.", file=sys.stderr)
+
 
 def per_seed(g, key):
     v = np.array([np.mean([F(r, key) for r in g if r["seed"] == s]) for s in seeds])

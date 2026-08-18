@@ -454,14 +454,37 @@ class MixtureInnovationKernel:
 
         Two things to read off it. The shape moves by 28% between 4 and 16 sweeps
         while rho barely moves at all -- the same rate asymmetry the outer loop
-        shows, appearing again one level down, so part of what looked like slow
-        outer convergence of the shape was an M-step that never finished. And the
-        outer objective is NOT monotone in this budget: 64 sweeps lands slightly
-        below 16. More optimisation is not more accuracy here either.
+        shows, appearing again one level down. And the outer objective is NOT
+        monotone in this budget: 64 sweeps lands slightly below 16.
 
-        Hence 16: it captures the shape to within 1% of the 64-sweep value at a
-        quarter of the cost. `n_inner=4` remains available as a fast mode, and
-        anything published from it should be treated as shape-censored.
+        But the effect is confined to SHORT outer runs, and the first version of
+        this note over-generalised from the 40-iteration measurement above. At 60
+        outer iterations the inner budget stops mattering, because the two loops
+        partially substitute -- the outer loop gets there anyway, just slower:
+
+            n     n_inner   s_min/h   excess kurtosis
+            128      4        9.58         3.217
+            128     16       10.01         3.343
+            512      4        9.43         2.967
+            512     16        9.80         2.932
+
+        Negligible, and non-monotone. So the honest statement is: 4 sweeps
+        under-converges the shape when the outer loop is cut short, and does not
+        when it is allowed to run. In the E9 efficiency run, which selects its
+        outer count on validation from a grid up to 400, the median selection is
+        120 and 70% of cells sit at 60 or above -- but 30% do not, and those are in
+        the regime where this matters.
+
+        Hence 16 as the default: it removes the interaction rather than requiring
+        anyone to reason about which regime a cell is in, at a quarter of the
+        64-sweep cost. `n_inner=4` remains a legitimate fast mode.
+
+        Those measurements also settle the resolution question the same audit
+        raised: s_min/h is 9.4-10.0 at C=8, i.e. the narrowest fitted component is
+        nearly ten grid cells wide, five times the threshold below which a
+        component is a lattice artefact. The production fits are resolved with
+        room to spare, and `scale_diagnostics` is now recorded per cell so this is
+        a checked fact rather than a spot check.
 
         The inner loop does not reach a tight tolerance at all -- the per-edge Q
         gain plateaus near 1e-7 and stops falling -- so `inner_converged` is

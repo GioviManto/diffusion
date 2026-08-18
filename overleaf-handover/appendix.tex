@@ -306,11 +306,11 @@ the removed constants are restored in the evidence, so no message underflows.
 \caption{Grid and domain control, Laplace chain. (a) Relative score error against a
 high-resolution reference at fixed $\halfwidth=8$; (b) the same at fixed $\ngrid=401$ as the
 domain grows. Both saturate at the floating-point floor $\sim10^{-14}$, so beyond that the curves
-measure arithmetic, not discretisation. (c) Worst boundary mass over sites --- the truncation
-diagnostic --- against $\halfwidth$. (d) Interior column-mass residual against spacing at
-$\halfwidth=8$ --- the quadrature diagnostic --- with an $O(\gridh^2)$ reference. The two
-diagnostics do different jobs and neither alone certifies convergence.
-All values are numerical, not empirical. \needsdata{regenerate from the frozen batch}}
+measure arithmetic, not discretisation. (c) Forward-message boundary mass against $\halfwidth$ ---
+the truncation diagnostic --- as the worst case and the $90$th percentile over $256$ chains, which
+differ by roughly two orders of magnitude and are therefore both drawn. (d) Interior column-mass
+residual against spacing at $\halfwidth=8$ --- the quadrature diagnostic --- with an $O(\gridh^2)$
+reference. The two diagnostics do different jobs and neither alone certifies convergence.}
 \label{fig:grid}
 \end{figure}
 
@@ -319,18 +319,38 @@ $[-\halfwidth,\halfwidth]$ is discarded rather than transported, an error contro
 $\halfwidth$ and essentially independent of $\ngrid$. \emph{Quadrature}: the trapezoidal rule is
 second order in $\gridh$ for integrands with bounded second derivative, an error controlled by
 $\gridh$ at fixed $\halfwidth$. Figure~\ref{fig:grid} measures them separately, using the
-worst-case boundary mass over sites for the first and the interior column-mass residual of the
+forward-message boundary mass for the first and the interior column-mass residual of the
 transition matrix for the second; the interior restriction $|\gridpt{}| \le \halfwidth/2$ removes
 columns whose transition density has a tail outside the grid, which is what makes the second
-diagnostic measure quadrature alone. The observed rates are: boundary mass
-$3\times10^{-4} \to 1.4\times10^{-8} \to 1.4\times10^{-10}$ at $\halfwidth = 4, 8, 10$; interior
-residual falling by a factor of four per halving of $\gridh$, i.e.\ $O(\gridh^2)$.
+diagnostic measure quadrature alone.
+
+The boundary mass is the maximum over sites of a \emph{sampled} trajectory, so it is a statistic
+and not a bound, and it is reported over $256$ chains per cell rather than from one draw. At
+$\ngrid=401$, taking the worst case over the twelve-level schedule,
+
+\begin{center}\small
+\begin{tabular}{@{}lcccc@{}}
+\toprule
+$\halfwidth$ & $4$ & $6$ & $8$ & $10$ \\
+\midrule
+worst chain & $2.3\times10^{-3}$ & $1.6\times10^{-4}$ & $1.2\times10^{-6}$ & $3.3\times10^{-8}$ \\
+$90$th percentile & $2.7\times10^{-4}$ & $2.5\times10^{-6}$ & $1.5\times10^{-8}$ & $7.8\times10^{-11}$ \\
+median & $3.8\times10^{-5}$ & $3.8\times10^{-7}$ & $3.0\times10^{-9}$ & $1.8\times10^{-11}$ \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\noindent
+The spread between the rows is the point: at the working $\halfwidth=8$ the worst chain carries
+$84$ times the boundary mass of the $90$th percentile, so a single trajectory's value --- or an
+upper quantile quoted as though it were a bound --- understates the tail by close to two orders of
+magnitude. The interior residual falls by a factor of four per halving of $\gridh$, i.e.\
+$O(\gridh^2)$.
 
 At $\halfwidth=4$ the interior residual saturates at $\sim10^{-3}$ instead of continuing to fall,
 because at that domain even the ``interior'' columns have truncated tails --- the floor is the
-truncation error leaking into the quadrature diagnostic, and it is visible in the data
-(\codefile{outputs/exp\_18/boundary.csv}). This is the reason the two diagnostics have to be read
-together and neither alone certifies convergence.
+truncation error leaking into the quadrature diagnostic. This is the reason the two diagnostics
+have to be read together and neither alone certifies convergence.
 
 \paragraph{What is not claimed.} A grid-resolution sweep at fixed $\halfwidth$ does not rule out
 truncation error, and a domain sweep at fixed $\ngrid$ does not rule out quadrature error. We
@@ -439,92 +459,20 @@ representation of it.}
 \label{fig:density}
 \end{figure}
 
-\section{The rotating ring}
-\label{app:ring}
-
-\paragraph{Two clocks.} Internal time $u=0,\dots,T-1$ runs along the trajectory; diffusion time
-$t$ is the noise level. One sample is a \emph{whole} trajectory $\va\in\Reals^{2T}$, so the
-ambient dimension is $D=2T$ and the channel hits all of it at once. This is the point of the
-model: the object being estimated is a property of the trajectory, not of any frame.
-
-\paragraph{The gauge.} Let $U_\psi=\mathrm{blockdiag}(R_{-u\psi})_{u=0}^{T-1}$, which rotates
-frame $u$ backwards by $u\psi$. It is orthogonal, so it commutes with the isotropic channel: if
-$\vx = e^{-t}\va+\sqrt{\Dt}\,\vect{\xi}$ then $U_\psi \vx = e^{-t}U_\psi\va + \sqrt{\Dt}\,U_\psi\vect{\xi}$
-and $U_\psi\vect{\xi}\overset{d}{=}\vect{\xi}$. Applying it to \eqref{eq:ring} turns
-$z_{u+1}=R_\psi z_u+\sigma\eta_u$ into a driftless walk, so
-\[
-P_t(\vx\mid\psi) \;=\; P_t^{0}(U_\psi \vx),
-\]
-with $P_t^0$ the $\psi=0$ density. At known $\psi$ the rotation costs nothing statistically.
-
-\paragraph{The $\psi=0$ density in closed form.} Conditionally on $z_0$ the trajectory is Gaussian
-with a $z_0$-independent covariance, so $P_0$ is a two-parameter \emph{location} mixture of one
-Gaussian. Writing $X\in\Reals^{T\times2}$ for the gauged trajectory,
-$A_t=e^{-2t}\sigma^2 K+\Dt \Id_T$ with $K_{uv}=\min(u,v)$, $g=A_t^{-1}\vect{1}$,
-$\kappa=\vect{1}^\top g$ and $\beta=\|X^\top g\|$,
-\[
-\log P_t^0(X) \;=\; -\tfrac12\,\mathrm{tr}(X^\top A_t^{-1}X) \;+\; \log \mathcal Z_t(\beta) + \text{const},
-\qquad
-\mathcal Z_t(\beta)=\int_0^\infty\! \rho\, e^{-(\rho-1)^2/2\lambda}\,
-e^{-e^{-2t}\kappa\rho^2/2}\, I_0(e^{-t}\rho\beta)\,\mathrm{d}\rho ,
-\]
-a quadratic form plus one one-dimensional Bessel integral. The constant depends on $t$ but not on
-$\psi$, so it cancels in every responsibility. $K$ is singular with a vanishing zeroth row ---
-frame $0$ \emph{is} $z_0$ and carries no walk noise --- so $A_t$ is exactly block-diagonal and
-frame $0$ decouples at every $t$.
-
-\begin{proof}[Proof of Theorem~\ref{thm:blind}]
-Unrolling \eqref{eq:ring},
-\[
-z_u \;=\; R_\psi^{\,u} z_0 \;+\; \sigma\sum_{k=1}^{u} R_\psi^{\,u-k}\eta_k .
-\]
-Each $\eta_k$ is isotropic Gaussian, and a rotation of an isotropic Gaussian has the same law, so
-$R_\psi^{\,u-k}\eta_k \overset{d}{=} \eta_k$, independently across $k$. And $\theta_0$ is uniform
-on $[0,2\pi)$, so $z_0$ has a rotationally invariant law and $R_\psi^{\,u}z_0\overset{d}{=}z_0$.
-The two terms are independent, so
-\[
-z_u \;\overset{d}{=}\; z_0 + \sigma\sqrt{u}\,\xi , \qquad \xi\sim\normal{\vect0}{\Id_2},
-\]
-in which $\psi$ does not appear. The channel acts coordinatewise and independently of $\psi$, so
-the noised frame satisfies $x_u\overset{d}{=}e^{-t}(z_0+\sigma\sqrt u\,\xi)+\sqrt{\Dt}\,\xi'$,
-again free of $\psi$. Hence for every $u$ and every $t$ the marginal law of $x_u$ is the same
-function of the model's other parameters regardless of $\psi$, so
-$\partial_\psi \log P_t(x_u)\equiv 0$ and the Fisher information about $\psi$ carried by any
-single frame is exactly zero. Summing per-frame log-densities cannot create information that no
-term contains, so a model built from per-frame marginals has zero information about $\psi$.
-\end{proof}
-
-\paragraph{What the theorem does not say.} It does not say the marginals are uninformative in
-general --- they determine $\lambda$ and $\sigma$ perfectly well, and the per-frame law is a
-visible non-Gaussian ring whose radius grows as $\sqrt{u}$. It says only that they are blind to
-the \emph{rotation}. Nor does it say the joint is easy: the joint carries the information, and
-extracting it is what the estimator does.
-
-\paragraph{EM over $p(\psi)$.} With $\psi$ discretised on a uniform grid of $|\psi|$ angles on
-$[-\pi,\pi)$, the algorithm is textbook EM for a finite mixture whose components are indexed by
-the rotation:
-\[
-\text{E:}\quad r_\mu(\psi_k) = \frac{p(\psi_k)\,P_t(\vx^\mu\mid\psi_k)}{\sum_l p(\psi_l)P_t(\vx^\mu\mid\psi_l)} ,
-\qquad
-\text{M:}\quad p(\psi_k) \leftarrow \frac{1}{\nseq}\sum_{\mu} r_\mu(\psi_k) .
-\]
-Since $P_t(\vx^\mu\mid\psi_k)$ does not depend on $p$, the $\nseq\times|\psi|$ matrix of
-log-densities is formed once and every iteration is a reweighting --- the same sufficiency that
-makes $\Xis$ a one-shot statistic on the chain. Initialisation is uniform, which encodes no
-knowledge of where the species are and is also the fixed point of the blind arm, so that arm
-visibly stands still. Implementation \coderef{src/ring.py}{log\_pt\_conditional} and
-\codefile{experiments/exp\_28\_ring\_em.py}; the port is checked bit-for-bit against the
-independently audited implementation in \codefile{research/board-3problems}.
-
 \section{Experimental protocol}
 \label{app:protocol}
 
 Every number here comes from one frozen configuration, defined in a single file and imported by
 every experiment so that no run can silently diverge from it: Laplace chain unless stated,
 $\corr=0.85$, $\nsites=32$, $\ngrid=401$, $\halfwidth=8$, twelve log-spaced noise levels on
-$[0.05,3.0]$, sixteen replicates, budgets $\nseq\in\{32,\dots,4096\}$, and $256$ held-out
-sequences on a disjoint seed. The ring uses $T=12$, so $\nsites=24$. Architectures, optimiser and
-seeds are in Appendix~\ref{app:protocol}.
+$[0.05,3.0]$, sixteen replicates, and $256$ held-out sequences on a disjoint seed.
+
+\paragraph{One view per chain.} Each clean chain is noised at \emph{one} level, the chains being
+split evenly across the twelve levels, so a training set of $\nseq$ chains yields exactly $\nseq$
+observations and the likelihood is a genuine one-view marginal likelihood rather than a composite
+objective over repeated views of the same latent sequence. This costs resolution at the small end
+--- at $\nseq=32$ a level carries two or three chains --- and it is what makes $\nseq$ a count of
+independent latent sequences, so that the sample-efficiency axis means what it says.
 
 \paragraph{The stopping rule, stated once.} EM stops when the fitted innovation excess kurtosis
 stops moving, $|\Delta\kappa_4|<10^{-3}$, with a relative log-likelihood tolerance of $10^{-9}$ as
@@ -541,18 +489,23 @@ other families & Gaussian, Student-$t$ ($\nu=5$), uniform, symmetric two-compone
                  ($\kappa=0.6$) \\
                 & all variance-matched to $\ivar$, so $\Cov(a_i,a_j)=\corr^{|i-j|}$ exactly \\
 grid & $\ngrid=401$, $\halfwidth=8$ ($\gridh=0.04$); refinements $\ngrid\in\{801,1601\}$ \\
-noise levels & $t\in\{0.1,0.2,0.4,0.8,1.6\}$ for training and pointwise evaluation \\
-budgets & $\nseq\in\{32,128,512,1024,2048,4096\}$ \\
+noise levels & twelve log-spaced $t\in[0.05,3.0]$, for training and pointwise evaluation \\
+budgets & $\nseq\in\{32,64,128,256,512,1024,2048\}$, one noise view per chain \\
 test set & $256$ held-out sequences, seed \texttt{exp07-test}, disjoint from all training seeds \\
-replicates & six; the replicate index is mixed into every training seed, so replicates vary \\
-           & the training set \emph{and} the initialisation; the test set is common to all six \\
+validation & a second disjoint bundle, used to select both arms' budget (below) \\
+replicates & sixteen; the replicate index is mixed into every training seed, so replicates \\
+           & vary the training set \emph{and} the initialisation; the test set is common to all \\
 \midrule
-EM--BP & mixture-innovation kernel \eqref{eq:kernel}, $\ncomp=4$ unless swept;
-         $12$ free parameters \\
-       & $\corr$ initialised at $0.3$; $50$--$120$ EM iterations; tolerance $10^{-9}$ \\
-global MLP & fully connected, $25{,}248$ parameters, denoising score matching, $20{,}000$
-             steps \\
-           & both parameterisations ($\varepsilon$ and $a$) trained; Adam \\
+EM--BP & mixture-innovation kernel \eqref{eq:kernel}, $\ncomp=8$; $3\ncomp=24$ free
+         parameters \\
+       & $\corr$ initialised at $0.3$; iteration count selected on validation from \\
+       & $\{10,20,40,60,80,120,160,220,300,400\}$; relative tolerance $10^{-9}$ \\
+global MLP & fully connected, $25{,}248$ parameters, denoising score matching, Adam \\
+           & training length selected on validation from
+             $\{0.5,1,2,3.5,6,10,14,20\}\times10^{3}$ steps \\
+           & both parameterisations ($\varepsilon$ and $a$) trained, and the choice between
+             them \\
+           & is also made on validation \\
 local CNN & weight-shared one-dimensional convolution, radius $r$, receptive field $2r+1$ \\
 capacity control & $24$ configurations, $3.2$k--$297$k parameters \\
 \midrule
@@ -562,13 +515,20 @@ hardware & CPU: single-threaded, \texttt{medium\_cpu} partition, Bocconi HPC \\
 \end{tabular}
 \end{center}
 
-\paragraph{Selection rules, stated plainly.} There is \textbf{no validation split}. Two selections
-therefore happen on the evaluation set and both favour the baselines: (i) the sample-efficiency comparison
-reports, at each noise level, the better of the two denoising-score-matching parameterisations,
-which is oracle post-selection over two models; (ii) the convolution's receptive field is a fixed
-configuration value read off the same sweep that is evaluated on the test set. The numbers in
-\S\ref{sec:networks} that depend on (ii) are labelled exploratory. Replacing both with
-validation-based selection is the first item of the revision plan.
+\paragraph{Selection rules, stated plainly.} Every tunable quantity that either arm is allowed to
+choose is chosen on a validation bundle disjoint from both the training set and the test set, and
+the two arms are given the same privilege. The network selects its parameterisation
+($\varepsilon$ or $a$) \emph{and} its training length; EM--BP selects its iteration count. Neither
+selection touches the test set. The selected choice coincides with the test-set optimum in $82.2\%$
+of cells for the network and $79.5\%$ for EM--BP, and Table~\ref{tab:pointwise} reports the
+validation-selected numbers, not those optima.
+
+The symmetry matters because the training length is a bias--variance knob for both arms, not a
+convergence detail: selecting one arm's budget while pinning the other's is not a neutral choice.
+Measured on this run, giving the network the same early-stopping privilege costs between $5\%$ and
+$36\%$ of the ratio, the larger corrections at the smaller sample sizes. The one selection that
+remains a fixed configuration value rather than a validation choice is the convolution's receptive
+field; the numbers in \S\ref{sec:networks} that depend on it are labelled exploratory.
 
 \section{Scope conditions}
 \label{app:limits}
@@ -576,14 +536,13 @@ validation-based selection is the first item of the revision plan.
 The initial law is held fixed at the one the generating process uses, so nothing is misspecified
 there and nothing shows it could be recovered. The linear form of \eqref{eq:kernel} is assumed:
 what is free is a scalar and a density, not an arbitrary bivariate transition. The chain is
-covariance-stationary rather than strictly stationary. Identifiability is a theorem at Rung 1,
-conditional at Rung 2, and assumed at Rung 3. The implementation is a discretisation whose error,
-for the Laplace family, is second order rather than spectral. Inference costs
-$O(\nsites\ngrid^{2})$ per sequence, far above a network forward pass, so the estimator's advantage
-is in data and not in wall-clock. And the likelihood is a \emph{composite} objective --- each clean
-chain observed at several noise levels, the groups treated as independent --- so every marginal is
-correctly specified but the effective sample size is the number of clean chains, not that times
-the number of levels.
+covariance-stationary rather than strictly stationary. Identifiability is a theorem at level 1 and
+conditional at level 2. The implementation is a discretisation whose error, for the Laplace family,
+is second order rather than spectral. Inference costs $O(\nsites\ngrid^{2})$ per sequence, far above
+a network forward pass, so the estimator's advantage is in data and not in wall-clock. And the
+comparison is asymmetric in supplied information by construction (Remark~\ref{rem:asymmetry}): it
+measures what the Markov assumption buys where that assumption holds, and says nothing about a
+setting where it does not.
 
 \section{Reproducibility map}
 \label{app:repro}

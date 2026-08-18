@@ -50,8 +50,8 @@
 \newtheorem{theorem}{Theorem}
 \newtheorem{remark}{Remark}
 
-\title{Learning a diffusion denoiser by belief propagation:\\
-exact scores for Markov data}
+\title{Exact diffusion scores for non-Gaussian Markov chains:\\
+what second-order message closure computes}
 
 \author{%
   Giovanni Mantovani \\
@@ -69,12 +69,16 @@ The global minimiser of the objective that trains a diffusion model is the score
 reproduce its training set and nothing else. Deciding what a network actually learned means
 comparing it against the score it should have learned, which for realistic data is unavailable.
 We exhibit a family where it is available and non-trivial: a first-order Markov chain with
-continuous, non-Gaussian transitions, for which coordinatewise noising leaves the posterior a
-chain and sum-product returns the exact score. We then drop the assumption that the chain is
-known and learn it from noised sequences alone: Fisher's identity gives the exact gradient of the
-marginal likelihood from one sum-product pass, so no differentiation through the recursion is
-needed. The resulting estimator, with twelve free parameters, attains $8$--$14\times$ lower
-pointwise denoising error than networks trained by denoising score matching on identical data.
+continuous, non-Gaussian transitions. Coordinatewise noising multiplies the prior by \emph{unary}
+factors, so the posterior factor graph is still the prior's chain --- a tree, on which sum-product
+is exact. The exact score is therefore available for a correlated, non-Gaussian model, and we
+validate the grid representation of the continuous messages against the Gaussian closed form and
+against brute-force enumeration of the discretised posterior. We then prove that single-Gaussian
+message closure computes \emph{exactly} the LMMSE estimator of the covariance-matched Gaussian
+model, so the gap between it and full sum-product is precisely the price of discarding everything
+beyond second moments --- not an uncontrolled approximation but a named estimator. The same
+posterior statistics also supply the exact likelihood gradient needed to learn the transition,
+which the longer paper develops.
 \end{abstract}
 
 \section{The problem}
@@ -95,9 +99,11 @@ about structure has a degenerate answer.
 \paragraph{This work.} We use a first-order Markov chain: diffusion is applied to sequential data,
 and studying how structure is exploited requires data that has structure one can dial. The chain
 is variance-matched, so Gaussian, Laplace, Student, uniform and bimodal innovations share a
-covariance exactly and differ only beyond second moments. Two things follow --- the exact score is
-computable, and the chain can be \emph{learned} from noised data far more efficiently than a
-network learns it.
+covariance exactly and differ only beyond second moments. Two things follow, and this note is about
+the first: the exact score is computable by local inference, and the standard second-order
+approximation to that inference turns out to be an identifiable estimator rather than an
+uncontrolled one. The same machinery also learns the kernel when it is unknown, which the longer
+paper develops.
 
 \section{The model, and why its score is computable}
 
@@ -141,83 +147,29 @@ Laplace chain, $\corr=0.85$; median over seeds with the $10$--$90$ percentile ba
 \label{fig:closure}
 \end{figure}
 
-\section{Learning the chain from noised sequences}
+\section{The same inference also learns the chain}
 
-Now treat the kernel as unknown, observe only noised sequences $\vx^\mu$, and write
-$\Lik(\params)=\sum_\mu\log P_{t,\params}(\vx^\mu)$. Gradient ascent on $\Lik$ looks expensive:
-$\Lik$ is defined through the recursion, so differentiating it appears to need backpropagation
-through $2(\nsites-1)$ message updates. It does not.
-
-\input{sections/prop-fisher}
-
-\noindent
-Sum-product is not a computation graph to backpropagate through; it supplies the conditional
-expectation, and one forward--backward pass yields the exact gradient, verified against finite
-differences of the discretised evidence to $\sim10^{-9}$. The statistic $\Xis$ is \emph{sufficient}
---- the complete-data log-likelihood is a sum over edges --- so maximisation never revisits the
-data. For Gaussian innovations that maximisation is closed form, the belief-weighted Yule--Walker
-equations, and gradient ascent and EM reach the same optimum; gradient ascent needs a tuned step
-size and EM does not. We estimate the innovation as a mixture, so both the autoregressive
-coefficient and the innovation density are free: twelve parameters at $\ncomp=4$.
-
-\begin{remark}[Information asymmetry]
-The estimator is given the Markov factorisation, the kernel's linear-autoregressive form, and
-homogeneity across sites; the networks are given none of these. What follows measures the value of
-that structure, not anything about neural denoisers in general.
-\end{remark}
-
-\input{sections/tab-efficiency}
-
-\noindent
-Table~\ref{tab:pointwise} is the point of the paper in one number: a ratio between $8$ and $14$
-across seven doublings of the training set, against networks trained by denoising score matching in
-both standard parameterisations, with the parameterisation chosen on a disjoint validation split.
-The network at the largest budget has not reached the error the estimator attains at the smallest.
-Markov structure, when the data has it, is worth an order of magnitude in sample efficiency.
-
-\section{When structure is invisible to the marginals}
-
-A chain makes what is being learned visible in low-order statistics. It need not be. Consider a
-point starting on a ring of radius ${\approx}1$ at a uniformly random angle, taking a rotating
-random walk; one sample is a whole $T$-frame trajectory, and the rotation $\psi$ is drawn per
-trajectory from an unknown $p(\psi)$:
-\input{sections/ring-model} The rotation is a \emph{gauge}:
-$U_\psi=\mathrm{blockdiag}(R_{-u\psi})$ is orthogonal, commutes with the isotropic channel, and
-maps the model onto $\psi=0$, so $P_t(\vx\mid\psi)=P_t^{0}(U_\psi\vx)$ is closed form at any $T$.
-
-\input{sections/thm-blindness}
-
-\noindent
-The proof is two lines: $R^{u-k}\eta_k\overset{d}{=}\eta_k$ by isotropy and
-$R^{u}z_0\overset{d}{=}z_0$ by the uniform phase, so $z_u\overset{d}{=}z_0+\sigma\sqrt{u}\,\xi$,
-in which $\psi$ does not appear. The marginal is not degenerate --- it is a visible, non-Gaussian
-ring whose radius grows as $\sqrt{u}$. It is simply blind to the dynamics. Radii are not evidence.
-
-This gives the theorem its own control. EM over $p(\psi)$ on the joint likelihood recovers the
-rotation to $0.15^\circ$ at low noise, degrading to $7.1^\circ$ at $t=1.4$ as the channel destroys
-the information. The same EM scored with per-frame marginals cannot move: its likelihood is
-constant in $\psi$, so the responsibilities equal $p(\psi)$ and the update is the identity. Across
-$1{,}344$ cells the blind arm's estimate moves $0.0000$ in total variation from its uniform
-initialisation --- a machine-precision zero, which is what a theorem predicting exactly no
-information requires.
-
-\begin{figure}[!htbp]
-\centering
-\includegraphics[width=0.60\textwidth]{fig_ring.pdf}
-\caption{Recovered $p(\psi)$ against the two-species truth
-$\tfrac12\delta_{+\omega}+\tfrac12\delta_{-\omega}$. Left: EM on the joint likelihood finds both
-species. Right: the same run scored with per-frame marginals, which by Theorem~\ref{thm:blind}
-cannot move off uniform, and does not. Shared $y$-axis.}
-\label{fig:ring}
-\end{figure}
+Everything above assumes the kernel is known. It need not be. The pairwise posterior marginals that
+sum-product already produces are exactly the expected transition statistics that likelihood
+learning needs: writing $\Lik(\params)=\sum_\mu\log P_{t,\params}(\vx^\mu)$, Fisher's identity gives
+$\nabla_\params\Lik$ as a posterior expectation of the complete-data score, so one
+forward--backward pass yields the exact gradient and no differentiation through the
+$2(\nsites-1)$ message updates is required. Accumulated over edges the pairwise beliefs form a
+single matrix $\Xis$ that is a complete summary for the resulting surrogate objective, so the
+maximisation step never revisits the data; for Gaussian innovations it is closed form, the
+belief-weighted Yule--Walker equations. The derivations, the mixture-innovation extension, and the
+recovery experiments are in the longer paper.
 
 \section{Scope, and what is open}
 
-The estimator assumes exact first-order Markov structure; under a non-Markov prior it is
-misspecified in a way more data does not repair, and the cost depends on which assumption breaks
---- a rank-one contamination a chain absorbs, long-range precision coupling it cannot represent.
-Inference costs $O(\nsites\ngrid^{2})$ per sequence, well above a network forward pass, so the
-advantage is in data and not wall-clock.
+Exactness is structural, not numerical: the recursion is exact on the functional messages, and what
+an implementation actually runs is a truncated grid whose truncation and quadrature error must be
+measured rather than assumed. The figures quoted above are agreements at the stated configuration,
+not a bound for arbitrary kernels, tails or noise levels --- trapezoidal quadrature is second order,
+and it degrades when a likelihood is narrower than a few grid cells. Everything here also assumes
+exact first-order Markov structure; under a non-Markov prior the inference is misspecified in a way
+more data does not repair. Inference costs $O(\nsites\ngrid^{2})$ per sequence, well above a network
+forward pass, so what this model buys is a computable target, not speed.
 
 The open question is architectural. Sum-product on a chain suggests a network narrow but as deep
 as twice the chain, unlike the tree-structured case where the natural depth is the tree's

@@ -112,7 +112,9 @@ the Gaussian closure when the sequence is not Gaussian.
 
 \section{Research questions}\label{sec:rq}
 
-The thesis addresses four questions.
+The thesis addresses six questions. The first four concern scores under
+\emph{known} dynamics and the last two concern learning dynamics that are
+unknown.
 
 \begin{itemize}
   \item[\textbf{RQ1.}] For a stationary Gaussian AR(1) chain observed
@@ -131,12 +133,32 @@ The thesis addresses four questions.
   \item[\textbf{RQ4.}] In the Gaussian model, how rapidly does the
   influence of remote observations on the score decay, and what limited
   guidance does this provide for local approximations of the score?
+
+  \item[\textbf{RQ5.}] Under what assumptions can an \emph{unknown} local
+  transition law be recovered from noised sequences alone, and which
+  numerical, optimisation and statistical checks are required before such
+  a recovery claim is reliable?
+
+  \item[\textbf{RQ6.}] On a family where the Markov assumption holds
+  exactly, what is supplying that assumption worth, measured against
+  denoising-score-matching networks trained on identical data and given
+  none of it?
 \end{itemize}
 
 These questions are deliberately confined to the models named in them.
 No claim is made about general Markov processes, about universal
 properties of learned diffusion scores, or about practical neural
-architectures.
+architectures. In particular RQ6 is a question about the value of a
+correct structural assumption on one family, not a comparison of learning
+algorithms in general: the two arms are asymmetric in supplied
+information by construction, which is what makes the measurement
+meaningful and also what bounds it.
+
+Chapter~\ref{ch:ring} is a self-contained case study rather than a
+seventh question. It asks what joint observations can identify that no
+single-frame marginal can, on a rotating-ring model whose state space and
+estimand both differ from the chain's, and it is placed alongside the
+main line rather than on it.
 
 \section{Contributions}
 
@@ -187,8 +209,12 @@ architectures.
 
 \section{Methodology}
 
-The methodology is deliberate: no neural networks, no black boxes;
-closed forms first, numerics as audit. Every claim is either proved by
+The methodology is deliberate: closed forms first, numerics as audit.
+Analytical results lead, and every approximation is measured against a
+reference computed by an independent method rather than assumed small.
+Networks appear in exactly one role --- as the baseline RQ6 measures the
+structured estimator against --- and never as an instrument for
+establishing anything about the model itself. Every claim is either proved by
 explicit algebra (with the longer passages isolated in numbered
 \emph{toolboxes}) or verified by deterministic numerical checks against
 ground truth computed by an independent method, in the spirit of the
@@ -207,10 +233,26 @@ The exact results concern one-dimensional state per frame, linear AR(1)
 dynamics, and stationary initial conditions. The non-Gaussian results
 are numerical, valid within the validated resolution regime of the
 reference solver and the tested parameter ranges. The locality results
-are proved for the Gaussian bulk only. No learning experiments are
-performed, so any implication for trained score networks is a hypothesis
-suggested by a controlled model, not an established property of
-practical systems.
+are proved for the Gaussian bulk only.
+
+The learning results (RQ5, RQ6) carry their own limits, and they are
+tighter than the analytical ones. The estimator is given the Markov
+factorisation, the autoregressive form, homogeneity across sites, and an
+innovation family containing the truth; nothing here speaks to a setting
+where those do not hold. The comparison in RQ6 is therefore a measurement
+of what a correct structural assumption buys on one family, and not
+evidence that likelihood learning through belief propagation is a better
+learning algorithm than score matching --- a distinction the thesis
+maintains wherever the numbers appear. Any implication for trained score
+networks in practice remains a hypothesis suggested by a controlled
+model, not an established property of practical systems.
+
+Two lines of experiment are reported as unresolved rather than as
+findings: the innovation-mixture capacity sweep, in which most
+shape coordinates had not settled within the iteration budget used, and
+the reverse-generation study built on those same fits. Both are recorded
+in Appendix~\ref{app:repro} as methodological negative results, and
+neither supports a conclusion in Chapter~\ref{ch:conclusions}.
 
 \section{Structure of the thesis}
 

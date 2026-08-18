@@ -161,9 +161,14 @@ Messages remain functions on $\R$, so they are represented exactly as in
 Section~\ref{sec:l-grid}: values on $M$ equispaced points in $[-A,A]$, updates
 by trapezoidal quadrature. Two error sources are tracked separately here as
 well. Truncation error --- the probability mass the finite domain $[-A,A]$
-misses --- is diagnosed by the worst boundary mass over the sites of a chain,
-which falls from $3.4\times 10^{-4}$ at $A=4$ to $1.4\times10^{-8}$ at $A=8$
-and does not depend on the grid resolution $M$. Quadrature error, from the
+misses --- is diagnosed by the maximum boundary mass over the sites of a chain.
+That is a statistic of a sampled trajectory rather than a bound, so it is
+recorded over $256$ chains per configuration: the worst chain falls from
+$2.3\times10^{-3}$ at $A=4$ to $1.2\times10^{-6}$ at $A=8$, the $90$th
+percentile from $2.7\times10^{-4}$ to $1.5\times10^{-8}$, and neither depends on
+the grid resolution $M$. The gap between the two rows matters, because a figure
+read off a single trajectory sits near the median and so understates the tail by
+two orders of magnitude. Quadrature error, from the
 finite spacing $h=2A/M$ on an otherwise exact interior update, falls as
 $O(h^2)$: a factor of four per halving of $h$, matching the trapezoidal
 rate on a smooth integrand. At the working configuration used for every
@@ -177,11 +182,16 @@ $1.8\times10^{-15}$ on the log-evidence.
 \begin{figure}[t]\centering
 \includegraphics[width=0.72\linewidth]{figures/fig_grid_domain.pdf}
 \caption{Grid and domain control on a Laplace chain ($\alpha=0.85$, $n=32$
-sites). Left: relative score error against a high-resolution reference as
-grid resolution $M$ grows at fixed half-width $A=8$. Right: the same as the
-domain half-width $A$ grows at fixed $M=401$. Both saturate at the
-floating-point floor well inside the working configuration. Source:
-\texttt{outputs/exp\_02\_grid\_convergence/}.}
+sites), four panels. (a) Relative score error against a high-resolution
+reference as grid resolution $M$ grows at fixed half-width $A=8$; (b) the same
+as $A$ grows at fixed $M=401$ --- both saturate at the floating-point floor
+well inside the working configuration. (c) Forward-message boundary mass
+against $A$, the truncation diagnostic, drawn as \emph{both} the maximum and
+the $90$th percentile over $256$ chains, which differ by roughly two orders of
+magnitude for the reason given in Remark~\ref{rmk:em-boundary}. (d) Interior
+column-mass residual against spacing at $A=8$, the quadrature diagnostic, with
+an $O(h^2)$ reference. Neither diagnostic alone certifies convergence. Source:
+\texttt{outputs/frozen/exp\_01/} and \texttt{outputs/frozen/exp\_18/}.}
 \label{fig:em-grid-domain}
 \end{figure}
 

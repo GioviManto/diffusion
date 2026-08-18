@@ -51,21 +51,45 @@ there the score direction is preserved much better than its magnitude.
 and~\ref{ch:em-results} relax the assumption, held throughout the rest of
 this thesis, that the innovation law is known. An EM procedure built
 directly on the exact chain inference of Chapter~\ref{ch:gaussian} estimates
-a mixture innovation from noised data alone, with an exact E-step for any
-innovation law and a generalised M-step; the resulting estimator reduces the
-data needed for accurate denoising by $9$--$14\times$ against an unstructured
-neural network and $2$--$4\times$ against a locality-matched one. That
-pointwise advantage does not transfer to generation: the sharpest evidence
-is a single trained network becoming simultaneously more accurate pointwise
-and less faithful generatively as its own training data grows, so pointwise
-accuracy does not determine generative fidelity even within one estimator.
-Mixture capacity saturates, on held-out evidence and on paired pointwise
-error, at roughly eight components. The chain-Markov assumption itself
-tolerates a violation it can absorb into its own fitted parameters (a
-shared global latent, up to the point where it accounts for half the
-marginal variance) and fails, well before generic intuition about
-misspecification would suggest, on one it structurally cannot represent
-(long-range coupling, by a coupling strength of roughly one tenth).
+a mixture innovation from noised data alone, with a structurally exact E-step
+for any innovation law and a generalised M-step.
+
+Answering RQ6, the resulting estimator attains between $7.3$ and $12.6$ times
+lower pointwise denoising error than networks trained by denoising score
+matching on identical data, across the six training-set sizes at which neither
+side is limited by its optimisation budget; at the largest size tested both
+select the largest budget on offer and the ratio there, $15.7$, is bounded by
+the budget grid rather than by the data. Both arms choose their budget on a
+disjoint validation bundle --- the network its parameterisation and training
+length, the estimator its iteration count --- because the training length is a
+bias--variance knob for both and selecting one while pinning the other is not a
+neutral protocol. The numbers are generated from the frozen outputs by
+\texttt{tools/make\_tab\_efficiency.py} rather than transcribed.
+
+What that comparison does \emph{not} establish bears repeating here, because
+the figure is quotable and the caveat is not. The two arms are asymmetric in
+supplied information by construction: the estimator receives the Markov
+factorisation, the autoregressive form and homogeneity, and the networks
+receive none of them. The measurement is of what a correct structural
+assumption is worth on a family where it holds exactly. It is not a ranking of
+learning algorithms, and no claim about architectures follows from it.
+
+The chain-Markov assumption itself tolerates a violation it can absorb into
+its own fitted parameters (a shared global latent, up to the point where it
+accounts for half the marginal variance) and fails, well before generic
+intuition about misspecification would suggest, on one it structurally cannot
+represent (long-range coupling, by a coupling strength of roughly one tenth).
+
+\paragraph{Two questions this thesis leaves open rather than answers.}
+Fixed-budget experiments suggested that mixture capacity saturates near eight
+components, and that pointwise accuracy and generative fidelity can move in
+opposite directions within one estimator. Neither survives its own convergence
+analysis: most shape coordinates in the capacity sweep had not settled within
+the iteration budget used, and the generation study is built on those same
+fits. Both are recorded in Appendix~\ref{app:repro} as methodological negative
+results. They are reported because a budget-limited comparison answers ``how do
+these behave after this much optimisation'', which is not the question either
+was asked --- and that distinction is itself one of the findings under RQ5.
 
 \section{What the model suggests but does not establish}
 
@@ -103,13 +127,15 @@ this thesis and are not reported here.
 
 \section{Future work}
 
-Two of the three directions identified earlier in this project have since
-been carried out and are reported in Chapters~\ref{ch:em-method}
+One of the three directions identified earlier in this project has been
+carried out and is reported in Chapters~\ref{ch:em-method}
 and~\ref{ch:em-results}: mixture messages, in the form of a fully estimated
-$C$-component innovation kernel rather than a fixed two-component closure;
-and reverse dynamics, in the form of the generative comparison of
-Section~\ref{sec:em-generative}, which integrates the reverse SDE under the
-estimated EM/BP score and under two trained neural scores. Discrete chains
+$C$-component innovation kernel rather than a fixed two-component closure.
+Reverse dynamics was attempted --- Section~\ref{sec:em-generative} integrates
+the reverse SDE under the estimated EM/BP score and under two trained neural
+scores --- but rests on fits that the convergence analysis showed to be
+unsettled, so it stands as an exploratory study to be redone with certified
+estimators rather than as a completed direction. Discrete chains
 remain untouched by this thesis: with a finite alphabet the BP messages are
 finite vectors and inference is exact with no closure at all, which would
 give a second solvable benchmark alongside the Gaussian one.

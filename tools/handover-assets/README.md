@@ -4,37 +4,62 @@ Everything needed to compile all four documents is in this folder. Nothing
 resolves a path outside it, so uploading the folder to Overleaf as a single
 project works with no rearranging. Set the main document per compile.
 
-| Root | What it is | Ready to send? |
-|---|---|---|
-| `workshop.tex` | 4pp workshop version | Yes |
-| `paper.tex` | the full paper, 9pp body | **No** — one placeholder |
-| `compendium.tex` | every derivation and experiment, including cut ones | Yes |
-| `thesis.tex` | the thesis | Yes, as a draft |
+| Root | What it is | Body | Ready to send? |
+|---|---|---|---|
+| `workshop.tex` | the analytical result: exact scores + LMMSE closure | 2pp of 4 | Yes |
+| `paper.tex` | the full paper | 8pp of 9 | Yes |
+| `compendium.tex` | every derivation and experiment, including cut ones | 53pp | Yes |
+| `thesis.tex` | the thesis | 169pp | Yes, as a draft |
 
-All four build with `tectonic`, with zero undefined references and zero
-undefined citations. `./build.sh` compiles all four and reports page counts.
+All four build with `tectonic`, with zero undefined references, zero undefined
+citations, and no unfilled placeholders. `./build.sh` compiles all four and
+reports page counts; it attributes placeholders per root by following `\input`
+transitively, so it names the documents actually affected rather than every file.
 
-## The paper is not ready to send
+## What changed in the last revision
 
-`paper.tex` renders a loud red `[PENDING: ...]` marker where a number is not yet
-earned: the numerical-values table in `appendix.tex` needs regenerating from the
-frozen batch. It is called out here rather than quietly shipped, and the marker
-is red on purpose — it should be impossible to send by accident.
+Both production documents were rescoped after an external audit found them
+carrying more questions than their page counts could defend.
 
-`workshop.tex` no longer inputs anything unfilled, so it is sendable. `build.sh`
-attributes placeholders per root by following `\input` transitively, so it will
-say which documents are actually affected rather than listing every file.
+**The rotating ring is out of the paper and the workshop.** It changes the state
+space, the dynamical model and the estimand, so calling it the next rung of the
+chain derivation was a presentational move rather than a real continuity. It
+lives in the compendium (ch12) and the thesis (ch09), both of which carry a more
+complete version than the paper ever did — the paper's copy predated the
+normaliser fix. Cutting it took the paper body from 10pp to 8pp.
 
-The efficiency table both share (`sections/tab-efficiency.tex`) is now filled
-from the run in which **both** arms have their optimisation budget chosen on a
-validation bundle — the network its parameterisation and training length, EM–BP
-its iteration count. One caveat is stated in its caption rather than hidden: at
-the largest sample size both arms select the largest budget the grid offers
-(33% and 61% of cells), so that row's ratio is bounded by the grid rather than
-by the estimators, and the range over the other six sizes is quoted alongside it.
+**The neural comparison stayed, reframed.** The audit recommended cutting it too,
+but on a stale reading: it saw a README from before the symmetric rerun and
+concluded the protocol was still asymmetric in selection. It is not — both arms
+now choose their optimisation budget on a disjoint validation bundle. What
+survives of that criticism is about framing, and is now stated plainly wherever
+the number appears: the two arms are asymmetric in *supplied information* by
+construction, so the measurement is of what a correct Markov assumption buys on
+a family where it holds, not a ranking of learning algorithms.
+
+**Efficiency numbers now come from macros, not typing.** The abstract read
+"between 8 and 14" for weeks after the regenerated table said 7.3–15.7. Every
+figure the prose quotes is now defined in `sections/efficiency-numbers.tex`,
+generated with the table, so the two cannot disagree. Related: the table said
+"12 free parameters", right at C=4 and wrong since the config moved to C=8 —
+it is 24, and now derived rather than written.
+
+One caveat is stated in the table caption rather than hidden: at the largest
+sample size both arms select the largest budget the grid offers (33% and 61% of
+cells), so that row's ratio is bounded by the grid rather than by the estimators,
+and the range over the other six sizes is quoted alongside it.
 
 The compendium and thesis are allowed to carry provisional results, and both say
 which results are provisional.
+
+## The workshop has 2pp of headroom
+
+It is 2 pages against a 4-page limit, because rescoping removed more than it
+added. That is deliberate — a short paper that makes one point beats a full one
+that makes five — but if you want the space, the place to spend it is the
+functional-BP exposition: what a message *is* as a function on the reals, and why
+the grid is a representation of it rather than the thing itself. That is the part
+readers of the old draft found compressed.
 
 ## What is shared, and why editing matters
 
