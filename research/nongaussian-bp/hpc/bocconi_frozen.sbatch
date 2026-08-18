@@ -377,6 +377,44 @@ print((list(FROZEN.seeds())[$SEED_IDX],))")
           --only sample_efficiency_val \
           --set "seed=$SEED"
       ;;
+  13[0-9]|14[0-5])
+      # E9 CERTIFIED. Supersedes 629985 + 630108 (tasks 110-125).
+      #
+      # Same protocol, same seeds, same selection rules. Three things the earlier
+      # run could not report, all added on 18 Aug 2026:
+      #
+      #   1. A resolution certificate per cell (em_resolved, em_s_min_over_h).
+      #      Without it there is no record of whether the fitted mixture's
+      #      narrowest component was wider than the mesh it lives on, and an
+      #      under-resolved component raises the quadrature likelihood without
+      #      corresponding to anything in the innovation law. Spot-checked at
+      #      s_min/h ~ 9.4-10.0, so this is expected to pass -- but
+      #      make_tab_efficiency.py currently prints "NOT CERTIFIED" for the
+      #      headline table, and "the check did not run" is not "the check
+      #      passed".
+      #
+      #   2. Density-level recovery (em_hellinger). Every other number measures
+      #      the fitted kernel through the score it induces, which at moderate
+      #      noise is forgiving enough that two visibly different innovation laws
+      #      agree to three decimals. The transition claim has to be stated on
+      #      the transition.
+      #
+      #   3. The corrected ECM inner budget (n_inner 4 -> 16). At 40 outer
+      #      iterations the old default left the fitted excess kurtosis at 1.68
+      #      against a truth of 3.0, where 16 sweeps reach 2.14. The effect
+      #      vanishes by 60 outer iterations, and 30% of cells in the previous
+      #      run selected fewer than that -- so this is expected to move the EM
+      #      arm slightly, most likely in its favour, at the small sizes.
+      #
+      # Wall time: the previous shards ran 35-43 min. The M-step is roughly 3x
+      # dearer and the E-step dominates at large nseq, so budget ~2x and keep the
+      # 6-hour partition wall.
+      SEED=$((TASK - 130))
+      run $PYTHON experiments/exp_07_em_vs_score_network.py \
+          $OUT/exp_07_certified_seed$SEED \
+          --only sample_efficiency_val \
+          --set "seed=$SEED"
+      ;;
   16) # E5 cont: what the channel costs, against the no-noising baseline.
       run $PYTHON experiments/exp_06_em_parameter_recovery.py $OUT/exp_06 \
           --only clean_vs_noised,clean_raw_mle

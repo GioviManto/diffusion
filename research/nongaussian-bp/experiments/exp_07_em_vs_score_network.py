@@ -67,6 +67,7 @@ from src.denoiser import (
 )
 from src.em import fit_em
 from src.kernels import MixtureInnovationKernel
+from src.metrics import transition_hellinger
 from src.noising import alpha_delta
 from src.plotting import new_figure, save_figure
 from src.priors import LaplaceAR1
@@ -324,6 +325,20 @@ def part5_sample_efficiency_val(grid, weights, sizes, hidden, n_steps, out):
         em_certificate = {
             it: ckpts[it].scale_diagnostics(grid) for it in sorted(ckpts)
         }
+        # Recovery at the DENSITY level, against the prior's own transition.
+        #
+        # Every other number here measures the fitted kernel through what it does
+        # -- the score it induces. That is the quantity the diffusion model uses,
+        # but it is forgiving: at moderate noise the channel has already blurred
+        # away differences between visibly distinct innovation laws, so a small
+        # score error is not by itself evidence that the transition was
+        # recovered. This states it on the transition.
+        log_k_true = prior.log_transition_matrix(grid)
+        em_density = {
+            it: transition_hellinger(
+                ckpts[it].log_transition_matrix(grid), log_k_true, grid, weights)
+            for it in sorted(ckpts)
+        }
         ckpt_steps = net_checkpoints(n_steps)
         nets = train_nets(A, ("exp07-net", n_chains), hidden, n_steps,
                           checkpoints=ckpt_steps)
@@ -391,6 +406,11 @@ def part5_sample_efficiency_val(grid, weights, sizes, hidden, n_steps, out):
                 # Certificate for the checkpoint this row actually reports.
                 # `em_resolved` false means the narrowest fitted component is
                 # under two grid cells wide, and the row may not be cited.
+                # Density-level recovery for the checkpoint this row reports.
+                # Floor is ~4e-8; anything at that level means "identical to
+                # arithmetic", not a resolved distance.
+                "em_hellinger": em_density[em_it]["hellinger_median_interior"],
+                "em_hellinger_max": em_density[em_it]["hellinger_max_interior"],
                 "em_s_min_over_h": em_certificate[em_it]["s_min_over_h"],
                 "em_resolved": int(em_certificate[em_it]["resolved"]),
                 "em_effective_n_components":
