@@ -60,9 +60,12 @@ and refining $\ngrid$ will not help, because the error is in the domain rather t
 resolution.
 
 This diagnostic used to be computed inside the recursion and thrown away, so no aggregate could
-be quoted. It is now recorded (\codefile{outputs/exp\_18/boundary.csv},
-\codefile{experiments/exp\_18\_revision\_diagnostics.py}). Taking the worst case over all $32$
-sites of a forward sweep on a Laplace chain at $\corr=0.85$:
+be quoted. It is now recorded (\codefile{outputs/frozen/exp\_18/boundary.csv},
+\codefile{experiments/exp\_18\_revision\_diagnostics.py}). The quantity is the maximum over all
+$32$ sites of a forward sweep on a Laplace chain at $\corr=0.85$ --- which makes it a
+\emph{statistic of a sampled trajectory}, not a bound. It is therefore reported over $256$ chains
+per cell and at three quantiles, taking in each case the worst value over the twelve-level noise
+schedule:
 
 \begin{center}
 \small
@@ -70,8 +73,12 @@ sites of a forward sweep on a Laplace chain at $\corr=0.85$:
 \toprule
 $\halfwidth$ & $4$ & $6$ & $8$ & $10$ \\
 \midrule
-worst boundary mass & $3.4\times10^{-4}$ & $2.0\times10^{-6}$ & $1.4\times10^{-8}$
-                    & $1.4\times10^{-10}$ \\
+worst chain & $2.3\times10^{-3}$ & $1.6\times10^{-4}$ & $1.2\times10^{-6}$
+            & $3.3\times10^{-8}$ \\
+$90$th percentile & $2.7\times10^{-4}$ & $2.5\times10^{-6}$ & $1.5\times10^{-8}$
+                  & $7.8\times10^{-11}$ \\
+median & $3.8\times10^{-5}$ & $3.8\times10^{-7}$ & $3.0\times10^{-9}$
+       & $1.8\times10^{-11}$ \\
 \bottomrule
 \end{tabular}
 \end{center}
@@ -80,7 +87,20 @@ worst boundary mass & $3.4\times10^{-4}$ & $2.0\times10^{-6}$ & $1.4\times10^{-8
 The value is essentially independent of $\ngrid$ across $\{201,401,801\}$, which is the point:
 truncation responds to the domain and not to the resolution, and a grid-refinement sweep at
 fixed $\halfwidth$ therefore cannot certify it. At the working $\halfwidth=8$ the discarded mass
-is eight orders of magnitude below any effect this project reports.
+is around $10^{-6}$ in the worst chain, four orders of magnitude below the smallest effect this
+project reports and still safe --- but the spread between the rows is why all three are given. The
+worst chain carries $84\times$ the $90$th percentile and $390\times$ the median, so a figure taken
+from one trajectory lands near the median and understates the tail by two to three orders of
+magnitude.
+
+\begin{pitfall}
+The frozen configuration justified $\halfwidth=8$ with ``the truncation residual is
+$1.4\times10^{-8}$'' for several weeks. That number is the \emph{$90$th percentile}, not a bound:
+the worst chain is $1.2\times10^{-6}$. The conclusion did not change --- both are far below every
+reported effect --- but the sentence claimed a guarantee it did not have, which is the same
+category of error as reading one trajectory's worst site as a bound. Quote the statistic you
+computed, and say which statistic it is.
+\end{pitfall}
 
 \begin{pitfall}
 This failure is invisible unless one looks for it. An earlier package in this project ran at

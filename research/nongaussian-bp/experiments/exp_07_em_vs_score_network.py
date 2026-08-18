@@ -578,7 +578,10 @@ def main() -> None:
         "seed": 0,
     }
     full = {
-        "grid_size": GRID_M, "sizes": (32, 64, 128, 256, 512, 1024, 2048),
+        # From the frozen config, not an inline literal. The list here and
+        # FROZEN.sizes disagreed, and the paper quoted a third list that matched
+        # neither; FROZEN.efficiency_sizes says which is right and why.
+        "grid_size": GRID_M, "sizes": tuple(FROZEN.efficiency_sizes),
         # NET_STEPS, not a repeated literal: the checkpoint grid ends at it, and
         # a drift between the two would silently drop the at-cap comparison.
         "net_hidden": (128, 128), "net_steps": NET_STEPS,

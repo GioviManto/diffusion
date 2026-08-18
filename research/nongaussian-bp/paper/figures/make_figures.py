@@ -28,6 +28,9 @@ ROOT = Path(__file__).resolve().parents[2]
 OUT = ROOT / "outputs"
 FIG = Path(__file__).resolve().parent
 
+sys.path.insert(0, str(ROOT / "experiments"))
+from frozen_config import FROZEN  # noqa: E402
+
 # Restrained academic style: no gradients, no decoration, colourblind-safe.
 plt.rcParams.update(
     {
@@ -140,7 +143,10 @@ def fig_sample_efficiency() -> None:
         )
     fig, ax = plt.subplots(figsize=(3.6, 2.7))
     names = {
-        "em_bp": ("em_bp", "EM\u2013BP (12 free parameters)"),
+        # Derived from the frozen component count, not typed: theta is
+        # [rho, pi(C), mu(C), s2(C)] with pi simplex-constrained, so 3C are free.
+        # This label read "12" (correct at C=4) after the config moved to C=8.
+        "em_bp": ("em_bp", f"EM\u2013BP ({3 * FROZEN.n_components} free parameters)"),
         "dsm_net_eps": ("mlp", r"MLP, $\varepsilon$-parameterisation"),
         "dsm_net_x0": ("cnn", r"MLP, $a$-parameterisation"),
     }

@@ -61,9 +61,23 @@ class FrozenConfig:
     # --- the quadrature grid ---------------------------------------------
     n_grid: int = 401
     half_width: float = 8.0
-    """Chosen from the grid/domain sweep: at (401, 8) the truncation residual is
-    1.4e-8 and the interior column-mass residual 9.6e-4, both far below every
-    effect reported. See Rung 0."""
+    """Chosen from the grid/domain sweep. At (401, 8), over the twelve-level
+    schedule with 256 chains per cell, the forward-message boundary mass is
+
+        worst chain   1.2e-6      p90   1.5e-8      median   3.0e-9
+
+    and the interior column-mass residual is 9.6e-4. The conclusion stands --
+    all of these are far below every effect reported -- but note WHICH statistic
+    is quoted. This docstring used to say "the truncation residual is 1.4e-8",
+    which is the p90, not a bound: the worst chain is 84x larger. A maximum over
+    sites of a sampled trajectory is a statistic, and quoting an upper quantile
+    of it as though it bounded the error is the mistake the boundary diagnostic
+    was rewritten to stop making. Regenerate with
+
+        python experiments/exp_18_revision_diagnostics.py --parts boundary \\
+            --out outputs/frozen/exp_18
+
+    See Rung 0."""
 
     # --- the noise schedule ----------------------------------------------
     t_grid: tuple[float, ...] = field(
@@ -80,7 +94,20 @@ class FrozenConfig:
     which is how a curve got read as flat when it was falling like M^{-1/2}."""
 
     sizes: tuple[int, ...] = (32, 128, 256, 512, 1024, 2048, 4096)
-    """Training-set sizes M, seven doublings."""
+    """Training-set sizes M, seven values."""
+
+    efficiency_sizes: tuple[int, ...] = (32, 64, 128, 256, 512, 1024, 2048)
+    """The sizes the network comparison uses, which are NOT `sizes`.
+
+    Two deliberate differences, recorded here because the experiment used to
+    carry this list inline and the paper's protocol appendix quoted a third
+    list that matched neither -- the exact drift this file exists to stop.
+
+    64 is added: the ratio moves fastest at the small end, and 32 -> 128 is one
+    jump across the region where the two arms separate. 4096 is dropped: at 2048
+    both arms already select the largest budget the checkpoint grid offers in
+    33% and 61% of cells, so that row is bounded by the budget rather than by
+    the data, and a further doubling would only add a second such row."""
 
     n_heldout: int = 256
     heldout_seed_offset: int = 1_000_000

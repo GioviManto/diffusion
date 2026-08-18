@@ -78,20 +78,56 @@ else
     echo "  [SKIP] body length -- needs tectonic and pdftotext"
 fi
 
-# 4b. The shared sections must actually be shared. A block that stops being
-#     \input by both documents has silently become two copies, which is the
-#     drift this structure exists to prevent.
+# 4b. Every section file must be reached by at least one production document.
+#
+#     The rule used to be "reached by BOTH", which was right while the workshop
+#     was a compression of the paper. It is not right now that the workshop is a
+#     strict subset -- the efficiency table and Fisher's identity are the paper's
+#     alone -- and a gate that demands the impossible is a gate people switch off.
+#     What still matters is that no section is orphaned: an unreached file is a
+#     copy nobody compiles, so it drifts from whatever superseded it and is then
+#     available to be pasted back in. That is exactly how the stale ring model
+#     (missing its normaliser) outlived the corrected one in the compendium.
 for f in paper/sections/*.tex; do
     name=$(basename "$f" .tex)
-    [ "$name" = "workshop-appendix" ] && continue
     inmain=$(grep -c "input{sections/$name}" paper/main.tex || true)
     inws=$(grep -c "input{sections/$name}" paper/workshop.tex || true)
-    if [ "$inmain" -ge 1 ] && [ "$inws" -ge 1 ]; then
-        pass "sections/$name shared by both documents"
+    if [ "$inmain" -ge 1 ] || [ "$inws" -ge 1 ]; then
+        pass "sections/$name reached (main:$inmain workshop:$inws)"
     else
-        fail "sections/$name is in main:$inmain workshop:$inws -- no longer shared"
+        fail "sections/$name is orphaned -- reached by neither document"
     fi
 done
+
+# 4c. Efficiency figures in the prose must come from the generator's macros.
+#
+#     The abstract said "between 8 and 14" for three weeks after the generator
+#     started emitting 7.3-15.7, because one number was typed in main.tex and the
+#     other computed in tools/. The first version of this check compared the two
+#     numerically and needed a tolerance to pass -- which is the same bug one level
+#     up, since the tolerance gets widened until it goes green. So the rule is
+#     structural instead: the numbers live in one generated file, the prose cites
+#     macros, and a typed decimal near the word "ratio" is the failure.
+MACROS=paper/sections/efficiency-numbers.tex
+if [ ! -f "$MACROS" ]; then
+    fail "$MACROS missing -- run tools/make_tab_efficiency.py"
+elif ! grep -q 'input{sections/efficiency-numbers}' "$PAPER"; then
+    fail "$PAPER does not \\input sections/efficiency-numbers"
+else
+    pass "efficiency figures come from generated macros"
+fi
+
+# A typed ratio range anywhere in the production documents. Matches "between $8$
+# and $14$" and "$8$--$14$"; the macro forms (\ratiolo, \ratioloword) contain no
+# digits and so cannot trip it.
+typed=$(grep -nE 'between \$[0-9]+(\.[0-9])?\$ and \$[0-9]+(\.[0-9])?\$ ?(times|\\times)|\$[0-9]+(\.[0-9])?\$--\$[0-9]+(\.[0-9])?\$ ?\\times' \
+        "$PAPER" paper/workshop.tex 2>/dev/null || true)
+if [ -z "$typed" ]; then
+    pass "no hand-typed efficiency ratio ranges"
+else
+    fail "hand-typed ratio range -- use the generated macros:"
+    echo "$typed" | sed 's/^/         /'
+fi
 
 # 5b. Replicate counts, checked block-aware.
 #

@@ -49,8 +49,10 @@ same as consuming it.
 
 \paragraph{The discretisation is controlled on two axes, separately.} Truncation --- mass outside
 $[-\halfwidth,\halfwidth]$ discarded rather than transported --- responds to the domain and not
-the resolution: the residual falls from $3\times10^{-4}$ at $\halfwidth=4$ to $1.4\times10^{-8}$
-at $\halfwidth=8$, essentially independently of $\ngrid$. Quadrature error falls by a factor of
+the resolution: the worst-chain boundary mass falls from $2.3\times10^{-3}$ at $\halfwidth=4$ to
+$1.2\times10^{-6}$ at $\halfwidth=8$, essentially independently of $\ngrid$ (the $90$th percentile
+falls $2.7\times10^{-4}\to1.5\times10^{-8}$ over the same range; \S\ref{sec:truncation} explains
+why both are quoted). Quadrature error falls by a factor of
 four per halving of $\gridh$, the predicted second order for the trapezoidal rule. Neither sweep
 alone certifies the other, which is why both are reported.
 
