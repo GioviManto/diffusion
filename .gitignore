@@ -37,10 +37,26 @@ research/nongaussian-bp/overleaf-bp-diffusion.zip
 
 # --- kept locally for reference, not for a reviewer's eyes ---
 # Internal revision/process notes -- not thesis content.
-thesis/editorial/
 # The university's own copyrighted guide PDFs -- no reason to redistribute.
-thesis/official-guides/*.pdf
 
 # Deploy stamp written by hpc/stamp_revision.sh. Regenerated per deploy, so a
 # committed copy would always be stale and would itself dirty the tree it records.
 research/nongaussian-bp/REVISION
+
+# LaTeX build products. Each document is compiled in its own folder now.
+overleaf/*/main.pdf
+overleaf/*/*.aux
+overleaf/*/*.bbl
+overleaf/*/*.blg
+overleaf/*/*.log
+overleaf/*/*.out
+overleaf/*/*.toc
+overleaf/*/*.lof
+overleaf/*/*.lot
+overleaf/*/*.fls
+overleaf/*/*.fdb_latexmk
+overleaf/*/*.synctex.gz
+
+# Editorial notes and the Bocconi guides are now TRACKED. They used to be
+# ignored, and an `rm -rf` of the old thesis/ tree on 18 Aug 2026 destroyed the
+# working copies precisely because git could not see them.

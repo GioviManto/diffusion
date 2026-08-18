@@ -1,0 +1,202 @@
+% ===========================================================================
+% WORKSHOP VERSION -- the analytical front half, 4 pages of content.
+%
+% Not an abridgement of the paper: a different, smaller claim. The paper asks
+% what can be recovered from noised sequences and answers it at three levels;
+% this note makes one point -- the score of a non-Gaussian Markov chain is
+% computable by local inference, and the standard second-order approximation to
+% that inference is exactly a named estimator (LMMSE under the covariance-matched
+% Gaussian) rather than an uncontrolled one.
+%
+% Every equation and proposition below is \input from paper/sections/, the same
+% files the paper uses, so the two cannot disagree about the mathematics.
+%
+% What is deliberately NOT here, and lives only in the paper:
+%   - the efficiency comparison against trained networks, and its table. A
+%     comparison whose entire content is a protocol cannot be defended in four
+%     pages, and a reader who cannot check the protocol should not be shown the
+%     number.
+%   - the rotating ring and the blindness theorem. Different state space,
+%     different estimand; it is a separate result and is now in the compendium
+%     (ch12) and the thesis (ch09) only.
+%   - the discretisation-control experiment, the gradient-ascent-against-EM
+%     comparison, the convergence-rate asymmetry, the mixture extension.
+%   - the related-work survey, reduced here to the papers that frame the question.
+%
+% Learning appears as one section pointing at the paper, per the audit's
+% recommendation that it be mentioned rather than developed at this length.
+%
+%   tectonic -X compile workshop.tex
+% ===========================================================================
+\documentclass{article}
+
+\usepackage[final,nonatbib]{neurips_2023}
+\makeatletter\renewcommand{\@noticestring}{}\makeatother
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{url}
+\usepackage{booktabs}
+\usepackage{array}
+\usepackage{amsfonts}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{amsthm}
+\usepackage{microtype}
+\usepackage{graphicx}
+\usepackage[numbers,sort&compress]{natbib}
+\usepackage{xcolor}
+\usepackage{hyperref}
+\definecolor{linknavy}{RGB}{20,60,130}
+\definecolor{citegreen}{RGB}{20,100,60}
+\hypersetup{colorlinks=true, linkcolor=linknavy, citecolor=citegreen,
+            urlcolor=linknavy, filecolor=linknavy}
+
+\renewcommand{\topfraction}{0.9}
+\renewcommand{\textfraction}{0.07}
+\renewcommand{\floatpagefraction}{0.75}
+
+\graphicspath{{../shared/figures/}}
+\input{../shared/notation}
+
+\newtheorem{proposition}{Proposition}
+\newtheorem{theorem}{Theorem}
+\newtheorem{remark}{Remark}
+
+\title{Exact diffusion scores for non-Gaussian Markov chains:\\
+what second-order message closure computes}
+
+\author{%
+  Giovanni Mantovani \\
+  Department of Computing Sciences \\
+  Bocconi University \\
+  \texttt{giovanni.mantovani@studbocconi.it}
+}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+The global minimiser of the objective that trains a diffusion model is the score of the
+\emph{empirical} distribution, not of the data distribution --- a model attaining it would
+reproduce its training set and nothing else. Deciding what a network actually learned means
+comparing it against the score it should have learned, which for realistic data is unavailable.
+We exhibit a family where it is available and non-trivial: a first-order Markov chain with
+continuous, non-Gaussian transitions. Coordinatewise noising multiplies the prior by \emph{unary}
+factors, so the posterior factor graph is still the prior's chain --- a tree, on which sum-product
+is exact. The exact score is therefore available for a correlated, non-Gaussian model, and we
+validate the grid representation of the continuous messages against the Gaussian closed form and
+against brute-force enumeration of the discretised posterior. We then prove that single-Gaussian
+message closure computes \emph{exactly} the LMMSE estimator of the covariance-matched Gaussian
+model, so the gap between it and full sum-product is precisely the price of discarding everything
+beyond second moments --- not an uncontrolled approximation but a named estimator. The same
+posterior statistics also supply the exact likelihood gradient needed to learn the transition,
+which the longer paper develops.
+\end{abstract}
+
+\section{The problem}
+
+Diffusion models are trained by regressing the posterior mean of a clean signal given its noised
+version \citep{sohl2015,ho2020,song2021,vincent2011}. A network never sees the data distribution
+$\Pz$; it sees $\nseq$ samples, and the global minimiser of that regression is the score of the
+empirical measure $\hat P_0 = \nseq^{-1}\sum_\mu\delta(\cdot-\va^\mu)$ smoothed by the forward
+Gaussian. A model attaining it exactly would generate its training set and nothing else. That
+diffusion models instead generate new data is the memorisation--generalisation question studied in
+the statistical mechanics of these models \citep{biroli2023,biroli2024dynamical}.
+
+Progress on it needs a target one can compute. For realistic data the exact score is unavailable,
+so a network's error cannot be separated from the difficulty of what it was approximating.
+Tractable families are scarce and mostly Gaussian, where the score is linear and every question
+about structure has a degenerate answer.
+
+\paragraph{This work.} We use a first-order Markov chain: diffusion is applied to sequential data,
+and studying how structure is exploited requires data that has structure one can dial. The chain
+is variance-matched, so Gaussian, Laplace, Student, uniform and bimodal innovations share a
+covariance exactly and differ only beyond second moments. Two things follow, and this note is about
+the first: the exact score is computable by local inference, and the standard second-order
+approximation to that inference turns out to be an identifiable estimator rather than an
+uncontrolled one. The same machinery also learns the kernel when it is unknown, which the longer
+paper develops.
+
+\section{The model, and why its score is computable}
+
+\input{../shared/sections/model}
+
+The likelihood factors are \emph{unary}: the forward noise is independent across coordinates, so
+each observation touches one latent variable. Unary factors reweight node potentials without
+creating edges among the $a_i$, so conditioning leaves the factor graph a chain --- a tree, on
+which sum-product returns exact marginals \citep{pearl1988,kschischang2001,mezard2009}. On a chain
+these are the forward--backward recursions \citep{baum1970,rabiner1989}, reducing to the Kalman
+filter when everything is Gaussian \citep{kalman1960,rauch1965}.
+
+Exactness is at the level of \emph{functional} messages. A message is a function on $\Reals$,
+forced by the state space, so an implementation must represent one; we use a truncated grid of
+$\ngrid$ points, which makes the recursion exact for a finite-state model whose discretisation
+error is measured separately. At $\ngrid=401$ it reproduces the Gaussian closed form to
+$9.2\times10^{-15}$ and brute-force enumeration of the discretised posterior to
+$1.6\times10^{-14}$. Cost is $O(\nsites\ngrid^{2})$ per sequence against $O(\ngrid^{\nsites-1})$
+for direct summation.
+
+\paragraph{What the standard Gaussian approximation computes.} Propagating only the first two
+moments of each message is the usual approximation. On this model it has an exact
+characterisation, which turns a heuristic into a measurement:
+
+\input{../shared/sections/prop-lmmse}
+
+\noindent
+So the gap between moment-projected and full sum-product is precisely the price of replacing the
+prior by its covariance twin --- not an artefact of a message representation. It vanishes as $t$
+grows, because noising Gaussianises the posterior, so the shape of $\innov$ survives only where
+the likelihood is weak: on the Laplace chain the median relative score error falls from $0.241$ at
+$t=0.05$ to $7.3\times10^{-6}$ at $t=3$ (Figure~\ref{fig:closure}).
+
+\begin{figure}[!htbp]
+\centering
+\includegraphics[width=0.86\textwidth]{fig_closure_vs_t.pdf}
+\caption{What the Gaussian second-order baseline costs, against sum-product under the true kernel.
+By Proposition~\ref{prop:lmmse} this gap is exactly the price of replacing the prior by its
+covariance-matched Gaussian, so it measures non-Gaussianity rather than approximation quality.
+Laplace chain, $\corr=0.85$; median over seeds with the $10$--$90$ percentile band.}
+\label{fig:closure}
+\end{figure}
+
+\section{The same inference also learns the chain}
+
+Everything above assumes the kernel is known. It need not be. The pairwise posterior marginals that
+sum-product already produces are exactly the expected transition statistics that likelihood
+learning needs: writing $\Lik(\params)=\sum_\mu\log P_{t,\params}(\vx^\mu)$, Fisher's identity gives
+$\nabla_\params\Lik$ as a posterior expectation of the complete-data score, so one
+forward--backward pass yields the exact gradient and no differentiation through the
+$2(\nsites-1)$ message updates is required. Accumulated over edges the pairwise beliefs form a
+single matrix $\Xis$ that is a complete summary for the resulting surrogate objective, so the
+maximisation step never revisits the data; for Gaussian innovations it is closed form, the
+belief-weighted Yule--Walker equations. The derivations, the mixture-innovation extension, and the
+recovery experiments are in the longer paper.
+
+\section{Scope, and what is open}
+
+Exactness is structural, not numerical: the recursion is exact on the functional messages, and what
+an implementation actually runs is a truncated grid whose truncation and quadrature error must be
+measured rather than assumed. The figures quoted above are agreements at the stated configuration,
+not a bound for arbitrary kernels, tails or noise levels --- trapezoidal quadrature is second order,
+and it degrades when a likelihood is narrower than a few grid cells. Everything here also assumes
+exact first-order Markov structure; under a non-Markov prior the inference is misspecified in a way
+more data does not repair. Inference costs $O(\nsites\ngrid^{2})$ per sequence, well above a network
+forward pass, so what this model buys is a computable target, not speed.
+
+The open question is architectural. Sum-product on a chain suggests a network narrow but as deep
+as twice the chain, unlike the tree-structured case where the natural depth is the tree's
+\citep{mei2024unet,garnierbrun2024transformers}. Which architectures exploit Markovianity, and at
+what depth, is what this setting is built to measure.
+
+% Marks the end of main content, so the page-limit check does not have to find
+% the bibliography by looking for the word "References" next to a "[1]" in
+% extracted text -- a heuristic that breaks on a style change or a stray match.
+\label{LastMainPage}
+\bibliographystyle{unsrtnat}
+\bibliography{../shared/references}
+
+\clearpage
+\appendix
+\input{appendix}
+
+\end{document}

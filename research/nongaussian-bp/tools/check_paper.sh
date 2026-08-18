@@ -15,9 +15,9 @@ cd "$(dirname "$0")/.."
 # Both production documents are gated. The compendium is the development
 # environment and is deliberately NOT gated -- it is where unfinished work is
 # allowed to live.
-DOCS=("paper/main.tex:9:paper" "paper/workshop.tex:4:workshop")
-PAPER=paper/main.tex
-APPENDIX=paper/appendix.tex
+DOCS=("../../overleaf/paper:9:paper" "../../overleaf/workshop:4:workshop")
+PAPER=../../overleaf/paper/main.tex
+APPENDIX=../../overleaf/paper/appendix.tex
 BUILD=${BUILD_DIR:-/tmp/paper-check}
 FAIL=0
 
@@ -27,9 +27,21 @@ fail() { printf "  [FAIL] %s\n" "$1"; FAIL=1; }
 echo "Paper gate"
 echo
 
+# Every check below greps files. If a path is wrong, grep finds nothing and the
+# check passes -- which is exactly what happened when the documents moved to
+# overleaf/ and this script still pointed at the old tree. So: exist first.
+for required in "$PAPER" "$APPENDIX" ../../overleaf/workshop/main.tex; do
+    [ -f "$required" ] || { fail "missing input: $required"; }
+done
+if [ "$FAIL" -ne 0 ]; then
+    echo
+    echo "Gate cannot run -- the documents are not where this script expects."
+    exit 1
+fi
+
 # 1. No code-file references in the paper. Pointers to the implementation
 #    belong in the compendium; the paper is the product, not the workshop.
-n=$(cat "$PAPER" paper/workshop.tex | grep -c 'codefile\|coderef' || true)
+n=$(cat "$PAPER" ../../overleaf/workshop/main.tex | grep -c 'codefile\|coderef' || true)
 [ "$n" -eq 0 ] && pass "no \\codefile/\\coderef in either document" \
                 || fail "$n \\codefile/\\coderef occurrence(s) in the production documents"
 
@@ -44,7 +56,7 @@ else
 fi
 
 # 3. No unfilled data placeholders.
-n=$(grep -c 'needsdata' "$PAPER" "$APPENDIX" paper/workshop.tex paper/sections/*.tex 2>/dev/null | awk -F: '{s+=$2} END{print s+0}')
+n=$(grep -c 'needsdata' "$PAPER" "$APPENDIX" ../../overleaf/workshop/main.tex ../../overleaf/shared/sections/*.tex 2>/dev/null | awk -F: '{s+=$2} END{print s+0}')
 if [ "$n" -eq 0 ]; then
     pass "no \\needsdata placeholders remain"
 else
@@ -56,12 +68,15 @@ fi
 if command -v tectonic >/dev/null && command -v pdftotext >/dev/null; then
     mkdir -p "$BUILD"
     for spec in "${DOCS[@]}"; do
-        src="${spec%%:*}"; rest="${spec#*:}"; limit="${rest%%:*}"; label="${rest#*:}"
-        base=$(basename "$src" .tex)
+        dir="${spec%%:*}"; rest="${spec#*:}"; limit="${rest%%:*}"; label="${rest#*:}"
+        base=main
+        # Compiled from inside its own folder, because the roots resolve
+        # `../shared/...` relative to themselves -- the same way Overleaf does it.
+        #
         # -k keeps the .aux, which is where the LastMainPage page number is read
         # from below. Without it tectonic deletes the intermediates and the check
         # silently falls back to the text heuristic it is meant to replace.
-        if (cd paper && tectonic -X compile -k "$base.tex" --outdir "$BUILD" >/dev/null 2>&1); then
+        if (cd "$dir" && tectonic -X compile -k main.tex --outdir "$BUILD" >/dev/null 2>&1); then
             # \label{LastMainPage} sits immediately before \bibliographystyle, so
             # LaTeX itself reports which page the main content ends on. This used
             # to be found by hunting extracted text for "References" next to a
@@ -102,10 +117,10 @@ fi
 #     copy nobody compiles, so it drifts from whatever superseded it and is then
 #     available to be pasted back in. That is exactly how the stale ring model
 #     (missing its normaliser) outlived the corrected one in the compendium.
-for f in paper/sections/*.tex; do
+for f in ../../overleaf/shared/sections/*.tex; do
     name=$(basename "$f" .tex)
-    inmain=$(grep -c "input{sections/$name}" paper/main.tex || true)
-    inws=$(grep -c "input{sections/$name}" paper/workshop.tex || true)
+    inmain=$(grep -c "input{../shared/sections/$name}" "$PAPER" || true)
+    inws=$(grep -c "input{../shared/sections/$name}" ../../overleaf/workshop/main.tex || true)
     if [ "$inmain" -ge 1 ] || [ "$inws" -ge 1 ]; then
         pass "sections/$name reached (main:$inmain workshop:$inws)"
     else
@@ -122,10 +137,10 @@ done
 #     up, since the tolerance gets widened until it goes green. So the rule is
 #     structural instead: the numbers live in one generated file, the prose cites
 #     macros, and a typed decimal near the word "ratio" is the failure.
-MACROS=paper/sections/efficiency-numbers.tex
+MACROS=../../overleaf/shared/sections/efficiency-numbers.tex
 if [ ! -f "$MACROS" ]; then
     fail "$MACROS missing -- run tools/make_tab_efficiency.py"
-elif ! grep -q 'input{sections/efficiency-numbers}' "$PAPER"; then
+elif ! grep -q 'input{../shared/sections/efficiency-numbers}' "$PAPER"; then
     fail "$PAPER does not \\input sections/efficiency-numbers"
 else
     pass "efficiency figures come from generated macros"
@@ -135,7 +150,7 @@ fi
 # and $14$" and "$8$--$14$"; the macro forms (\ratiolo, \ratioloword) contain no
 # digits and so cannot trip it.
 typed=$(grep -nE 'between \$[0-9]+(\.[0-9])?\$ and \$[0-9]+(\.[0-9])?\$ ?(times|\\times)|\$[0-9]+(\.[0-9])?\$--\$[0-9]+(\.[0-9])?\$ ?\\times' \
-        "$PAPER" paper/workshop.tex 2>/dev/null || true)
+        "$PAPER" ../../overleaf/workshop/main.tex 2>/dev/null || true)
 if [ -z "$typed" ]; then
     pass "no hand-typed efficiency ratio ranges"
 else

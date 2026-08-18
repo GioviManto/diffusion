@@ -1,0 +1,350 @@
+% ============================================================
+% Chapter 11 --- What structure buys, and where it stops paying
+%
+% Original work of this thesis. Results are those of research/nongaussian-bp
+% (27 experiments); the corrected readings follow that project's own
+% re-derivation of its claims from committed data (CLAIMS_TO_UPDATE.md) and
+% an executable audit of the estimator (audit/AUDIT_NOTE.md), both dated
+% 2026-08-12. Where a number in the project's own paper predates one of
+% those corrections, the corrected version is reported here instead, and
+% the discrepancy is noted.
+% ============================================================
+
+\chapter{What Structure Buys, and Where It Stops Paying}
+\label{ch:em-results}
+
+Chapter~\ref{ch:em-method} built an estimator that is exact in its inference
+step and approximate only in its numerical representation and its
+optimisation budget. This chapter asks what that estimator is worth. Four
+questions organise it, in the order the evidence answers them most cleanly.
+
+\begin{quote}
+How much does the structured estimator reduce the data needed to match a
+given denoising accuracy; does that pointwise advantage survive when the
+estimated score is used to \emph{generate}, by integrating the reverse
+process; how much mixture capacity does the model need; and how far can the
+Markov assumption itself be wrong before the structure stops helping?
+\end{quote}
+
+Every comparison below fits the mixture kernel of \eqref{eq:em-mixture-kernel}
+by the EM procedure of Chapter~\ref{ch:em-method} and compares it against
+neural denoisers trained by ordinary denoising score matching on the same
+noised data, with no access to the Markov factorisation, the linear kernel
+form, or homogeneity across sites --- three structural facts the estimator is
+given and the networks are not. Two network architectures recur throughout: a
+fully connected MLP with no locality bias, and a local convolutional network
+matched in receptive field to the estimator's own locality (Chapter~9's
+theme, transported here). The comparison measures the value of the structure
+supplied, not a general claim about neural denoisers.
+
+\section{Pointwise data efficiency}\label{sec:em-pointwise}
+
+Under the correctly specified model, at the data budgets tested, the
+structured estimator attains lower relative denoising error than the global
+MLP by a factor of \textbf{9--14} across seven doublings of the training set,
+with no trend in the factor as the budget grows (Figure~\ref{fig:em-sample-eff}).
+Against the locality-respecting convolutional network the margin narrows to
+\textbf{2--4}, so more than half of the fully connected network's deficit is
+attributable to its architecture rather than to the estimator's advantage ---
+consistent with the locality results of Chapter~\ref{ch:ring} and the
+receptive-field argument of Chapter~\ref{ch:gaussian}.
+
+\begin{figure}[t]\centering
+\includegraphics[width=0.62\linewidth]{fig_sample_efficiency.pdf}
+\caption{Relative denoising error against training-set size, mean over six
+replicates with standard errors, for the EM/BP estimator and the two network
+baselines reported separately. Source:
+\texttt{outputs/exp\_07\_em\_vs\_score\_network/}.}
+\label{fig:em-sample-eff}
+\end{figure}
+
+This comparison was originally selected by an oracle --- the network
+parameterisation (predicting the noise or the clean signal) and, in a
+separate sweep, the receptive-field radius, were both chosen on the same
+test bundle used to report the result. Re-selecting on a disjoint validation
+split instead agrees with the test-set choice in 33 of 35 cells for the
+parameterisation and 54 of 60 for the two-axis receptive-field sweep; the
+mean advantage moves from $11.65\times$ (test-oracle) to $11.66\times$
+(validation-selected), and the receptive-field ratio from $3.846$ to
+$3.862$. Both oracles were therefore worth less than $1.005\times$ --- a
+genuine methodological correction with no measurable effect on the
+conclusion.
+
+\section{How much mixture capacity is enough}\label{sec:em-capacity}
+
+Enlarging $C$ in \eqref{eq:em-mixture-kernel} should help until the mixture
+can represent the true innovation law and stop helping after. Held-out
+log-evidence per edge, fit and scored on disjoint data, rises with $C$ but
+\emph{saturates}: paired against $C=1$ on identical training and evaluation
+data within each cell (six paired seeds, $N=128$),
+
+\begin{center}
+\begin{tabular}{@{}rrrrr@{}}
+\toprule
+$C$ & paired $\Delta$(evidence/edge) & s.e. & beyond 2 s.e.? & effective $C$ \\
+\midrule
+2  & $+0.000013$ & $0.000090$ & no  & $2.00$ \\
+4  & $+0.001286$ & $0.000107$ & yes & $3.82$ \\
+8  & $+0.001735$ & $0.000136$ & yes & $7.70$ \\
+16 & $+0.001740$ & $0.000152$ & yes & $15.50$ \\
+\bottomrule
+\end{tabular}
+\end{center}
+\noindent$C=2$ buys nothing over a single Gaussian innovation; capacity
+begins to pay at $C=4$; and $C=8$ and $C=16$ differ by $5\times10^{-6}$,
+inside one standard error, so nothing further is bought past $C\approx8$. The
+same pattern holds on the primary pointwise metric --- held-out denoising MSE
+against the Bayes denoiser, paired the same way --- where $C=8$ is the paired
+optimum at both $N=128$ and $N=512$, $C=16$ is not distinguishable from it,
+and at $N=512$ the smallest capacity $C=2$ is measurably \emph{worse} than
+$C=1$: extra parameters cost more than they buy below the capacity the data
+supports. This is not a resolution artefact --- the narrowest fitted component
+stays at least $8.8$ grid spacings wide in every one of these cells.
+
+\begin{figure}[t]\centering
+\includegraphics[width=0.62\linewidth]{fig_capacity.pdf}
+\caption{Held-out denoising MSE and generated-sample fidelity against mixture
+capacity $C$, three seeds, at a fixed EM budget of 40 iterations. Read
+alongside the caveat below: the shape-dependent curves in this figure are
+confounded with EM convergence rate; the evidence-based saturation reported
+in the text, from a separate paired design, is not. Source:
+\texttt{outputs/exp\_16/}.}
+\label{fig:em-capacity}
+\end{figure}
+
+\begin{remark}[This capacity picture is qualified, and the qualification
+matters]\label{rmk:em-capacity-confound}
+Every fit contributing to Figure~\ref{fig:em-capacity} and to any curve in
+$C$ that depends on the \emph{fitted or generated shape} of the innovation
+(as opposed to held-out evidence or runtime) used the fixed EM budget of 40
+iterations. Section~\ref{sec:em-convergence} measured that the innovation
+shape can need on the order of 2000 iterations to settle --- a factor of
+roughly 50 --- and, applied to this specific sweep, found that across 72
+seed-configurations \textbf{93\% had not settled in the shape coordinate by
+iteration 40}. Because a larger $C$ has more shape parameters to move within
+the same fixed budget, under-iteration alone produces a curve that looks
+exactly like a capacity effect whether or not capacity is doing anything. A
+direct check attributes roughly \textbf{96\% of the apparent capacity effect}
+in this configuration to convergence rate at the fixed budget, not to
+capacity. The held-out-evidence saturation reported in the main text above
+survives this concern, because it is a paired comparison scored by an
+average over the whole density that saturates early in the optimisation; the
+runtime measurement below is unaffected for the same reason. Anything
+resting on fitted or generated \emph{shape} at $C>1$ in the rest of this
+section, and in Section~\ref{sec:em-generative} where those same $C=40$-iteration
+fits reappear, should be read as evidence for a real phenomenon at an
+under-converged operating point, not as a claim about the converged
+estimator. Re-running to a convergence criterion rather than a fixed count is
+identified as the direct fix and was not completed as part of this thesis.
+\end{remark}
+
+Runtime is close to flat across the whole capacity sweep, $13.5\to14.3$
+seconds per iteration from $C=2$ to $C=16$ while the number of free
+parameters grows $6\to48$, confirming that the E-step's $O(nM^2)$ cost
+dominates and only the M-step scales with $C$ --- this measurement, like the
+evidence saturation above, is unaffected by
+Remark~\ref{rmk:em-capacity-confound}.
+
+\section{Pointwise accuracy does not determine generative fidelity}
+\label{sec:em-generative}
+
+The comparisons above are all pointwise: they score a denoiser against a
+single noised observation. Using the estimated score to \emph{generate},
+by integrating the reverse SDE from noise, is a different test, and the
+central finding of this chapter is that the two tests disagree.
+
+The generative metric is the excess kurtosis of the residual
+$r_i = x_i - \alpha x_{i-1}$ computed on a generated sample at a small
+diffusion time --- an AR-filtered residual, not literally the clean innovation:
+$r_i = \alpha\varepsilon_i + \sqrt{\Deltat}(z_i - \alpha z_{i-1})$ has a
+predicted, non-zero lag-one autocorrelation of $-0.0997$ at $t=0.02$ (rising
+in magnitude with $t$), confirmed by measurement and small on the clean
+chain ($|\text{ACF}|<0.02$). With that naming caveat in place, it remains
+the sharpest discriminator available between innovation families at matched
+covariance, against a closed-form target of $1.9098$ excess kurtosis for the
+Laplace-innovation chain used throughout this comparison.
+
+Under a corrected generation protocol --- continuous log-uniform training
+noise levels rather than five discrete ones, removing an interpolation
+artefact that had been mixed into the earlier comparison --- the two
+network-free arms (\texttt{exact} and the EM/BP estimator) are, as they must
+be, bit-identical to the previous protocol; the correction is isolated to
+the trained networks, both of which \emph{improve} under it. The result
+across four training budgets:
+
+\begin{center}
+\begin{tabular}{@{}rrrl@{}}
+\toprule
+$N$ & EM/BP & CNN & MLP \\
+\midrule
+32   & 0.491 & 0.728 & 14.803\ (2/4 seeds unstable) \\
+128  & 0.814 & 1.293 & 1.441 \\
+512  & 0.897 & \textbf{1.601} & 0.167 \\
+2048 & 0.902 & \textbf{1.572} & \textbf{0.046} \\
+\bottomrule
+\end{tabular}
+\end{center}
+\noindent(target $1.9098$; mean over four seeds per cell except $N=32$).
+Pointwise, the EM/BP estimator wins by roughly an order of magnitude at every
+budget (Section~\ref{sec:em-pointwise}). Generatively, it never exceeds
+$0.90$ at any budget, while the local CNN reaches $1.57$--$1.60$ from
+$N=128$ up --- closer to the target than the estimator that dominates it
+pointwise, at every budget from 128 onward. The dissociation is present
+already at $N=128$, where the small-sample instability of the MLP ($N=32$,
+where two of four seeds diverge --- an over-parameterisation artefact of
+fitting a $128\times128$ network on 32 chains, not a property of the
+protocol) has already resolved.
+
+\begin{figure}[t]\centering
+\includegraphics[width=0.5\linewidth]{fig_pointwise_vs_generative.pdf}
+\caption{Pointwise denoising MSE against generated-sample excess kurtosis,
+one point per estimator/capacity configuration. The two axes are not a
+trade-off curve for a single estimator; the sharper statement is the
+within-arm MLP result reported in the text. Source:
+\texttt{outputs/exp\_16/gen2\_n*/}.}
+\label{fig:em-pointwise-vs-gen}
+\end{figure}
+
+\paragraph{The sharpest version of the result is within one arm.} At
+$N=2048$ the global MLP's four per-seed generated-kurtosis values are
+$0.097$, $0.069$, $0.019$, $-0.002$ --- all indistinguishable from a purely
+Gaussian generated law --- while its own pointwise error over the same range
+of $N$ is monotonically \emph{improving}. A single estimator, trained on
+more data by every reasonable measure of fit quality, becomes simultaneously
+more accurate pointwise and less faithful generatively. This is a stronger
+statement than the three-arm ranking above, because it needs no comparison
+between different estimators and no assumption about which one is
+correctly specified: it is one estimator, disagreeing with itself across two
+notions of correctness as its training data grows. The mechanism proposed ---
+that a better $L_2$ fit to the posterior mean is smoother, and a smoother
+denoiser drives the reverse SDE toward a more Gaussian generated law --- is a
+hypothesis consistent with the direction of the effect and has not been
+measured directly in this thesis.
+
+\section{Where the Markov assumption stops paying}\label{sec:em-nonmarkov}
+
+Every result so far assumes the clean chain is exactly first-order Markov.
+Two controlled violations were measured against an exact reference (linear
+Gaussian algebra for the contaminated model, so the estimator being wrong is
+not confused with the reference being wrong): a rank-one global latent
+shared across all sites at strength $\beta$, and a long-range coupling at
+strength $\gamma$ added on top of the chain.
+
+\begin{center}
+\small
+\begin{tabular}{@{}llrrl@{}}
+\toprule
+violation & strength & CNN/EM-BP & Chow--Liu & reading \\
+\midrule
+global latent & $\beta=0$     & $11.4\to5.4$      & $-0.0009$ & Markov control \\
+global latent & $\beta=0.5$   & $4.1\to3.2$       & $+0.0091$ & degraded, still winning \\
+global latent & $\beta=1.0$   & $2.1\to3.1$       & $+0.0128$ & \textbf{never inverts} \\
+long-range    & $\gamma=0$    & $25.4\to10.5$     & $+0.0014$ & Markov control \\
+long-range    & $\gamma=0.10$ & $0.77\to1.32$     & $+0.0574$ & \textbf{inverts at low $t$} \\
+long-range    & $\gamma=0.40$ & $0.47\to1.03$     & $+0.1010$ & \textbf{inverts across most of it} \\
+\bottomrule
+\end{tabular}
+\end{center}
+\noindent The two violations behave qualitatively differently, and the
+difference is principled rather than incidental. A global latent shared
+across every site makes the score residual \emph{exactly} rank one, by a
+Woodbury identity; a chain-structured estimator can absorb a rank-one
+correction into its fitted coefficients and does --- the fitted $\alpha$
+rises and the fitted innovation kurtosis flattens as $\beta$ grows, exactly
+tracking the contamination it is misattributing to the chain. Long-range
+coupling is only \emph{approximately} low rank, and a chain family cannot
+represent it at all: the advantage is gone by $\gamma\approx0.05$--$0.10$ and
+the structured estimator's own relative error reaches $57\%$ at high noise
+and the strongest tested coupling. The minimum CNN/EM-BP ratio over the full
+noise schedule never falls below $2.08$ for the rank-one violation at any
+strength up to $\beta=1.0$ --- where half the marginal variance is a shared
+global constant --- and falls to $0.47$ for the long-range one. The Chow--Liu
+deviation column corroborates the mechanism independently: the fitted chain
+stays close to the best possible Markov approximation of the truth under
+rank-one contamination and departs from it under long-range coupling,
+exactly where a chain can no longer represent what generated the data. The
+same qualitative split holds when the innovation law is Laplace rather than
+Gaussian: the rank-one violation still never inverts the advantage, with the
+minimum ratio at $\beta=1.0$ equal to $1.45$ against an exact non-Markov
+reference.
+
+\begin{remark}
+The two extends the lesson of Chapter~\ref{ch:laplace}: there, what broke
+under a harder innovation law was the \emph{representability of messages} in
+a finite-dimensional family, while the tree, the two-sweep schedule, and the
+score--posterior identity survived unconditionally. Here, the further
+question is what breaks when the graph is not a tree to begin with. The
+answer is not "misspecification degrades the advantage" uniformly --- it is
+that a chain-structured estimator tolerates the one violation it can
+absorb into its own parameters and fails on the one it structurally cannot
+represent, and the two are not interchangeable amounts of "how wrong the
+model is": they are different in kind.
+\end{remark}
+
+\section{Shape is intrinsically harder to identify than correlation}
+\label{sec:em-information}
+
+Section~\ref{sec:em-convergence} found that the innovation shape converges
+far slower than the autoregressive coefficient under EM. A direct
+information-theoretic measurement gives a structural reason: on a
+generalised-Gaussian innovation family where a shape parameter $\beta$
+moves the fourth moment at \emph{exactly fixed} variance, the efficient
+Fisher information for $\beta$ --- after projecting out the nuisance
+coordinates $(\alpha, q)$, since raw diagonal entries alone are misleading
+when parameters are correlated --- decays two to three orders of magnitude
+faster with diffusion noise than the information for $\alpha$ itself:
+
+\begin{center}
+\begin{tabular}{@{}rrrr@{}}
+\toprule
+true $\beta$ & info loss, $\alpha$ & info loss, $q$ & info loss, $\beta$ (shape) \\
+\midrule
+1.0 & $78\times$ & $235\times$ & $\mathbf{8{,}738\times}$ \\
+1.5 & $83\times$ & $459\times$ & $\mathbf{64{,}227\times}$ \\
+3.0 & $56\times$ & $522\times$ & $\mathbf{68{,}460\times}$ \\
+\bottomrule
+\end{tabular}
+\end{center}
+\noindent (information loss measured between the smallest and largest
+diffusion time tested). This is not merely a restatement of the convergence
+finding: it is a property of the noised likelihood itself, independent of
+any optimiser, and it explains \emph{why} the shape coordinate is slow ---
+there is structurally less information about it in noised data at any fixed
+sample size, at every diffusion time past the smallest ones. It is also the
+reason the capacity sweep of Section~\ref{sec:em-capacity} is exactly the
+kind of measurement where an insufficient iteration budget is dangerous: the
+coordinate that is hardest to move is also the one with the least signal per
+observation.
+
+\section{Scope not covered here}
+
+The estimator of Chapter~\ref{ch:em-method} was also extended, within the
+same research package, to video sequences and to natural-image patches, and
+to a wavelet-domain hidden-Markov-tree generalisation of the chain
+structure used throughout this thesis. Those extensions are reported in the
+package's own notebooks and paper rather than reproduced in this chapter:
+the image comparison in particular is, by that project's own account, an
+unfinished comparison --- the two kernel families compared were fit with
+different, not directly comparable factories --- and reporting a number here
+without the caveat that project attaches to it would overstate what is
+established.
+
+\section{Summary}
+
+Four results, each qualified by exactly how far it was checked. The
+structured estimator reduces the data needed for accurate denoising by
+$9$--$14\times$ against an unstructured network and $2$--$4\times$ against a
+locality-matched one, and this survives a validation-split correction to
+the oracle that originally selected it. That pointwise advantage does not
+transfer to generation: the sharpest evidence is a single estimator getting
+simultaneously better pointwise and worse generatively as its training data
+grows. Mixture capacity beyond roughly eight components buys nothing on
+held-out evidence or on paired pointwise MSE, in a measurement that survives
+the chapter's central methodological caveat; any capacity conclusion resting
+on fitted or generated shape at a fixed, modest EM budget should be treated
+as evidence for a real phenomenon at an under-converged operating point
+rather than a converged one. And the Markov structure this estimator relies
+on is not a single amount of "how much structure": it survives a violation
+it can absorb into its own parameters and fails, well before generic
+intuition about model misspecification would suggest, on one it structurally
+cannot represent.
