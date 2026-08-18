@@ -58,13 +58,27 @@ if command -v tectonic >/dev/null && command -v pdftotext >/dev/null; then
     for spec in "${DOCS[@]}"; do
         src="${spec%%:*}"; rest="${spec#*:}"; limit="${rest%%:*}"; label="${rest#*:}"
         base=$(basename "$src" .tex)
-        if (cd paper && tectonic -X compile "$base.tex" --outdir "$BUILD" >/dev/null 2>&1); then
-            body=$(pdftotext -layout "$BUILD/$base.pdf" - 2>/dev/null | awk '
-                BEGIN { RS="\f"; p=0 }
-                /References/ && (/\[1\]/ || /\[2\]/) { print NR-1; p=1; exit }
-                END { if (!p) print -1 }')
+        # -k keeps the .aux, which is where the LastMainPage page number is read
+        # from below. Without it tectonic deletes the intermediates and the check
+        # silently falls back to the text heuristic it is meant to replace.
+        if (cd paper && tectonic -X compile -k "$base.tex" --outdir "$BUILD" >/dev/null 2>&1); then
+            # \label{LastMainPage} sits immediately before \bibliographystyle, so
+            # LaTeX itself reports which page the main content ends on. This used
+            # to be found by hunting extracted text for "References" next to a
+            # "[1]" -- a heuristic that a style change or a stray match breaks,
+            # and one that fails silently in the permissive direction.
+            body=$(sed -n 's/.*\\newlabel{LastMainPage}{{[^}]*}{\([0-9]*\)}.*/\1/p' \
+                   "$BUILD/$base.aux" 2>/dev/null | head -1)
+            if [ -z "$body" ]; then
+                # Fall back to the old heuristic rather than skipping the check.
+                body=$(pdftotext -layout "$BUILD/$base.pdf" - 2>/dev/null | awk '
+                    BEGIN { RS="\f"; p=0 }
+                    /References/ && (/\[1\]/ || /\[2\]/) { print NR-1; p=1; exit }
+                    END { if (!p) print -1 }')
+                echo "         (no LastMainPage label in $label; used the text heuristic)"
+            fi
             if [ "$body" -lt 0 ]; then
-                fail "$label: could not locate the bibliography"
+                fail "$label: could not locate the end of main content"
             elif [ "$body" -le "$limit" ]; then
                 pass "$label body is $body pages (limit $limit)"
             else

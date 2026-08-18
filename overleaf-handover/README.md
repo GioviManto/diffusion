@@ -6,8 +6,8 @@ project works with no rearranging. Set the main document per compile.
 
 | Root | What it is | Body | Ready to send? |
 |---|---|---|---|
-| `workshop.tex` | the analytical result: exact scores + LMMSE closure | 2pp of 4 | Yes |
-| `paper.tex` | the full paper | 8pp of 9 | Yes |
+| `workshop.tex` | the analytical result: exact scores + LMMSE closure | 3pp of 4 | Yes |
+| `paper.tex` | the full paper | 9pp of 9 | Yes |
 | `compendium.tex` | every derivation and experiment, including cut ones | 53pp | Yes |
 | `thesis.tex` | the thesis | 169pp | Yes, as a draft |
 
@@ -52,14 +52,20 @@ and the range over the other six sizes is quoted alongside it.
 The compendium and thesis are allowed to carry provisional results, and both say
 which results are provisional.
 
-## The workshop has 2pp of headroom
+## How the page counts are measured, and why they moved
 
-It is 2 pages against a 4-page limit, because rescoping removed more than it
-added. That is deliberate — a short paper that makes one point beats a full one
-that makes five — but if you want the space, the place to spend it is the
-functional-BP exposition: what a message *is* as a function on the reals, and why
-the grid is a representation of it rather than the thing itself. That is the part
-readers of the old draft found compressed.
+Both documents now carry `\label{LastMainPage}` immediately before the
+bibliography, so LaTeX reports where main content ends. The gate previously found
+the bibliography by looking through extracted text for the word "References" next
+to a "[1]", which **undercounted by one page** in both documents — it stops at the
+page before the one where references appear, which is wrong whenever the
+bibliography starts on the same page the main text ends. So the paper is at 9 of 9,
+not the 8 the old check reported: compliant, but with no slack left.
+
+The workshop has 1pp of genuine headroom. If you want to spend it, the place is
+the functional-BP exposition: what a message *is* as a function on the reals, and
+why the grid is a representation of it rather than the thing itself. That is the
+part readers of the earlier draft found compressed.
 
 ## What is shared, and why editing matters
 

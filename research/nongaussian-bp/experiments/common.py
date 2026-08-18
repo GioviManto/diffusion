@@ -91,12 +91,43 @@ def select_parts(parts: dict, only: str | None) -> dict:
     return {name: parts[name] for name in wanted}
 
 
+_REVISION_FILE = Path(__file__).resolve().parents[1] / "REVISION"
+
+
+def _revision_stamp() -> dict[str, str]:
+    """Commit and dirty state recorded at deploy time, for hosts without .git.
+
+    The graceful degradation below did exactly what it was designed to do and
+    that turned out to be the problem: every cluster run has an EMPTY git_commit,
+    because the code is rsynced without .git. The runs that most need a revision
+    are the ones that never had one.
+
+    So the deploy step writes a REVISION file next to the code, and it is read
+    here when git itself is unavailable. Two lines: the commit, then the
+    porcelain status at deploy time (empty if the tree was clean). NGBP_GIT_COMMIT
+    and NGBP_GIT_DIRTY override both, for a scheduler that would rather pass them
+    in the environment.
+    """
+    env = os.environ.get("NGBP_GIT_COMMIT", "").strip()
+    if env:
+        return {"commit": env, "dirty": os.environ.get("NGBP_GIT_DIRTY", "").strip(),
+                "source": "env"}
+    try:
+        lines = _REVISION_FILE.read_text().splitlines()
+        return {"commit": lines[0].strip() if lines else "",
+                "dirty": "\n".join(lines[1:]).strip(),
+                "source": "REVISION file"}
+    except Exception:
+        return {"commit": "", "dirty": "", "source": "unavailable"}
+
+
 def _git(*args: str) -> str:
     """A git query that degrades to "" rather than killing an experiment.
 
     Runs on compute nodes and from exported tarballs where .git may be absent,
     so every failure mode -- no repo, no git binary, timeout -- returns the empty
-    string and the manifest simply records that the commit was unavailable.
+    string. Callers that need the commit should go through `provenance`, which
+    falls back to `_revision_stamp` rather than recording nothing.
     """
     import subprocess
 
@@ -110,13 +141,22 @@ def _git(*args: str) -> str:
 
 
 def provenance() -> dict[str, str]:
+    commit = _git("rev-parse", "HEAD")
+    dirty = _git("status", "--porcelain")
+    stamp = {"source": "git"}
+    if not commit:
+        stamp = _revision_stamp()
+        commit, dirty = stamp["commit"], stamp["dirty"]
     return {
         "timestamp": time.strftime("%Y-%m-%d %H:%M:%S"),
-        "git_commit": _git("rev-parse", "HEAD"),
+        "git_commit": commit,
         "git_branch": _git("rev-parse", "--abbrev-ref", "HEAD"),
         # Non-empty means the tree carried uncommitted changes when this ran, so
         # git_commit alone does not reproduce the result.
-        "git_dirty": _git("status", "--porcelain"),
+        "git_dirty": dirty,
+        # Which of git / the REVISION file / the environment supplied the commit,
+        # so "" is distinguishable from "recorded, from a deploy stamp".
+        "revision_source": stamp["source"],
         "python": sys.version.split()[0],
         "numpy": np.__version__,
         "platform": platform.platform(),

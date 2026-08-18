@@ -1,18 +1,30 @@
 % ===========================================================================
-% WORKSHOP VERSION -- 4 pages of content.
+% WORKSHOP VERSION -- the analytical front half, 4 pages of content.
 %
-% This is not an abridgement written by hand. Every equation, proposition,
-% theorem and number below is \input from paper/sections/, the same files the
-% 9-page paper uses, so the two cannot disagree about the mathematics or the
-% results. What is written here rather than shared is the connecting prose,
-% which is genuinely different at this length: the paper develops a ladder of
-% four rungs, and the workshop states the two that carry the claim.
+% Not an abridgement of the paper: a different, smaller claim. The paper asks
+% what can be recovered from noised sequences and answers it at three levels;
+% this note makes one point -- the score of a non-Gaussian Markov chain is
+% computable by local inference, and the standard second-order approximation to
+% that inference is exactly a named estimator (LMMSE under the covariance-matched
+% Gaussian) rather than an uncontrolled one.
+%
+% Every equation and proposition below is \input from paper/sections/, the same
+% files the paper uses, so the two cannot disagree about the mathematics.
 %
 % What is deliberately NOT here, and lives only in the paper:
-%   - the discretisation-control experiment (truncation vs quadrature)
-%   - Rung 1's gradient-ascent-against-EM comparison
-%   - the convergence-rate asymmetry and its stopping rule
-%   - the related-work survey, reduced here to the three papers that frame it
+%   - the efficiency comparison against trained networks, and its table. A
+%     comparison whose entire content is a protocol cannot be defended in four
+%     pages, and a reader who cannot check the protocol should not be shown the
+%     number.
+%   - the rotating ring and the blindness theorem. Different state space,
+%     different estimand; it is a separate result and is now in the compendium
+%     (ch12) and the thesis (ch09) only.
+%   - the discretisation-control experiment, the gradient-ascent-against-EM
+%     comparison, the convergence-rate asymmetry, the mixture extension.
+%   - the related-work survey, reduced here to the papers that frame the question.
+%
+% Learning appears as one section pointing at the paper, per the audit's
+% recommendation that it be mentioned rather than developed at this length.
 %
 %   tectonic -X compile workshop.tex
 % ===========================================================================
@@ -176,6 +188,10 @@ as twice the chain, unlike the tree-structured case where the natural depth is t
 \citep{mei2024unet,garnierbrun2024transformers}. Which architectures exploit Markovianity, and at
 what depth, is what this setting is built to measure.
 
+% Marks the end of main content, so the page-limit check does not have to find
+% the bibliography by looking for the word "References" next to a "[1]" in
+% extracted text -- a heuristic that breaks on a style change or a stray match.
+\label{LastMainPage}
 \bibliographystyle{unsrtnat}
 \bibliography{references}
 

@@ -40,3 +40,7 @@ research/nongaussian-bp/overleaf-bp-diffusion.zip
 thesis/editorial/
 # The university's own copyrighted guide PDFs -- no reason to redistribute.
 thesis/official-guides/*.pdf
+
+# Deploy stamp written by hpc/stamp_revision.sh. Regenerated per deploy, so a
+# committed copy would always be stale and would itself dirty the tree it records.
+research/nongaussian-bp/REVISION
