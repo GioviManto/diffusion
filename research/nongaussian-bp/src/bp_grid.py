@@ -17,9 +17,19 @@ quadrature. Two error sources follow:
 Layer-2 experiments quantify both against the exactly solvable Gaussian case.
 
 Messages are kept in the linear domain but renormalized to unit quadrature mass
-after every step; the discarded constants are accumulated so that the *exact*
-model evidence log p_t(x) is also returned (testable against the closed-form
+after every step; the discarded constants are accumulated so that the model
+evidence log p_t(x) can also be returned (testable against the closed-form
 Gaussian marginal likelihood).
+
+What that returned number is, precisely: a **quadrature estimate of the marginal
+evidence under the truncated grid representation**. It used to be documented as
+the "exact model evidence", which cannot be right two paragraphs after listing
+truncation and O(dx^2) quadrature as error sources. What *is* exact is the
+bookkeeping -- no rescaling constant is lost, so the returned value is the
+evidence of the finite-state model the grid defines, to floating point. Reserve
+"exact" for three things: the analytic Gaussian likelihood, the continuous
+functional recursion before discretisation, and finite-state BP once the grid
+model has been declared to be the model of interest.
 """
 
 from __future__ import annotations
@@ -48,8 +58,11 @@ class GridBPResult:
     means, variances : posterior marginal mean / variance per site (exact up to
                        grid error).
     beliefs          : normalized posterior marginals on the grid, shape (n, M).
-    log_evidence     : log p_t(x), the chain marginal likelihood, including all
+    log_evidence     : log p_t(x) under the truncated grid model -- a quadrature
+                       estimate of the continuous evidence, including all
                        constants (likelihood normalizers and message rescalings).
+                       Exact for the finite-state model the grid defines; see the
+                       module docstring on what "exact" does and does not cover.
     """
 
     means: np.ndarray
@@ -174,7 +187,7 @@ def grid_bp_batch(
     Used by the reverse-dynamics experiments, where BP must run at every
     integration step for every trajectory. Returns (means, variances), each of
     shape (B, n), or (means, variances, log_evidence) with `return_evidence=True`,
-    the third being the per-chain exact log p_t(x) of shape (B,).
+    the third being the per-chain log p_t(x) under the grid model, shape (B,).
 
     The evidence is the same quantity `grid_bp` returns for a single chain, computed
     the same way -- forward rescaling constants, tail integral, and the restored

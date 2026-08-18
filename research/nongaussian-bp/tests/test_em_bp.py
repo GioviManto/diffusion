@@ -285,6 +285,88 @@ def test_returned_kernel_is_the_one_the_trace_ends_on(kernel_name, n_iters, tol)
     assert trace.monotone_violation < 1e-8
 
 
+def test_stopping_tolerance_is_scale_free_in_both_units():
+    """Both the old and the new tolerance are invariant in the sample size.
+
+    Written to record a NEGATIVE result, because an external audit asserted that
+    the dataset-relative threshold `|dL| <= tol*|L|` had to be normalised by the
+    number of transitions "because total log-likelihood scales with N(L-1)". It
+    does -- but so does dL, and the ratio is therefore already scale-free. The
+    per-transition form is a change of units for interpretability, not a fix.
+
+    An earlier version of this test asserted that the two rules stop at different
+    iterations, and its own vacuity guard caught it: they agree, because both are
+    invariant. So the property actually worth pinning is the invariance itself,
+    which is what is checked here -- if a future change breaks it, that is a real
+    regression in either unit.
+    """
+    grid, weights = make_grid(8.0, 201)
+    prior = LaplaceAR1(RHO)
+    rng = rng_for("test-em-tol-scale")
+    _, X, alpha, delta = _sample(prior, 32, 0.3, rng)
+    X4 = np.concatenate([X, X, X, X])          # same law, four times the edges
+
+    traces = []
+    for data in (X, X4):
+        start = MixtureInnovationKernel.init(
+            3, rho=0.2, var=0.9, rng=rng_for("test-em-tol-init")
+        )
+        _, tr = fit_em(start, grid, weights, [(data, alpha, delta)],
+                       n_iters=30, tol=0.0)
+        traces.append(tr)
+    t1, t4 = traces
+
+    assert t4.n_edges == 4 * t1.n_edges
+    L1 = np.asarray(t1.log_evidence)
+    L4 = np.asarray(t4.log_evidence)
+    d1, d4 = np.diff(L1), np.diff(L4)
+
+    # Relative-to-total: invariant, which is the audit's claim refuted.
+    np.testing.assert_allclose(np.abs(d4) / np.abs(L4[:-1]),
+                               np.abs(d1) / np.abs(L1[:-1]), rtol=1e-9)
+    # Per transition: invariant too, so the change of units is safe.
+    np.testing.assert_allclose(d4 / t4.n_edges, d1 / t1.n_edges, rtol=1e-9)
+
+
+@pytest.mark.parametrize("kernel_name", ["gaussian", "mixture"])
+def test_a_decrease_is_not_reported_as_convergence(kernel_name):
+    """A run that ends by exhausting its budget must say so.
+
+    The old test accepted `|dL| <= tol*|L|`, so a small DECREASE ended the loop
+    and the run was returned looking exactly like a converged one. Two things are
+    checked: an impossible tolerance must produce a censored trace rather than a
+    converged one, and a generous tolerance must produce a converged one -- so
+    the status tracks reality instead of being constant.
+    """
+    grid, weights = make_grid(8.0, 201)
+    prior = LaplaceAR1(RHO)
+    rng = rng_for("test-em-censored", kernel_name)
+    _, X, alpha, delta = _sample(prior, 24, 0.3, rng)
+    groups = [(X, alpha, delta)]
+    start = {
+        "gaussian": GaussianAR1Kernel(0.2, 0.9),
+        "mixture": MixtureInnovationKernel.init(
+            3, rho=0.2, var=0.9, rng=rng_for("test-em-censored-init")
+        ),
+    }[kernel_name]
+
+    _, censored = fit_em(start, grid, weights, groups, n_iters=6, tol=0.0)
+    assert censored.stop_reason == "censored" and not censored.converged
+    # n_iters + 1: the budget-exhausted path scores the final proposal too, so
+    # the returned kernel is one the trace has an evidence for. That alignment is
+    # tested by test_returned_kernel_is_the_one_the_trace_ends_on.
+    assert len(censored.log_evidence) == 7
+
+    _, done = fit_em(start, grid, weights, groups, n_iters=500, tol=1e-3)
+    assert done.stop_reason == "converged" and done.converged
+    assert len(done.log_evidence) < 500
+
+    # And the increment that stopped it was an increase, not a decrease.
+    assert done.monotone_violation < 1e-8
+    gain = (done.log_evidence[-1] - done.log_evidence[-2]) / done.n_edges
+    assert gain >= 0.0, f"stopped on a decrease of {gain:.3e} nats/edge"
+
+
 def test_em_recovers_gaussian_parameters():
     """A well-specified fit lands on the truth from a bad initialization."""
     grid, weights = make_grid(8.0, 301)

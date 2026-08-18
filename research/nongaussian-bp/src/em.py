@@ -1,4 +1,14 @@
-"""Exact EM for chain-prior parameters, with belief propagation as the E-step.
+"""Tree-structured grid EM for chain-prior parameters, with belief propagation as
+the E-step and exact or generalised kernel updates.
+
+The name is deliberate and this module used to be called "Exact EM", which
+overstated it in two directions at once. The E-step is exact *structurally* -- the
+posterior really is a tree and sum-product really does return its marginals -- but
+what runs is a truncated grid quadrature, so the numbers carry a discretisation
+error. And the M-step is an exact maximiser only for the Gaussian and Laplace
+kernels; the mixture and MDN kernels take conditional-maximisation sweeps, which
+ascend Q without maximising it. "Exact" belongs to the continuous recursion, not
+to this implementation of it.
 
 Problem
 -------
@@ -11,15 +21,23 @@ given a sample {(x^(d), t_d)} and want theta. This is a latent-variable problem
 (the clean chain a is never seen), so the natural estimator is maximum marginal
 likelihood, computed by EM.
 
-Why the E-step is exact here
----------------------------
+Why the E-step is structurally exact here
+-----------------------------------------
 The posterior p_theta(a | x) is again a chain: the likelihood factorizes
 sitewise, so it only reweights the node potentials and leaves the edge
 structure untouched. A chain is a tree, hence sum-product BP returns the
 *exact* single-site and pairwise posterior marginals. There is no loopy-BP
-approximation anywhere; the only error is the grid representation of the
-continuous messages, which the Layer-2 experiments pin at the 1e-15 floor for
-M = 401, A = 8.
+approximation anywhere.
+
+The remaining error is the grid representation of the continuous messages, and it
+is measured rather than assumed. At M = 401, A = 8 the recursion agrees with the
+Gaussian closed form to 9.2e-15 relative and with brute-force enumeration of the
+discretised posterior to 1.6e-14 -- at that configuration, on those tests. That is
+not a 1e-15 error bound for arbitrary kernels, tails or noise levels: trapezoidal
+quadrature is O(h^2) and degrades when a likelihood is narrower than a few grid
+cells, and the truncation diagnostic is a statistic over sampled chains whose
+worst case at A = 8 is 1.2e-6, not its 90th percentile of 1.5e-8. See
+frozen_config.half_width and experiments/exp_18_revision_diagnostics.py.
 
 The one matrix that is the whole E-step
 ---------------------------------------
@@ -41,9 +59,16 @@ M x M matrix
 
 with `*` elementwise. Xi[k, j] is the expected posterior mass placed on the
 transition u_j -> u_k, summed over the whole dataset: exactly the continuous
-analogue of the expected transition-count matrix of Baum-Welch. It is a
-*sufficient statistic of the E-step*: it does not depend on how K_theta is
-parameterized, and sum(Xi) equals the number of edges in the dataset.
+analogue of the expected transition-count matrix of Baum-Welch.
+
+Xi is a *complete summary for the current Q-function and M-step*: it does not
+depend on how K_theta is parameterized, so the maximisation never revisits the
+data, and sum(Xi) equals the number of edges in the dataset. It is NOT a
+sufficient statistic of the observations, which is what calling it "a sufficient
+statistic" unqualified suggests -- it is computed from the posterior at the
+current theta, and so is conditional on that theta, on the model family, on the
+grid, on the fixed initial law, and on the transition being homogeneous. Change
+any of those and Xi changes.
 
 Consequences used throughout this module:
 
@@ -325,11 +350,36 @@ class EMTrace:
     theta: list[np.ndarray]
     seconds: list[float]
 
+    # New fields carry defaults so the ~30 existing call sites are untouched.
+    n_edges: int = 0
+    """Transitions in the dataset, chains x (n_sites - 1). Needed to read any of
+    the log-evidence numbers per transition rather than as a dataset total."""
+
+    converged: bool = False
+    stop_reason: str = ""
+    """Why the loop ended: "converged", "censored" (hit the iteration cap), or
+    "" for a trace built before this field existed. A censored run used to be
+    returned indistinguishably from a converged one, so a caller comparing
+    estimators could not tell whether it was comparing converged estimators or
+    just two runs that had been given the same number of iterations."""
+
     @property
     def monotone_violation(self) -> float:
         """Largest decrease of the log-likelihood across iterations (0 if none)."""
         d = np.diff(np.asarray(self.log_evidence, dtype=float))
         return float(max(0.0, -d.min())) if d.size else 0.0
+
+    @property
+    def per_edge_log_evidence(self) -> list[float]:
+        """The evidence trace in nats per transition.
+
+        The comparable quantity across sample sizes: the total sums over edges,
+        so it grows with the dataset and two runs at different n cannot have
+        their increments compared directly.
+        """
+        if not self.n_edges:
+            raise ValueError("n_edges was not recorded on this trace")
+        return [v / self.n_edges for v in self.log_evidence]
 
 
 def fit_em(
@@ -349,8 +399,33 @@ def fit_em(
     with its own batch of noisy chains. Every iteration is one exact BP E-step
     over the whole dataset followed by the kernel's own M-step.
 
-    Stops early when the relative increase of the marginal log-likelihood falls
-    below `tol`.
+    Stops early when the marginal log-likelihood increases by less than `tol`
+    NATS PER TRANSITION, and only if it increased.
+
+    The load-bearing change is the sign. The old test was
+
+        abs(L_k - L_{k-1}) <= tol * abs(L_{k-1})
+
+    which accepts a small DECREASE as though it were a small increase. Exact EM
+    cannot decrease the evidence, so a decrease is a defect -- a broken M-step, or
+    a generalised M-step overshooting -- and stopping on it reported the defect as
+    success. The loop now requires a non-negative increment, records any decrease
+    in `trace.monotone_violation`, and labels a run that never achieves a small
+    non-negative increment as censored rather than converged.
+
+    Normalising by `stats.n_edges` is a change of units, NOT a bug fix, and the
+    distinction is worth stating because an external audit read it the other way.
+    The old threshold was relative to the dataset total, and since dL and L are
+    both sums over the same edges, dL/|L| is invariant under changing the sample
+    size -- measured on the same law at 1x and 4x the data it agrees to every
+    digit. So the old rule was already scale-free; it was not the n-dependent
+    tolerance that had to be fixed in the ring experiment's plateau test. What
+    per-transition units buy is interpretability: a constant threshold in nats per
+    transition, rather than one that tightens over the run as |L| falls and that
+    means something different at every noise level. At the budgets used here the
+    default 1e-9 is far below the increments EM actually takes (~1e-4 per edge at
+    iteration 30), so this guard rarely fires and the cap or the shape rule
+    governs -- which is why the change is close to behaviourally inert.
 
     The returned kernel is always the one whose evidence is `trace.log_evidence[-1]`, and
     that alignment is load-bearing rather than cosmetic. An earlier version logged the
@@ -380,13 +455,16 @@ def fit_em(
         trace.theta.append(np.asarray(current.theta, dtype=float).copy())
         proposal = current.m_step(stats, grid)
         trace.seconds.append(time.perf_counter() - t0)
-        converged = (
-            np.isfinite(prev) and abs(stats.log_evidence - prev) <= tol * abs(prev)
-        )
+        trace.n_edges = stats.n_edges
+        # Per transition, and signed: a decrease is not convergence.
+        gain = (stats.log_evidence - prev) / stats.n_edges
+        converged = np.isfinite(prev) and 0.0 <= gain <= tol
         prev = stats.log_evidence
         if converged:
             # `current` is the parameter whose evidence is the last logged entry. The
             # proposal is discarded rather than returned unevaluated.
+            trace.converged = True
+            trace.stop_reason = "converged"
             break
         current = proposal
     else:
@@ -399,6 +477,13 @@ def fit_em(
         trace.log_evidence.append(stats.log_evidence)
         trace.theta.append(np.asarray(current.theta, dtype=float).copy())
         trace.seconds.append(time.perf_counter() - t0)
+        trace.n_edges = stats.n_edges
+        # Reached the cap without a small non-negative increment. Censored, not
+        # converged: the returned kernel is the best seen, but nothing here says
+        # the optimiser had finished, and a comparison of "converged estimators"
+        # may not use it as one.
+        trace.converged = False
+        trace.stop_reason = "censored"
         if checkpoints is not None and n_iters in checkpoints:
             saved[n_iters] = current
 
