@@ -105,17 +105,38 @@ without it.
 \setcounter{tocdepth}{1}
 \tableofcontents
 
+% Six parts, in dependency order: what the model is, how inference on it works,
+% what a computer actually runs, how the unknown parts are learned, what the
+% experiments established, and what sits alongside the main line.
+%
+% The division is not decoration. Before it, a reader looking for "is this
+% derivation exact or is it a grid artefact" had to know which chapter to open,
+% and the two questions were interleaved. Parts II and III now separate them:
+% everything in II is exact at the level of continuous message functions, and
+% everything in III is about the error introduced by representing those
+% functions on a finite grid.
+
+\part{Model and exact identities}
 \input{chapters/ch02-setting}
 \input{chapters/ch04-score}
 \input{chapters/ch05-markov}
+
+\part{Functional inference}
 \input{chapters/ch06-graphical}
 \input{chapters/ch07-bp}
 \input{chapters/ch08-gaussian}
+
+\part{Numerical representation}
 \input{chapters/ch09-numerics}
+
+\part{Learning the transition}
 \input{chapters/ch10-estimation}
-\input{chapters/ch11-status}
+
+\part{The experiment ledger}
+\input{chapters/ch11-claim-audit}
+
+\part{Case studies alongside the main line}
 \input{chapters/ch12-rotating-ring}
-\input{chapters/ch13-corrections}
 
 \bibliographystyle{unsrtnat}
 \bibliography{../shared/references}

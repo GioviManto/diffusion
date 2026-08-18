@@ -28,6 +28,22 @@ Three things it holds that nothing else does:
 This is the one document where unfinished work belongs, which is why
 `tools/check_paper.sh` does not gate it. Everything provisional says so.
 
-Chapters `ch11-status` and `ch13-corrections` together hold the claim ledger:
-what is settled, what is in progress, what was withdrawn and not replaced.
-Check there before citing a number from an older draft.
+## Six parts
+
+1. Model and exact identities  2. Functional inference  3. Numerical
+representation  4. Learning the transition  5. The experiment ledger
+6. Case studies alongside the main line.
+
+The division between II and III is the one that earns its keep: everything in II
+is exact at the level of continuous message functions, everything in III is about
+the error introduced by representing those functions on a finite grid. Those two
+questions used to be interleaved.
+
+## The claim ledger
+
+`ch11-claim-audit` opens with a one-line-per-claim table — settled, conditional,
+censored, withdrawn — and then gives the record behind each. It merges what were
+two chapters, `ch11-status` and `ch13-corrections`, which meant a claim's current
+status lived in one and the reason it changed lived in the other.
+
+**Check the ledger before citing any number from an older draft.**
