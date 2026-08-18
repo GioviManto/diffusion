@@ -6,36 +6,35 @@ project works with no rearranging. Set the main document per compile.
 
 | Root | What it is | Ready to send? |
 |---|---|---|
-| `workshop.tex` | 4pp workshop version | **No** — see placeholders |
-| `paper.tex` | the full paper, 9pp body | **No** — see placeholders |
+| `workshop.tex` | 4pp workshop version | Yes |
+| `paper.tex` | the full paper, 9pp body | **No** — one placeholder |
 | `compendium.tex` | every derivation and experiment, including cut ones | Yes |
 | `thesis.tex` | the thesis | Yes, as a draft |
 
 All four build with `tectonic`, with zero undefined references and zero
 undefined citations. `./build.sh` compiles all four and reports page counts.
 
-## Two documents are NOT ready to send
+## The paper is not ready to send
 
-`paper.tex` and `workshop.tex` each render a loud red `[PENDING: ...]` marker
-where a number is not yet earned. They are listed here rather than quietly
-shipped, and the marker is red on purpose — it is meant to be impossible to
-send by accident.
+`paper.tex` renders a loud red `[PENDING: ...]` marker where a number is not yet
+earned: the numerical-values table in `appendix.tex` needs regenerating from the
+frozen batch. It is called out here rather than quietly shipped, and the marker
+is red on purpose — it should be impossible to send by accident.
 
-1. **`sections/tab-efficiency.tex`** — the efficiency table. The numbers in it
-   came from runs at an EM budget of 120 iterations; the frozen config says
-   400, and the budget turned out to change the answer's direction (worse at
-   small n, better at large n). The 16-seed validation-selected rerun has since
-   landed, but it is not filled in here, because the protocol it used is still
-   asymmetric: EM's stopping point is chosen on a validation bundle while the
-   network's training length is fixed at 20,000 steps. That asymmetry favours
-   EM, and this table is the paper's headline claim, so it should not go in
-   until both arms are selected the same way.
+`workshop.tex` no longer inputs anything unfilled, so it is sendable. `build.sh`
+attributes placeholders per root by following `\input` transitively, so it will
+say which documents are actually affected rather than listing every file.
 
-2. **`appendix.tex`** (numerical-values table) — needs regenerating from the
-   frozen batch.
+The efficiency table both share (`sections/tab-efficiency.tex`) is now filled
+from the run in which **both** arms have their optimisation budget chosen on a
+validation bundle — the network its parameterisation and training length, EM–BP
+its iteration count. One caveat is stated in its caption rather than hidden: at
+the largest sample size both arms select the largest budget the grid offers
+(33% and 61% of cells), so that row's ratio is bounded by the grid rather than
+by the estimators, and the range over the other six sizes is quoted alongside it.
 
-The compendium and thesis are unaffected: both are allowed to carry provisional
-results, and both say which results are provisional.
+The compendium and thesis are allowed to carry provisional results, and both say
+which results are provisional.
 
 ## What is shared, and why editing matters
 

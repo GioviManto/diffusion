@@ -87,35 +87,59 @@ and a sign error in exactly that derivative once survived every internal diagnos
 \label{sec:rec-efficiency}
 
 Relative denoising error against grid BP under the true kernel, averaged over the noise schedule,
-with the network's parameterisation chosen on a disjoint validation split:
+with \emph{both} arms' optimisation budgets chosen on a disjoint validation bundle
+(\texttt{629985}):
 
 \begin{center}\small
 \begin{tabular}{@{}rccc@{}}
 \toprule
 $\nseq$ & network & EM--BP ($12$ free) & ratio \\
 \midrule
-32   & $0.6613 \pm 0.0026$ & $\mathbf{0.0703 \pm 0.0051}$ & $9.4$ \\
-64   & $0.5896 \pm 0.0029$ & $\mathbf{0.0541 \pm 0.0035}$ & $10.9$ \\
-128  & $0.4942 \pm 0.0015$ & $\mathbf{0.0361 \pm 0.0024}$ & $13.7$ \\
-256  & $0.3473 \pm 0.0012$ & $\mathbf{0.0259 \pm 0.0014}$ & $13.4$ \\
-512  & $0.2359 \pm 0.0010$ & $\mathbf{0.0233 \pm 0.0010}$ & $10.1$ \\
-1024 & $0.1685 \pm 0.0006$ & $\mathbf{0.0185 \pm 0.0011}$ & $9.1$ \\
-2048 & $0.1364 \pm 0.0007$ & $\mathbf{0.0172 \pm 0.0008}$ & $7.9$ \\
+32   & $0.3953 \pm 0.0023$ & $\mathbf{0.0546 \pm 0.0027}$ & $7.3$ \\
+64   & $0.3285 \pm 0.0026$ & $\mathbf{0.0481 \pm 0.0041}$ & $7.9$ \\
+128  & $0.2744 \pm 0.0012$ & $\mathbf{0.0328 \pm 0.0018}$ & $8.8$ \\
+256  & $0.2268 \pm 0.0010$ & $\mathbf{0.0243 \pm 0.0014}$ & $10.1$ \\
+512  & $0.1878 \pm 0.0006$ & $\mathbf{0.0214 \pm 0.0011}$ & $9.3$ \\
+1024 & $0.1569 \pm 0.0006$ & $\mathbf{0.0162 \pm 0.0011}$ & $12.6$ \\
+2048 & $0.1326 \pm 0.0005$ & $\mathbf{0.0134 \pm 0.0008}$ & $15.7$ \\
 \bottomrule
 \end{tabular}
 \end{center}
 
-All sixteen seeds, all seven doublings, $\pm$ one standard error over seeds. The
-validation-selected parameterisation agrees with the test-set optimum in $99.4\%$ of the $1{,}344$
-cells, so the oracle it replaces is worth nothing measurable. The network at $\nseq=2048$
-($0.136$) has not reached the error the estimator attains at $\nseq=32$ ($0.070$); no crossing is
-observed anywhere in the range, so no data-equivalence factor is quoted.
+All sixteen seeds, all seven doublings, $\pm$ one standard error \emph{aggregated per seed and then
+across seeds} --- the twelve noise levels within a seed share one training set and one set of
+fitted models, so they are not twelve independent observations. The network's
+(parameterisation, training length) choice agrees with the test-set optimum in $82.2\%$ of the
+$1{,}344$ cells and EM--BP's iteration count in $79.5\%$, so the selection is signal rather than
+noise. EM--BP is more accurate in $1{,}342$ of $1{,}344$ cells; the two exceptions are both at
+$\nseq=32$, $t=3.0$, at ratios $0.92$ and $0.96$. The network at $\nseq=2048$ ($0.133$) has not
+reached the error the estimator attains at $\nseq=32$ ($0.055$), and no crossing is observed, so no
+data-equivalence factor is quoted.
 
-The ratio is not monotone --- it rises to $13.7$ at $\nseq=128$ and falls to $7.9$ at $2048$ ---
-and that shape should not be over-read. Both arms improve with $\nseq$; the estimator starts so
-far ahead that the ratio is a quotient of two moving quantities, and nothing here identifies a
-mechanism for the turn. What the table supports is the statement that the margin is an order of
-magnitude across five doublings, not a claim about how it scales.
+\begin{pitfall}
+\textbf{The largest ratio in the table is the least trustworthy number in it.} At $\nseq=2048$ the
+network selects the $20{,}000$-step cap in $33\%$ of cells and EM--BP selects the $400$-iteration
+cap in $61\%$: both arms are asking for more budget than the grid offers, so $15.7$ is bounded by
+the grid rather than by the estimators. Over the remaining six sizes the range is $7.3$--$12.6$.
+Quote that range, not the endpoint.
+\end{pitfall}
+
+\paragraph{What the symmetric protocol cost, and why it was worth it.}
+The previous version of this table (\texttt{629091}) selected EM--BP's iteration count on
+validation while training the network to a fixed $20{,}000$ steps. Correcting that moved every
+ratio down --- by $32\%$ at $\nseq=32$, $36\%$ at $128$, and only $5\%$ at $2048$ --- because early
+stopping helps the network most where data is scarcest. Measured on each arm separately, running to
+the configured budget instead of the selected one costs the network $+42\%$, $+52\%$, $+52\%$ at
+$\nseq=32,64,128$ against EM--BP's $+39\%$, $+32\%$, $+14\%$. Pinning one arm's budget was
+therefore not a neutral bookkeeping choice; it was worth up to a third of the headline number, in
+our favour.
+
+The ratio is not monotone and that shape should not be over-read. Both arms improve with $\nseq$;
+the estimator starts so far ahead that the ratio is a quotient of two moving quantities, and
+nothing here identifies a mechanism. A side observation, recorded but not claimed: the selected
+network training length scales as $\nseq^{0.84}$ ($r=0.99$) against EM--BP's $\nseq^{0.53}$
+($r=1.00$), so the network needs disproportionately more optimisation as data grows --- but both
+slopes are lower bounds, since both arms hit their caps at $\nseq=2048$.
 
 \begin{pitfall}
 These sixteen seeds ran at $120$ EM iterations, because \codefile{exp\_07} hard-coded that budget
@@ -287,8 +311,10 @@ Zero monotonicity violations across all sixteen traces. The kurtosis figure has 
 to $638$ updates in the slowest seed --- which is what makes a $400$ cap a decision rather than a
 formality.
 
-\paragraph{Landed: sample efficiency at sixteen seeds} (\texttt{628571}). \S\ref{sec:rec-efficiency},
-with the iteration-budget caveat recorded there.
+\paragraph{Landed: sample efficiency, both budgets selected} (\texttt{629985}, sixteen seeds).
+\S\ref{sec:rec-efficiency}. Supersedes \texttt{628571} (fixed budgets both sides) and
+\texttt{629091} (EM-BP's budget selected, the network's pinned). This is the version the paper
+carries, with the $\nseq=2048$ caveat recorded there.
 
 \paragraph{Landed, partly: the confining potential} (Rung 4a, \texttt{629193}).
 \label{sec:rung4a-status}
@@ -377,16 +403,6 @@ Any joint-versus-marginal margin from \texttt{629962} carries that caveat.
 \item \textbf{Rung 4a at a matched convergence budget} (\texttt{629962}), eight seeds split by
       sample size into sixteen shards, at a $3000$-step cap under the per-sequence tolerance. Until
       it lands, the joint-versus-marginal margin above stays out of every document.
-\item \textbf{Sample efficiency with both budgets selected} (\texttt{629985}), which will replace
-      the table in \S\ref{sec:rec-efficiency}. \texttt{629091} selected EM-BP's iteration count
-      on validation while the network trained to a fixed $20{,}000$ steps --- the same fairness
-      error that validation selection was introduced to remove, relocated rather than fixed.
-      Training length is a bias/variance knob for both arms: EM's held-out error has an interior
-      minimum at every sample size (\S\ref{sec:em-overfitting}), and SGD's does too. Selecting
-      one budget while pinning the other favours the selected arm, and here it favoured us.
-      The network's training length is now chosen on the same bundle, jointly with its
-      parameterisation. Each arm has one selected quantity; the network selects over a
-      two-dimensional grid and EM-BP over one.
 \end{itemize}
 
 \section{Withdrawn, and not replaced}
