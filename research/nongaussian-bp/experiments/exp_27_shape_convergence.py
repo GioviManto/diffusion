@@ -49,6 +49,7 @@ from src.bp_grid import make_grid
 from src.em import e_step_multi, q_gradient, q_value
 from src.kernels import MixtureInnovationKernel
 from src.noising import alpha_delta
+from src.protocols import one_view_groups as noisy_groups
 from src.priors import LaplaceAR1
 from src.utils import ensure_dir, rng_for, write_csv, write_json
 from frozen_config import FROZEN
@@ -68,16 +69,6 @@ NOISE_DESIGNS = {
 }
 
 
-def noisy_groups(A, t_values, rng):
-    """One noise draw per chain, one chain per noise level -- never seen clean."""
-    parts = np.array_split(rng.permutation(len(A)), len(t_values))
-    groups = []
-    for t, idx in zip(t_values, parts):
-        alpha, delta = alpha_delta(t)
-        sub = A[idx]
-        groups.append((alpha * sub + np.sqrt(delta) * rng.standard_normal(sub.shape),
-                       alpha, delta))
-    return groups
 
 
 def _aligned(kernel):

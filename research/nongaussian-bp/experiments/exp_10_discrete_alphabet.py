@@ -41,6 +41,7 @@ from src.discrete import (
 )
 from src.noising import alpha_delta
 from src.plotting import new_figure, save_figure
+from src.protocols import one_view_groups as noisy_groups
 from src.utils import ensure_dir, rng_for, write_csv, write_json
 
 N_SITES = 32
@@ -49,17 +50,6 @@ N_TEST = 256
 PARAMETERIZATIONS = ("eps", "x0")
 
 
-def noisy_groups(A, t_values, rng):
-    """One noise draw per chain, chains split evenly across noise levels."""
-    parts = np.array_split(rng.permutation(len(A)), len(t_values))
-    groups = []
-    for t, idx in zip(t_values, parts):
-        alpha, delta = alpha_delta(t)
-        sub = A[idx]
-        groups.append(
-            (alpha * sub + np.sqrt(delta) * rng.standard_normal(sub.shape), alpha, delta)
-        )
-    return groups
 
 
 def make_test_set(chain, t_values, n_test):

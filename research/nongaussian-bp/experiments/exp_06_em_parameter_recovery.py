@@ -76,6 +76,7 @@ from src.em import e_step_multi, fit_clean, fit_em, q_gradient
 from src.kernels import GaussianAR1Kernel, LaplaceAR1Kernel, MixtureInnovationKernel
 from src.noising import alpha_delta
 from src.plotting import new_figure, save_figure
+from src.protocols import one_view_groups as noisy_groups
 from src.priors import GaussianAR1, LaplaceAR1
 from src.utils import ensure_dir, rng_for, write_csv, write_json
 from frozen_config import FROZEN
@@ -87,21 +88,6 @@ GRID_M = FROZEN.n_grid
 T_TRAIN = tuple(FROZEN.t_grid)
 
 
-def noisy_groups(A: np.ndarray, t_values, rng: np.random.Generator):
-    """Split chains evenly across noise levels; one noise draw per chain.
-
-    Deliberately stingy: each clean chain is observed exactly once, at exactly
-    one noise level, and never seen clean. This is strictly less information
-    than the score-matching baseline of exp_07 receives.
-    """
-    parts = np.array_split(rng.permutation(len(A)), len(t_values))
-    groups = []
-    for t, idx in zip(t_values, parts):
-        alpha, delta = alpha_delta(t)
-        sub = A[idx]
-        X = alpha * sub + np.sqrt(delta) * rng.standard_normal(sub.shape)
-        groups.append((X, alpha, delta))
-    return groups
 
 
 # ----------------------------------------------------------------------------

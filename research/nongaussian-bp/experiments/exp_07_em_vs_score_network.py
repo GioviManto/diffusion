@@ -70,6 +70,7 @@ from src.kernels import MixtureInnovationKernel
 from src.metrics import transition_hellinger
 from src.noising import alpha_delta
 from src.plotting import new_figure, save_figure
+from src.protocols import one_view_groups as noisy_groups
 from src.priors import LaplaceAR1
 from src.utils import ensure_dir, rng_for, write_csv, write_json
 from frozen_config import FROZEN
@@ -145,17 +146,6 @@ def make_test_set(prior, grid, weights, t_values, n_test: int, tag: str = TEST_T
     return A, bundle
 
 
-def noisy_groups(A: np.ndarray, t_values, rng: np.random.Generator):
-    """One noise draw per chain, chains split evenly across noise levels."""
-    parts = np.array_split(rng.permutation(len(A)), len(t_values))
-    groups = []
-    for t, idx in zip(t_values, parts):
-        alpha, delta = alpha_delta(t)
-        sub = A[idx]
-        groups.append(
-            (alpha * sub + np.sqrt(delta) * rng.standard_normal(sub.shape), alpha, delta)
-        )
-    return groups
 
 
 PARAMETERIZATIONS = ("eps", "x0")
