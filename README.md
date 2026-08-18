@@ -1,71 +1,59 @@
-# Diffusion — MSc Research Thesis (DSBA, Bocconi)
+# Diffusion — exact scores and transition learning for Markov data
 
-Score-based diffusion for structured data: exact joint scores for Markov chains, Gaussian
-belief propagation and AMP, Gaussian-closure error beyond the Gaussian case, and — the most
-recent line of work — EM-learned non-Gaussian innovation kernels, compared against trained
-neural denoisers both pointwise and generatively.
+MSc thesis project. Submission 16 September 2026, defence October 2026.
+
+**The result.** A locally specified non-Gaussian Markov law induces a *globally*
+dependent diffusion score, yet that score is computable exactly by local
+inference on the latent chain — and the same inference yields the pairwise
+posterior statistics needed to learn the transition when it is unknown.
+
+Coordinatewise noising multiplies the prior by *unary* factors. Those reweight
+node potentials without creating edges, so the posterior factor graph is still
+the prior's chain; a chain is a tree; sum-product on a tree is exact. That is the
+whole mechanism, and it is why the exact score is available here when it is
+unavailable almost everywhere else.
 
 ## Start here
 
-Four documents are the output of this project, at four lengths, telling one story. Everything
-else in `research/` is the working material behind them.
+```bash
+cd overleaf && ./build.sh      # all four documents
+```
 
-**[`overleaf-handover/`](overleaf-handover/) holds all four in one flat, self-contained folder**
-— upload it to Overleaf as a single project and set the main document per compile. It is built
-by [`tools/make_handover.sh`](tools/make_handover.sh), which has a `--check` mode that reports
-drift between the folder and the repo sources. Read that folder's `README.md` first: it says
-which documents are ready to send and which are not.
-
-| Document | What it is |
+| Folder | What it holds |
 |---|---|
-| `workshop.tex` | The 4 pp workshop version. **Not sendable yet** — carries an unfilled `\needsdata`. |
-| `paper.tex` | The NeurIPS-format paper on the EM/BP estimator, 9 pp body + appendices (21 pp total). **Not sendable yet** — same placeholder. |
-| `compendium.tex` | Every derivation and every experiment, including the cut ones, plus a corrections chapter (53 pp). |
-| `thesis.tex` | The Bocconi MSc thesis, 12 chapters + 7 appendices (166 pp). Chapters 1–5 are background; 6–11 are the research, ending with the EM/non-Gaussian material (Ch. 10–11); 12 is discussion and conclusions. |
+| [`overleaf/`](overleaf) | the four documents — paper, workshop, compendium, thesis |
+| [`research/`](research) | the code and the experimental record |
+| [`sources/`](sources) | reference PDFs — papers, guides, background |
+| [`meetings/`](meetings) | supervision notes and call transcripts |
+| [`questions/`](questions) | open questions for advisors, and planning documents |
+| [`tools/`](tools) | repository-level scripts |
+| `archive/` | superseded work, kept locally, not tracked |
 
-The repo sources these are assembled from live at `thesis/` and
-`research/nongaussian-bp/{paper,compendium}/`. The paper and the workshop version deliberately
-share their setup section, both propositions, the blindness theorem and the efficiency table,
-via `paper/sections/` — that sharing is what stops the two documents disagreeing.
+## Where things are single-sourced
 
-Which results are settled and which are provisional is recorded in
-`research/nongaussian-bp/outputs/CLUSTER_JOBS_FROZEN.md` (the job ledger) and in the
-compendium's status and corrections chapters.
+Two rules carry most of the weight, both because breaking them has cost real
+time on this project:
 
-For a guided walkthrough of the theory *and* the code behind Chapters 10–11 — runnable,
-executed notebooks that re-derive every number from committed data rather than transcribing
-it — start at [`research/nongaussian-bp/notebooks/README.md`](research/nongaussian-bp/notebooks/README.md).
-For what is and is not established, in one place: `research/nongaussian-bp/CLAIMS_TO_UPDATE.md`
-and `research/nongaussian-bp/audit/AUDIT_NOTE.md`.
+**Documents share, they do not copy.** `overleaf/shared/` holds the notation,
+the bibliography, the figures and the propositions that more than one document
+uses. Four documents drifting apart is the failure this structure prevents.
 
-## Layout
+**Numbers are generated, not typed.** The efficiency table and the macros the
+prose quotes come from `research/nongaussian-bp/tools/make_tab_efficiency.py`,
+run against frozen outputs. The abstract once carried "between 8 and 14" for
+three weeks after the table read 7.3–15.7; the fix was to make it impossible
+rather than to check for it.
 
-| Path | Content |
-|---|---|
-| `thesis/` | The official Bocconi thesis (LaTeX + figures + compiled PDF) |
-| `research/nongaussian-bp/` | The main research line: EM-learned non-Gaussian innovation kernels, exact chain BP, 27 experiments, HPC sweeps, notebooks, paper. See its own `README.md`. |
-| `research/experiment1-rotating-ring/` | The rotating-ring dynamic object behind thesis Chapter 9 — exact Cartesian surrogate, numerical validation, locality diagnostics |
-| `research/board-3problems/` | The three board problems from supervision, each developed in its simplest content-preserving setting |
-| `research/unified-note/` | Consolidated working note (main.pdf, code, 8 figures, 53/53 audit) |
-| `research/gaussian-bp/` | 31-page Gaussian BP + AMP note, 3 executed notebooks, closed forms |
-| `research/bp-from-scratch/` | Independent equation-by-equation BP derivation from the 5 Jun call |
-| `research/gaussian-ar1-bp/` | Gaussian AR(1) package (BP = precision-matrix score to machine precision) |
-| `research/bp-generalization/` | General (non-Gaussian) BP formulation sketches + code |
-| `questions/` | Every open question the project posed, with status and evidence |
-| `research/session-summaries/` | Five session-summary PDFs + problem formulation |
-| `research/initial-experiments/` | Initial diffusion-setup experiments and early figures |
-| `research/notebook-scans/` | Handwritten derivation notebook scans |
-| `tools/` | Repo-wide auditors (provenance checking, cross-run summarisation) |
-| `sources/` *(local only)* | Key papers and textbooks (gitignored) |
-| `meetings/` *(local only)* | Call recordings/transcripts and board sketches (gitignored) |
-| `thesis/editorial/`, `thesis/official-guides/` *(local only)* | Thesis revision notes and the university's own guide PDFs — kept for reference, gitignored |
+Similarly, every experiment imports `experiments/frozen_config.py` rather than
+setting ρ, the grid, or an iteration budget locally.
 
-Full project history (superseded packages, toy models, transcripts, retired drafts) is
-preserved outside this repo in `../archive/`, organised by the date each batch was retired.
+## Before sending anything
 
-## Verifying a claim
+```bash
+cd research/nongaussian-bp && tools/check_paper.sh
+```
 
-`research/nongaussian-bp/tools/check_all.sh` runs everything this project can check locally in
-one command: the test suite, provenance audits, notebook re-execution and freshness, sweep
-completeness, and cross-process reproducibility. `./check_all.sh --quick` skips the slow parts
-(notebooks, reproducibility) for a one-minute sanity check.
+Page limits, placeholders, code references, hand-typed ratios, orphaned shared
+sections, replicate counts, and stray configuration. It gates the paper and the
+workshop only — the compendium and thesis are allowed to carry provisional
+results, and both label them.

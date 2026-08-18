@@ -60,3 +60,8 @@ overleaf/*/*.synctex.gz
 # Editorial notes and the Bocconi guides are now TRACKED. They used to be
 # ignored, and an `rm -rf` of the old thesis/ tree on 18 Aug 2026 destroyed the
 # working copies precisely because git could not see them.
+
+# Superseded historical research, kept on disk but not tracked. It is ~150 MB of
+# old notebooks and drafts whose successors are all in research/ -- worth having
+# locally, not worth carrying in every clone. See archive/README.md.
+archive/
