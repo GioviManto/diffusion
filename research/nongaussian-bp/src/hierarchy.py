@@ -781,11 +781,20 @@ def tree_root_belief(
     return norm(bu[:, 0] * np.exp(log_root - log_root.max()))
 
 
-def _leave_one_out_product(msgs: np.ndarray) -> np.ndarray:
-    """`out[..., i, :] = prod_{j != i} msgs[..., j, :]`, without dividing."""
+def _leave_one_out_product(msgs: np.ndarray, xp=None) -> np.ndarray:
+    """`out[..., i, :] = prod_{j != i} msgs[..., j, :]`, without dividing.
+
+    ``xp`` is the array module `msgs` belongs to; it defaults to numpy. cupy
+    implements `__array_function__`, so `np.ones_like` on a device array would
+    dispatch correctly anyway -- but relying on that makes the device path work
+    by accident rather than by construction, and it is the kind of thing that
+    breaks silently on a cupy upgrade. Pass it explicitly.
+    """
+    if xp is None:
+        xp = np
     b = msgs.shape[-2]
-    prefix = np.ones_like(msgs)
-    suffix = np.ones_like(msgs)
+    prefix = xp.ones_like(msgs)
+    suffix = xp.ones_like(msgs)
     for i in range(1, b):
         prefix[..., i, :] = prefix[..., i - 1, :] * msgs[..., i - 1, :]
     for i in range(b - 2, -1, -1):

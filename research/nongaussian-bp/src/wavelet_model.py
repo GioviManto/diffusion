@@ -33,6 +33,7 @@ from dataclasses import dataclass
 
 import numpy as np
 
+from .backend import device_name, get_xp
 from .bp_grid import make_grid
 from .hierarchy import TreeIndex
 from .noising import alpha_delta
@@ -185,14 +186,22 @@ class WaveletTreeModel:
     # -- inference ---------------------------------------------------------
 
     def posterior_mean_nodes(
-        self, nodes_std: np.ndarray, alpha: float, delta: float, chunk: int = 32
+        self, nodes_std: np.ndarray, alpha: float, delta: float, chunk: int = 32,
+        xp=None,
     ) -> tuple[np.ndarray, float]:
         """E[a | x] on standardised nodes, plus the exact log evidence.
 
         `nodes_std` is (B, 3, n_nodes). The three orientation trees are disjoint,
         so their evidences add and their posteriors are computed independently --
         which is a statement about the model, not a factorisation approximation.
+
+        ``xp`` selects the device; ``None`` reads ``BP_DEVICE``, the same
+        convention as `src/denoiser.py`. This is the application layer, so this is
+        where the environment is allowed to decide -- `wavelet_tree_bp` itself
+        defaults to numpy and never consults it.
         """
+        if xp is None:
+            xp = get_xp()
         out = np.empty_like(nodes_std)
         total_log_ev = 0.0
         for oi in range(3):
@@ -200,7 +209,7 @@ class WaveletTreeModel:
                 self.grids, self.weights, self.log_k(oi), self.log_root[oi],
                 nodes_std[:, oi, :], alpha,
                 self.scales.delta_by_depth(oi, delta),
-                self.qt.branching, self.depth, chunk=chunk,
+                self.qt.branching, self.depth, chunk=chunk, xp=xp,
             )
             out[:, oi, :] = res.posterior_mean
             total_log_ev += res.log_evidence
@@ -513,6 +522,7 @@ def fit_wavelet_tree(
     chunk: int = 32,
     tol: float = 1e-9,
     verbose: bool = False,
+    xp=None,
 ) -> tuple[WaveletTreeModel, WaveletEMTrace]:
     """Generalised EM for the wavelet HMT.
 
@@ -528,9 +538,19 @@ def fit_wavelet_tree(
     `t_train`). Pass `grid_size` instead to force one uniform mesh everywhere,
     which is what the pre-per-depth results used and is kept for comparison.
     Passing both is refused rather than silently resolved.
+
+    Device. `xp=None` reads `BP_DEVICE`. The E-step is the whole cost -- three
+    orientations x len(t_train) exact tree passes per iteration -- and it is what
+    moves to the GPU; the M-step stays on the host, where its operands are the
+    per-level Xi (M_child x M_parent) rather than anything batch-sized. The
+    resolved device is printed under `verbose` because `get_xp` falls back to
+    numpy with a warning when no device is usable, and a fit that took the
+    fallback should be legible as a CPU run in its own log.
     """
     if grid_size is not None and t_resolve is not None:
         raise ValueError("give grid_size or t_resolve, not both")
+    if xp is None:
+        xp = get_xp()
     from .utils import rng_for
 
     rng = rng_for("wavelet-em", levels, tuple(t_train))
@@ -551,6 +571,7 @@ def fit_wavelet_tree(
     log_root = np.tile(-0.5 * grids[0] ** 2 - 0.5 * _LOG_2PI, (3, 1))
     if verbose:
         print(f"  grid sizes by depth: {sizes}")
+        print(f"  device: {device_name(xp)}")
 
     n_kern = 1 if tie_orientations else 3
     kern = [[kernel_factory(d, rng) for d in range(qt.depth)] for _ in range(n_kern)]
@@ -581,7 +602,7 @@ def fit_wavelet_tree(
                 res = wavelet_tree_bp(
                     grids, weights, log_k, log_root[oi], x_std[:, oi, :], alpha,
                     scales.delta_by_depth(oi, delta), qt.branching, qt.depth,
-                    want_stats=True, chunk=chunk,
+                    want_stats=True, chunk=chunk, xp=xp,
                 )
                 log_ev += res.log_evidence
                 parts = stats_by_level(

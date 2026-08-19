@@ -98,7 +98,14 @@ EM_ITERS = FROZEN.em_max_iters
 # can be run without editing this list. `em_checkpoints` clips it to whatever cap
 # it is handed, exactly as `net_checkpoints` does for the network -- the two arms
 # get the same treatment, which is the whole point of this experiment.
-_EM_CHECKPOINTS = (10, 20, 40, 60, 80, 120, 160, 220, 300, 400, 600, 800, 1200)
+_EM_CHECKPOINTS = (10, 20, 40, 60, 80, 120, 160, 220, 300, 400, 600, 800, 1200,
+                   1800, 2400, 3200)
+# The tail past 1200 is not speculative. The nseq=2048 budget probe (631467)
+# raised both caps 3x and freed the network -- it selects a median 20,000 of an
+# allowed 60,000 and never reaches the cap -- while EM still sat at 1200 in 67%
+# of cells. So EM's appetite at 2048 exceeds 1200, and at 4096 it can only be
+# larger. Running nseq=4096 at a 1200 cap would reproduce the same limitation one
+# size up, which is the thing the probe exists to stop.
 
 
 def em_checkpoints(cap: int) -> set[int]:

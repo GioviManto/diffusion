@@ -213,6 +213,7 @@ def caterpillar_bp(
     depth: int,
     chunk: int = 32,
     want_stats: bool = False,
+    xp=None,
 ) -> VideoBPResult:
     """Exact BP on a temporal chain of spatial quadtrees.
 
@@ -225,6 +226,11 @@ def caterpillar_bp(
     unchanged rather than duplicating the upward and downward passes, and a
     duplicated BP implementation that silently drifts from the tested one is a
     worse problem than a factor of two.
+
+    `xp` is forwarded to the two spatial passes, which are where the cost is:
+    they run B x F trees against the chain's B x F root-grid messages. The
+    temporal chain itself stays on the host -- it is one M-wide recursion over F
+    frames, and moving it would cost more in transfers than it saves.
     """
     x = np.asarray(x, dtype=float)
     b, f_len, n_nodes = x.shape
@@ -242,6 +248,7 @@ def caterpillar_bp(
     up = wavelet_tree_bp(
         grids, wts, log_k_space, uniform, flat, alpha, delta_by_depth,
         branching, depth, chunk=chunk, root_message=np.ones((b * f_len, m)),
+        xp=xp,
     )
     pot = up.root_belief_up.reshape(b, f_len, m)
     tree_scale = up.log_scale.reshape(b, f_len).sum(axis=1)
@@ -260,7 +267,7 @@ def caterpillar_bp(
     down = wavelet_tree_bp(
         grids, wts, log_k_space, uniform, flat, alpha, delta_by_depth,
         branching, depth, chunk=chunk, root_message=context,
-        want_stats=want_stats,
+        want_stats=want_stats, xp=xp,
     )
 
     log_evidence = float(np.sum(tree_scale + chain.log_z))

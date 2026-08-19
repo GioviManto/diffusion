@@ -56,6 +56,22 @@ log K_d(u_k | u_j) with k the *child* value and j the *parent* value, so the
 upward message is `K.T @ f` and the downward message is `K @ g`. Note which grid
 each message lives on: a node's message *to its parent* is a function of the
 parent's value, so it lives on the parent's grid.
+
+Device
+------
+The recursion is parameterised by its array module, exactly as `src/bp_grid.py`
+is, so the quadtree runs on a GPU from the same code path that runs on CPU --
+see `src/backend.py` for why there is no second implementation. Until 19 Aug
+2026 `backend` was wired into `bp_grid` and `denoiser` only, which meant the 1-D
+chain work could use a device and *every image and video experiment could not*:
+`BP_DEVICE=gpu` was silently a no-op for exp_23..exp_26.
+
+Unlike `grid_bp_batch`, this returns **numpy** arrays whatever device it ran on.
+The M-step, the model wrapper and every experiment downstream are host code, and
+the results are small next to the work: posterior means are O(B x n_nodes) and
+the per-level Xi are O(M_child x M_parent), against an O(B x n_nodes x M^2)
+recursion. Converting at this boundary keeps every caller unchanged rather than
+pushing device arrays into code that would then need its own port.
 """
 
 from __future__ import annotations
@@ -64,6 +80,7 @@ from dataclasses import dataclass
 
 import numpy as np
 
+from .backend import to_device, to_host
 from .em import ExpectedStatistics
 from .hierarchy import TreeIndex, _leave_one_out_product
 
@@ -126,6 +143,7 @@ def wavelet_tree_bp(
     want_stats: bool = False,
     chunk: int = 64,
     root_message: np.ndarray | None = None,
+    xp=None,
 ) -> WaveletBPResult:
     """Exact sum-product on the quadtree with observations at every node.
 
@@ -139,53 +157,71 @@ def wavelet_tree_bp(
     (B, M_0) or (M_0,). It defaults to the root prior `exp(log_root)`, which is
     the standalone case. Supplying something else is how a tree gets attached to
     a larger loop-free graph -- a temporal chain of roots, in `src/video_bp.py`.
+
+    `xp` selects the array module; it defaults to numpy, *not* to `get_xp()`.
+    A default of `get_xp()` would let an unrelated `BP_DEVICE` in the environment
+    silently change which device a library call runs on, which is the opposite of
+    what `backend.py` is for -- the caller chooses, once, and says so. Returned
+    arrays are numpy regardless.
     """
+    if xp is None:
+        xp = np
     ti = TreeIndex(depth, branching)
-    x = np.atleast_2d(np.asarray(x, dtype=float))
-    if x.shape[1] != ti.n_nodes:
-        raise ValueError(f"x has {x.shape[1]} nodes, tree has {ti.n_nodes}")
+    x_host = np.atleast_2d(np.asarray(x, dtype=float))
+    if x_host.shape[1] != ti.n_nodes:
+        raise ValueError(f"x has {x_host.shape[1]} nodes, tree has {ti.n_nodes}")
     if len(log_k) != depth:
         raise ValueError(f"need {depth} kernels, got {len(log_k)}")
     if len(np.asarray(delta_by_depth)) != depth + 1:
         raise ValueError(f"need {depth + 1} deltas, got {len(np.asarray(delta_by_depth))}")
 
-    grids = as_grid_list(grid, depth)
-    wts = as_grid_list(weights, depth)
+    grids_host = as_grid_list(grid, depth)
+    wts_host = as_grid_list(weights, depth)
     for d, lk in enumerate(log_k):
-        want = (grids[d + 1].size, grids[d].size)
-        if lk.shape != want:
+        want = (grids_host[d + 1].size, grids_host[d].size)
+        if np.shape(lk) != want:
             raise ValueError(
-                f"log_k[{d}] must be {want} (child x parent), got {lk.shape}"
+                f"log_k[{d}] must be {want} (child x parent), got {np.shape(lk)}"
             )
 
-    k_mats = [np.exp(lk) for lk in log_k]
-    root = np.exp(log_root)
+    grids = [to_device(g, xp) for g in grids_host]
+    wts = [to_device(w, xp) for w in wts_host]
+    k_mats = [xp.exp(to_device(np.asarray(lk, dtype=float), xp)) for lk in log_k]
+    root = xp.exp(to_device(np.asarray(log_root, dtype=float), xp))
     deltas = np.asarray(delta_by_depth, dtype=float)
+    x_dev = to_device(x_host, xp)
 
-    means = np.empty_like(x)
-    root_up = np.empty((x.shape[0], grids[0].size))
-    log_scale = np.empty(x.shape[0])
+    n_batch = x_host.shape[0]
+    m_root = grids_host[0].size
+    means = np.empty_like(x_host)
+    root_up = np.empty((n_batch, m_root))
+    log_scale = np.empty(n_batch)
     log_evidence = 0.0
     xi_total = (
-        [np.zeros((grids[d + 1].size, grids[d].size)) for d in range(depth)]
+        [
+            np.zeros((grids_host[d + 1].size, grids_host[d].size))
+            for d in range(depth)
+        ]
         if want_stats else None
     )
 
-    for start in range(0, x.shape[0], chunk):
+    for start in range(0, n_batch, chunk):
         sl = slice(start, start + chunk)
         rm = root_message
-        if rm is not None and np.ndim(rm) == 2:
-            rm = rm[sl]
+        if rm is not None:
+            rm = np.asarray(rm, dtype=float)
+            rm = to_device(rm[sl] if rm.ndim == 2 else rm, xp)
         part = _bp_chunk(
-            ti, grids, wts, k_mats, root, x[sl], alpha, deltas, want_stats, rm,
+            ti, grids, wts, k_mats, root, x_dev[sl], alpha, deltas,
+            want_stats, rm, xp,
         )
-        means[sl] = part.posterior_mean
-        root_up[sl] = part.root_belief_up
-        log_scale[sl] = part.log_scale
+        means[sl] = to_host(part.posterior_mean)
+        root_up[sl] = to_host(part.root_belief_up)
+        log_scale[sl] = to_host(part.log_scale)
         log_evidence += part.log_evidence
         if xi_total is not None and part.xi_by_level is not None:
             for d in range(depth):
-                xi_total[d] += part.xi_by_level[d]
+                xi_total[d] += to_host(part.xi_by_level[d])
 
     return WaveletBPResult(means, log_evidence, xi_total, root_up, log_scale)
 
@@ -201,27 +237,39 @@ def _bp_chunk(
     deltas: np.ndarray,
     want_stats: bool,
     root_message: np.ndarray | None = None,
+    xp=None,
 ) -> WaveletBPResult:
+    if xp is None:
+        xp = np
     b = x.shape[0]
     depth, branching = ti.depth, ti.branching
 
     def norm(v):
         s = v.sum(axis=-1, keepdims=True)
-        return v / np.maximum(s, 1e-300), np.log(np.maximum(s, 1e-300))
+        return v / xp.maximum(s, 1e-300), xp.log(xp.maximum(s, 1e-300))
 
     # -- evidence at every node, level by level ---------------------------
     # Row-shifted so exp() cannot underflow a whole row; the discarded shift and
     # the Gaussian normaliser are both restored in `log_scale`.
-    ev: list[np.ndarray] = []
-    log_scale = np.zeros(b)
-    for d in range(depth + 1):
+    # A level is a contiguous block in breadth-first order, so address it with a
+    # slice rather than the `nodes_at` index array: fancy-indexing a device array
+    # with a *host* index array is not portable across array modules, and a slice
+    # is a view rather than a gather in either.
+    def level_slice(d: int) -> slice:
         nodes = ti.nodes_at(d)
-        z = x[:, nodes, None] - alpha * grids[d][None, None, :]
+        return slice(int(nodes[0]), int(nodes[-1]) + 1)
+
+    ev: list[np.ndarray] = []
+    log_scale = xp.zeros(b)
+    for d in range(depth + 1):
+        sl_d = level_slice(d)
+        n_d = branching**d
+        z = x[:, sl_d, None] - alpha * grids[d][None, None, :]
         log_ell = -0.5 * z**2 / deltas[d]
         row_max = log_ell.max(axis=2)
-        ev.append(np.exp(log_ell - row_max[:, :, None]))       # (B, n_d, M_d)
+        ev.append(xp.exp(log_ell - row_max[:, :, None]))       # (B, n_d, M_d)
         log_scale += row_max.sum(axis=1)
-        log_scale -= 0.5 * len(nodes) * np.log(2.0 * np.pi * deltas[d])
+        log_scale -= 0.5 * n_d * float(np.log(2.0 * np.pi * deltas[d]))
 
     # -- upward pass -------------------------------------------------------
     # bu[d][v] = evidence(v) * prod over children of their upward messages.
@@ -230,7 +278,7 @@ def _bp_chunk(
     bu = [e.copy() for e in ev]
     up: list[np.ndarray | None] = [None] * (depth + 1)
     for d in range(depth, 0, -1):
-        msg, ls = norm(np.einsum("cnk,kj->cnj", wts[d] * bu[d], k_mats[d - 1]))
+        msg, ls = norm(xp.einsum("cnk,kj->cnj", wts[d] * bu[d], k_mats[d - 1]))
         up[d] = msg                                            # (B, n_d, M_{d-1})
         log_scale += ls.sum(axis=(1, 2))
         n_parents = branching ** (d - 1)
@@ -239,19 +287,20 @@ def _bp_chunk(
         log_scale += ls.sum(axis=(1, 2))
 
     root_belief_up = bu[0][:, 0].copy()
-    incoming = root if root_message is None else np.asarray(root_message, dtype=float)
-    log_evidence = float(np.sum(
+    incoming = root if root_message is None else to_device(root_message, xp)
+    log_evidence = float(xp.sum(
         log_scale
-        + np.log(np.maximum((wts[0] * bu[0][:, 0] * incoming).sum(-1), 1e-300))
+        + xp.log(xp.maximum((wts[0] * bu[0][:, 0] * incoming).sum(-1), 1e-300))
     ))
 
     # -- downward pass -----------------------------------------------------
     down: list[np.ndarray | None] = [None] * (depth + 1)
-    down[0] = np.broadcast_to(
-        np.atleast_2d(incoming)[:, None, :], (b, 1, grids[0].size)
+    incoming_2d = incoming if incoming.ndim == 2 else incoming[None, :]
+    down[0] = xp.broadcast_to(
+        incoming_2d[:, None, :], (b, 1, grids[0].size)
     ).copy()
     xi_by_level = (
-        [np.zeros((grids[d + 1].size, grids[d].size)) for d in range(depth)]
+        [xp.zeros((grids[d + 1].size, grids[d].size)) for d in range(depth)]
         if want_stats else None
     )
 
@@ -264,7 +313,7 @@ def _bp_chunk(
         # sibling messages live on the *parent's* grid, which is why this is
         # m_par wide.
         loo = _leave_one_out_product(
-            up[d + 1].reshape(b, n_par, branching, m_par)
+            up[d + 1].reshape(b, n_par, branching, m_par), xp=xp
         )
         # What the parent knows *apart from* this child: its own evidence, the
         # message from above, and its other children.
@@ -275,19 +324,19 @@ def _bp_chunk(
         if want_stats:
             f_all = (wts[d] * excl).reshape(-1, m_par)          # parent side
             g_all = (wts[d + 1] * bu[d + 1]).reshape(-1, m_kid)  # child side
-            partition = np.einsum("ek,ek->e", g_all, f_all @ k_mats[d].T)
-            c_mat = (g_all / np.maximum(partition, 1e-300)[:, None]).T @ f_all
+            partition = xp.einsum("ek,ek->e", g_all, f_all @ k_mats[d].T)
+            c_mat = (g_all / xp.maximum(partition, 1e-300)[:, None]).T @ f_all
             xi_by_level[d] += c_mat * k_mats[d]
 
         down[d + 1], _ = norm(
-            np.einsum("cnj,kj->cnk", wts[d] * excl, k_mats[d])
+            xp.einsum("cnj,kj->cnk", wts[d] * excl, k_mats[d])
         )
 
     # -- beliefs, reassembled in breadth-first order -----------------------
-    means = np.empty_like(x)
+    means = xp.empty_like(x)
     for d in range(depth + 1):
         belief, _ = norm(bu[d] * down[d])
-        means[:, ti.nodes_at(d)] = belief @ grids[d]
+        means[:, level_slice(d)] = belief @ grids[d]
 
     return WaveletBPResult(
         means, log_evidence, xi_by_level, root_belief_up, log_scale,

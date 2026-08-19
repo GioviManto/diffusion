@@ -535,17 +535,24 @@ print((list(FROZEN.seeds())[$SEED_IDX],))")
       # project that a GPU actually helps; at nseq=4096, N_g=401 that is ~2e10
       # flops per iteration per level, which is why CPU tops out here.
       #
-      # DO NOT SUBMIT before 631467 (the nseq=2048 budget probe) reports. If the
-      # caps bind at 2048 they will bind harder at 4096, and this would add a
-      # second budget-limited row rather than a data point -- the exact mistake
-      # the probe exists to prevent.
+      # Caps set FROM the nseq=2048 probe (631467), not guessed. That probe raised
+      # both caps 3x and the two arms responded completely differently: the
+      # network was freed -- median 20,000 selected of an allowed 60,000, cap
+      # never reached -- while EM still sat at its 1200 cap in 67% of cells. So
+      # the network keeps 60,000, which is already slack, and EM gets 2400.
+      #
+      # Note what that asymmetry does to the claim. With only EM capped, EM's
+      # error is an upper bound and the ratio is a LOWER bound -- "at least X" --
+      # which is a defensible statement in a way "X, budget-limited on both arms"
+      # never was. If EM still saturates at 2400 here, report it that way rather
+      # than raising again.
       SEED=$((TASK - 170))
       run $PYTHON experiments/exp_07_em_vs_score_network.py \
           $OUT/exp_07_n4096_seed$SEED \
           --only sample_efficiency_val \
           --set "seed=$SEED" \
           --set "sizes=(4096,)" \
-          --set "em_iters=1200" \
+          --set "em_iters=2400" \
           --set "net_steps=60000"
       ;;
   16) # E5 cont: what the channel costs, against the no-noising baseline.

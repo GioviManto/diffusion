@@ -71,6 +71,20 @@
 #     sbatch --partition=compute --time=3-00:00:00 \
 #            --export=ALL,MODE=imagefit_scale bocconi_wavelet.sbatch
 #
+#   GPU. The quadtree recursion runs on a device as of 19 Aug 2026. Gate first --
+#   it is 15 minutes and it is the only thing standing between a port bug and a
+#   plausible-looking wrong number -- then the full-size fit:
+#     sbatch --partition=debug_gpuh200 --qos=debug --gres=gpu:1 --time=00:15:00 \
+#            --propagate=NONE --export=ALL,MODE=gpu_gate bocconi_wavelet.sbatch
+#     sbatch --partition=medium_gpuh200 --gres=gpu:1 --time=06:00:00 \
+#            --propagate=NONE --export=ALL,MODE=imagefit_scale_gpu bocconi_wavelet.sbatch
+#
+# --propagate=NONE ON EVERY SUBMISSION. The login node sets `ulimit -t 600` and
+# Slurm propagates the submitter's rlimits, so a 6-hour job without it is killed
+# by SIGXCPU after ten minutes of CPU time -- with nothing in the log, and
+# `sacct` showing TotalCPU pinned at exactly 10:00. An array died to this on
+# 18 Aug 2026.
+#
 # The image array splits by *family* and the video array by *cut depth*, because
 # in both cases the tasks share nothing: each fits its own model and writes its
 # own file, so there is no merge step. Splitting by experiment *part* instead
@@ -84,6 +98,43 @@ cd "$ROOT/research/nongaussian-bp"
 
 TASK=${SLURM_ARRAY_TASK_ID:-0}
 MODE=${MODE:-stats}
+
+# GPU gate, lifted from bocconi_frozen.sbatch's MODE=gpu and kept identical on
+# purpose. The wavelet recursion became device-parameterised on 19 Aug 2026;
+# before that `src/backend` was wired into bp_grid and denoiser only, so
+# BP_DEVICE=gpu was a silent no-op for every experiment in this file.
+#
+# The gate checks the DEVICE, not pytest's exit code. Every test in the parity
+# suite skips when cupy cannot see a card, an all-skipped run exits 0, and the
+# job would then do hours of CPU work wearing a GPU job's name -- which is what
+# job 631477 did on an H200. So: prove the device reduces correctly, then run
+# parity, then refuse a run in which anything skipped.
+gpu_gate() {
+    [ -f "$ROOT/gpu_env.sh" ] && source "$ROOT/gpu_env.sh"
+    export BP_DEVICE=gpu
+
+    "$PYTHON" - <<'PY' || { echo "FATAL: BP_DEVICE=gpu but no usable CUDA device" >&2; exit 1; }
+import sys
+from src.backend import gpu_available
+if not gpu_available():
+    sys.exit(1)
+# A reduction, not just a matmul: cupy-cuda12x JIT-compiles reduction kernels and
+# that compile fails against the system-default CUDA 13.3 headers while cuBLAS
+# keeps working, so a matmul-only probe passes on a node where every .sum() in
+# the recursion would die mid-sweep.
+import cupy as cp
+a = cp.arange(1000, dtype=cp.float64)
+assert abs(float(a.sum()) - 499500.0) < 1e-6, "cupy reduction returned the wrong value"
+PY
+
+    "$PYTHON" -m pytest tests/test_backend_parity.py -q -rs --no-header \
+        -o cache_dir=/tmp/pytest_cache | tee /tmp/parity_wavelet.log
+    if grep -qE '[0-9]+ skipped' /tmp/parity_wavelet.log; then
+        echo "FATAL: parity tests skipped on a node with a working device" >&2
+        exit 1
+    fi
+    echo "GPU GATE PASSED"
+}
 
 THREADS=${SLURM_CPUS_PER_TASK:-1}
 export OMP_NUM_THREADS=$THREADS
@@ -218,6 +269,77 @@ case "$MODE" in
         --set families="('gaussian','mixture','scale_mixture')"
     ;;
 
+  gpu_gate)
+    # Prove the ported quadtree recursion agrees across devices on THIS card, and
+    # measure what the port actually buys, before any long GPU run is submitted.
+    # Cheap enough for debug_gpuh200 (15 min).
+    gpu_gate
+    echo
+    echo "=== CPU vs GPU, one exp_24-shaped E-step ==="
+    "$PYTHON" -u - <<'PY'
+import time
+import numpy as np
+from src.backend import get_xp, device_name
+from src.image_data import load_cifar10_luminance
+from src.wavelet import images_to_tree
+from src.wavelet_model import SubbandScales, per_depth_grid_sizes
+from src.bp_grid import make_grid
+from src.wavelet_bp import wavelet_tree_bp
+from src.kernels import GaussianAR1Kernel
+from src.noising import alpha_delta
+
+# The real shape: CIFAR luminance, 5 levels, the per-depth mesh exp_24 resolves
+# to t=0.05. Timing a toy tree would say nothing about the batch/grid regime the
+# fit actually runs in.
+imgs = load_cifar10_luminance("data/cifar-10-python.tar.gz", n_images=256, split="train")
+qt, nodes, _ = images_to_tree(imgs, 5)
+scales = SubbandScales.fit(qt, nodes)
+std = scales.standardise(qt, nodes)
+sizes = per_depth_grid_sizes(scales.scales, 0.05, 8.0)
+made = [make_grid(8.0, m) for m in sizes]
+grids, wts = [g for g, _ in made], [w for _, w in made]
+kern = [GaussianAR1Kernel(rho=0.4, q=0.84) for _ in range(qt.depth)]
+log_k = [k.log_transition_matrix(grids[d], grids[d + 1]) for d, k in enumerate(kern)]
+log_root = -0.5 * grids[0] ** 2 - 0.5 * float(np.log(2 * np.pi))
+alpha, delta = alpha_delta(0.3)
+deltas = scales.delta_by_depth(0, delta)
+print(f"grid sizes by depth: {sizes}   batch={len(imgs)}  nodes={qt.depth}")
+
+res = {}
+for label, xp in (("cpu", np), ("gpu", get_xp("gpu"))):
+    t0 = time.perf_counter()
+    r = wavelet_tree_bp(grids, wts, log_k, log_root, std[:, 0, :], alpha,
+                        deltas, qt.branching, qt.depth, want_stats=True, chunk=64,
+                        xp=xp)
+    secs = time.perf_counter() - t0
+    res[label] = r
+    print(f"  {label:3s} ({device_name(xp)}): {secs:.2f}s   log_ev {r.log_evidence:.9e}")
+
+c, g = res["cpu"], res["gpu"]
+rel_m = np.linalg.norm(g.posterior_mean - c.posterior_mean) / np.linalg.norm(c.posterior_mean)
+rel_e = abs(g.log_evidence - c.log_evidence) / abs(c.log_evidence)
+print(f"  agreement: rel mean {rel_m:.3e}  rel log-evidence {rel_e:.3e}")
+assert rel_m < 1e-12 and rel_e < 1e-12, "device disagreement on the real problem shape"
+print("AGREEMENT OK")
+PY
+    ;;
+
+  imagefit_scale_gpu)
+    # The full-size three-family fit on a GPU. Same settings as `imagefit_scale`
+    # so the two are directly comparable -- the device is the only difference,
+    # and the parity gate above is what licenses saying that.
+    #
+    # This mode exists because the CPU arithmetic does not fit the queue: measured
+    # on this cluster at n_train=200/n_iters=5 (job 631488), gaussian took 176s and
+    # mixture 227s, which scale by 50x to ~2.4h and ~3.2h. Three families is well
+    # past medium_cpu's 6h cap before scale_mixture -- the most expensive of them --
+    # is counted at all.
+    gpu_gate
+    "$PYTHON" -u experiments/exp_24_wavelet_fit.py \
+        --output-dir "$ROOT/outputs/${IMAGEFIT_OUT:-exp_24_wavelet_fit_scale_mixture_gpu}" \
+        --set families="('gaussian','mixture','scale_mixture')"
+    ;;
+
   images)
     # Everything on real CIFAR in one slot: the gate, then each kernel family.
     # Sequential because the QOS cap makes an array unaffordable, not because
@@ -262,7 +384,8 @@ case "$MODE" in
   *)
     echo "unknown MODE=$MODE (expected smoke, stats, generate, cutcurve," >&2
     echo "                    video, images, videoall, imagefit," >&2
-    echo "                    imagefit_scale_calibrate or imagefit_scale)" >&2
+    echo "                    imagefit_scale_calibrate, imagefit_scale," >&2
+    echo "                    gpu_gate or imagefit_scale_gpu)" >&2
     exit 2
     ;;
 esac
