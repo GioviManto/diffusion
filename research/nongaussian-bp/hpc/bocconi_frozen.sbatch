@@ -415,8 +415,20 @@ print((list(FROZEN.seeds())[$SEED_IDX],))")
       #      iterations the old default left the fitted excess kurtosis at 1.68
       #      against a truth of 3.0, where 16 sweeps reach 2.14. The effect
       #      vanishes by 60 outer iterations, and 30% of cells in the previous
-      #      run selected fewer than that -- so this is expected to move the EM
-      #      arm slightly, most likely in its favour, at the small sizes.
+      #      run selected fewer than that.
+      #
+      # RESULT (630845, all 16 shards, ~1h each). I predicted the corrected inner
+      # budget would move the EM arm in its own favour. It did the opposite: the
+      # ratios came down slightly at every size -- 7.3/10.1/12.6/15.7 became
+      # 7.0/9.7/12.5/15.5. Ascending Q harder made the fitted kernel a little
+      # worse on held-out score error, which is the same non-monotonicity already
+      # seen in the outer loop and in Rung 4a.
+      #
+      # The resolution certificate also earned its keep immediately: 16 of 1344
+      # cells came back with a mixture component under two grid cells wide, 13 of
+      # them at nseq=32 and 11 from a single seed. My spot check had found
+      # s_min/h of 9.4-10.0 and concluded the fits were resolved with room to
+      # spare; that was two configurations and did not generalise.
       #
       # Wall time: the previous shards ran 35-43 min. The M-step is roughly 3x
       # dearer and the E-step dominates at large nseq, so budget ~2x and keep the

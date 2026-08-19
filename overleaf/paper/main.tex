@@ -508,6 +508,29 @@ conclusion --- an apparent \emph{information} penalty that is really a rate at a
 budget. Both arms recover the truth when run to convergence.
 \end{remark}
 
+\paragraph{The score is recovered faster than the density that induces it.} Reporting recovery
+through the induced score alone is generous, because the channel has already blurred the
+innovation law by the time the score is evaluated. Measuring the fitted transition against the
+truth directly --- Hellinger distance between kernel columns, on the same grid, both renormalised
+under the same quadrature --- separates the two:
+
+\begin{center}\small
+\begin{tabular}{@{}lccccccc@{}}
+\toprule
+$\nseq$ & $32$ & $64$ & $128$ & $256$ & $512$ & $1024$ & $2048$ \\
+\midrule
+relative score error & $0.059$ & $0.050$ & $0.034$ & $0.026$ & $0.022$ & $0.016$ & $0.013$ \\
+transition Hellinger & $0.100$ & $0.090$ & $0.076$ & $0.064$ & $0.060$ & $0.052$ & $0.050$ \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\noindent
+Both fall with $\nseq$, so the transition is being recovered and not merely fitted. But the score
+error falls by a factor of $4.5$ across the range while the density distance falls by $2$: a
+sixty-fourfold increase in data buys much less at the density level than the pointwise number
+suggests. Any claim that the \emph{law} was recovered should be stated on the law.
+
 \noindent
 The practical consequence is a stopping rule. The autoregressive coefficient settles roughly an
 order of magnitude sooner than the shape, and a $\corr$-trace looks textbook-converged over a
