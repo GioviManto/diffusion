@@ -134,9 +134,16 @@ worst chain was 1.2e-6, 84× larger. Say which statistic you computed.
 - Working dir mirrors the repo: `~/nongaussian-bp/research/nongaussian-bp`.
 - GPU: `medium_gpuh200` (6 h), `short_gpuh200`, `debug_gpuh200` (needs
   `--qos=debug`). cupy 13.6.0, inside the pin.
-- `MODE=gpu` in `hpc/bocconi_frozen.sbatch` runs the CPU/GPU parity test and
-  **aborts** rather than falling back — keep that. cupy imports fine on a node
-  with no device, so a silent fallback looks like a GPU run.
+- `MODE=gpu` in `hpc/bocconi_frozen.sbatch` asserts the device is reachable and
+  performs a real cupy **reduction** before running the parity suite, aborting on
+  any of the three. Keep all of it. The parity suite on its own gates nothing:
+  every test in it skips when there is no device, and **an all-skipped pytest run
+  exits 0** — job `631477` passed that way on an H200 it could not use. The
+  reduction is separate from the import check because cupy JIT-compiles reduction
+  kernels: against the system-default CUDA 13.3 headers that compile fails while
+  cuBLAS keeps working, so matmuls pass and every `.sum()`/`.max()` in the
+  recursion dies mid-sweep. **Source `~/nongaussian-bp/gpu_env.sh`** — it pins
+  `CUDA_PATH` to 12.4, and without it cupy cannot see the card at all.
 - **`--propagate=NONE` is mandatory.** The login node has `ulimit -t 600` and
   Slurm propagates the submitter's rlimits, so without it a 6-hour job is killed
   by SIGXCPU after ten minutes of CPU time. An array died to this on 18 Aug and

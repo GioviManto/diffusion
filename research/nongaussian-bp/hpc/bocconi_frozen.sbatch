@@ -70,8 +70,11 @@
 # retired: MODE=smoke runs the parity suite, and MODE=gpu below is a working
 # escape hatch for when the GPU queues clear or the grid grows enough that
 # O(d N_g^2) per sequence stops fitting in a CPU walltime. Set
-# --partition=medium_gpuh200 --gres=gpu:1 and MODE=gpu. If cupy imports but
-# parity fails, the run ABORTS -- it does not fall back to CPU and quietly
+# --partition=medium_gpuh200 --gres=gpu:1 and MODE=gpu. The gate asserts the
+# DEVICE is reachable and does a real reduction before running parity, because an
+# all-skipped pytest run exits 0 -- job 631477 passed that way on an H200 with
+# gpu_available() False. If the device is unusable the run ABORTS; it does not
+# fall back to CPU and quietly
 # relabel itself, because a silent fallback is how a GPU result becomes a CPU
 # result with a GPU provenance stamp. Keep cupy-cuda12x BELOW 14: 14.x
 # JIT-compiles its cub reductions against headers this toolkit cannot build, and
@@ -129,8 +132,45 @@ fi
 if [ "$MODE" = "gpu" ]; then
     source "$ROOT/gpu_env.sh"
     export BP_DEVICE=gpu
-    # Abort rather than fall back. See the header.
-    $PYTHON -m pytest tests/test_backend_parity.py -q
+
+    # Assert the device is REACHABLE before trusting the parity suite.
+    #
+    # This line exists because the suite alone does not gate anything. Every test
+    # in it is skipped when cupy cannot see a device, pytest exits 0 on an
+    # all-skipped run, and the job then proceeds with BP_DEVICE=gpu set,
+    # get_xp() warning and falling back to numpy, and several hours of CPU work
+    # wearing a GPU job's name. Job 631477 did exactly that on an H200: nvidia-smi
+    # reported the card, gpu_available() returned False, twelve tests skipped, and
+    # the run reported success.
+    #
+    # The likely cause is a missing or wrong CUDA_PATH -- 631477 had not sourced
+    # gpu_env.sh -- but the point is that ANY cause produces a green gate, so the
+    # check has to be on the device rather than on the exit code.
+    $PYTHON - <<'PY' || { echo "FATAL: BP_DEVICE=gpu but no usable CUDA device" >&2; exit 1; }
+import sys
+from src.backend import gpu_available
+if not gpu_available():
+    sys.exit(1)
+# A reduction, not just an import: cupy-cuda12x JIT-compiles reduction kernels,
+# and against the system-default CUDA 13.3 headers that compile fails inside
+# cuda_fp4.hpp while cuBLAS keeps working. Matmuls would pass a weaker check and
+# every .sum()/.max() in the recursion would then die mid-sweep.
+import cupy as cp
+a = cp.arange(1000, dtype=cp.float64)
+assert abs(float(a.sum()) - 499500.0) < 1e-6, "cupy reduction returned the wrong value"
+PY
+
+    # -W error::pytest.PytestUnraisableExceptionWarning is not the point here;
+    # `-p no:cacheprovider` keeps the read-only deploy tree clean. What matters is
+    # that a skip is now impossible: the guard above has already proved the device
+    # works, so any skip in this suite means the tests are gating on something
+    # else and that is worth failing on.
+    $PYTHON -m pytest tests/test_backend_parity.py -q -rs --no-header \
+        -o cache_dir=/tmp/pytest_cache | tee /tmp/parity.log
+    if grep -qE '[0-9]+ skipped' /tmp/parity.log; then
+        echo "FATAL: parity tests skipped on a node with a working device" >&2
+        exit 1
+    fi
 fi
 
 # ---------------------------------------------------------------------------
@@ -478,10 +518,12 @@ print((list(FROZEN.seeds())[$SEED_IDX],))")
       #          --export=ALL,MODE=gpu --propagate=NONE --time=06:00:00 \
       #          hpc/bocconi_frozen.sbatch
       #
-      # MODE=gpu runs the CPU/GPU parity test first and ABORTS on failure rather
-      # than falling back, which matters here: cupy installs and imports happily
-      # on a node with no device, and a silent fallback would produce a correct
-      # but very slow CPU run that looked like a GPU one. Cluster cupy is 13.6.0,
+      # MODE=gpu asserts the device is reachable, does a real cupy reduction, and
+      # only then runs parity -- aborting on any of the three. The parity suite
+      # alone gates nothing: its tests SKIP without a device and pytest exits 0,
+      # which is how 631477 reported success on an H200 it could not actually
+      # use. A silent fallback produces a correct but very slow CPU run wearing a
+      # GPU job's name. Cluster cupy is 13.6.0,
       # inside the load-bearing <14 pin -- 14.x passes matmuls and fails
       # reductions, which is the worst failure mode available and the reason the
       # parity gate exists at all.
