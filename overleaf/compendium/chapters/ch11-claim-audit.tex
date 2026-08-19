@@ -382,16 +382,17 @@ carries, with the $\nseq=2048$ caveat recorded there.
 \label{sec:rung4a-status}
 Three attempts, and the third has now landed in full, so this is worth setting out in order.
 
-\paragraph{Result, at eight seeds (\texttt{629962}, 432 cells).} The joint arm recovers the
-well width better than the marginal arm --- median relative error $0.284$ against $0.380$ ---
-and its accuracy improves monotonically with the number of trajectories:
+\paragraph{Result, complete (\texttt{629962}: $480$ cells, eight seeds $\times$ five sizes
+$\times$ six noise levels, balanced).} The joint arm recovers the well width better than the
+marginal arm --- median relative error $0.277$ against $0.404$ --- and its accuracy improves
+monotonically with the number of trajectories:
 
 \begin{center}\small
 \begin{tabular}{@{}lccccc@{}}
 \toprule
 $\nseq$ & $128$ & $512$ & $1024$ & $2048$ & $4096$ \\
 \midrule
-median $|\hat\lambda-\lambda|/\lambda$ & $0.726$ & $0.367$ & $0.260$ & $0.175$ & $0.161$ \\
+median $|\hat\lambda-\lambda|/\lambda$ & $0.656$ & $0.367$ & $0.260$ & $0.192$ & $0.161$ \\
 \bottomrule
 \end{tabular}
 \end{center}
@@ -400,15 +401,34 @@ median $|\hat\lambda-\lambda|/\lambda$ & $0.726$ & $0.367$ & $0.260$ & $0.175$ &
 The convergence fix is what made this readable. Under the previous absolute tolerance the
 marginal arm hit its iteration cap in $87.8\%$ of cells against the joint arm's $56.7\%$, so the
 two arms were being compared at different amounts of optimisation; only $13$ of $400$ pairs had
-both converged. With the per-sequence tolerance and a raised cap the rates are $43.1\%$ and
-$21.8\%$, and the comparison is between estimators rather than between budgets.
+both converged. With the per-sequence tolerance and a raised cap the rates are $44.2\%$ and
+$21.2\%$, and the comparison is between estimators rather than between budgets.
+
+\paragraph{Where the advantage lives, and where it reverses.} Resolved by noise level, the
+ordering is not schedule-wide and the crossover is sharp:
+
+\begin{center}\small
+\begin{tabular}{@{}lcccccc@{}}
+\toprule
+$t$ & $0.050$ & $0.105$ & $0.222$ & $0.467$ & $0.982$ & $2.068$ \\
+\midrule
+joint    & $\mathbf{0.086}$ & $\mathbf{0.137}$ & $\mathbf{0.127}$ & $\mathbf{0.359}$ & $0.860$ & $0.936$ \\
+marginal & $0.141$ & $0.170$ & $0.447$ & $0.410$ & $\mathbf{0.754}$ & $\mathbf{0.838}$ \\
+\bottomrule
+\end{tabular}
+\end{center}
 
 \begin{pitfall}
-Two caveats travel with the headline. The joint arm's advantage is confined to
-$t \lesssim 0.5$: at $t \geq 0.98$ the marginal arm is \emph{better}, and quoting a
-schedule-wide margin would hide that. And the median errors are large in absolute terms ---
-$0.16$ at the largest sample size is not a recovered parameter, it is a trend. What this rung
-supports is the ordering and the scaling, not a precision claim.
+Two caveats travel with the headline, and the schedule-wide median hides both.
+
+The joint arm wins at $t \leq 0.467$ and \emph{loses} at $t \geq 0.982$. Past the crossover
+the channel has destroyed most of the rotation information, both arms are near the null, and
+the joint likelihood's extra freedom costs more than it buys. Quoting $0.277$ against $0.404$
+without the breakdown would imply a uniform advantage that the data does not show.
+
+And the errors are large in absolute terms. At the largest sample size the joint arm is still
+$16\%$ off the true well width. What this rung supports is the \emph{ordering} at low noise and
+the \emph{scaling} in $\nseq$ --- not a precision claim about $\lambda$.
 \end{pitfall}
 
 \texttt{628434\_5} was killed by the six-hour wall having written nothing --- $960$ gradient fits at
