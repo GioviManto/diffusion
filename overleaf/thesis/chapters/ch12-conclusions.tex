@@ -54,11 +54,11 @@ directly on the exact chain inference of Chapter~\ref{ch:gaussian} estimates
 a mixture innovation from noised data alone, with a structurally exact E-step
 for any innovation law and a generalised M-step.
 
-Answering RQ6, the resulting estimator attains between $7.3$ and $12.6$ times
+Answering RQ6, the resulting estimator attains between $\ratiolosub$ and $\ratiohisub$ times
 lower pointwise denoising error than networks trained by denoising score
 matching on identical data, across the six training-set sizes at which neither
 side is limited by its optimisation budget; at the largest size tested both
-select the largest budget on offer and the ratio there, $15.7$, is bounded by
+select the largest budget on offer and the ratio there, $\ratiohi$, is bounded by
 the budget grid rather than by the data. Both arms choose their budget on a
 disjoint validation bundle --- the network its parameterisation and training
 length, the estimator its iteration count --- because the training length is a

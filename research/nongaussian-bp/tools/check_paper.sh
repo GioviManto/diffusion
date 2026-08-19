@@ -149,8 +149,15 @@ fi
 # A typed ratio range anywhere in the production documents. Matches "between $8$
 # and $14$" and "$8$--$14$"; the macro forms (\ratiolo, \ratioloword) contain no
 # digits and so cannot trip it.
+# The thesis is included here even though it is not otherwise gated. It is the
+# document that drifted: the conclusion carried 7.3/12.6/15.7 for a day after the
+# certified run emitted 7.0/12.5/15.5, because it was the one root not wired to
+# the generated macros. Length and placeholders stay ungated for the thesis --
+# it is allowed to be long and provisional -- but a stale headline number is not
+# a matter of taste.
 typed=$(grep -nE 'between \$[0-9]+(\.[0-9])?\$ and \$[0-9]+(\.[0-9])?\$ ?(times|\\times)|\$[0-9]+(\.[0-9])?\$--\$[0-9]+(\.[0-9])?\$ ?\\times' \
-        "$PAPER" ../../overleaf/workshop/main.tex 2>/dev/null || true)
+        "$PAPER" ../../overleaf/workshop/main.tex \
+        ../../overleaf/thesis/chapters/ch12-conclusions.tex 2>/dev/null || true)
 if [ -z "$typed" ]; then
     pass "no hand-typed efficiency ratio ranges"
 else
