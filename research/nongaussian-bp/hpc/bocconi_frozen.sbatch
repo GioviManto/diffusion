@@ -471,6 +471,41 @@ print((list(FROZEN.seeds())[$SEED_IDX],))")
           --set "em_iters=1200" \
           --set "net_steps=60000"
       ;;
+  17[0-9]|18[0-5])
+      # E11: the efficiency comparison at nseq=4096, on GPU.
+      #
+      #   sbatch --array=170-185%4 --partition=medium_gpuh200 --gres=gpu:1 \
+      #          --export=ALL,MODE=gpu --propagate=NONE --time=06:00:00 \
+      #          hpc/bocconi_frozen.sbatch
+      #
+      # MODE=gpu runs the CPU/GPU parity test first and ABORTS on failure rather
+      # than falling back, which matters here: cupy installs and imports happily
+      # on a node with no device, and a silent fallback would produce a correct
+      # but very slow CPU run that looked like a GPU one. Cluster cupy is 13.6.0,
+      # inside the load-bearing <14 pin -- 14.x passes matmuls and fails
+      # reductions, which is the worst failure mode available and the reason the
+      # parity gate exists at all.
+      #
+      # Why 4096 and why GPU. The table currently stops at 2048, where the ratio
+      # is still climbing (7.0 -> 15.5). One more doubling says whether that is a
+      # trend or an approach to a ceiling. The E-step is O(nseq * nsites * N_g^2)
+      # and is a sequence of (M,M)@(M,B) matmuls, so it is the part of this
+      # project that a GPU actually helps; at nseq=4096, N_g=401 that is ~2e10
+      # flops per iteration per level, which is why CPU tops out here.
+      #
+      # DO NOT SUBMIT before 631467 (the nseq=2048 budget probe) reports. If the
+      # caps bind at 2048 they will bind harder at 4096, and this would add a
+      # second budget-limited row rather than a data point -- the exact mistake
+      # the probe exists to prevent.
+      SEED=$((TASK - 170))
+      run $PYTHON experiments/exp_07_em_vs_score_network.py \
+          $OUT/exp_07_n4096_seed$SEED \
+          --only sample_efficiency_val \
+          --set "seed=$SEED" \
+          --set "sizes=(4096,)" \
+          --set "em_iters=1200" \
+          --set "net_steps=60000"
+      ;;
   16) # E5 cont: what the channel costs, against the no-noising baseline.
       run $PYTHON experiments/exp_06_em_parameter_recovery.py $OUT/exp_06 \
           --only clean_vs_noised,clean_raw_mle
