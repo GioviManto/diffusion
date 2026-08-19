@@ -94,7 +94,23 @@ EM_ITERS = FROZEN.em_max_iters
 # interesting structure is early: exp_27 puts rho settling near 80 and the innovation
 # shape near 229, and the 120-vs-400 reversal measured on array 628943 sits between
 # nseq=256 and 512, so the grid must resolve both ends.
-EM_CHECKPOINTS = {10, 20, 40, 60, 80, 120, 160, 220, 300, EM_ITERS}
+# Base grid, extended past the standard 400-iteration cap so that a budget probe
+# can be run without editing this list. `em_checkpoints` clips it to whatever cap
+# it is handed, exactly as `net_checkpoints` does for the network -- the two arms
+# get the same treatment, which is the whole point of this experiment.
+_EM_CHECKPOINTS = (10, 20, 40, 60, 80, 120, 160, 220, 300, 400, 600, 800, 1200)
+
+
+def em_checkpoints(cap: int) -> set[int]:
+    """The EM grid, clipped to a run allowed `cap` iterations.
+
+    Mirrors `net_checkpoints`. The cap is always included, so "what the pinned
+    budget would have given" stays measurable at whatever budget is in force.
+    """
+    return {s for s in _EM_CHECKPOINTS if s < cap} | {int(cap)}
+
+
+EM_CHECKPOINTS = em_checkpoints(EM_ITERS)
 
 # The network's training lengths, selected on the same validation bundle as
 # everything else. This is the missing half of the protocol: adding EM_CHECKPOINTS
@@ -109,7 +125,12 @@ EM_CHECKPOINTS = {10, 20, 40, 60, 80, 120, 160, 220, 300, EM_ITERS}
 # measurable. Wider than EM's grid because 20k steps is a long way from 500 and
 # early stopping in SGD bites much earlier than the endpoint.
 NET_STEPS = 20000
-_NET_CHECKPOINTS = (500, 1000, 2000, 3500, 6000, 10000, 14000, NET_STEPS)
+# Extended past 20k for the same reason EM's grid is extended past 400: at the
+# largest sample size both arms select their cap, so the ratio there is bounded
+# by the grid rather than by the data, and the only way to find out what it is
+# bounded by is to move the grid.
+_NET_CHECKPOINTS = (500, 1000, 2000, 3500, 6000, 10000, 14000, 20000,
+                    30000, 45000, 60000)
 
 
 def net_checkpoints(n_steps: int) -> set[int]:
@@ -249,7 +270,8 @@ def part1_sample_efficiency(grid, weights, sizes, hidden, n_steps, out):
 # Part 5: the same comparison, with model selection moved off the test set
 # ----------------------------------------------------------------------------
 
-def part5_sample_efficiency_val(grid, weights, sizes, hidden, n_steps, out):
+def part5_sample_efficiency_val(grid, weights, sizes, hidden, n_steps, out,
+                                em_iters=EM_ITERS):
     """Part 1 again, with the parameterisation chosen on validation rather than on test.
 
     Part 1 emits `dsm_net_eps` and `dsm_net_x0` as separate rows and the better of the two
@@ -299,12 +321,13 @@ def part5_sample_efficiency_val(grid, weights, sizes, hidden, n_steps, out):
         # Same keys as part 1, so these are literally the same fitted models.
         rng = train_rng("exp07-p1", n_chains)
         A = np.stack([prior.sample(rng, N_SITES) for _ in range(n_chains)])
+        em_ckpts = em_checkpoints(em_iters)
         kernel, em_trace, ckpts = fit_em(
             MixtureInnovationKernel.init(
                 N_COMPONENTS, rho=0.3, var=0.8, rng=train_rng("exp07-init")
             ),
-            grid, weights, noisy_groups(A, T_TRAIN, rng), n_iters=EM_ITERS,
-            checkpoints=EM_CHECKPOINTS,
+            grid, weights, noisy_groups(A, T_TRAIN, rng), n_iters=em_iters,
+            checkpoints=em_ckpts,
         )
         # Resolution and convergence certificate for the EM arm, per selected
         # checkpoint. Without these the headline ratio has no record of whether
@@ -606,7 +629,7 @@ def main() -> None:
         "net_steps": 1500, "archs": ((32, 32), (128, 128)),
         "step_counts": (1000, 4000), "capacity_n": 256,
         "t_probe": (0.05, 0.2, 0.8, 3.0), "inference_batches": (32, 128),
-        "seed": 0,
+        "seed": 0, "em_iters": 40,
     }
     full = {
         # From the frozen config, not an inline literal. The list here and
@@ -621,7 +644,12 @@ def main() -> None:
         "t_probe": (0.02, 0.05, 0.1, 0.15, 0.2, 0.3, 0.4, 0.6, 0.8, 1.2, 1.6,
                     2.4, 3.2),
         "inference_batches": (32, 128, 512),
-        "seed": 0,
+        # Both arms' caps live here so a budget probe is a --set away rather than
+        # an edit. At nseq=2048 both select their cap, so the ratio there is
+        # bounded by the grid; moving both by the same factor is the only way to
+        # find out by how much, and moving only one would repeat the asymmetry
+        # this experiment was rebuilt to remove.
+        "seed": 0, "em_iters": EM_ITERS,
     }
     cfg = apply_overrides(quick if args.quick else full, args.set)
 
@@ -650,7 +678,8 @@ def main() -> None:
 
     def p5(grid, weights, out):
         write_csv(out / "sample_efficiency_val.csv", part5_sample_efficiency_val(
-            grid, weights, cfg["sizes"], cfg["net_hidden"], cfg["net_steps"], out))
+            grid, weights, cfg["sizes"], cfg["net_hidden"], cfg["net_steps"], out,
+            em_iters=cfg["em_iters"]))
 
     parts = {
         "sample_efficiency": ("sample efficiency", p1),

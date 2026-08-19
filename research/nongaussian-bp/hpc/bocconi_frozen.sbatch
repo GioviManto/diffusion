@@ -439,6 +439,38 @@ print((list(FROZEN.seeds())[$SEED_IDX],))")
           --only sample_efficiency_val \
           --set "seed=$SEED"
       ;;
+  15[0-9]|16[0-5])
+      # E10: the budget probe at nseq=2048, both arms extended by the same factor.
+      #
+      # In the certified run both arms select their largest allowed budget at the
+      # largest sample size -- the network its 20,000th step in 33% of cells,
+      # EM-BP its 400th iteration in 56%. A ratio measured there is bounded by the
+      # checkpoint grid rather than by the data, and no amount of re-reading the
+      # existing output can say by how much. Only moving the grid can.
+      #
+      # Both caps go up 3x: EM 400 -> 1200, network 20,000 -> 60,000. The same
+      # factor on both, because moving one and not the other is exactly the
+      # asymmetry this experiment was rebuilt to remove, and it would be the more
+      # tempting error here since raising only EM's cap would flatter us.
+      #
+      # nseq=2048 only. The other six sizes are not budget-limited -- their
+      # selected budgets sit well inside the grid -- so re-running them would cost
+      # six times the compute to reproduce numbers that are already correct.
+      #
+      # Outcome to look for: if the ratio at 2048 holds near 15.5 with both caps
+      # tripled, the row was never budget-limited in a way that mattered and the
+      # caveat can go. If it moves, the caveat stays and the new number is the one
+      # bounded by the wider grid -- which must then say so in the caption, since
+      # a probe that only ever loosens a bound is not a measurement.
+      SEED=$((TASK - 150))
+      run $PYTHON experiments/exp_07_em_vs_score_network.py \
+          $OUT/exp_07_budget2048_seed$SEED \
+          --only sample_efficiency_val \
+          --set "seed=$SEED" \
+          --set "sizes=(2048,)" \
+          --set "em_iters=1200" \
+          --set "net_steps=60000"
+      ;;
   16) # E5 cont: what the channel costs, against the no-noising baseline.
       run $PYTHON experiments/exp_06_em_parameter_recovery.py $OUT/exp_06 \
           --only clean_vs_noised,clean_raw_mle
