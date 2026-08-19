@@ -67,10 +67,10 @@ Writing to `outputs/exp_18/{boundary,em_trace,innovation_density,innovation_summ
 ## Regenerating every figure
 
 ```bash
-python3 paper/figures/make_figures.py
+python3 tools/make_figures.py
 ```
 
-Reads only committed CSVs under `outputs/` and writes PDF and PNG into `paper/figures/`. It
+Reads only committed CSVs under `outputs/` and writes PDF and PNG into `overleaf/shared/figures/`. It
 exits non-zero and names the missing file if any input is absent, so a figure can never be
 silently stale with respect to its data.
 
@@ -79,10 +79,10 @@ silently stale with respect to its data.
 Both compile with `tectonic` (used here) or a full TeX Live via `latexmk`.
 
 ```bash
-cd paper && tectonic -X compile main.tex --keep-intermediates --outdir .
+cd ../../overleaf/paper && tectonic -k main.tex
 ```
 ```bash
-cd compendium && tectonic -X compile main.tex --keep-intermediates --outdir .
+cd ../../overleaf/compendium && tectonic -k main.tex
 ```
 
 With TeX Live instead:
@@ -149,7 +149,7 @@ rsync -avz 3164542@lnode01-da.hpc.unibocconi.it:'~/nongaussian-bp/outputs/exp_16
 
 ## Which output supports which claim
 
-`paper/appendix.tex`, Appendix J, is the claim-to-script-to-output table, and
+`overleaf/paper/appendix.tex`, Appendix J, is the claim-to-script-to-output table, and
 `REVISION_AUDIT.md` (archived; see `CLAIMS_TO_UPDATE.md` for the current claim ledger) records
 the audit that produced it, including the one number found not to be traceable to any committed
 run and what replaced it.

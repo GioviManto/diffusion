@@ -1,3 +1,23 @@
+> **SUPERSEDED SNAPSHOT — 11 August 2026. Do not send.**
+>
+> This is a point-in-time record and is kept as one; it has deliberately **not**
+> been rewritten with current numbers, because editing a dated report to carry
+> later results destroys the thing it is for.
+>
+> What has changed since:
+>
+> | stated here | current | why |
+> |---|---|---|
+> | ratio $9$–$14\times$ | $7.0$–$12.5$ (and $15.5$ at the budget-limited $\nseq=2048$) | both arms now select their optimisation budget on a disjoint validation bundle; before, EM's was selected and the network's pinned |
+> | twelve free parameters | **twenty-four** | correct at $C=4$; the frozen config has used $C=8$ since the paired-design sweep |
+> | capacity saturates near eight components | **withdrawn** | most shape coordinates had not settled at the iteration budget used |
+> | pointwise/generative dissociation | **withdrawn** | rests on those same unconverged fits |
+>
+> For current status, read `overleaf/compendium/` chapter 11, the claim ledger.
+> For current numbers, `overleaf/paper/`.
+
+---
+
 # Answers and questions for the advisors
 
 Giovanni Mantovani — 7 August 2026. Companion to `paper/main.pdf` and `compendium/main.pdf`.

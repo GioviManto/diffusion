@@ -1,7 +1,13 @@
 # Exact BP diffusion on real images: the wavelet-tree route
 
-Giovanni Mantovani — 8 August 2026. Companion to `paper/main.pdf`,
-`ANSWERS_AND_QUESTIONS_FOR_ADVISORS.md`.
+Giovanni Mantovani — 8 August 2026. Companion to `overleaf/paper/`.
+
+> **Exploratory branch, and a dated one.** Wavelets and images are outside the
+> scope of the paper, the workshop and the thesis; nothing here supports a claim
+> in any of them. Efficiency figures quoted below are the August ones and have
+> since been superseded — see `overleaf/compendium/` chapter 11 for current
+> status. Kept because the Stage-1 substrate works and the measurement that
+> changed the plan is worth not rediscovering.
 
 This document reports a working Stage-1 substrate, the measurements that gate it,
 and one measurement that **changes the plan**. It separates, as the advisor
