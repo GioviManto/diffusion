@@ -42,8 +42,10 @@ The innovation \emph{density} is recovered & conditional &
   under the declared density metric and at a certified budget; the shape needs
   $\sim$120 iterations where $\corr$ needs $\sim$25 \\
 Structure is worth an order of magnitude against networks & conditional &
-  \S\ref{sec:rec-efficiency}; both budgets validation-selected, and the arms are
-  asymmetric in supplied information by construction \\
+  \S\ref{sec:rec-efficiency}; conditional on the arms being asymmetric in
+  supplied information \emph{by construction}, which is the point of the
+  measurement and does not go away. The budget objection, which did, was closed
+  by tripling both caps at $\nseq=2048$: the ratio moves $-0.16 \pm 0.18$ \\
 Local score estimation is near-optimal away from mid $t$ & settled &
   the windowed estimator is the exact conditional expectation under strictly
   stationary initialisation; the initial-law mismatch was measured at a median
@@ -190,11 +192,51 @@ reached the error the estimator attains at $\nseq=32$ ($0.055$), and no crossing
 data-equivalence factor is quoted.
 
 \begin{pitfall}
-\textbf{The largest ratio in the table is the least trustworthy number in it.} At $\nseq=2048$ the
-network selects the $20{,}000$-step cap in $33\%$ of cells and EM--BP selects the $400$-iteration
-cap in $61\%$: both arms are asking for more budget than the grid offers, so $15.7$ is bounded by
-the grid rather than by the estimators. Over the remaining six sizes the range is $7.3$--$12.6$.
-Quote that range, not the endpoint.
+\textbf{``Both arms select their cap'' was read as ``the ratio is bounded by the cap''. It is
+not, and the difference is measurable.} This box used to say that the largest ratio was the least
+trustworthy number in the table, on the grounds that at $\nseq=2048$ the network selects the
+$20{,}000$-step cap in $33\%$ of cells and EM--BP the $400$-iteration cap in $61\%$, and to advise
+quoting $7.3$--$12.6$ rather than the endpoint.
+
+That inference does not follow. An arm selects its last checkpoint whenever validation error is
+still falling, at whatever rate; cap-selection therefore reports the \emph{sign} of the remaining
+gain and says nothing about its \emph{size}. The size was measured directly: array
+\texttt{631467} reruns $\nseq=2048$ with the EM cap tripled ($400 \to 1200$) and the network's
+tripled ($20{,}000 \to 60{,}000$), on the same sixteen seeds and the same validation and test
+bundles, so the comparison pairs seed by seed --- necessary here, because the seed-to-seed spread
+in the ratio ($8.97$--$36.33$) is an order of magnitude larger than the effect sought.
+
+The paired difference is $-0.16 \pm 0.18$ ($t=-0.87$ on $15$ df) and the network's error moves by
+$-0.3\%$. Under the raised caps the network's cap-selection falls from $33\%$ to $6.8\%$ --- it
+genuinely stops being budget-constrained --- while EM--BP still selects its cap in $48\%$ of cells,
+so the caps are still \emph{selected}; they simply do not \emph{bind}. The endpoint is quotable and
+the advice above is withdrawn.
+
+The generator enforces this rather than trusting the prose: it recomputes the paired difference on
+every run and refuses to emit the table if it exceeds $1.0$.
+\end{pitfall}
+
+\paragraph{$\nseq=4096$, and why it is in the table after being excluded.}
+\texttt{frozen\_config} originally dropped $4096$ from \texttt{efficiency\_sizes} citing exactly
+the reasoning the paragraph above retracts. With that reasoning gone, the size was run: arrays
+\texttt{631496}/\texttt{631497}, sixteen seeds on H200, at a budget raised to match ($2400$ EM
+iterations, $60{,}000$ steps). All $192$ cells are resolution-certified (minimum $s_{\min}/h =
+5.07$), and EM--BP is more accurate in $192$ of $192$ --- the ratio is $17.60 \pm 1.21$, continuing
+the rise with $\nseq$, at a mean transition Hellinger of $0.0457$.
+
+Because that row runs at a different budget from the rest of the table, the $\nseq=2048$ rerun
+above does double duty: it is the calibration that makes the two protocols comparable, and it is
+disclosed as such in the caption.
+
+\begin{pitfall}
+\textbf{A cell-level split that was really a seed-level one.} At $\nseq=4096$ the cells where the
+EM stopping rule fires look worse than the censored ones ($0.0110$ against $0.0089$ in score
+error), which reads as the stopping rule cutting fits short. It is not: \texttt{stop\_reason} is
+constant within a seed --- part 5 fits EM once per seed and evaluates it at all twelve noise
+levels --- so the split is four seeds against twelve, not $48$ cells against $144$. At the seed
+level the gap is not significant (Welch $t = +0.95$ on score error, $+1.49$ on Hellinger,
+$-0.64$ on the ratio). This is the same error as the replicate-count episode in
+\S\ref{sec:corr-replicates}, in a new costume.
 \end{pitfall}
 
 \paragraph{What the symmetric protocol cost, and why it was worth it.}

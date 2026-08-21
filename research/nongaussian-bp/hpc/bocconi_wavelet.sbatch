@@ -291,7 +291,9 @@ from src.noising import alpha_delta
 # The real shape: CIFAR luminance, 5 levels, the per-depth mesh exp_24 resolves
 # to t=0.05. Timing a toy tree would say nothing about the batch/grid regime the
 # fit actually runs in.
-imgs = load_cifar10_luminance("data/cifar-10-python.tar.gz", n_images=256, split="train")
+imgs = load_cifar10_luminance(
+    "data/cifar-10-python.tar.gz", n_images=256, split="train"
+).images
 qt, nodes, _ = images_to_tree(imgs, 5)
 scales = SubbandScales.fit(qt, nodes)
 std = scales.standardise(qt, nodes)
@@ -335,9 +337,42 @@ PY
     # past medium_cpu's 6h cap before scale_mixture -- the most expensive of them --
     # is counted at all.
     gpu_gate
+    # EXTRA_SET passes further --set overrides through, unquoted so it word-splits
+    # into separate arguments. Without it this mode silently ignored anything
+    # appended at submit time -- trailing sbatch arguments go to the script, which
+    # never read "$@" -- so a run asking for n_iters=120 would quietly produce
+    # another n_iters=25 fit in a directory named as though it were something else.
+    #   --export=ALL,MODE=imagefit_scale_gpu,IMAGEFIT_OUT=...,EXTRA_SET="--set n_iters=120"
     "$PYTHON" -u experiments/exp_24_wavelet_fit.py \
         --output-dir "$ROOT/outputs/${IMAGEFIT_OUT:-exp_24_wavelet_fit_scale_mixture_gpu}" \
-        --set families="('gaussian','mixture','scale_mixture')"
+        --set families="('gaussian','mixture','scale_mixture')" \
+        ${EXTRA_SET:-}
+    ;;
+
+  fid_validate)
+    # exp_29: gate the FID pipeline against known answers before it scores any
+    # generated sample. Runs no model.
+    #
+    # A DIFFERENT INTERPRETER. `.venv-metrics` carries torch 2.6.0+cu124; the
+    # package venv carries cupy 13.6 against the CUDA 12.4 module, and that pin is
+    # load-bearing for every exact-BP number the project has (cupy 14.x passes
+    # matmuls and fails reductions). Two CUDA stacks in one environment is a risk
+    # with no upside here: nothing in exp_29 imports src.wavelet*, so the split
+    # costs a duplicated numpy and buys immunity.
+    METRICS_PY=$ROOT/.venv-metrics/bin/python
+    if [ ! -x "$METRICS_PY" ]; then
+        echo "missing $METRICS_PY -- create it on the login node:" >&2
+        echo "  python3 -m venv $ROOT/.venv-metrics" >&2
+        echo "  $ROOT/.venv-metrics/bin/pip install torch torchvision \\" >&2
+        echo "      --index-url https://download.pytorch.org/whl/cu124" >&2
+        echo "  $ROOT/.venv-metrics/bin/pip install numpy scipy" >&2
+        exit 2
+    fi
+    [ -f "$ROOT/gpu_env.sh" ] && source "$ROOT/gpu_env.sh"
+    "$METRICS_PY" -u -c "import torch; print('torch', torch.__version__, 'cuda', torch.cuda.is_available(), torch.cuda.get_device_name(0) if torch.cuda.is_available() else '')"
+    "$METRICS_PY" -u experiments/exp_30_fid_validation.py \
+        --output-dir "$ROOT/outputs/exp_30_fid_validation" \
+        ${FID_ARGS:-}
     ;;
 
   images)
@@ -384,7 +419,7 @@ PY
   *)
     echo "unknown MODE=$MODE (expected smoke, stats, generate, cutcurve," >&2
     echo "                    video, images, videoall, imagefit," >&2
-    echo "                    imagefit_scale_calibrate, imagefit_scale," >&2
+    echo "                    imagefit_scale_calibrate, imagefit_scale, fid_validate," >&2
     echo "                    gpu_gate or imagefit_scale_gpu)" >&2
     exit 2
     ;;

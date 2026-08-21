@@ -104,10 +104,22 @@ class FrozenConfig:
     list that matched neither -- the exact drift this file exists to stop.
 
     64 is added: the ratio moves fastest at the small end, and 32 -> 128 is one
-    jump across the region where the two arms separate. 4096 is dropped: at 2048
-    both arms already select the largest budget the checkpoint grid offers in
-    33% and 61% of cells, so that row is bounded by the budget rather than by
-    the data, and a further doubling would only add a second such row."""
+    jump across the region where the two arms separate.
+
+    4096 was dropped, on the argument that at 2048 both arms already select the
+    largest budget the checkpoint grid offers in 33% and 61% of cells, so that
+    row is bounded by the budget rather than by the data and a further doubling
+    would only add a second such row. That argument was wrong. Selecting the cap
+    means validation error is still falling, not that it is falling fast enough
+    to matter; tripling both caps at 2048 (job 631467, 16 seeds, paired) moves
+    the ratio by -0.16 +/- 0.18. 4096 was then run separately at a raised budget
+    (jobs 631496/631497, 16 seeds on H200) and IS in the table.
+
+    This list stays at seven sizes regardless, because it is the protocol the
+    certified outputs were produced under and widening it would silently
+    invalidate their provenance. The 4096 row has its own source directory and
+    the generator joins the two, with the budget difference disclosed in the
+    caption and calibrated by the 2048 rerun."""
 
     n_heldout: int = 256
     heldout_seed_offset: int = 1_000_000

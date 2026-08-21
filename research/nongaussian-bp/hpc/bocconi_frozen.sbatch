@@ -555,6 +555,41 @@ print((list(FROZEN.seeds())[$SEED_IDX],))")
           --set "em_iters=2400" \
           --set "net_steps=60000"
       ;;
+  19[0-9]|20[0-5])
+      # E12: the efficiency comparison at nseq=8192, on GPU.
+      #
+      #   sbatch --array=190-205%4 --partition=medium_gpuh200 --gres=gpu:1 \
+      #          --export=ALL,MODE=gpu --propagate=NONE --time=06:00:00 \
+      #          hpc/bocconi_frozen.sbatch
+      #
+      # DO NOT SUBMIT until the EM device parity job has passed. Until 21 Aug
+      # 2026 `BP_DEVICE=gpu` did not reach `src/em.py` at all -- only `bp_grid`,
+      # `denoiser` and the wavelet modules imported `backend`, while the EM
+      # E-step kept its own numpy forward-backward. So E11 above got the device
+      # for the network arm and the BP reference and ran its EM fit on the CPU.
+      # At 4096 that was merely wasteful; at 8192, with the E-step scaling in
+      # nseq, it is the difference between a job that fits in the partition and
+      # one that does not. `tests/test_backend_parity.py::test_em_e_step_*` is
+      # the gate, and `tests/test_backend_coverage.py` is what stops the
+      # regression coming back silently.
+      #
+      # Budgets, again read off the run below rather than guessed. At 4096 EM
+      # selected its 2400 cap in 25.5% of cells (median 600), so it has room and
+      # 3200 is margin rather than necessity. The NETWORK is the arm to watch:
+      # its cap-hit rate rises with nseq -- 33% at 2048, 42.2% at 4096 -- so it
+      # gets 100,000, which the extended checkpoint grid now has 80,000 beneath.
+      # A cap with no checkpoint below it makes "selected" and "capped" the same
+      # event and would destroy the one diagnostic that told us the caps do not
+      # bind.
+      SEED=$((TASK - 190))
+      run $PYTHON experiments/exp_07_em_vs_score_network.py \
+          $OUT/exp_07_n8192_seed$SEED \
+          --only sample_efficiency_val \
+          --set "seed=$SEED" \
+          --set "sizes=(8192,)" \
+          --set "em_iters=3200" \
+          --set "net_steps=100000"
+      ;;
   16) # E5 cont: what the channel costs, against the no-noising baseline.
       run $PYTHON experiments/exp_06_em_parameter_recovery.py $OUT/exp_06 \
           --only clean_vs_noised,clean_raw_mle

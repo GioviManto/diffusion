@@ -14,6 +14,8 @@ the sweep rather than assuming a green laptop run means anything.
 
 from __future__ import annotations
 
+import os
+
 import numpy as np
 import pytest
 
@@ -246,3 +248,100 @@ def test_wavelet_returns_host_arrays_from_the_gpu_path():
     assert got.posterior_mean.dtype == np.float64
     assert isinstance(got.root_belief_up, np.ndarray)
     assert all(isinstance(xi, np.ndarray) for xi in got.xi_by_level)
+
+
+# ----------------------------------------------------------------------------
+# EM E-step
+#
+# `backend` reached `bp_grid` and `denoiser` on 19 Aug 2026 and the wavelet
+# recursion shortly after, but `src/em.py` kept its own copy of the
+# forward-backward sweep and stayed pure numpy. So `BP_DEVICE=gpu` accelerated
+# the grid-BP reference and the network arm while the EM fit -- the dominant
+# cost at high `em_iters`, and the arm the headline claim rests on -- ran on the
+# CPU regardless. Jobs 631496/631497 were submitted to H200 nodes on that
+# understanding and only ever got the device for part of their work.
+#
+# `_e_step_chunk` now runs through `xp`, returning host arrays so that the
+# M-step and every consumer stay numpy-only. These are its gate.
+#
+# What needs covering here that the chain tests above do not: the E-step returns
+# *sufficient statistics*, not a posterior mean. `xi` is an (M, M) accumulation
+# over every edge of every chain and `log_evidence` is a scalar summed over the
+# batch, so both concentrate error that a per-site mean would average away --
+# and `log_evidence` is the number whose monotone increase is the correctness
+# check for the whole algorithm.
+# ----------------------------------------------------------------------------
+
+from src.em import e_step  # noqa: E402
+
+
+def _e_step_on(device, prior, n_sites, n_chains, t, seed=0):
+    grid, weights, log_K, X, alpha, delta, _ = _setup(
+        prior, n_sites, n_chains, 401, t, seed)
+    old = os.environ.get("BP_DEVICE")
+    os.environ["BP_DEVICE"] = device
+    try:
+        return e_step(grid, weights, log_K, X, alpha, delta)
+    finally:
+        if old is None:
+            os.environ.pop("BP_DEVICE", None)
+        else:
+            os.environ["BP_DEVICE"] = old
+
+
+@pytest.mark.parametrize("family", ["gaussian", "laplace"])
+@pytest.mark.parametrize("t", [0.05, 0.4, 1.6])
+def test_em_e_step_statistics_agree_across_devices(family, t):
+    prior = GaussianAR1(0.85) if family == "gaussian" else LaplaceAR1(0.85)
+    cpu = _e_step_on("cpu", prior, 16, 128, t)
+    gpu = _e_step_on("gpu", prior, 16, 128, t)
+
+    # xi is summed over B(n-1) edges, so a per-edge discrepancy shows up here
+    # multiplied by the edge count rather than averaged down.
+    rel_xi = np.linalg.norm(gpu.xi - cpu.xi) / np.linalg.norm(cpu.xi)
+    assert rel_xi < 1e-12, f"xi disagrees across devices: {rel_xi:.3e}"
+
+    rel_s1 = np.linalg.norm(gpu.site1 - cpu.site1) / np.linalg.norm(cpu.site1)
+    assert rel_s1 < 1e-12, f"site1 disagrees across devices: {rel_s1:.3e}"
+
+    rel_ev = abs(gpu.log_evidence - cpu.log_evidence) / abs(cpu.log_evidence)
+    assert rel_ev < 1e-12, f"log_evidence disagrees across devices: {rel_ev:.3e}"
+
+    assert gpu.n_edges == cpu.n_edges and gpu.n_chains == cpu.n_chains
+
+
+def test_em_e_step_returns_host_arrays_from_the_gpu_path():
+    """The device boundary is inside `_e_step_chunk`, and must stay there.
+
+    Every consumer of `ExpectedStatistics` -- the Yule-Walker M-step, the
+    mixture ECM sweeps, the kernels -- is numpy-only. A cupy array leaking out
+    of the E-step would either raise deep inside the M-step or, worse, work by
+    silent coercion and move the device boundary somewhere nobody chose.
+    """
+    stats = _e_step_on("gpu", LaplaceAR1(0.85), 12, 64, 0.4)
+    assert isinstance(stats.xi, np.ndarray)
+    assert isinstance(stats.site1, np.ndarray)
+    assert stats.xi.dtype == np.float64
+    assert isinstance(stats.log_evidence, float)
+
+
+def test_em_e_step_is_chunk_independent_on_gpu():
+    """`chunk` is a memory knob and must not be an accuracy knob.
+
+    The GPU path exists to widen batches; if the statistics depended on chunk
+    width, the speedup would be buying different numbers.
+    """
+    prior = LaplaceAR1(0.85)
+    grid, weights, log_K, X, alpha, delta, _ = _setup(prior, 16, 256, 401, 0.4)
+    old = os.environ.get("BP_DEVICE")
+    os.environ["BP_DEVICE"] = "gpu"
+    try:
+        wide = e_step(grid, weights, log_K, X, alpha, delta, chunk=256)
+        narrow = e_step(grid, weights, log_K, X, alpha, delta, chunk=32)
+    finally:
+        if old is None:
+            os.environ.pop("BP_DEVICE", None)
+        else:
+            os.environ["BP_DEVICE"] = old
+    rel = np.linalg.norm(narrow.xi - wide.xi) / np.linalg.norm(wide.xi)
+    assert rel < 1e-12, f"xi depends on chunk width: {rel:.3e}"

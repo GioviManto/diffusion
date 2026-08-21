@@ -459,6 +459,52 @@ representation of it.}
 \label{fig:density}
 \end{figure}
 
+\section{The fitted rates in the efficiency comparison}
+\label{app:rates}
+
+The body reports fitted $\log$--$\log$ slopes of relative denoising error against
+$\nseq$. They are fitted \emph{per seed} and then averaged, not fitted to the
+seed-averaged curve: cells within a seed share one training set and one set of
+fitted models, so the two differ, and only the first keeps the pairing that makes
+the arms' difference testable. Over $\nseq=32$ to $\biggestn$ the network gives
+$\ratenet \pm \ratenetse$ and EM--BP $\rateem \pm \rateemse$, a paired difference
+of $\rategap \pm \rategapse$ ($t = \rategapt$ on $\rateseeds - 1$ degrees of
+freedom). The sign test is the one to trust at this sample size, and it is
+unanimous: EM--BP is steeper in all $\ratesteeperseeds$ seeds. Restricting to
+$\nseq \ge 256$ or to $\nseq \le 512$ leaves the difference at $0.13$ and $0.10$
+respectively, so it is not carried by either end of the range.
+
+\paragraph{Why censoring does not explain it.} Both arms select their largest
+allowed budget in a growing fraction of cells as $\nseq$ grows --- the network
+from $6\%$ at $\nseq=32$ to $42\%$ at $\biggestn$, EM--BP from $12\%$ to $61\%$.
+By the rule used throughout this work, two arms with different cap-hit rates are
+being compared on their budgets, so the fitted slopes are uninterpretable unless
+the direction of the effect is known. It is measured. Tripling both caps at
+$\nseq=\nseqcalib$, on the same seeds and validation bundles, lowers the network's
+error by $\ratecalibnet\%$ and EM--BP's by $\ratecalibem\%$ --- an order of
+magnitude apart. EM--BP is the arm being held back, and it is also the arm whose
+cap-hit rate rises faster with $\nseq$, so the censoring inflates its error more
+at large $\nseq$ than at small and \emph{flattens} its fitted curve. Removing the
+censoring would steepen EM--BP's slope and widen the difference. The reported
+value is a lower bound.
+
+Two further checks point the same way. Fitting the slope between $\nseq=\nseqcalib$
+and $\nseq=\biggestn$ using only the raised-budget runs at both ends --- so that
+neither endpoint is at the certified cap --- gives a difference of $0.26 \pm 0.12$,
+larger than the full-range figure, though a two-point slope on $\rateseeds$ seeds
+is individually weak. And the fit is generated rather than transcribed: the
+generator refuses to emit if the budget calibration ever shows the network as the
+more censored arm, since that is the single assumption the claim rests on which
+the fitted slopes do not themselves display.
+
+\paragraph{What the slopes are not.} Neither matches a rate we can derive.
+EM--BP's $\rateem$ is well short of the $\nseq^{-1/2}$ that
+Appendix~\ref{app:protocol} and the Rung~1 measurement obtain for $\ivar$ alone,
+which is consistent with a pointwise error inheriting the slower of its two
+coordinates rather than the faster --- $\corr$ falls at $-0.27$ over the same
+range --- but we have not established that, and we do not build on it. The claim
+in the body is the qualitative one.
+
 \section{Experimental protocol}
 \label{app:protocol}
 

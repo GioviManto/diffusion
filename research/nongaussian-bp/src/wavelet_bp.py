@@ -91,6 +91,9 @@ class WaveletBPResult:
 
     posterior_mean : (B, n_nodes) E[a_v | x], exact up to quadrature.
     log_evidence   : summed over the batch, log p_t(x), all constants included.
+    log_evidence_per_item : (B,) the same quantity before summation. Kept because
+                     a summed likelihood cannot carry a standard error, so a
+                     comparison between two models has no scale to be judged on.
     xi_by_level    : per-level expected transition mass, or None if not asked for.
                      `xi_by_level[d]` is (M_{d+1}, M_d) for the edge d -> d+1.
     root_belief_up : (B, M_0) the root's evidence times all its children's upward
@@ -109,6 +112,7 @@ class WaveletBPResult:
     xi_by_level: list[np.ndarray] | None
     root_belief_up: np.ndarray | None = None
     log_scale: np.ndarray | None = None
+    log_evidence_per_item: np.ndarray | None = None
 
 
 def node_delta(ti: TreeIndex, delta_by_depth) -> np.ndarray:
@@ -196,6 +200,7 @@ def wavelet_tree_bp(
     means = np.empty_like(x_host)
     root_up = np.empty((n_batch, m_root))
     log_scale = np.empty(n_batch)
+    log_ev_items = np.empty(n_batch)
     log_evidence = 0.0
     xi_total = (
         [
@@ -218,12 +223,15 @@ def wavelet_tree_bp(
         means[sl] = to_host(part.posterior_mean)
         root_up[sl] = to_host(part.root_belief_up)
         log_scale[sl] = to_host(part.log_scale)
+        log_ev_items[sl] = to_host(part.log_evidence_per_item)
         log_evidence += part.log_evidence
         if xi_total is not None and part.xi_by_level is not None:
             for d in range(depth):
                 xi_total[d] += to_host(part.xi_by_level[d])
 
-    return WaveletBPResult(means, log_evidence, xi_total, root_up, log_scale)
+    return WaveletBPResult(
+        means, log_evidence, xi_total, root_up, log_scale, log_ev_items,
+    )
 
 
 def _bp_chunk(
@@ -288,10 +296,18 @@ def _bp_chunk(
 
     root_belief_up = bu[0][:, 0].copy()
     incoming = root if root_message is None else to_device(root_message, xp)
-    log_evidence = float(xp.sum(
+    # Kept per item as well as summed. The summand is already computed here, and
+    # discarding it costs every downstream likelihood comparison its standard
+    # error: a total says model A beats model B, a per-item vector says by how
+    # much against how much spread, and only the second can be tested. The test
+    # images are shared across models, so the paired difference is the estimator
+    # with the small variance -- which is the whole reason to keep the vector
+    # rather than recompute a total per model.
+    log_ev_items = (
         log_scale
         + xp.log(xp.maximum((wts[0] * bu[0][:, 0] * incoming).sum(-1), 1e-300))
-    ))
+    )
+    log_evidence = float(xp.sum(log_ev_items))
 
     # -- downward pass -----------------------------------------------------
     down: list[np.ndarray | None] = [None] * (depth + 1)
@@ -340,6 +356,7 @@ def _bp_chunk(
 
     return WaveletBPResult(
         means, log_evidence, xi_by_level, root_belief_up, log_scale,
+        log_ev_items,
     )
 
 

@@ -36,27 +36,70 @@ _WORDS = {6: "six", 7: "seven", 8: "eight", 9: "nine", 10: "ten", 11: "eleven",
 # kept only so the two can be compared; it must not be the source, because it
 # carries no em_resolved and the gate below would then have nothing to check.
 SOURCE = "outputs/frozen/exp_07_certified_seed*/sample_efficiency_val.csv"
-FILES = sorted(glob.glob(SOURCE))
-if not FILES:
-    print(f"REFUSING: no certified run found at {SOURCE}", file=sys.stderr)
-    sys.exit(1)
-rows = []
-for f in FILES:
-    seed = f.split("seed")[1].split("/")[0]
-    with open(f) as fh:
-        for r in csv.DictReader(fh):
-            r["seed"] = seed
-            rows.append(r)
+
+# nseq=4096 (job 631496/631497, H200): the same protocol at a larger sample than
+# the certified grid reaches, run at a raised budget because the certified caps
+# were chosen for nseq <= 2048. That budget difference is not assumed harmless --
+# it is measured, by CALIB below.
+EXTENDED = "outputs/frozen/exp_07_n4096_seed*/sample_efficiency_val.csv"
+
+# nseq=2048 at the raised budget (job 631467), the same seeds and bundles as the
+# certified run. This exists to answer one question and no other: the caption used
+# to call the largest ratio "budget-limited" because both arms often selected
+# their largest allowed budget there. Selecting the cap is not the same as being
+# bounded by it, and the difference is measurable -- so it was measured, by
+# rerunning one size with both caps raised and pairing on seed.
+CALIB = "outputs/frozen/exp_07_budget2048_seed*/sample_efficiency_val.csv"
+CALIB_N = 2048
+
+
+def load(pattern, what):
+    files = sorted(glob.glob(pattern))
+    if not files:
+        print(f"REFUSING: no {what} run found at {pattern}", file=sys.stderr)
+        sys.exit(1)
+    out = []
+    for f in files:
+        seed = f.split("seed")[1].split("/")[0]
+        with open(f) as fh:
+            for r in csv.DictReader(fh):
+                r["seed"] = seed
+                out.append(r)
+    return out
+
+
+rows = load(SOURCE, "certified")
+ext = load(EXTENDED, "extended-nseq")
+calib = load(CALIB, "budget-calibration")
 
 seeds = sorted({r["seed"] for r in rows}, key=int)
-sizes = sorted({int(r["n_chains"]) for r in rows})
 F = lambda r, k: float(r[k])
 
 EXPECTED = 16
-if len(seeds) != EXPECTED:
-    print(f"REFUSING: {len(seeds)} seeds present, expected {EXPECTED}: "
-          f"{','.join(seeds)}", file=sys.stderr)
+for label, block in (("certified", rows), ("extended", ext), ("calibration", calib)):
+    s = sorted({r["seed"] for r in block}, key=int)
+    if len(s) != EXPECTED:
+        print(f"REFUSING: {label} has {len(s)} seeds, expected {EXPECTED}: "
+              f"{','.join(s)}", file=sys.stderr)
+        sys.exit(1)
+    # The calibration is a PAIRED comparison and the extended row is aggregated
+    # per seed alongside the rest; both are meaningless if the seeds differ.
+    if s != seeds:
+        print(f"REFUSING: {label} seeds differ from certified", file=sys.stderr)
+        sys.exit(1)
+
+# The extended run must be a different size from the certified grid, or it is not
+# extending anything and the table would silently gain a duplicate row.
+ext_sizes = {int(r["n_chains"]) for r in ext}
+base_sizes = {int(r["n_chains"]) for r in rows}
+if len(ext_sizes) != 1 or (ext_sizes & base_sizes):
+    print(f"REFUSING: extended run covers {sorted(ext_sizes)}, which is not a "
+          f"single new size beyond {sorted(base_sizes)}", file=sys.stderr)
     sys.exit(1)
+EXT_N = ext_sizes.pop()
+
+rows = rows + ext
+sizes = sorted(base_sizes | {EXT_N})
 
 # Resolution gate.
 #
@@ -115,11 +158,49 @@ net_agree = 100 * np.mean([int(r["net_steps_agrees"]) for r in rows])
 em_agree = 100 * np.mean([int(r["em_iters_agrees"]) for r in rows])
 wins = sum(1 for r in rows if F(r, "ratio_selected") < 1)
 big = sizes[-1]
-gb = [r for r in rows if int(r["n_chains"]) == big]
-net_cap = 100 * np.mean([int(r["net_steps_selected"]) == 20000 for r in gb])
-em_cap = 100 * np.mean([int(r["em_iters_selected"]) == 400 for r in gb])
 lo, hi = min(ratios), max(ratios)
-sub = [r for i, r in enumerate(ratios) if sizes[i] != big]
+
+# The budget calibration.
+#
+# The previous caption asserted that the ratio at the largest size was
+# "budget-limited", inferring it from how often each arm selected its largest
+# allowed budget. That inference is wrong, and the error is instructive: an arm
+# selects the last checkpoint whenever validation error is still falling, however
+# slowly, so cap-selection measures the SIGN of the remaining gain and says
+# nothing about its SIZE.
+#
+# So the size was measured. exp_07_budget2048 reruns nseq=2048 with the EM cap
+# tripled and the network's cap tripled, on the same seeds and the same
+# validation and test bundles, which makes the comparison paired -- necessary
+# here, because the seed-to-seed spread in the ratio is an order of magnitude
+# larger than the effect being looked for.
+def paired_delta(a_rows, b_rows, n, key="ratio_selected"):
+    """Per-seed mean of `key` at size `n`, differenced seed by seed."""
+    def by_seed(block):
+        return np.array([np.mean([F(r, key) for r in block
+                                  if int(r["n_chains"]) == n and r["seed"] == s
+                                  and ("em_resolved" not in r or int(r["em_resolved"]))])
+                         for s in seeds])
+    d = by_seed(b_rows) - by_seed(a_rows)
+    return d.mean(), d.std(ddof=1) / np.sqrt(d.size)
+
+
+cal_d, cal_se = paired_delta(rows, calib, CALIB_N)
+cal_net = paired_delta(rows, calib, CALIB_N, "net_score_rel_l2_selected")[0]
+cal_net_base = np.mean([F(r, "net_score_rel_l2_selected") for r in rows
+                        if int(r["n_chains"]) == CALIB_N])
+
+# If tripling both budgets moved the ratio by more than this, the caps really were
+# binding and the caption must say so rather than dismiss it. The measured value
+# is -0.16 +/- 0.18, so the branch below reports "does not move"; the threshold is
+# here so that a future rerun which DOES move cannot quietly keep the old wording.
+CALIB_MAX = 1.0
+if abs(cal_d) > CALIB_MAX:
+    print(f"REFUSING: tripling both budgets moves the nseq={CALIB_N} ratio by "
+          f"{cal_d:+.2f} (> {CALIB_MAX}). The caps bind, so the table must not "
+          f"carry an nseq={EXT_N} row run at a different budget, and the caption "
+          f"must state the limitation rather than dismiss it.", file=sys.stderr)
+    sys.exit(1)
 
 # Does the answer depend on the cells that were dropped?
 #
@@ -171,8 +252,9 @@ tex = f"""%% Included by overleaf/paper/main.tex only. The workshop no longer ca
 %% content is a protocol cannot be defended in the space available.
 %%
 %% GENERATED by tools/make_tab_efficiency.py from outputs/frozen/
-%% exp_07_symmetric_seed*/ ({len(seeds)} seeds, {n_cells} cells). Do not hand-edit
-%% the numbers; rerun the generator.
+%% exp_07_certified_seed*/ (nseq <= {CALIB_N}) and exp_07_n4096_seed*/
+%% ({len(seeds)} seeds, {n_cells} cells). The budget calibration in the caption comes
+%% from exp_07_budget2048_seed*/. Do not hand-edit the numbers; rerun the generator.
 
 \\begin{{table}}[!htbp]
 \\caption{{Relative denoising error against grid BP under the true kernel, averaged over the noise
@@ -180,9 +262,9 @@ schedule; {len(seeds)} seeds $\\pm$ one standard error, aggregated per seed. Bot
 disjoint validation bundle --- the network selects its parameterisation \\emph{{and}} training
 length, EM--BP its iteration count --- agreeing with the test-set optimum in ${net_agree:.1f}\\%$ and
 ${em_agree:.1f}\\%$ of cells. EM--BP is more accurate in ${th(n_cells - wins)}$ of ${th(n_cells)}$.
-At $\\nseq = {big}$ both select their largest allowed budget in ${net_cap:.0f}\\%$ and
-${em_cap:.0f}\\%$ of cells, so that ratio is budget-limited; elsewhere the range is
-${min(sub):.1f}$--${max(sub):.1f}$.{drop_note}}}
+The $\\nseq = {EXT_N}$ row uses a raised budget, the caps having been set for $\\nseq \\le {CALIB_N}$;
+rerunning $\\nseq = {CALIB_N}$ at that budget on the same seeds moves its ratio by
+${cal_d:+.2f} \\pm {cal_se:.2f}$.{drop_note}}}
 \\label{{tab:pointwise}}
 \\centering
 \\begin{{tabular}}{{rccc}}
@@ -210,28 +292,40 @@ macros = f"""%% GENERATED by tools/make_tab_efficiency.py -- do not hand-edit.
 %% Every efficiency number the prose quotes is defined here and nowhere else, so
 %% that the abstract, the body and the table cannot disagree. If a value looks
 %% wrong, rerun the generator; do not edit the number in the text.
+%%
+%% \\ratiolosub, \\ratiohisub, \\ratiohisubword and \\nsizessub USED TO BE DEFINED
+%% HERE and deliberately are not any more. They existed to quote the range over
+%% the sizes at which neither arm selected its largest budget, because the largest
+%% size was believed to be budget-limited. That belief was tested by rerunning
+%% nseq={CALIB_N} with both budgets tripled and found to be false. Deleting the
+%% macros rather than redefining them is the point: any prose still carrying the
+%% old framing fails to build instead of silently rendering a number that no
+%% longer means what the surrounding sentence says it means.
 \\newcommand{{\\ratiolo}}{{{lo:.1f}}}
 \\newcommand{{\\ratiohi}}{{{hi:.1f}}}
-\\newcommand{{\\ratiolosub}}{{{min(sub):.1f}}}
-\\newcommand{{\\ratiohisub}}{{{max(sub):.1f}}}
 \\newcommand{{\\ratioloword}}{{{_WORDS[round(lo)]}}}
-\\newcommand{{\\ratiohisubword}}{{{_WORDS[round(max(sub))]}}}
+\\newcommand{{\\ratiohiword}}{{{_WORDS[round(hi)]}}}
 \\newcommand{{\\nfreeparams}}{{{N_FREE}}}
 \\newcommand{{\\nseedsused}}{{{len(seeds)}}}
 \\newcommand{{\\ncellsused}}{{{th(n_cells)}}}
 \\newcommand{{\\nsizesused}}{{{len(sizes)}}}
-\\newcommand{{\\nsizessub}}{{{len(sub)}}}
 \\newcommand{{\\biggestn}}{{{big}}}
 \\newcommand{{\\netagree}}{{{net_agree:.1f}}}
 \\newcommand{{\\emagree}}{{{em_agree:.1f}}}
+%% The budget calibration, quoted wherever the text claims the comparison is not
+%% an artefact of the optimisation caps.
+\\newcommand{{\\nseqcalib}}{{{CALIB_N}}}
+\\newcommand{{\\budgetdelta}}{{{cal_d:+.2f}}}
+\\newcommand{{\\budgetdeltase}}{{{cal_se:.2f}}}
 """
 mdest = "../../overleaf/shared/sections/efficiency-numbers.tex"
 open(mdest, "w").write(macros)
 
 print(f"wrote {dest}: {len(seeds)} seeds, {n_cells} cells, "
-      f"ratio {lo:.1f}-{hi:.1f} (excl. n={big}: {min(sub):.1f}-{max(sub):.1f})")
+      f"{len(sizes)} sizes (to nseq={big}), ratio {lo:.1f}-{hi:.1f}")
 print(f"wrote {mdest}: \\ratiolo={lo:.1f} \\ratiohi={hi:.1f} "
-      f"\\ratiolosub={min(sub):.1f} \\ratiohisub={max(sub):.1f} "
-      f"\\nfreeparams={N_FREE}")
+      f"\\biggestn={big} \\nfreeparams={N_FREE}")
 print(f"  network val==test {net_agree:.1f}%, EM {em_agree:.1f}%, "
       f"network wins {wins} cells")
+print(f"  budget calibration at nseq={CALIB_N}: ratio {cal_d:+.2f} +/- {cal_se:.2f}, "
+      f"network error {100*cal_net/cal_net_base:+.1f}% (does not bind)")

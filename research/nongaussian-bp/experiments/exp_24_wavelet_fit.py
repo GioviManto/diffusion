@@ -30,6 +30,7 @@ denoise   Held-out denoising MSE against the raw observation and the Gaussian
 
 from __future__ import annotations
 
+import dataclasses
 import time
 
 import numpy as np
@@ -39,9 +40,10 @@ from common import (
 )
 from src.image_data import load_cifar10_luminance
 from src.kernels import GaussianAR1Kernel, MixtureInnovationKernel
-from src.scale_kernel import ScaleMixtureKernel
+from src.scale_kernel import ScaleMixtureKernel, magnitude_diagnostics
 from src.noising import alpha_delta
 from src.utils import ensure_dir, rng_for, write_csv, write_json
+from src.wavelet import ORIENTATIONS
 from src.wavelet_model import fit_wavelet_tree
 
 SETTINGS = {
@@ -50,11 +52,43 @@ SETTINGS = {
     "n_train": 2000,
     "n_test": 500,
     "t_train": (0.3, 0.6, 1.0),
-    "t_eval": (0.2, 0.4, 0.8, 1.5),
+    # The denoising sweep. Order carries no meaning -- see `t_loglik`.
+    # Extended below 0.2 on 19 Aug to test a prediction: the scale-mixture
+    # advantage over the Gaussian closure must vanish at both ends (at t -> 0
+    # every model reproduces the observation, at t -> inf every model returns the
+    # prior mean), so it peaks somewhere. The calibration showed it falling
+    # monotonically across 0.2..1.5, which places the peak at or below 0.2. If
+    # the mechanism is the one in exp_23 -- magnitude dependence concentrated at
+    # the finest scales, where the per-depth Delta_d = Delta / s_d^2 is largest
+    # and the kernel therefore does the most work -- the gain should rise as t
+    # falls towards t_resolve. If instead it keeps falling, that story is wrong.
+    "t_eval": (0.2, 0.4, 0.8, 1.5, 0.1, 0.06),
+    # The single noise level the held-out likelihood is reported at.
+    #
+    # This used to be `t_eval[1]`, which tied the headline number to an element's
+    # *position* in a tuple kept for a different purpose: extending the sweep
+    # silently moved the likelihood to another noise level and broke
+    # comparability with every earlier run. --quick already diverged this way,
+    # reporting at 0.8 against the full run's 0.4. 0.4 is the value every
+    # committed result used, so this changes nothing and prevents the next
+    # extension from changing something.
+    "t_loglik": 0.4,
     "n_iters": 25,
     "t_resolve": 0.05,
     "half_width": 8.0,
+    # Raise to refine the FINE-depth meshes only; see fit_wavelet_tree.
+    "state_points_per_std": 4.0,
     "n_components": 4,
+    # One kernel per level shared across HL/LH/HH, or three.
+    #
+    # Tying is the default and every result before 20 Aug used it. But exp_23
+    # measures linear correlations of 0.452 (HL), 0.482 (LH) and 0.148 (HH) at
+    # the finest boundary -- HH is a qualitatively different object, and a tied
+    # fit must return one rho for all three. That is a candidate explanation for
+    # why the fitted magnitude excess (1.12 at the finest edge) recovers so
+    # little of the empirical 1.86-2.33: the structure is being averaged across
+    # orientations that do not share it. Untying is the test.
+    "tie_orientations": True,
     "families": ("gaussian", "mixture"),
     "chunk": 64,
     "seed": 0,
@@ -99,7 +133,8 @@ def _fit(family, settings, train):
         train.images, levels=settings["levels"], t_train=list(settings["t_train"]),
         kernel_factory=_factory(family, settings), n_iters=settings["n_iters"],
         half_width=settings["half_width"], t_resolve=settings["t_resolve"],
-        chunk=settings["chunk"],
+        chunk=settings["chunk"], tie_orientations=settings["tie_orientations"],
+        state_points_per_std=settings["state_points_per_std"],
     )
     return model, trace, time.perf_counter() - t0
 
@@ -119,13 +154,46 @@ def _aligned(rows):
     return [{h: row.get(h, "") for h in headers} for row in rows]
 
 
+def _kernel_state(k) -> dict:
+    """Every fitted parameter of one kernel, as JSON-able numbers.
+
+    Written because `fit.csv` records `rho` and nothing else, so the gate
+    parameters that carry the magnitude dependence -- `beta` and `gamma` on
+    ScaleMixtureKernel -- died with the process. Any diagnostic not thought of
+    in advance then costs a refit, which for this experiment is hours. The
+    kernels are frozen dataclasses, so the field list is the parameter list.
+    """
+    if not dataclasses.is_dataclass(k):
+        return {"repr": repr(k)}
+    out = {"class": type(k).__name__}
+    for f in dataclasses.fields(k):
+        value = getattr(k, f.name)
+        arr = np.asarray(value, dtype=float)
+        out[f.name] = arr.tolist() if arr.ndim else float(arr)
+    return out
+
+
 def part_fit(settings, out_dir):
     train, test = _splits(settings)
     rows, traces = [], []
+    kernel_params: dict = {}
 
+    per_image: dict = {}
     for family in settings["families"]:
         model, trace, secs = _fit(family, settings, train)
-        ll = model.log_likelihood_images(test.images, settings["t_eval"][1])
+        # Per-image, not just the total. Two families scored on the SAME held-out
+        # images give a paired difference whose standard error is far below either
+        # family's spread across images, because image difficulty is common to
+        # both and cancels. Without this vector a likelihood gap has no error bar,
+        # and "family A beats family B by 14.8 nats" cannot be told apart from
+        # noise. It is also the comparison FID cannot make: FID's own real-vs-real
+        # floor is 4.5 at n=10^4 (exp_30), so a percent-level model difference is
+        # under its resolution while being many sigma in likelihood.
+        ll_each = model.log_likelihood_images(
+            test.images, settings["t_loglik"], per_image=True
+        )
+        per_image[family] = np.asarray(ll_each, dtype=float)
+        ll = float(np.sum(ll_each))
         row = {
             "family": family,
             "n_train": settings["n_train"],
@@ -152,6 +220,50 @@ def part_fit(settings, out_dir):
             else:
                 for c, value in enumerate(rho):
                     row[f"rho_d{d}_c{c}"] = float(value)
+
+            # The measurement this whole experiment is for. `exp_23` found an
+            # empirical Q4/Q1 magnitude excess of 1.86-2.33 at the finest scale
+            # boundary, and a scale-mixture kernel exists because a linear-AR one
+            # cannot represent any of it. Whether the *fitted* kernel reproduces
+            # that excess is the question -- and until now it was neither computed
+            # here nor recoverable afterwards, because only `rho` was persisted
+            # and the gate parameters that carry the dependence were discarded
+            # with the model. A held-out likelihood cannot answer it: a family
+            # with more parameters can win on likelihood while leaving the
+            # magnitude structure untouched.
+            #
+            # Wrapped, because a diagnostic must never be able to destroy the run
+            # it is diagnosing. This is the last statement before an 8-hour fit's
+            # results are written; a nan in a column is recoverable, a raise here
+            # loses every family in the job.
+            try:
+                row.update({
+                    f"{key}_d{d}": value
+                    for key, value in magnitude_diagnostics(k, model.grids[d]).items()
+                })
+                # Untied fits carry a different kernel per orientation, and the
+                # orientations are the whole point: exp_23 finds HH with linear
+                # correlation 0.148 against HL's 0.452 but a comparable magnitude
+                # excess, so an HH kernel that has learned the structure should
+                # show a *low* implied rho and a *high* excess. Averaging the
+                # three, or reporting only the first, would hide precisely that.
+                if not settings["tie_orientations"]:
+                    for oi, name in enumerate(ORIENTATIONS):
+                        diag = magnitude_diagnostics(
+                            model.kernels[oi][d], model.grids[d]
+                        )
+                        row.update({
+                            f"{key}_{name}_d{d}": value
+                            for key, value in diag.items()
+                        })
+            except Exception as exc:                       # pragma: no cover
+                row[f"magnitude_error_d{d}"] = repr(exc)
+        kernel_params[family] = {
+            f"{name}_depth_{d}": _kernel_state(model.kernels[oi][d])
+            for d in range(model.depth)
+            for oi, name in enumerate(ORIENTATIONS)
+        }
+        kernel_params[family]["grid_sizes"] = [int(g.size) for g in model.grids]
         rows.append(row)
         traces.extend(
             {"family": family, "iteration": i, "log_evidence": v}
@@ -163,6 +275,36 @@ def part_fit(settings, out_dir):
 
     write_csv(out_dir / "fit.csv", _aligned(rows))
     write_csv(out_dir / "em_trace.csv", traces)
+    write_json(out_dir / "kernels.json", kernel_params)
+
+    if per_image:
+        fams = list(per_image)
+        np.savez(out_dir / "loglik_per_image.npz", **per_image)
+        # The paired comparison, computed here so it cannot be done wrongly
+        # later: pair on image, never compare two unpaired means.
+        pair_rows = []
+        for i, a in enumerate(fams):
+            for b in fams[i + 1:]:
+                d = per_image[a] - per_image[b]
+                n = len(d)
+                se = float(np.std(d, ddof=1) / np.sqrt(n))
+                pair_rows.append({
+                    "family_a": a, "family_b": b, "n_test": n,
+                    "mean_diff_nats_per_image": float(np.mean(d)),
+                    "paired_se": se,
+                    "t": float(np.mean(d) / se) if se > 0 else float("nan"),
+                    "a_better_on_images": int(np.sum(d > 0)),
+                    # What an UNPAIRED comparison would have reported, to show
+                    # what the pairing buys.
+                    "unpaired_se": float(np.sqrt(
+                        np.var(per_image[a], ddof=1) + np.var(per_image[b], ddof=1)
+                    ) / np.sqrt(n)),
+                })
+                print(f"[loglik] {a} - {b}: "
+                      f"{np.mean(d):+.2f} +/- {se:.2f} nats/image "
+                      f"(t={pair_rows[-1]['t']:.1f}, "
+                      f"{pair_rows[-1]['a_better_on_images']}/{n} images)")
+        write_csv(out_dir / "loglik_paired.csv", pair_rows)
     return rows
 
 
@@ -223,7 +365,7 @@ def main() -> None:
     if args.quick:
         settings.update(
             n_train=300, n_test=100, n_iters=6, t_resolve=0.3,
-            t_train=(0.5,), t_eval=(0.4, 0.8),
+            t_train=(0.5,), t_eval=(0.4, 0.8), t_loglik=0.4,
         )
 
     out_dir = ensure_dir(args.output_dir)

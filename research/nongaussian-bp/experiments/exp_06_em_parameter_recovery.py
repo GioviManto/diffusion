@@ -442,7 +442,8 @@ def part5_quantization(grid_sizes, rho_values, n_chains, out):
     return rows
 
 
-def part6_clean_vs_noised(grid, weights, sizes, n_rep, t_eval, n_components, out):
+def part6_clean_vs_noised(grid, weights, sizes, n_rep, t_eval, n_components, out,
+                          em_iters: int = 120, shape_iters: int | None = None):
     """What does the noising actually cost? The clean-data MLE as the missing anchor.
 
     Marc's remark is that identifying the prior needs no noising at all: if the clean chain is
@@ -466,6 +467,11 @@ def part6_clean_vs_noised(grid, weights, sizes, n_rep, t_eval, n_components, out
     q_true = 1.0 - RHO_TRUE**2
     gauss_prior, lap_prior = GaussianAR1(RHO_TRUE), LaplaceAR1(RHO_TRUE)
 
+    # Defaults to the parameter budget so the old invocation is unchanged; pass it
+    # explicitly to get moments that are worth reporting.
+    if shape_iters is None:
+        shape_iters = em_iters
+
     # Shared held-out reference for the induced denoiser error, common to every arm and budget.
     rng_test = rng_for("exp06-p6-test")
     A_test = np.stack([lap_prior.sample(rng_test, N_SITES) for _ in range(256)])
@@ -486,7 +492,7 @@ def part6_clean_vs_noised(grid, weights, sizes, n_rep, t_eval, n_components, out
 
             k0 = GaussianAR1Kernel(0.2, 0.8)
             clean_k, _ = fit_clean(k0, grid, A_g)
-            noised_k, _ = fit_em(k0, grid, weights, groups_g, n_iters=120)  # frozen-exempt: reports (rho, q) only; exp_27 puts both at <=80 updates, well inside this budget
+            noised_k, _ = fit_em(k0, grid, weights, groups_g, n_iters=em_iters)  # frozen-exempt: reports (rho, q) only; exp_27 puts both at <=80 updates, well inside this budget
             for arm, k in (("clean", clean_k), ("noised", noised_k)):
                 rows_param.append({
                     "arm": arm, "n_chains": n_chains, "rep": r,
@@ -501,8 +507,15 @@ def part6_clean_vs_noised(grid, weights, sizes, n_rep, t_eval, n_components, out
                 # it just never touches the channel. Same count as the noised arm, so the
                 # comparison is not an optimisation-budget difference in disguise (the lesson
                 # of the em_iters=40 defect found in exp_16).
-                clean_m, _ = fit_clean(m0, grid, A_l, n_iters=120)  # frozen-exempt: PROVISIONAL -- reports innovation moments, whose kurtosis settles at a median 229 updates (exp_27). Compendium-only; see ch13 sec:corr-capacity. Rerun at FROZEN.em_max_iters before any use
-                noised_m, _ = fit_em(m0, grid, weights, groups_l, n_iters=120)  # frozen-exempt: PROVISIONAL -- reports innovation moments, whose kurtosis settles at a median 229 updates (exp_27). Compendium-only; see ch13 sec:corr-capacity. Rerun at FROZEN.em_max_iters before any use
+                # `shape_iters`, not `em_iters`: this pair reports innovation MOMENTS, and the
+                # kurtosis settles at a median 229 updates (exp_27) where rho is flat by ~25. A
+                # budget adequate for the parameter arm above is not adequate here, and the
+                # default 120 is below the requirement -- which is why the numbers this loop
+                # produced were marked provisional and compendium-only. Pass a converged budget
+                # to make them reportable; the two arms always get the SAME count, so the
+                # comparison is never an optimisation-budget difference in disguise.
+                clean_m, _ = fit_clean(m0, grid, A_l, n_iters=shape_iters)
+                noised_m, _ = fit_em(m0, grid, weights, groups_l, n_iters=shape_iters)
                 for arm, k in (("clean", clean_m), ("noised", noised_m)):
                     mom = k.innovation_moments
                     row = {"arm": arm, "n_chains": n_chains, "rep": r, "n_components": c,
@@ -724,6 +737,7 @@ def main() -> None:
         "n_chains_quantization": 128,
         "sizes_clean": (64, 256), "n_rep_clean": 2, "components_clean": (4,),
         "t_eval_clean": (0.2,), "n_rep_raw": 3,
+        "em_iters_clean": 20, "shape_iters_clean": 20,
     }
     # EVERY replicate count comes from the frozen config.
     #
@@ -749,6 +763,13 @@ def main() -> None:
         # parameter and shape recovery against N, and the induced denoiser error is a
         # secondary read-out whose 256-chain BP passes otherwise dominate the runtime.
         "components_clean": (8,), "t_eval_clean": (0.2, 0.8),
+        # Two budgets, because the two arms of this part answer different questions and
+        # converge at different rates. (rho, q) is flat by ~25 updates (exp_27), so 120 is
+        # ample. The innovation KURTOSIS settles at a median 229, so 120 is not: every shape
+        # number this part has ever produced was taken below its own convergence requirement
+        # and marked provisional in the source. `shape_iters` is what makes them reportable.
+        # Both arms always receive the same count -- see the note at the call site.
+        "em_iters_clean": 120, "shape_iters_clean": FROZEN.em_max_iters,
         # Part 7 is cheap -- no BP, no held-out denoiser passes -- so it can afford the
         # replication Part 6 cannot, which is exactly the point of running it.
         "n_rep_raw": 32,  # frozen-exempt: part 7 has no BP and no held-out passes,
@@ -785,7 +806,8 @@ def main() -> None:
     def p6(grid, weights, out):
         param_rows, shape_rows = part6_clean_vs_noised(
             grid, weights, cfg["sizes_clean"], cfg["n_rep_clean"],
-            cfg["t_eval_clean"], cfg["components_clean"], out)
+            cfg["t_eval_clean"], cfg["components_clean"], out,
+            em_iters=cfg["em_iters_clean"], shape_iters=cfg["shape_iters_clean"])
         write_csv(out / "clean_vs_noised_params.csv", param_rows)
         write_csv(out / "clean_vs_noised_shape.csv", shape_rows)
 

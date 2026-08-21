@@ -133,11 +133,25 @@ EM_CHECKPOINTS = em_checkpoints(EM_ITERS)
 # early stopping in SGD bites much earlier than the endpoint.
 NET_STEPS = 20000
 # Extended past 20k for the same reason EM's grid is extended past 400: at the
-# largest sample size both arms select their cap, so the ratio there is bounded
-# by the grid rather than by the data, and the only way to find out what it is
-# bounded by is to move the grid.
+# largest sample size both arms often select their cap, and the only way to find
+# out whether that bounds the answer is to move the grid and look.
+#
+# It was moved, and it does not. Tripling both caps at nseq=2048 (job 631467,
+# 16 seeds, paired on seed and on validation bundle) changes the ratio by
+# -0.16 +/- 0.18 and the network's error by 0.3%. Cap-selection turns out to
+# report the SIGN of the remaining gain, not its size: an arm takes its last
+# checkpoint whenever validation error is still falling at any rate at all.
+# Keep the extended grid anyway -- it is what licenses that statement.
+#
+# 80k and 100k are for nseq >= 8192 and change nothing below it: the grid is
+# filtered by `s < n_steps`, so a run capped at 20,000 or 60,000 sees exactly the
+# checkpoints it saw before. They are here because the network's cap-hit rate
+# RISES with nseq -- 33% at 2048 on a 20,000 cap, 42% at 4096 on a 60,000 one --
+# so a larger sample needs a longer grid to stay off its own ceiling, and a cap
+# with no checkpoints beneath it would make "selected" and "capped" the same
+# event.
 _NET_CHECKPOINTS = (500, 1000, 2000, 3500, 6000, 10000, 14000, 20000,
-                    30000, 45000, 60000)
+                    30000, 45000, 60000, 80000, 100000)
 
 
 def net_checkpoints(n_steps: int) -> set[int]:
@@ -652,10 +666,10 @@ def main() -> None:
                     2.4, 3.2),
         "inference_batches": (32, 128, 512),
         # Both arms' caps live here so a budget probe is a --set away rather than
-        # an edit. At nseq=2048 both select their cap, so the ratio there is
-        # bounded by the grid; moving both by the same factor is the only way to
-        # find out by how much, and moving only one would repeat the asymmetry
-        # this experiment was rebuilt to remove.
+        # an edit -- and moving both by the same factor is the only honest probe,
+        # since moving one would repeat the asymmetry this experiment was rebuilt
+        # to remove. Run as job 631467 (nseq=2048, EM 400->1200, net 20k->60k):
+        # the ratio moves -0.16 +/- 0.18, so the caps are selected but do not bind.
         "seed": 0, "em_iters": EM_ITERS,
     }
     cfg = apply_overrides(quick if args.quick else full, args.set)

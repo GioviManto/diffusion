@@ -3,17 +3,28 @@
 %% Every efficiency number the prose quotes is defined here and nowhere else, so
 %% that the abstract, the body and the table cannot disagree. If a value looks
 %% wrong, rerun the generator; do not edit the number in the text.
+%%
+%% \ratiolosub, \ratiohisub, \ratiohisubword and \nsizessub USED TO BE DEFINED
+%% HERE and deliberately are not any more. They existed to quote the range over
+%% the sizes at which neither arm selected its largest budget, because the largest
+%% size was believed to be budget-limited. That belief was tested by rerunning
+%% nseq=2048 with both budgets tripled and found to be false. Deleting the
+%% macros rather than redefining them is the point: any prose still carrying the
+%% old framing fails to build instead of silently rendering a number that no
+%% longer means what the surrounding sentence says it means.
 \newcommand{\ratiolo}{7.0}
-\newcommand{\ratiohi}{15.5}
-\newcommand{\ratiolosub}{7.0}
-\newcommand{\ratiohisub}{12.5}
+\newcommand{\ratiohi}{17.6}
 \newcommand{\ratioloword}{seven}
-\newcommand{\ratiohisubword}{twelve}
+\newcommand{\ratiohiword}{eighteen}
 \newcommand{\nfreeparams}{24}
 \newcommand{\nseedsused}{16}
-\newcommand{\ncellsused}{1{,}328}
-\newcommand{\nsizesused}{7}
-\newcommand{\nsizessub}{6}
-\newcommand{\biggestn}{2048}
-\newcommand{\netagree}{82.1}
-\newcommand{\emagree}{78.6}
+\newcommand{\ncellsused}{1{,}520}
+\newcommand{\nsizesused}{8}
+\newcommand{\biggestn}{4096}
+\newcommand{\netagree}{81.1}
+\newcommand{\emagree}{77.6}
+%% The budget calibration, quoted wherever the text claims the comparison is not
+%% an artefact of the optimisation caps.
+\newcommand{\nseqcalib}{2048}
+\newcommand{\budgetdelta}{-0.16}
+\newcommand{\budgetdeltase}{0.18}

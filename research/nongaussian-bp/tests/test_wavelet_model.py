@@ -231,3 +231,65 @@ def test_denoising_beats_the_observation_and_likelihood_is_finite():
 
     ll = model.log_likelihood_images(noisy, 0.5)
     assert np.isfinite(ll)
+
+
+@pytest.mark.slow
+def test_per_image_likelihood_sums_to_the_total():
+    """The vector must reconstruct the scalar exactly, not approximately.
+
+    A per-image likelihood that only *roughly* sums to the reported total would
+    be an apportionment rather than a decomposition, and every standard error
+    computed from it would be describing the apportionment. Both corrections that
+    turn tree evidence into an image likelihood -- the standardisation Jacobian
+    and the scaling-coefficient term -- are genuinely per-image, so exactness is
+    achievable and is the right thing to require.
+    """
+    rng = rng_for("wavelet-model-perimage")
+    qt, images, _ = _make_images(rng, 120)
+    model, _ = fit_wavelet_tree(
+        images, levels=LEVELS, t_train=[0.5],
+        kernel_factory=lambda d, r: GaussianAR1Kernel(rho=0.3, q=0.5),
+        n_iters=4, half_width=8.0, grid_size=161, chunk=64,
+    )
+    test = _make_images(rng_for("wavelet-model-perimage-test"), 32)[1]
+
+    total = model.log_likelihood_images(test, 0.5)
+    each = model.log_likelihood_images(test, 0.5, per_image=True)
+
+    assert each.shape == (len(test),)
+    assert np.all(np.isfinite(each))
+    assert float(np.sum(each)) == pytest.approx(total, rel=1e-12)
+
+
+@pytest.mark.slow
+def test_per_image_likelihood_gives_a_paired_comparison_an_error_bar():
+    """What the vector is for: two models on the SAME images are paired.
+
+    The paired standard error is far smaller than either model's spread across
+    images, because image difficulty is common to both and cancels. That is the
+    entire reason a likelihood can resolve a model difference that an unpaired
+    sample statistic cannot, so it is asserted rather than assumed.
+    """
+    rng = rng_for("wavelet-model-paired")
+    qt, images, _ = _make_images(rng, 120)
+    common = dict(images=images, levels=LEVELS, t_train=[0.5], n_iters=4,
+                  half_width=8.0, grid_size=161, chunk=64)
+    weak, _ = fit_wavelet_tree(
+        kernel_factory=lambda d, r: GaussianAR1Kernel(rho=0.0, q=1.0), **common
+    )
+    fitted, _ = fit_wavelet_tree(
+        kernel_factory=lambda d, r: GaussianAR1Kernel(rho=0.3, q=0.5), **common
+    )
+    test = _make_images(rng_for("wavelet-model-paired-test"), 48)[1]
+
+    a = fitted.log_likelihood_images(test, 0.5, per_image=True)
+    b = weak.log_likelihood_images(test, 0.5, per_image=True)
+    diff = a - b
+
+    paired_se = float(np.std(diff, ddof=1) / np.sqrt(len(diff)))
+    unpaired_se = float(
+        np.sqrt(np.var(a, ddof=1) + np.var(b, ddof=1)) / np.sqrt(len(diff))
+    )
+    assert paired_se < unpaired_se, (
+        f"pairing bought nothing: {paired_se:.4g} vs {unpaired_se:.4g}"
+    )

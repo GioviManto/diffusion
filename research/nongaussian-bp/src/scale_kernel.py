@@ -88,6 +88,42 @@ def linear_ar_magnitude_ratio(rho: float) -> float:
     return float(np.sqrt((r2 * _VAR_Q4 + 1.0 - r2) / (r2 * _VAR_Q1 + 1.0 - r2)))
 
 
+def magnitude_diagnostics(kernel, grid: np.ndarray) -> dict:
+    """`std_ratio_q4_q1`, its linear-AR null, and the excess, for any kernel.
+
+    This is the measurement that decides whether the scale-mixture family did the
+    job it was built for, so it is computed the same way for every family rather
+    than only for the one expected to win. `exp_23` reports an empirical excess
+    of 1.86 (HH) to 2.33 (HL) at the finest scale boundary; a fitted kernel that
+    reproduces that has captured the structure, and one that returns an excess
+    near 1 has not -- whatever its held-out likelihood says.
+
+    The excess is `ratio / null` with the null evaluated at the kernel's *own*
+    implied slope, matching how the empirical number is read in the handover.
+
+    For a linear-AR kernel the two agree by construction and the excess is
+    exactly 1. That is a consistency check, not a wasted computation: it runs on
+    the gaussian and mixture arms of every fit and would catch a quadrature or
+    convention error in the diagnostic itself before it was used to make a claim
+    about the scale mixture.
+    """
+    if hasattr(kernel, "magnitude_ratio"):
+        rho_eff = float(kernel.implied_rho(grid))
+        ratio = float(kernel.magnitude_ratio(grid))
+    else:
+        # Linear-AR families: scalar rho, conditional variance independent of the
+        # parent, so the closed form *is* the model's prediction.
+        rho_eff = float(np.asarray(getattr(kernel, "rho", np.nan)).reshape(-1)[0])
+        ratio = linear_ar_magnitude_ratio(rho_eff)
+    null = linear_ar_magnitude_ratio(rho_eff)
+    return {
+        "rho_implied": rho_eff,
+        "magnitude_ratio": ratio,
+        "magnitude_null": null,
+        "magnitude_excess": ratio / null if null > 0 else float("nan"),
+    }
+
+
 def _softmax_rows(z: np.ndarray) -> np.ndarray:
     z = z - z.max(axis=-1, keepdims=True)
     e = np.exp(z)
@@ -205,6 +241,31 @@ class ScaleMixtureKernel:
         mean = w @ self.rho * grid
         second = (w * (self.s2[None, :] + (self.rho[None, :] * grid[:, None]) ** 2)).sum(1)
         return np.sqrt(np.maximum(second - mean**2, 0.0))
+
+    def implied_rho(self, grid: np.ndarray) -> float:
+        """The lag-1 correlation a *linear* AR fit would return for this kernel.
+
+        This is the number that makes the HH case in the cross-scale measurement
+        legible. A least-squares fit of child on parent returns
+        Cov(a', a) / Var(a), which for a standard-normal parent is just
+        E[a a'] = E[a * E[a'|a]]. Under this kernel the conditional mean is
+        `rho_bar(a) * a` with `rho_bar(a) = sum_c w_c(a) rho_c`, so the slope
+        averages the components *weighted by where the gate puts them*.
+
+        A kernel can therefore carry strong magnitude dependence and still report
+        a slope near zero -- which is exactly what a linear-AR family sees on HH,
+        and why it collapses to independence there while the real structure is
+        untouched. Reporting this beside `magnitude_ratio` says how much of the
+        dependence a linear model was ever able to see.
+
+        Same quadrature convention as `magnitude_ratio`: a standard-normal parent
+        on the given (uniform) grid.
+        """
+        w = self.gate(grid)                                   # (M, C)
+        cond_mean = (w @ self.rho) * grid
+        dens = np.exp(-0.5 * grid**2)
+        p = dens / dens.sum()
+        return float(p @ (grid * cond_mean))
 
     def magnitude_ratio(self, grid: np.ndarray) -> float:
         """Model analogue of `exp_23`'s empirical `std_ratio_q4_q1`.

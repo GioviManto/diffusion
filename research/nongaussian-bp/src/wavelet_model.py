@@ -204,6 +204,7 @@ class WaveletTreeModel:
             xp = get_xp()
         out = np.empty_like(nodes_std)
         total_log_ev = 0.0
+        per_item = np.zeros(len(nodes_std))
         for oi in range(3):
             res = wavelet_tree_bp(
                 self.grids, self.weights, self.log_k(oi), self.log_root[oi],
@@ -213,7 +214,10 @@ class WaveletTreeModel:
             )
             out[:, oi, :] = res.posterior_mean
             total_log_ev += res.log_evidence
-        return out, total_log_ev
+            # The three orientation trees are disjoint, so their per-image
+            # evidences ADD -- the same statement that lets their totals add.
+            per_item += res.log_evidence_per_item
+        return out, total_log_ev, per_item
 
     def denoise_images(
         self, noisy: np.ndarray, t: float, chunk: int = 32
@@ -227,7 +231,7 @@ class WaveletTreeModel:
         alpha, delta = alpha_delta(t)
         _, nodes, scaling = images_to_tree(noisy, self.qt.levels)
         std_nodes = self.scales.standardise(self.qt, nodes)
-        post, _ = self.posterior_mean_nodes(std_nodes, alpha, delta, chunk)
+        post, _, _ = self.posterior_mean_nodes(std_nodes, alpha, delta, chunk)
         post = self.scales.restore(self.qt, post)
         # The LL coefficient is a scalar Gaussian problem in closed form.
         post_ll = self._ll_posterior_mean(scaling, alpha, delta)
@@ -457,7 +461,10 @@ class WaveletTreeModel:
         # score is built from the posterior mean in the first place.
         return denoising_readout(x, score_fn(x, t_min), t_min)
 
-    def log_likelihood_images(self, images: np.ndarray, t: float, chunk: int = 32) -> float:
+    def log_likelihood_images(
+        self, images: np.ndarray, t: float, chunk: int = 32,
+        per_image: bool = False,
+    ):
         """Exact log p_t(x) for a batch of images, in *pixel* coordinates.
 
         Two corrections turn the tree evidence into an image likelihood and both
@@ -471,18 +478,29 @@ class WaveletTreeModel:
         That second point is the reason this number is comparable across models
         that work in different bases, and it is why the transform had to be
         orthonormal rather than merely invertible.
+
+        `per_image=True` returns the (B,) vector instead of its sum. Both
+        corrections above are per-image quantities, so this is exact rather than
+        an apportionment of the total. It exists because two models scored on the
+        SAME held-out images give a paired difference whose standard error is far
+        smaller than either model's spread across images -- and without the vector
+        a likelihood gap has no error bar and cannot be called significant.
         """
         alpha, delta = alpha_delta(t)
         _, nodes, scaling = images_to_tree(images, self.qt.levels)
         std_nodes = self.scales.standardise(self.qt, nodes)
-        _, log_ev = self.posterior_mean_nodes(std_nodes, alpha, delta, chunk)
-        log_jac = -float(np.sum(np.log(self.scales.per_node(self.qt)))) * len(images)
+        _, log_ev, log_ev_items = self.posterior_mean_nodes(
+            std_nodes, alpha, delta, chunk
+        )
+        log_jac_each = -float(np.sum(np.log(self.scales.per_node(self.qt))))
         var_ll = alpha**2 * self.ll_std**2 + delta
-        log_ll = float(np.sum(
-            -0.5 * ((scaling - alpha * self.ll_mean) ** 2 / var_ll
-                    + np.log(var_ll) + _LOG_2PI)
-        ))
-        return log_ev + log_jac + log_ll
+        log_ll_each = -0.5 * (
+            (np.asarray(scaling).reshape(len(images), -1) - alpha * self.ll_mean) ** 2
+            / var_ll + np.log(var_ll) + _LOG_2PI
+        ).sum(axis=1)
+        if per_image:
+            return log_ev_items + log_jac_each + log_ll_each
+        return log_ev + log_jac_each * len(images) + float(np.sum(log_ll_each))
 
 
 # ----------------------------------------------------------------------------
@@ -523,6 +541,7 @@ def fit_wavelet_tree(
     tol: float = 1e-9,
     verbose: bool = False,
     xp=None,
+    state_points_per_std: float = 4.0,
 ) -> tuple[WaveletTreeModel, WaveletEMTrace]:
     """Generalised EM for the wavelet HMT.
 
@@ -562,7 +581,18 @@ def fit_wavelet_tree(
         sizes = [grid_size] * (qt.depth + 1)
     else:
         target = t_resolve if t_resolve is not None else min(t_train)
-        sizes = per_depth_grid_sizes(scales.scales, target, half_width)
+        # `state_points_per_std` binds at the FINE end, where the likelihood is
+        # wide and the state resolution is all that sets the mesh. At the default
+        # 4.0 the finest subband gets a spacing of 0.25 on a unit-variance
+        # coefficient, which is coarse for representing a conditional variance
+        # that depends sharply on the parent -- and the finest edge is exactly
+        # where the fitted magnitude excess falls furthest short of exp_23's
+        # measurement (1.18 against 1.86). Exposed so that shortfall can be
+        # tested against a grid explanation rather than attributed to the family.
+        sizes = per_depth_grid_sizes(
+            scales.scales, target, half_width,
+            state_points_per_std=state_points_per_std,
+        )
     grids, weights = [], []
     for size in sizes:
         g, w = make_grid(half_width, size)

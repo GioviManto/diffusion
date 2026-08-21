@@ -96,6 +96,8 @@ from dataclasses import dataclass
 
 import numpy as np
 
+from src.backend import get_xp, to_device, to_host
+
 
 @dataclass(frozen=True)
 class ExpectedStatistics:
@@ -187,35 +189,54 @@ def _e_step_chunk(
     if n < 2:
         raise ValueError("EM on a chain needs at least two sites.")
 
+    # The E-step is where this project's compute actually goes: the forward and
+    # backward sweeps are 2(n-1) matmuls of (B, M) against (M, M), and the
+    # pairwise accumulation is two more at (E, M) x (M, M) with E = B(n-1). At
+    # M = 401 and nseq in the thousands that is the whole cost of a fit, so it
+    # is the one part worth putting on a device.
+    #
+    # Everything below runs through `xp`, which is numpy unless BP_DEVICE asks
+    # for a GPU. The device boundary is drawn HERE rather than at the caller:
+    # results are returned to the host before `ExpectedStatistics` is built, so
+    # the M-step, the kernels and every consumer stay numpy-only and unaware.
+    # That keeps the port to one function, and it keeps the CPU path bit-for-bit
+    # what it was: with xp = numpy, `to_device`/`to_host` are `np.asarray` and
+    # every call below is the one that was there before. The single place where
+    # the two devices would have diverged is flagged where it happens.
+    xp = get_xp()
+    grid = to_device(np.asarray(grid, dtype=float), xp)
+    weights = to_device(np.asarray(weights, dtype=float), xp)
+    K = to_device(np.asarray(K, dtype=float), xp)
+    X = to_device(np.asarray(X, dtype=float), xp)
+    log_mu = to_device(np.asarray(log_mu, dtype=float), xp)
+
     # Row-shifted likelihood tables, one per (chain, site); the removed shifts
     # are restored in the evidence at the end.
     z = X[:, :, None] - alpha * grid[None, None, :]
     log_ell = -0.5 * z**2 / delta
     row_shift = log_ell.max(axis=2)  # (B, n)
     log_ell = log_ell - row_shift[:, :, None]
-    ell = np.exp(log_ell)  # (B, n, M)
+    ell = xp.exp(log_ell)  # (B, n, M)
 
-    L = np.empty((n, b_size, m))
-    R = np.empty((n, b_size, m))
-    L[0] = np.exp(log_mu)[None, :]
-    log_z_fwd = np.zeros(b_size)
+    L = xp.empty((n, b_size, m))
+    R = xp.empty((n, b_size, m))
+    L[0] = xp.exp(log_mu)[None, :]
+    log_z_fwd = xp.zeros(b_size)
 
     for i in range(n - 1):
         incoming = L[i] * ell[:, i, :] * weights[None, :]  # (B, M)
         out = incoming @ K.T  # (B, M);  out[b, k] = sum_j K[k, j] incoming[b, j]
         mass = out @ weights
-        if not np.all(np.isfinite(mass)) or np.any(mass <= 0.0):
-            raise FloatingPointError(f"Forward message {i + 1} lost all mass.")
+        _guard(xp, mass, f"Forward message {i + 1} lost all mass.")
         L[i + 1] = out / mass[:, None]
-        log_z_fwd += np.log(mass)
+        log_z_fwd += xp.log(mass)
 
     R[-1] = 1.0
     for i in range(n - 1, 0, -1):
         incoming = R[i] * ell[:, i, :] * weights[None, :]
         out = incoming @ K
         mass = out @ weights
-        if not np.all(np.isfinite(mass)) or np.any(mass <= 0.0):
-            raise FloatingPointError(f"Backward message {i - 1} lost all mass.")
+        _guard(xp, mass, f"Backward message {i - 1} lost all mass.")
         R[i - 1] = out / mass[:, None]
 
     # Pairwise accumulation. F[i] and G[i] carry the local factors so that the
@@ -227,9 +248,18 @@ def _e_step_chunk(
     g_all = G[1:].reshape(-1, m)  # (B(n-1), M)
     # Z_e = g_e^T K f_e for every edge e, as two BLAS calls rather than a
     # three-operand einsum (which would contract at O(E M^2) outside BLAS).
-    partition = np.einsum("ek,ek->e", g_all, f_all @ K.T)
-    if not np.all(np.isfinite(partition)) or np.any(partition <= 0.0):
-        raise FloatingPointError("Pairwise belief lost all mass.")
+    #
+    # numpy keeps `einsum`, cupy gets multiply-and-sum. These are the same
+    # arithmetic but NOT the same summation order -- einsum accumulates
+    # sequentially, `.sum` pairwise -- and they disagree at ~1e-15 relative.
+    # That is far below anything claimed here, but the grid-validation figures
+    # quoted in the paper were measured on the einsum path, and there is no
+    # reason to move a published number to save one line.
+    if xp is np:
+        partition = np.einsum("ek,ek->e", g_all, f_all @ K.T)
+    else:
+        partition = (g_all * (f_all @ K.T)).sum(axis=1)
+    _guard(xp, partition, "Pairwise belief lost all mass.")
     c_mat = (g_all / partition[:, None]).T @ f_all  # (M, M), C[k, j]
     xi = c_mat * K
 
@@ -241,15 +271,27 @@ def _e_step_chunk(
     # Exact evidence: forward normalizers x tail integral x restored constants.
     tail = (L[-1] * ell[:, -1, :]) @ weights
     log_const = row_shift.sum(axis=1) + n * (-0.5 * np.log(2.0 * np.pi * delta))
-    log_evidence = float(np.sum(log_z_fwd + np.log(tail) + log_const))
+    log_evidence = float(to_host(xp.sum(log_z_fwd + xp.log(tail) + log_const)))
 
     return ExpectedStatistics(
-        xi=xi,
-        site1=site1,
+        xi=to_host(xi),
+        site1=to_host(site1),
         log_evidence=log_evidence,
         n_edges=b_size * (n - 1),
         n_chains=b_size,
     )
+
+
+def _guard(xp, v, message: str) -> None:
+    """Raise if a normaliser has gone non-finite or non-positive.
+
+    Kept as a per-message check rather than deferred to the end of the sweep,
+    even though on a GPU each call forces a synchronisation: the site index in
+    the message is how these failures have actually been diagnosed, and a fit
+    that has lost mass is not worth the microseconds saved by finding out later.
+    """
+    if not bool(xp.all(xp.isfinite(v))) or bool(xp.any(v <= 0.0)):
+        raise FloatingPointError(message)
 
 
 def e_step_multi(

@@ -220,3 +220,98 @@ def test_gradient_interface_is_refused_explicitly():
     k = ScaleMixtureKernel.init(2, rho=0.4, var=1.0, rng=rng_for("scale-kernel-grad"))
     with pytest.raises(NotImplementedError, match="ECM"):
         k.grad_log_transition_matrix(grid)
+
+
+# ----------------------------------------------------------------------------
+# magnitude_diagnostics
+#
+# This is the measurement that decides whether the scale-mixture family did what
+# it was built for. exp_23 finds an empirical Q4/Q1 excess of 1.86 (HH) to 2.33
+# (HL) at the finest scale boundary; a fitted kernel either reproduces that or it
+# does not, and held-out likelihood cannot tell the difference -- a family with
+# more parameters can win on likelihood while leaving the magnitude structure
+# untouched. So the diagnostic itself needs to be right.
+# ----------------------------------------------------------------------------
+
+import dataclasses  # noqa: E402
+
+from src.bp_grid import make_grid  # noqa: E402
+from src.kernels import GaussianAR1Kernel  # noqa: E402
+from src.scale_kernel import magnitude_diagnostics  # noqa: E402
+
+
+def _flat_scale_mixture(rho, n_components=4, seed=0):
+    """A ScaleMixtureKernel degenerated to a plain AR(1).
+
+    Identical components and a dead gate (beta = gamma = 0), so the conditional
+    variance cannot depend on the parent. Its magnitude ratio must therefore
+    equal the closed-form linear null -- which makes this the one case where the
+    general path has an exactly known answer.
+    """
+    k = ScaleMixtureKernel.init(
+        n_components, rho=rho, var=1.0 - rho**2,
+        rng=np.random.default_rng(seed),
+    )
+    return dataclasses.replace(
+        k,
+        rho=np.full(n_components, rho),
+        s2=np.full(n_components, 1.0 - rho**2),
+        beta=np.zeros(n_components),
+        gamma=np.zeros(n_components),
+    )
+
+
+@pytest.mark.parametrize("rho", [0.15, 0.45, 0.60])
+def test_linear_family_excess_is_exactly_one(rho):
+    """A linear-AR kernel has no magnitude dependence to find, by construction.
+
+    Runs on the gaussian and mixture arms of every fit, so a convention or
+    quadrature error in the diagnostic shows up there before it is used to make
+    a claim about the scale mixture.
+    """
+    grid, _ = make_grid(8.0, 1201)
+    out = magnitude_diagnostics(GaussianAR1Kernel(rho=rho, q=1.0 - rho**2), grid)
+    assert out["rho_implied"] == pytest.approx(rho)
+    assert out["magnitude_excess"] == pytest.approx(1.0, abs=1e-12)
+
+
+def test_implied_rho_recovers_the_slope_of_a_degenerate_mixture():
+    """With every component sharing one rho, the linear slope is that rho."""
+    grid, _ = make_grid(8.0, 1201)
+    for rho in (0.2, 0.45):
+        out = magnitude_diagnostics(_flat_scale_mixture(rho), grid)
+        assert out["rho_implied"] == pytest.approx(rho, abs=2e-3)
+
+
+@pytest.mark.parametrize("m_grid", [1593, 771, 349, 151, 65])
+def test_diagnostic_error_is_small_at_every_grid_the_fit_uses(m_grid):
+    """Bound the diagnostic's own discretisation error where it will be used.
+
+    The per-depth meshes in the real exp_24 fit are [1593, 771, 349, 151, 65],
+    and the quartile bands are hard masks on grid points -- so which points fall
+    inside jumps discretely and the error does *not* fall monotonically with M.
+    At M=65 only three points lie in the Q1 band. Measured against the degenerate
+    kernel's exact answer the error stays under 1% at every one of these sizes,
+    which is ~200x smaller than the 1.86-2.33 excess being measured.
+
+    Asserted rather than described, because the temptation on seeing a coarse
+    grid is to refine it, and refining does not monotonically help here.
+    """
+    grid, _ = make_grid(8.0, m_grid)
+    out = magnitude_diagnostics(_flat_scale_mixture(0.45), grid)
+    assert abs(out["magnitude_excess"] - 1.0) < 1e-2
+
+
+def test_a_live_gate_produces_excess_above_one():
+    """The direction the whole family exists for: gated variance lifts the ratio
+    above what any linear-AR kernel with the same slope could produce."""
+    grid, _ = make_grid(8.0, 1201)
+    k = ScaleMixtureKernel(
+        rho=np.array([0.45, 0.45]),
+        s2=np.array([0.2, 2.0]),          # components differ in scale
+        beta=np.array([0.0, -1.0]),
+        gamma=np.array([0.0, 1.0]),       # large |a| favours the wide component
+    )
+    out = magnitude_diagnostics(k, grid)
+    assert out["magnitude_excess"] > 1.05
+    assert out["magnitude_ratio"] > out["magnitude_null"]
