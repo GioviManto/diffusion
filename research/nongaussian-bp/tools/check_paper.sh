@@ -1,9 +1,29 @@
 #!/usr/bin/env bash
-# Gate the paper against the rules the rewrite was done under.
+# MANUSCRIPT CONSISTENCY GATE for the paper. Not an honesty gate.
 #
-# These are the checks from the rebuild plan, in one place, so "is the paper
-# ready" has a mechanical answer rather than a judgement call. Run from the
-# repository root:
+# The distinction is worth stating, because this script was described as the
+# latter and it cannot be. What it checks is that the document is internally
+# consistent with its own outputs: no placeholders, no orphaned section files,
+# every efficiency figure coming from a generated macro rather than being typed,
+# no duplicated scientific constants, the body inside its page budget. Those are
+# real and they catch a real failure -- a number drifting between the prose and
+# the table it came from.
+#
+# What it CANNOT check, and what nobody should read a green run as certifying:
+# whether the baselines are strong enough to support the comparison; whether a
+# budget was right-censored; whether validation leaked into test; whether every
+# figure uses the correct statistical unit; whether an exclusion rule favours
+# one arm; whether a theorem's hypotheses match the prose around it; or whether
+# a GPU test actually executed rather than skipping.
+#
+# One rule here is especially easy to misread. The check forbidding correction
+# and withdrawal language in main.tex enforces that the PAPER does not carry its
+# own errata -- corrections belong in the compendium's claim audit. It does not
+# verify that a withdrawn claim has actually left every dependent figure and
+# conclusion. That verification is the claim ledger's job, and the ledger is a
+# document maintained by hand, not a script.
+#
+# Run from the repository root:
 #
 #     tools/check_paper.sh
 #
@@ -38,7 +58,7 @@ FAIL=0
 pass() { printf "  [PASS] %s\n" "$1"; }
 fail() { printf "  [FAIL] %s\n" "$1"; FAIL=1; }
 
-echo "Paper gate"
+echo "Manuscript consistency gate (see the header: this is not an honesty gate)"
 echo
 
 # Every check below greps files. If a path is wrong, grep finds nothing and the

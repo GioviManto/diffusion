@@ -68,6 +68,13 @@ nvidia-smi --query-gpu=name --format=csv,noheader
 # BP_DEVICE=gpu is an explicit request, so a silent numpy fallback must be a
 # failure and not a warning: the whole point of this sweep is that the numbers
 # come off the hardware they claim to.
+# An all-skipped parity run exits 0, so pytest's status alone cannot gate this.
+# tests/test_backend_parity.py skips its whole module when no device is visible,
+# which is correct on a laptop and catastrophic here: the sweep would proceed on
+# numpy having "passed" its GPU check. Assert the device FIRST, so the tests
+# actually execute and the exit code means something.
+"$PYTHON" -c "import sys; from src.backend import gpu_available; sys.exit(0 if gpu_available() else 1)" \
+    || { echo "NO USABLE GPU - refusing to run a GPU sweep on the CPU"; exit 3; }
 "$PYTHON" -m pytest tests/test_backend_parity.py -q \
     || { echo "PARITY FAILED - refusing to run"; exit 3; }
 

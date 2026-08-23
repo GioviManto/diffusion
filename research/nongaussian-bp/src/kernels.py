@@ -40,6 +40,7 @@ Every kernel is immutable; `m_step` returns a new instance.
 
 from __future__ import annotations
 
+import warnings
 from dataclasses import dataclass, replace
 from typing import Protocol
 
@@ -107,6 +108,18 @@ class GaussianAR1Kernel:
         return "gaussian_ar1"
 
     @property
+    def is_covariance_stationary(self) -> bool:
+        """Whether the stationary reading of this fit is available at all.
+
+        An AR(1) chain is covariance-stationary exactly when |rho| < 1. Outside
+        that the finite-chain law is still valid but has no stationary
+        distribution to match variances against, so `FROZEN.innovation_variance`
+        and every "variance-matched across innovation families" statement stop
+        applying to it.
+        """
+        return abs(self.rho) < 1.0
+
+    @property
     def theta(self) -> np.ndarray:
         return np.array([self.rho, self.q])
 
@@ -136,6 +149,22 @@ class GaussianAR1Kernel:
         the pairwise-belief-weighted Yule-Walker equations. Reducing to the
         clean-data limit (Xi a histogram of observed transitions) recovers the
         ordinary AR(1) least-squares estimator, as it must.
+
+        NOTHING CONSTRAINS |rho| < 1 HERE, deliberately. The update is the exact
+        maximiser of Q, and clamping it would trade an exact M-step for a
+        silently biased one -- the outer EM would still ascend, so the damage
+        would not show up in any monotonicity check. On a finite chain
+        |rho| >= 1 is still a perfectly valid joint distribution, so there is no
+        numerical problem either.
+
+        What breaks at |rho| >= 1 is the INTERPRETATION, and only that. The
+        chain is no longer covariance-stationary, so the variance-matching
+        convention q = 1 - rho^2 that makes every innovation family share
+        Cov(a_i, a_j) = rho^|i-j| stops meaning anything, and any statement in
+        the paper that appeals to stationarity does not cover such a fit.
+        `is_covariance_stationary` exposes the test, and the warning below
+        exists so that a fit which has left that regime cannot be aggregated
+        into a stationary claim without something having said so.
         """
         xi = stats.xi
         out = grid if grid_out is None else grid_out
@@ -145,7 +174,19 @@ class GaussianAR1Kernel:
         s11 = float(np.einsum("kj,k,k->", xi, out, out))
         rho = s01 / s00
         q = max((s11 - rho * s01) / w_tot, _VAR_FLOOR)
-        return GaussianAR1Kernel(rho=float(rho), q=float(q))
+        fitted = GaussianAR1Kernel(rho=float(rho), q=float(q))
+        if not fitted.is_covariance_stationary:
+            warnings.warn(
+                f"Gaussian M-step returned rho={rho:.4f} with |rho| >= 1. The "
+                "fit is a valid finite-chain distribution and the M-step is "
+                "still the exact maximiser, but the chain is not "
+                "covariance-stationary and q = 1 - rho^2 no longer matches "
+                "variances. Do not pool this fit into a claim that assumes "
+                "stationarity.",
+                RuntimeWarning,
+                stacklevel=2,
+            )
+        return fitted
 
 
 # ----------------------------------------------------------------------------

@@ -249,16 +249,17 @@ def _e_step_chunk(
     # Z_e = g_e^T K f_e for every edge e, as two BLAS calls rather than a
     # three-operand einsum (which would contract at O(E M^2) outside BLAS).
     #
-    # numpy keeps `einsum`, cupy gets multiply-and-sum. These are the same
-    # arithmetic but NOT the same summation order -- einsum accumulates
-    # sequentially, `.sum` pairwise -- and they disagree at ~1e-15 relative.
-    # That is far below anything claimed here, but the grid-validation figures
-    # quoted in the paper were measured on the einsum path, and there is no
-    # reason to move a published number to save one line.
-    if xp is np:
-        partition = np.einsum("ek,ek->e", g_all, f_all @ K.T)
-    else:
-        partition = (g_all * (f_all @ K.T)).sum(axis=1)
+    # ONE contraction for both backends. This used to branch -- numpy on
+    # `einsum`, cupy on multiply-and-sum -- because the two accumulate in
+    # different orders and disagree at ~1e-15 relative, and the grid-validation
+    # figures quoted in the paper had been measured on the einsum path. That is
+    # not a reason: 1e-15 is four orders below the tightest number the paper
+    # reports (the 1e-11 Gaussian agreement) and eleven below anything
+    # scientific. Preserving an incidental floating-point summation order so a
+    # published digit does not move is superstition, and it costs a real thing
+    # -- the two backends were running different arithmetic, which is precisely
+    # what the parity test exists to rule out.
+    partition = (g_all * (f_all @ K.T)).sum(axis=1)
     _guard(xp, partition, "Pairwise belief lost all mass.")
     c_mat = (g_all / partition[:, None]).T @ f_all  # (M, M), C[k, j]
     xi = c_mat * K

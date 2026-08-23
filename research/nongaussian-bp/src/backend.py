@@ -84,11 +84,22 @@ def gpu_available() -> bool:
 def get_xp(device: str | None = None) -> Any:
     """Return the array module to compute with.
 
-    ``device`` defaults to the ``BP_DEVICE`` environment variable, then to CPU. Asking for a
-    GPU that is not present is a **warning and a fall back to numpy**, not a crash: a cluster
-    job that lands on a node without a visible device should still produce correct numbers
-    slowly rather than no numbers at all. The warning is loud so the fallback cannot be
-    mistaken for a GPU run in the logs.
+    ``device`` defaults to the ``BP_DEVICE`` environment variable, then to CPU.
+
+    AN EXPLICIT GPU REQUEST FAILS CLOSED. ``BP_DEVICE=gpu`` used to warn and fall
+    back to numpy, on the reasoning that a job landing on a node without a
+    visible device should produce correct numbers slowly rather than none. That
+    reasoning is wrong for this project, and the history says so: for a month
+    ``em.py`` did not import the backend at all, so "GPU" EM sweeps were
+    CPU-bound and nothing said so, and a separate GPU gate passed while every
+    parity test skipped. A warning that only appears in a log nobody reads is
+    indistinguishable from no warning, and the failure it hides -- a timing or a
+    device claim attributed to hardware that never ran -- is exactly the kind
+    this package cannot afford.
+
+    So the contract is now: ``gpu`` means GPU or an exception. ``auto`` is the
+    setting that prefers a device and degrades quietly, and a caller that
+    genuinely wants "fast if possible" should ask for that instead.
     """
     if device is None:
         device = os.environ.get("BP_DEVICE", "cpu")
@@ -99,14 +110,26 @@ def get_xp(device: str | None = None) -> Any:
     if device in ("gpu", "cuda", "cupy"):
         if gpu_available():
             return _try_import_cupy()
+        raise RuntimeError(
+            f"device {device!r} was requested explicitly and no usable GPU is "
+            "present. Refusing to fall back to numpy: a run that reports GPU "
+            "timings or GPU-device provenance while executing on the CPU is "
+            "worse than a run that fails. Use BP_DEVICE=auto to prefer a GPU "
+            "and degrade to CPU, or BP_DEVICE=cpu to ask for the CPU."
+        )
+    if device == "auto":
+        if gpu_available():
+            return _try_import_cupy()
         warnings.warn(
-            "BP_DEVICE requested a GPU but none is usable; falling back to numpy. "
-            "Timings from this run are CPU timings.",
+            "BP_DEVICE=auto found no usable GPU; using numpy. Timings from "
+            "this run are CPU timings.",
             RuntimeWarning,
             stacklevel=2,
         )
         return np
-    raise ValueError(f"unknown device {device!r}; expected 'cpu' or 'gpu'")
+    raise ValueError(
+        f"unknown device {device!r}; expected 'cpu', 'gpu' or 'auto'"
+    )
 
 
 def to_device(a: np.ndarray, xp: Any) -> Any:

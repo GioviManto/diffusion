@@ -411,10 +411,12 @@ independent controls are brute-force posterior enumeration on a tiny grid and th
 Gaussian gradient (Appendix~\ref{app:protocol}).
 
 $\Xis$ is the continuum analogue of the expected transition counts of Baum--Welch
-\citep{baum1970}, and it is \emph{sufficient}: the complete-data log-likelihood is a sum over
-edges, so the $\params$-dependent part of the auxiliary function
-$\Qfun(\params\mid\params^{(r)})$ depends on the data only through $\Xis$. Sufficiency requires a
-homogeneous kernel shared across sites and sequences, a fixed grid, an initial law excluded from
+\citep{baum1970}, and it is sufficient \emph{for the current $\Qfun$} --- not a sufficient
+statistic of the data. The complete-data log-likelihood is a sum over edges, so the
+$\params$-dependent part of $\Qfun(\params\mid\params^{(r)})$ depends on the data only through
+$\Xis$; but $\Xis$ is itself computed at $\params^{(r)}$ and is rebuilt every iteration, so the
+claim is about one maximisation step, not about the data being compressible once. It also requires
+a homogeneous kernel shared across sites and sequences, a fixed grid, an initial law excluded from
 $\params$, and $\params$-free likelihood factors --- the last being what licenses observations at
 several noise levels to add into one $\Xis$. Given those, maximisation never revisits the data and
 costs $O(P\ngrid^2)$ for $P$ parameters, independently of $\nseq$. Forming $\Xis$ costs

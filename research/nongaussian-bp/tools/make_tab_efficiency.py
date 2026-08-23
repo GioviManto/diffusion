@@ -156,7 +156,13 @@ ext_phrase = (f"The $\\nseq = {_ns[0]}$ row uses"
 # cap -- small sample, long budget, one component collapsing onto the mesh. The
 # largest ratio shift from excluding them is 0.081.
 UNRESOLVED_FRAC_MAX = 0.05
-MAX_SHIFT = 0.5
+# Set to the tolerance the PAPER states, not to a value the realised shift
+# happens to clear. The caption says excluding the unresolved cells changes no
+# ratio by more than 0.08; a gate at 0.5 would let the shift grow sixfold and
+# still pass, i.e. it would permit the caption to become false while reporting
+# success. 0.1 is the smallest round number above the realised 0.081, so the
+# gate now fails at roughly the point the sentence it protects stops being true.
+MAX_SHIFT = 0.1
 
 dropped = []
 if "em_resolved" in (rows[0] if rows else {}):
