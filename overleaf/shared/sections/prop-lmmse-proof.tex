@@ -12,7 +12,7 @@ $\E[\va] + \Cov(\va,\vx)\Cov(\vx)^{-1}(\vx-\E[\vx])$, and \eqref{eq:lmmse} is th
 special case. \emph{$\corr\neq0$} is required because the backward map in \eqref{eq:closure}
 divides by $\corr$; at $\corr=0$ the chain has no edges, the sites are independent, and the
 claim holds trivially and separately, each site's posterior mean being the scalar Gaussian
-$\Sig_0(\Sig_0+\Dt e^{2t})^{-1}x_i$. \emph{Where the projection is applied} matters because
+$e^{-t}\Sig_0(e^{-2t}\Sig_0+\Dt)^{-1}x_i = e^{t}\Sig_0(\Sig_0+\Dt e^{2t})^{-1}x_i$. \emph{Where the projection is applied} matters because
 $\Pgauss$ does not commute with multiplication by the likelihood; Proposition~\ref{prop:lmmse}
 fixes the order, and a different order is a different algorithm.
 
@@ -43,8 +43,15 @@ map for every innovation with moments $(0,\ivar)$, and in particular the same as
 chain. In the Gaussian chain the convolution of two Gaussians is already Gaussian, so no
 projection occurs there; here $\Pgauss$ is applied, and since the pre-projection function has
 exactly the moments just computed, the projection returns precisely the Gaussian chain's message.
-The backward recursion is identical with the transition map inverted, $(m,v)\mapsto
-(m/\corr,\,(v+\ivar)/\corr^2)$, which is where $\corr\neq0$ is used.
+
+The backward recursion runs the same argument with the transition map inverted, $(m,v)\mapsto
+(m/\corr,\,(v+\ivar)/\corr^2)$, which is where $\corr\neq0$ is used. Its base case needs one word
+of care. The terminal backward message is $r_n\equiv 1$, which is not a normalisable density and
+so is not in the domain of $\Pgauss$; the induction therefore starts one step earlier, at the
+terminal \emph{unary likelihood} $\ell_n$, which is Gaussian and normalisable. Every subsequent
+backward message is a likelihood-weighted transition integral of a normalisable Gaussian and stays
+in the domain. Nothing is lost by starting there, because $r_n\equiv1$ contributes no factor: the
+first object the recursion actually projects is $\ell_n$.
 
 Hence every projected belief equals the corresponding Gaussian-chain belief, and the returned
 posterior mean is the Gaussian chain's posterior mean. For jointly Gaussian zero-mean

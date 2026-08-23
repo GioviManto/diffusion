@@ -85,8 +85,9 @@ reproduce its training set and nothing else, yet diffusion models generate new d
 a trained network has actually learned requires comparing it against the score it should have
 learned --- and for essentially every distribution of interest that target is unavailable, so a
 network's error cannot be separated from the difficulty of its target. The analytical literature
-therefore works with Gaussians and Gaussian mixtures, where the score is linear and any question
-about how structure is exploited has a degenerate answer.
+therefore works with Gaussians, whose scores are linear, and Gaussian mixtures, whose scores stay
+available in closed form; in the Gaussian case any question about how structure is exploited has a
+degenerate answer.
 
 We study a family where the target is computable and non-trivial: a first-order Markov chain on
 $\Reals^{\nsites}$ with continuous, non-Gaussian transitions, variance-matched so that innovation
@@ -106,16 +107,17 @@ second moments. Estimating a transition \emph{density} rather than its parameter
 convergence-rate asymmetry, which we trace to the innovation mixture's own latent label rather
 than to the channel.
 
-Against networks trained by denoising score matching on identical data, with the optimisation
-budget of \emph{both} arms selected on a held-out bundle, the structured estimator attains between
-\ratioloword{} and \ratiohiword{} times lower pointwise denoising error across \nsizesused{}
-training-set sizes, and the network at the largest budget does not reach what the estimator attains
-at the smallest. Most of that margin is architectural rather than structural: a weight-shared
-convolution, tuned the same way, narrows the gap to $\cnnratiolo$--$\cnnratiohi$, which still grows
-with sample size. The comparison is deliberately asymmetric in prior information --- the estimator
-is handed the Markov factorisation, the autoregressive form and a low-dimensional innovation
-family, and the networks none of them --- so it measures the worth of that structure on this
-family, not a general ranking of the two approaches.
+Against an \emph{unstructured} network trained by denoising score matching on identical data, with
+the optimisation budget of both arms selected on a held-out bundle, the structured estimator
+attains between \ratioloword{} and \ratiohiword{} times lower pointwise denoising error across
+\nsizesused{} training-set sizes. That figure bounds what the structural assumption is worth rather
+than measuring it: most of the margin is architectural, and a weight-shared window baseline --- the
+same object as a one-layer convolution --- closes the greater part of it. What survives against a
+baseline that can represent chain inference at all is smaller, and is the quantity we treat as the
+result. The comparison is deliberately asymmetric in prior information --- the estimator is handed
+the Markov factorisation, the autoregressive form and a low-dimensional innovation family, the
+networks none of them --- so it measures the worth of that structure on this family, not a general
+ranking of the two approaches.
 \end{abstract}
 
 \section{Introduction}
@@ -139,9 +141,10 @@ Measuring this is the difficulty. Deciding what a trained network has learned me
 against the score it \emph{should} have learned, and for realistic data that object is
 unavailable --- so a large error may indicate a poor model or a hard target, and nothing in the
 measurement distinguishes them. Distributions with tractable population scores are scarce, which
-is why the analytical literature leans on Gaussians and Gaussian mixtures; those are poor probes
-of \emph{structure}, since the score is linear and any question about exploiting correlation has a
-degenerate answer.
+is why the analytical literature leans on Gaussians and Gaussian mixtures. Both are poor probes of
+\emph{structure}: the Gaussian score is linear, so any question about exploiting correlation has a
+degenerate answer, and a mixture score --- nonlinear, through its responsibilities --- is nonlinear
+in the mixture index rather than in any dependence between coordinates.
 
 \paragraph{Why a Markov chain.} Two reasons. Diffusion is applied to sequential data --- video,
 audio, time series --- so a model of correlation along a sequence is the relevant caricature. And
@@ -395,7 +398,7 @@ $\kernelth(a'\mid a)=\normal{a'-\corr a}{\ivar}$ and $\params=(\corr,\ivar)$ is 
 observe only noised sequences $\vx^\mu$, $\mu=1,\dots,\nseq$, and write
 $\Lik(\params)=\sum_\mu \log P_{t,\params}(\vx^\mu)$ for the marginal log-likelihood.
 
-\paragraph{The gradient is free.} The obvious route is gradient ascent on $\Lik$. That looks
+\paragraph{The gradient needs no backpropagation.} The obvious route is gradient ascent on $\Lik$. That looks
 expensive --- $\Lik$ is defined through the recursion, so differentiating it appears to require
 backpropagating through $2(\nsites-1)$ message updates. It does not. Fisher's identity
 \citep{fisher1925,louis1982,cappe2005} gives
@@ -410,18 +413,9 @@ to $\sim10^{-9}$; that check shares the forward recursion with what it validates
 independent controls are brute-force posterior enumeration on a tiny grid and the closed-form
 Gaussian gradient (Appendix~\ref{app:protocol}).
 
-$\Xis$ is the continuum analogue of the expected transition counts of Baum--Welch
-\citep{baum1970}, and it is sufficient \emph{for the current $\Qfun$} --- not a sufficient
-statistic of the data. The complete-data log-likelihood is a sum over edges, so the
-$\params$-dependent part of $\Qfun(\params\mid\params^{(r)})$ depends on the data only through
-$\Xis$; but $\Xis$ is itself computed at $\params^{(r)}$ and is rebuilt every iteration, so the
-claim is about one maximisation step, not about the data being compressible once. It also requires
-a homogeneous kernel shared across sites and sequences, a fixed grid, an initial law excluded from
-$\params$, and $\params$-free likelihood factors --- the last being what licenses observations at
-several noise levels to add into one $\Xis$. Given those, maximisation never revisits the data and
-costs $O(P\ngrid^2)$ for $P$ parameters, independently of $\nseq$. Forming $\Xis$ costs
-$O(\nseq\nsites\ngrid^2)$ per iteration, so ``one matrix'' is a statement about sufficiency, not
-about inference being cheap.
+$\Xis$ is the continuum analogue of Baum--Welch's expected transition counts \citep{baum1970}, and
+it is sufficient \emph{for the current $\Qfun$} only --- not a sufficient statistic of the data.
+Appendix~\ref{app:protocol} states the conditions and the cost.
 
 \paragraph{Two routes to the same place.} Equation~\eqref{eq:fisher} licenses gradient ascent;
 EM instead increases $\Qfun$. For the Gaussian kernel the maximisation step is closed form ---
@@ -543,56 +537,50 @@ Appendix~\ref{app:rates}.
 \label{sec:networks}
 
 The three levels above establish what is recoverable. This section asks what the structural
-assumption is worth against a generic function approximator, and is deliberately the shortest in
-the note.
-
-\noindent
-The comparison is asymmetric by construction: the estimator is given the Markov factorisation, the
-kernel's linear-autoregressive form and homogeneity across sites, and the networks none of them,
-so what follows measures the value of that structure and nothing about neural denoisers in
-general. The baseline in Table~\ref{tab:pointwise} is a fully connected network trained by
-denoising score matching in both standard parameterisations, scored against grid BP under the true
-kernel on held-out sequences --- a generic function approximator, carrying neither weight sharing
-nor a locality prior. Below we replace it with one that carries both.
+assumption is worth, and is deliberately the shortest in the note. As stated in the abstract the
+comparison is asymmetric by construction, so what follows measures the value of that structure and
+says nothing about neural denoisers in general. The baseline in Table~\ref{tab:pointwise} is a
+fully connected network trained by denoising score matching in both standard parameterisations,
+scored against the deterministic grid-BP reference on held-out sequences --- carrying neither
+weight sharing nor a locality prior. Below we replace it with one that carries both.
 
 \input{../shared/sections/tab-efficiency}
 
-Table~\ref{tab:pointwise} gives a ratio between $\ratiolo$ and $\ratiohi$. It is substantially
-larger at the largest sample sizes, but it is not monotone --- it falls from $9.7$ at
-$\nseq=256$ to $9.0$ at $\nseq=512$ before rising again --- and we do not claim a trend beyond
-that.
-Each arm often selects its largest offered budget at the larger sizes, but that reports only that
-validation error is still falling, not that it is falling fast enough to matter: tripling both
-budgets at $\nseq=\nseqcalib$ moves the ratio by $\budgetdelta \pm \budgetdeltase$. The network at
-$\nseq=\biggestn$ has not reached the error the estimator attains at $\nseq=32$; we observe no
-crossing and therefore quote no data-equivalence factor.
+Table~\ref{tab:pointwise} gives a ratio between $\ratiolo$ and $\ratiohi$, larger at the largest
+sample sizes but \emph{not} monotone --- it falls from $9.7$ at $\nseq=256$ to $9.0$ at
+$\nseq=512$ before rising --- so we claim no trend. It is also the largest of several defensible
+aggregations of these cells (Appendix~\ref{app:aggregation}). Each arm often selects its largest
+offered budget at the larger sizes, which reports only that validation error is still falling:
+tripling both budgets at $\nseq=\nseqcalib$ moves the ratio by $\budgetdelta \pm \budgetdeltase$.
+We observe no crossing between the two curves and therefore quote no data-equivalence factor.
 
 \paragraph{How much of this is the architecture?} A ratio against a fully connected network cannot
 separate knowing the Markov structure from sharing weights across sites, and the second is the
-cheaper explanation. Against a weight-shared convolution instead --- radius swept to the full chain
-width, radius and parameterisation selected on validation, EM--BP refitted on the same chains ---
-\emph{most of the headline gap is architectural}: the ratio falls to $\cnnratiolo$--$\cnnratiohi$,
-and what survives \emph{widens} with $\nseq$, from $\cnnratiolo$ at $32$ to $\cnnratiohi$ at
-$2048$ (EM--BP better in $\cnnemwins$ of $\cnncells$ cells, the exceptions all at the two smallest
-sizes; Appendix~\ref{app:structured}). The structural advantage is therefore not what a locality
-prior supplies, but what the convolution fails to acquire as data grows.
-
-The asymmetry in supplied information is the point of the measurement, but it also bounds what the
-measurement supports. The scoped statement is: \emph{on this family, at these sizes, and with each
-arm's budget chosen on held-out data, the correctly specified structured estimator is more
-sample-efficient in pointwise denoising than the networks we trained --- by roughly an order of
-magnitude against a generic function approximator, and by $\cnnratiolo$ to $\cnnratiohi$ against a
-weight-shared convolution tuned the same way.} It is not evidence that likelihood learning through
-belief propagation is the better learning algorithm in general. Deep dilated stacks, temporal
-U-Nets and attention are untried here; see Section~\ref{sec:limits}.
+cheaper explanation. Against a weight-shared window head instead --- radius and parameterisation
+selected on validation, EM--BP refitted on the same chains --- \emph{most of the headline gap is
+architectural}, and the residual is a small multiple rather than an order of magnitude
+(Appendix~\ref{app:structured}). It bounds what remains to be explained rather than measuring
+structure's worth: a window head trained to a fixed step count sees each chain fewer times as
+$\nseq$ grows, so a residual widening with $\nseq$ cannot be separated from the budget shrinking,
+and its error falls throughout. \emph{Whether the residual reflects optimisation, approximation or
+statistical efficiency is unresolved}; an earlier draft read it as the convolution failing to
+acquire the structure as data grows, a mechanism this design cannot distinguish from its own budget
+schedule. So the scoped statement is: \emph{on this family, at these sizes, and with each arm's
+budget chosen on held-out data, the correctly specified estimator is more sample-efficient in
+pointwise denoising than the networks we trained --- by roughly an order of magnitude against a
+generic function approximator, and by considerably less against a structure-aware one.} A window
+head is itself a weak test, since it cannot propagate past its radius however much data it sees;
+architectures that can --- dilated stacks, bidirectional message passing, attention --- are what a
+stronger claim must survive (Section~\ref{sec:limits}).
 
 
 
 \noindent
-\paragraph{Protocol, in one line.} Every number here comes from one frozen configuration
-(Appendix~\ref{app:protocol}). Its load-bearing part: EM stops on the fitted innovation excess
-kurtosis, $|\Delta\kappa_4|<10^{-3}$, never on $\corr$ --- by Remark~\ref{rem:rates} a settled
-$\corr$ certifies a converged-looking trace over an unconverged kernel.
+% The "Protocol, in one line" paragraph that stood here was cut for length. It
+% restated two facts already carried elsewhere -- that both arms select their
+% budget on a disjoint validation bundle (abstract, and the table caption) and
+% that EM's internal stop is a signed log-evidence tolerance rather than \corr
+% (Appendix~\ref{app:protocol}, which states the rule and the correction to it).
 
 \section{Limitations and outlook}
 \label{sec:limits}

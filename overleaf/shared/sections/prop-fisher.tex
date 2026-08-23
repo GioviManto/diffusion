@@ -20,7 +20,9 @@ the gradient of the \emph{discretised} marginal log-likelihood is
 = \sum_{\mu}\E_\params\!\left[\nabla_\params \log P_\params(\va,\vx^\mu)\,\middle|\,\vx^\mu\right]
 = \big\langle \Xis(\params),\; \nabla_\params \log \kernelth \big\rangle .
 \end{equation}
-Both $\Xis$ and the evidence are produced by a single complete forward--backward pass --- one
-forward and one backward recursion, not one directional sweep --- so \eqref{eq:fisher} costs no
-more than evaluating the likelihood, and involves no differentiation through the recursion.
+Both $\Xis$ and the evidence come from a single complete forward--backward pass --- one forward and
+one backward recursion, not one directional sweep --- so \eqref{eq:fisher} is of the same
+asymptotic order as evaluating the likelihood, with no additional message pass and no
+backpropagation through the recursion. It is not free: accumulating $\Xis$ over all $(k,l)$
+dominates the constant at large $\ngrid$.
 \end{proposition}

@@ -112,7 +112,8 @@ the statistical mechanics of these models \citep{biroli2023,biroli2024dynamical}
 Progress on it needs a target one can compute. For realistic data the exact score is unavailable,
 so a network's error cannot be separated from the difficulty of what it was approximating.
 Tractable families are scarce and mostly Gaussian, where the score is linear and every question
-about structure has a degenerate answer.
+about structure has a degenerate answer. Gaussian mixtures keep a closed-form score, but it is
+nonlinear only in the mixture index, not in any dependence between coordinates.
 
 \paragraph{This work.} We use a first-order Markov chain: diffusion is applied to sequential data,
 and studying how structure is exploited requires data that has structure one can dial. The chain

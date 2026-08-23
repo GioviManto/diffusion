@@ -14,8 +14,16 @@ $\nabla_\params \Lik = \int\!\!\int \xi_\params(a,a')\,\nabla_\params \log
 \kernel_\params(a'\mid a)\,\dd a\,\dd a'$, also holds, but it needs hypotheses the discrete
 statement does not: $\kernel_\params(a'\mid a)$ differentiable in $\params$, support not depending
 on $\params$, and an integrable dominating function for $\partial_\params \kernel_\params$ so that
-differentiation and integration may be exchanged. Our kernels satisfy these --- Gaussian and
-Gaussian-mixture innovations are smooth in $\params$ with full support, and Laplace is smooth in
-$\corr$ away from the residual's kink --- but the two results should not be conflated, and the
-numbers we report certify the discrete one.
+differentiation and integration may be exchanged.
+
+Gaussian and Gaussian-mixture innovations satisfy the hypotheses \emph{as written}: both are
+smooth in $\params$ with full support. Laplace does not, and saying so matters because Laplace is
+the innovation law the reported runs use. Its density $\propto \exp(-|a'-\corr a|/b)$ has a kink
+at $a'=\corr a$, so $\partial_\corr \kernel_\corr$ fails to exist on that set and the proposition's
+smoothness hypothesis is violated there. The identity survives, but by a different argument: the
+kink set is Lebesgue-null, the derivative exists almost everywhere, and the difference quotients
+are dominated locally uniformly in $\corr$, so dominated convergence still licenses the exchange.
+The discrete statement is untouched either way --- on the grid the kink is a finite set of entries
+and the sum is differentiated term by term --- and it is the discrete one the reported numbers
+certify.
 \end{remark}

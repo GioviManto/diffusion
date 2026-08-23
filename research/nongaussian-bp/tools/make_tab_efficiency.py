@@ -301,7 +301,7 @@ tex = f"""%% Included by overleaf/paper/main.tex only. The workshop no longer ca
 %% from exp_07_budget2048_seed*/. Do not hand-edit the numbers; rerun the generator.
 
 \\begin{{table}}[!htbp]
-\\caption{{Relative denoising error against grid BP under the true kernel, averaged over the noise
+\\caption{{Relative denoising error against the deterministic grid-BP reference under the true kernel, averaged over the noise
 schedule; {len(seeds)} seeds $\\pm$ one standard error, aggregated per seed. Both arms are tuned on a
 disjoint validation bundle --- the network selects its parameterisation \\emph{{and}} training
 length, EM--BP its iteration count --- agreeing with the test-set optimum in ${net_agree:.1f}\\%$ and

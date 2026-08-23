@@ -135,8 +135,24 @@ matrices --- comes from deterministic quadrature and carries no sampling error a
 discretisation error. Where a quantity is averaged over random draws of a dataset, that is
 replicate spread and is labelled as such.
 
-We write ``exact tree inference'' for (i), ``exact for the discretised model'' for (ii), and
-``grid-BP reference'' for the numerical arm; none is abbreviated to ``exact''.
+Three levels of exactness are involved and collapsing any two of them overstates the result, so
+each has its own name and none is abbreviated to ``exact''.
+
+\begin{enumerate}
+\item \emph{Tree-exact functional BP.} The posterior factorises on a chain and the sum-product
+integrals are exact as statements about functions on $\Reals$. Nothing numerical has happened yet.
+\item \emph{Exact recursion for the discretised model.} Once grid and quadrature weights are
+fixed, forward--backward is exact --- up to floating point --- \emph{for that finite-state model}.
+It is not exact for the continuous chain.
+\item \emph{Validated grid-quadrature reference.} The finite-state model approximates the
+continuous chain, with truncation and quadrature error that is measured rather than assumed
+(\S\ref{sec:rung0}).
+\end{enumerate}
+
+Accordingly the tables say ``deterministic grid-BP reference under the true kernel'', and the
+population statement is that the score \emph{reduces to tree-exact functional inference and is
+evaluated numerically by controlled grid quadrature}. ``Exact grid-BP'' would collapse (ii) into
+(iii) and quietly promote a measured approximation into a guarantee.
 
 \section{Sum-product on the posterior chain}
 \label{app:bp}
@@ -564,10 +580,30 @@ in the body is the qualitative one.
 
 \input{../shared/sections/prop-fisher-scope}
 
-Every number here comes from one frozen configuration, defined in a single file and imported by
-every experiment so that no run can silently diverge from it: Laplace chain unless stated,
-$\corr=0.85$, $\nsites=32$, $\ngrid=401$, $\halfwidth=8$, twelve log-spaced noise levels on
-$[0.05,3.0]$, sixteen replicates, and $256$ held-out sequences on a disjoint seed.
+\paragraph{What $\Xis$ is sufficient for.} The complete-data log-likelihood is a sum over edges, so
+the $\params$-dependent part of $\Qfun(\params\mid\params^{(r)})$ sees the data only through
+$\Xis$. But $\Xis$ is itself computed at $\params^{(r)}$ and rebuilt every iteration, so the claim
+concerns one maximisation step, not the data being compressible once. It also requires a
+homogeneous kernel shared across sites and sequences, a fixed grid, an initial law excluded from
+$\params$, and $\params$-free likelihood factors --- the last licensing observations at several
+noise levels to add into one $\Xis$. Given those, maximisation costs $O(P\ngrid^2)$ for $P$
+parameters, independently of $\nseq$, while forming $\Xis$ costs $O(\nseq\nsites\ngrid^2)$ per
+iteration. ``One matrix'' is therefore a statement about sufficiency, not about inference being
+cheap.
+
+The reported numbers come from one frozen configuration, defined in a single file and imported by
+the experiments that produce them: Laplace chain unless stated, $\corr=0.85$, $\nsites=32$,
+$\ngrid=401$, $\halfwidth=8$, twelve log-spaced noise levels on $[0.05,3.0]$, sixteen replicates,
+and $256$ held-out sequences on a disjoint seed.
+
+Two qualifications, because the stronger claim --- that no run can diverge from the file --- has
+twice been false. A declared field is not necessarily a \emph{read} field: importing a
+configuration does not make the code consult it, and the provenance stamp compares the
+configuration against itself, so it cannot see a setting nobody reads. Two such fields survive
+today and are listed as defects in \texttt{tests/test\_frozen\_config\_is\_read.py}, which fails
+the build if a third appears. Separately, experiments carrying their own local settings --- chain
+length, noise grid, architecture sweeps --- are not described by this file at all, so their
+outputs additionally record a digest of the settings actually resolved at run time.
 
 \paragraph{One view per chain.} Each clean chain is noised at \emph{one} level, the chains being
 split evenly across the twelve levels, so a training set of $\nseq$ chains yields exactly $\nseq$
@@ -576,11 +612,25 @@ objective over repeated views of the same latent sequence. This costs resolution
 --- at $\nseq=32$ a level carries two or three chains --- and it is what makes $\nseq$ a count of
 independent latent sequences, so that the sample-efficiency axis means what it says.
 
-\paragraph{The stopping rule, stated once.} EM stops when the fitted innovation excess kurtosis
-stops moving, $|\Delta\kappa_4|<10^{-3}$, with a relative log-likelihood tolerance of $10^{-9}$ as
-a secondary guard and a cap of $400$ iterations. Stopping on $\corr$ is not permitted anywhere:
-by Remark~\ref{rem:rates} it certifies a converged-looking trace over an unconverged kernel. The
-rule is the same at every rung.
+\paragraph{The stopping rule, stated once, and a correction.} Earlier versions of this appendix
+stated that EM stops when the fitted innovation excess kurtosis stops moving,
+$|\Delta\kappa_4|<10^{-3}$. \textbf{That rule is not implemented and no reported number was
+produced by it.} A threshold of that name is declared in the configuration file, and nothing reads
+it. What \texttt{fit\_em} actually does is stop when the signed log-evidence gain per transition
+falls in $[0,10^{-9}]$ --- signed, so a decrease is recorded as a defect rather than accepted as
+convergence --- subject to a cap of $400$ iterations, after which the run is labelled
+\emph{censored} rather than converged. The headline estimator does not rely on that rule at all:
+it selects an iteration count on the disjoint validation bundle, exactly as the network arm
+selects its training length.
+
+Shape convergence is monitored, and the monitoring is why the discrepancy matters rather than
+being a typographical slip. The coordinates converge at very different rates: at $\corr=0.85$,
+$\nseq=512$, $C=8$ the autoregressive coefficient is flat from iteration ${\sim}25$ while the
+fitted excess kurtosis reads $0.84$ at $30$ iterations, $1.85$ at $60$, $2.30$ at $120$ and $2.29$
+at $400$. Stopping on $\corr$ would therefore certify a kernel still missing a third of the
+higher-order structure, which is why it is not permitted anywhere. But the remedy the text
+described was never wired in, and the actual guard against that failure is the validation
+selection, not a kurtosis threshold.
 
 \begin{center}
 \small

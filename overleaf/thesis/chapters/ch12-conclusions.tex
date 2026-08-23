@@ -56,8 +56,11 @@ for any innovation law and a generalised M-step.
 
 Answering RQ6, the resulting estimator attains between $\ratiolo$ and $\ratiohi$ times
 lower pointwise denoising error than networks trained by denoising score
-matching on identical data, across the \nsizesused{} training-set sizes tested,
-with the ratio rising as the training set grows. At the larger sizes each side
+matching on identical data, across the \nsizesused{} training-set sizes tested.
+The ratio is \emph{not} monotone in the training-set size, and an earlier draft
+of this chapter said it rose with it; the reported summary is also the largest
+of several defensible aggregations of the same cells, which
+Appendix~\ref{app:aggregation} sets out. At the larger sizes each side
 often selects the largest budget on offer; that is not the same as being limited
 by it, since an arm selects its last checkpoint whenever validation error is
 still falling at any rate at all. Rerunning the \nseqcalib-sequence case with
@@ -75,7 +78,18 @@ supplied information by construction: the estimator receives the Markov
 factorisation, the autoregressive form and homogeneity, and the networks
 receive none of them. The measurement is of what a correct structural
 assumption is worth on a family where it holds exactly. It is not a ranking of
-learning algorithms, and no claim about architectures follows from it.
+learning algorithms.
+
+In particular the comparison is against an \emph{unstructured} network, and
+most of the margin turns out to be attributable to that choice rather than to
+estimation. A weight-shared window baseline --- the same object as a one-layer
+convolution --- closes the greater part of the gap, which means the headline
+figure should be read as an upper bound on the value of the structural
+assumption and not as its size. How much survives against a baseline that can
+actually represent chain inference, rather than one restricted to a fixed
+window, is measured in Chapter~\ref{ch:em-results} and is materially smaller;
+that measurement is the one to quote, and its own limits are stated where it
+appears.
 
 The chain-Markov assumption itself tolerates a violation it can absorb into
 its own fitted parameters (a shared global latent, up to the point where it

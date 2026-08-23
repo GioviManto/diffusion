@@ -4,8 +4,7 @@
 \label{app:aggregation}
 
 A ratio is a nonlinear function of two means, so its value depends on the order
-of averaging: $\E[X/Y] \ge \E[X]/\E[Y]$ by Jensen, with a gap that grows
-with the spread. Table~\ref{tab:pointwise} reports the mean of per-cell
+of averaging. Table~\ref{tab:pointwise} reports the mean of per-cell
 ratios, aggregated per seed. That is the right inferential unit --- the twelve
 noise levels share a training set and a fitted model --- but being the right
 unit does not make it the only defensible summary, so here is the same data
@@ -45,13 +44,26 @@ But \textbf{the estimand we report is systematically the largest of the
 four}, and by a margin that grows with $\nseq$ --- up to $5.5$ at
 $\nseq=2048$. The ratio of per-seed averaged errors, which is the summary a
 reader is most likely to have in mind, runs $6.6$ to $16.1$
-rather than $\ratiolo$ to $\ratiohi$. This is Jensen's inequality doing
-exactly what it must, not an error, but quoting only the largest of five
-summaries would be a choice presented as a fact.
+rather than $\ratiolo$ to $\ratiohi$.
+
+An earlier version of this appendix attributed that ordering to Jensen's
+inequality. That was wrong and the correction is worth making precisely,
+because the wrong version claimed a theorem where there is only a measurement.
+Jensen gives $\E[1/Y]\ge 1/\E[Y]$, but $\E[X/Y]\ge\E[X]/\E[Y]$ does
+\emph{not} follow for arbitrary positive correlated $X$ and $Y$ --- the
+dependence between numerator and denominator can push the comparison either
+way. What is true here is empirical: denominator heterogeneity across noise
+levels interacts with that dependence, and in this dataset the mean of
+cellwise ratios comes out largest. It is a property of these cells, not a law,
+which is exactly why the estimand has to be named rather than assumed.
 
 Resolving the average over noise levels shows where the aggregation hides
 structure: the ratio is not flat in $t$ but peaks near $t \approx 0.5$ and
-falls at both ends, and the weakest single (size, level) cell in the whole
-grid is $3.6$. The estimator's advantage is largest at moderate
-noise, where the posterior is neither dominated by the likelihood nor by the
-prior --- which is where knowing the transition structure should help most.
+falls at both ends. The weakest seed-averaged $(\nseq,t)$ aggregate in the
+grid is $3.6$. That is \emph{not} the weakest individual cell,
+and the two were previously conflated: the weakest individual cell is
+$0.92$, and EM--BP is beaten outright in $2$ of
+the $1,712$ cells summarised here.
+The estimator's advantage is largest at moderate noise, where the posterior is
+dominated by neither the likelihood nor the prior --- which is where knowing
+the transition structure should help most.
