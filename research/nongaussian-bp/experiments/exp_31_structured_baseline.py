@@ -386,11 +386,64 @@ def part_screen(cfg, out):
     return rows
 
 
+def _winners_from_screening(path) -> dict:
+    """Pick the architecture and hyperparameters, from development seeds only.
+
+    Selection is on the BULK region, pooled across development seeds and sizes
+    by the schedule-level risk -- numerator and denominator summed before the
+    square root, the same estimand the confirmatory stage reports. Two
+    architectures are carried forward: the winner, and the shared-window head
+    regardless of whether it wins, because it is the review's reference point
+    and dropping it when it loses would be selective.
+
+    A tie is broken toward the cheaper model. This runs inside the confirmatory
+    job so the choice is reproducible from the screening CSV rather than
+    transcribed by hand into a job script.
+    """
+    import csv
+    from collections import defaultdict
+
+    rows = list(csv.DictReader(open(path)))
+    if not rows:
+        raise SystemExit(f"screening file {path} is empty")
+    agg = defaultdict(lambda: [0.0, 0.0, 0])
+    for r in rows:
+        if r["region"] != "bulk":
+            continue
+        k = (r["arch"], r["hp"])
+        a = agg[k]
+        a[0] += float(r["sq_err"])
+        a[1] += float(r["sq_ref"])
+        a[2] += int(r["n_params"])
+    if not agg:
+        raise SystemExit(f"screening file {path} has no bulk-region rows")
+
+    scored = sorted(
+        ((float(np.sqrt(e / d)), params, arch, hp)
+         for (arch, hp), (e, d, params) in agg.items()),
+        key=lambda x: (x[0], x[1]),
+    )
+    for risk, _, arch, hp in scored[:6]:
+        print(f"  screen {arch:8} {hp}  bulk risk {risk:.5f}", flush=True)
+
+    best_arch, best_hp = scored[0][2], scored[0][3]
+    winners = {best_arch: json.loads(best_hp)}
+    if "window" not in winners:
+        win = min((s for s in scored if s[2] == "window"), default=None)
+        if win is not None:
+            winners["window"] = json.loads(win[3])
+    return winners
+
+
 def part_confirm(cfg, out):
     """Confirmatory run on the sixteen seeds, with selection already frozen."""
     grid, weights = make_grid(GRID_A, cfg["grid_size"])
     prior = LaplaceAR1(cfg["rho"])
     winners = cfg.get("winners")
+    if isinstance(winners, str) and winners.startswith("auto:"):
+        winners = _winners_from_screening(winners[5:])
+        print(f"selected from screening: {json.dumps(winners, sort_keys=True)}",
+              flush=True)
     if not winners:
         raise SystemExit(
             "part_confirm needs --set winners=... , the architecture and "
@@ -398,11 +451,27 @@ def part_confirm(cfg, out):
             "let the confirmatory seeds influence the choice, which is the "
             "thing the two-stage design exists to prevent."
         )
+    # Resume support. A three-day job that dies at hour 70 with nothing on disk
+    # is a three-day job wasted, and the wall clock here is a real constraint
+    # rather than a formality. Completed (seed, size) cells are appended as they
+    # finish and skipped on restart, so resubmitting continues instead of
+    # starting over. The unit is the cell because that is what shares a bundle.
+    dest = out / "confirm.csv"
+    done: set = set()
     rows = []
+    if dest.exists():
+        import csv as _csv
+        rows = list(_csv.DictReader(dest.open()))
+        done = {(int(r["seed"]), int(r["n_chains"])) for r in rows}
+        print(f"resuming: {len(done)} cell(s) already on disk", flush=True)
+
     for seed in range(cfg["seed0"], cfg["seed0"] + cfg["seeds"]):
+        pending = [n for n in cfg["sizes"] if (seed, n) not in done]
+        if not pending:
+            continue
         _, val = _bundle(prior, grid, weights, "exp31-val", seed, cfg["n_val"], T_SCHEDULE)
         _, test = _bundle(prior, grid, weights, "exp31-test", seed, cfg["n_test"], T_SCHEDULE)
-        for n_chains in cfg["sizes"]:
+        for n_chains in pending:
             A, _ = _bundle(prior, grid, weights, "exp31-train",
                            (seed, n_chains), n_chains, ())
             arms = {"em_bp": _em_arm(cfg, grid, weights, A, val, test, seed)}
@@ -426,7 +495,9 @@ def part_confirm(cfg, out):
             print(f"seed={seed} n={n_chains} " + " ".join(
                 f"{k}={np.sqrt(sum(e for e, _ in v['eval']('bulk')) / sum(r for _, r in v['eval']('bulk'))):.4f}"
                 for k, v in arms.items()), flush=True)
-    write_csv(out / "confirm.csv", rows)
+            # Flush after every cell, not at the end: see the resume note above.
+            write_csv(dest, rows)
+    write_csv(dest, rows)
     return rows
 
 
