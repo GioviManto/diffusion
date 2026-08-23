@@ -154,7 +154,15 @@ QUICK = dict(
 # Data: one bundle per seed, shared by every arm
 # ---------------------------------------------------------------------------
 def _bundle(prior, grid, weights, tag, seed, n_chains, t_values):
-    """Noised chains and their exact-BP posterior means under the TRUE kernel."""
+    """Noised chains and their exact-BP posterior means under the TRUE kernel.
+
+    Every random operation draws from its own named stream via `rng_for`, so the
+    training chains, the noise, the network initialisation and the minibatch
+    order are independent. That is not tidiness: with one seed driving several
+    logically distinct draws, reordering code changes the dataset AND the
+    initialisation AND the training noise together, and a difference between two
+    runs cannot be attributed.
+    """
     rng = rng_for(tag, seed)
     A = np.stack([prior.sample(rng, N_SITES) for _ in range(n_chains)])
     log_k = prior.log_transition_matrix(grid)
@@ -165,6 +173,25 @@ def _bundle(prior, grid, weights, tag, seed, n_chains, t_values):
         m_ref, _ = grid_bp_batch(grid, weights, log_k, X, alpha, delta)
         out[t] = (X, m_ref)
     return A, out
+
+
+def _bundle_hash(bundle) -> str:
+    """A digest of a validation/test bundle, so "same bundle" is checkable.
+
+    The design says every arm inside a seed is scored on identical data. Saying
+    so in a caption is not the same as it being true, and a bundle rebuilt from
+    a drifting seed would produce a comparison that looks paired and is not.
+    Hashing the actual arrays turns the claim into something the output file
+    can be audited against.
+    """
+    import hashlib
+
+    h = hashlib.sha256()
+    for t in sorted(bundle):
+        X, m = bundle[t]
+        h.update(np.ascontiguousarray(X, dtype=np.float64).tobytes())
+        h.update(np.ascontiguousarray(m, dtype=np.float64).tobytes())
+    return h.hexdigest()[:12]
 
 
 def _sq(m_hat, m_ref, X, t, sl):
@@ -381,6 +408,7 @@ def part_confirm(cfg, out):
             arms = {"em_bp": _em_arm(cfg, grid, weights, A, val, test, seed)}
             for arch, hp in winners.items():
                 arms[arch] = _net_arm(cfg, arch, dict(hp), A, val, test, seed)
+            vh, th = _bundle_hash(val), _bundle_hash(test)
             for name, res in arms.items():
                 for region in REGIONS:
                     err, ref = map(sum, zip(*res["eval"](region)))
@@ -391,6 +419,9 @@ def part_confirm(cfg, out):
                         "n_params": res["n_params"],
                         "sq_err": err, "sq_ref": ref,
                         "risk": float(np.sqrt(err / ref)),
+                        # Identical within a seed by construction; recorded so a
+                        # merge step can verify the pairing rather than trust it.
+                        "val_bundle": vh, "test_bundle": th,
                     })
             print(f"seed={seed} n={n_chains} " + " ".join(
                 f"{k}={np.sqrt(sum(e for e, _ in v['eval']('bulk')) / sum(r for _, r in v['eval']('bulk'))):.4f}"

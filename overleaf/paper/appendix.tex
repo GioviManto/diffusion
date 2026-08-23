@@ -353,15 +353,45 @@ observations conditioned into the tail & $2\times10^{-7}$ & $1\times10^{-11}$
 \noindent The $10^{-14}$ figure is the \emph{best} cell in this table, not a bound on it. Under
 ordinary draws the production grid resolves the whole schedule to $10^{-3}$ or better across every
 family, which is the regime all reported results are in and is the threshold the generator
-enforces. Under tail-conditioned observations the two heavy-tailed families lose two further
-orders. Partial underflow is real rather than hypothetical: up to $0.27\%$ of likelihood entries
-round to exactly zero at the production configuration, rising to $3.8\%$ at $\ngrid=201$ --- always
-under tail conditioning, never under ordinary draws. Boundary mass reaches $4\%$ at the largest
-$t$, where the posterior is widest relative to the window.
+enforces. Under displaced observations the two heavy-tailed families lose two further orders.
+Partial underflow is real rather than hypothetical: up to $0.27\%$ of likelihood entries round to
+exactly zero at the production configuration, rising to $3.8\%$ at $\ngrid=201$ --- always under
+displacement, never under ordinary draws.
 
-None of this moves a reported number, all of which sit in the ordinary-draw regime. It bounds what
-the discretisation claim covers, which the single Gaussian figure did not.
-Section~\ref{app:limits} records the residual limitation.
+\paragraph{Two corrections to how this was measured.} The stress row is a three-standard-deviation
+\emph{displacement} of the whole chain, not conditioning on a tail event of the prior: a translate
+and a conditional law are different objects, and only the first was computed. It is a legitimate
+stress test and is named as one.
+
+Second, an earlier version of this section reported that ``boundary mass reaches $4\%$ at the
+largest $t$''. That number came from a quantity that was not a boundary mass of anything the
+recursion propagates --- the diagnostic multiplied the unary likelihood by a column-wise maximum of
+the transition matrix and normalised, involving no forward message, no backward message, no
+quadrature weights and no initial law. It is withdrawn. Measured inside the recursion instead, on
+the objects BP actually carries, the worst forward-message edge occupancy over the schedule is
+$\gcfwdedge$ and the worst node-belief edge occupancy is $\gcbeledge$, both over $\gccells$
+production cells --- two to three orders below the figure previously quoted. The evidence
+diagnostic named in the generator's own header was likewise never computed; it now is, and the
+worst per-site log-evidence shift against the reference resolution is $\gcworstev$ nats.
+
+\paragraph{The regime that had not been tested, and what it shows.} The families exercised here
+were four analytic priors. The kernels the reported runs actually use are \emph{fitted} mixtures,
+which can place a component far narrower than any smooth law --- and the narrowest component
+relative to the mesh is precisely what the grid must resolve, so the untested case was the one most
+likely to fail. Adding a fitted mixture with a component two grid cells wide changes the picture in
+one place and not the other. Under ordinary draws it is unremarkable and the schedule still
+resolves to $\gcworstord$. Under three-standard-deviation displacement at the narrowest domain
+tried ($\halfwidth=6$) it is the worst cell in the entire sweep, with $96\%$ of node-belief mass
+against the boundary: a narrow component displaced toward the edge of a too-small window is not
+resolved at all. That configuration is outside the production setting, and it marks where the
+method stops working rather than a defect in the reported numbers --- but it is the failure mode to
+check first if the domain is ever narrowed.
+
+\paragraph{What this does and does not certify.} It is a self-convergence stress test on fresh
+synthetic draws. It establishes that errors on representative ordinary draws are below $10^{-3}$.
+It does \emph{not} establish that no reported number moves: that would require re-evaluating the
+actual held-out observations and fitted kernels at a finer resolution --- a different experiment,
+and one not run here. Section~\ref{app:limits} records the residual limitation.
 
 \begin{figure}[h]
 \centering

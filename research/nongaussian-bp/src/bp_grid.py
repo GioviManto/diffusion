@@ -179,6 +179,7 @@ def grid_bp_batch(
     xp=None,
     *,
     return_evidence: bool = False,
+    boundary_frac: float | None = None,
 ) -> tuple[np.ndarray, np.ndarray]:
     """Vectorized grid BP over a batch of observations X of shape (B, n).
 
@@ -252,6 +253,7 @@ def grid_bp_batch(
 
     means = xp.empty((b_size, n))
     variances = xp.empty((b_size, n))
+    bel_edge = xp.zeros((b_size, n)) if boundary_frac else None
     for i in range(n):
         raw = L[i] * ell[:, i, :] * R[i]
         mass = raw @ weights
@@ -260,6 +262,41 @@ def grid_bp_batch(
         bel = raw / mass[:, None]
         means[:, i] = bel @ (grid * weights)
         variances[:, i] = bel @ (grid**2 * weights) - means[:, i] ** 2
+        if boundary_frac:
+            e = max(1, int(boundary_frac * m))
+            bel_edge[:, i] = (bel[:, :e] @ weights[:e]) + (bel[:, -e:] @ weights[-e:])
+
+    if boundary_frac:
+        # How much of the mass sits in the outermost `boundary_frac` of the
+        # domain -- for the objects the recursion actually propagates.
+        #
+        # WHY THIS LIVES HERE (round-two review, item 9.1). The convergence tool
+        # used to compute its own "boundary mass" as
+        #     ell * exp(log_K.max(axis=0))
+        # normalised over the grid axis. That is the unary likelihood times the
+        # column-wise maximum of the transition matrix. It involves no forward
+        # message, no backward message, no recursion, no quadrature weights and
+        # no initial law, so whatever it measured, it was not the boundary mass
+        # of anything BP propagates -- and the appendix quoted it as such.
+        #
+        # Computing it inside the recursion is the only way to be sure the
+        # diagnostic and the algorithm refer to the same object.
+        e = max(1, int(boundary_frac * m))
+        fwd_edge = (L[:, :, :e] @ weights[:e]) + (L[:, :, -e:] @ weights[-e:])
+        diag = {
+            # L is normalised to unit mass under the quadrature, so these are
+            # already fractions.
+            "forward_edge_max": float(xp.max(fwd_edge)),
+            "forward_edge_mean": float(xp.mean(fwd_edge)),
+            "belief_edge_max": float(xp.max(bel_edge)),
+            "belief_edge_mean": float(xp.mean(bel_edge)),
+            "edge_cells": int(e),
+        }
+        if return_evidence:
+            tail = (L[-1] * ell[:, -1, :]) @ weights
+            log_const = row_shift.sum(axis=1) + n * (-0.5 * xp.log(2.0 * xp.pi * delta))
+            return means, variances, log_z_fwd + xp.log(tail) + log_const, diag
+        return means, variances, diag
 
     if return_evidence:
         tail = (L[-1] * ell[:, -1, :]) @ weights
