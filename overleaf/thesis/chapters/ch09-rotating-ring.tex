@@ -182,13 +182,7 @@ If $\eta \sim \Nd(0, I_2)$ and $R$ is orthogonal, then $R\eta \sim \Nd(0,I_2)$.
 \end{lemma}
 
 \begin{proof}
-A linear map of a Gaussian is Gaussian, so $R\eta$ is fixed by its first two
-moments: $\E[R\eta] = R\,\E[\eta] = 0$ and
-$\mathrm{Cov}(R\eta) = R\, I_2\, R^{\T} = R R^{\T} = I_2$. Equivalently, in
-terms of densities, $(2\pi)^{-1}e^{-\norm{z}^2/2}$ depends on $z$ only through
-$\norm{z}$, and the change of variables $z \mapsto Rz$ changes neither
-$\norm{R^{-1}z} = \norm{z}$ nor $|\det R^{-1}| = 1$: the level sets are circles
-centred at the origin and a rotation maps each circle to itself.
+Appendix~\ref{app:ring}.
 \end{proof}
 
 The isotropy is essential. A rotation would not preserve $\Nd(0,\Sigma)$ for
@@ -216,37 +210,7 @@ where the superscript zero denotes the quantities of the non-rotating model.
 \end{lemma}
 
 \begin{proof}
-Substituting \eqref{eq:ring-sur-dynamics} and using the composition rule of
-\eqref{eq:ring-rot-props},
-\begin{equation*}
-  y_{k+1}
-  = R_{-(k+1)\psi}\big(R_\psi z_k + \sigma\eta_{k+1}\big)
-  = \underbrace{R_{-(k+1)\psi}R_\psi}_{= R_{-k\psi}} z_k
-    + \sigma R_{-(k+1)\psi}\eta_{k+1}
-  = y_k + \sigma\widetilde\eta_{k+1} ,
-\end{equation*}
-and by Lemma~\ref{lem:ring-isotropy} each
-$\widetilde\eta_{k+1} \sim \Nd(0,I_2)$; they stay independent because each is a
-fixed linear map of a different independent $\eta$. Next, $U_\psi$ is block
-diagonal with orthogonal blocks, so
-$U_\psi^{\T} U_\psi = \mathrm{diag}(I_2, \dots, I_2) = I_{2K}$ and
-$\det U_\psi = \prod_k \det R_{-k\psi} = 1$. Applying $U_\psi$ to
-\eqref{eq:ring-channel} gives
-$U_\psi x = e^{-t} U_\psi a + \sqrt{\Deltat}\, U_\psi \xi$ with
-$U_\psi \xi \sim \Nd(0, I_{2K})$, so $U_\psi x$ has exactly the law of the
-noised non-rotating trajectory: the de-rotation commutes with the channel. For
-the densities, $z = U_\psi^{\T} y$ and
-$P_t(z\,|\,\psi) = P^{(0)}_t(U_\psi z)\,|\det U_\psi|$, the Jacobian factor
-being one. Differentiating that identity componentwise, with
-$\partial y_b/\partial z_c = (U_\psi)_{bc}$,
-\begin{equation*}
-  \frac{\partial}{\partial z_c} \log P^{(0)}_t(U_\psi z)
-  = \sum_b (U_\psi)_{bc}\,
-    \big(\nabla \log P^{(0)}_t\big)_b (U_\psi z)
-  = \big[ U_\psi^{\T} \score^{(0)}(U_\psi z, t) \big]_c .
-\end{equation*}
-The transpose is not cosmetic: a score is a gradient, so it transforms with
-$U_\psi^{\T}$ while a point transforms with $U_\psi$.
+Appendix~\ref{app:ring}.
 \end{proof}
 
 The term \emph{gauge} is used in the sense standard in physics, of a change of
@@ -274,47 +238,11 @@ precision (Table~\ref{tab:ring-validation}).}
 
 \subsection{The clean law after the gauge}
 
-Iterating \eqref{eq:ring-gauged-rw} and letting the intermediate terms cancel,
-\begin{equation}
-  y_k - y_0 = \sum_{r=1}^{k} (y_r - y_{r-1})
-            = \sigma \sum_{r=1}^{k} \widetilde\eta_r ,
-  \qquad\text{so}\qquad
-  y_k = A + \sigma \sum_{r=1}^{k} \widetilde\eta_r ,
-  \label{eq:ring-unrolled}
-\end{equation}
-with $A := y_0 \sim p_\lambda$ and the empty sum equal to zero. Every frame
-contains the \emph{same} random anchor, drawn once on the ring, plus a partial
-sum of independent innovations; the anchor is the only non-Gaussian ingredient
-of the model.
-
-The clean law factorises over the ring prior and the one-step transitions, so
-$\log P_0(y) = -(\norm{y_0}-1)^2/2\lambda
-- (2\sigma^2)^{-1}\sum_{k=0}^{K-2}\norm{y_{k+1}-y_k}^2 + \text{const}$.
-Differentiating is a counting exercise: an interior $y_k$ appears in exactly two
-summands, the edge arriving at it and the edge leaving it, whose derivatives are
-$-(y_k - y_{k-1})/\sigma^2$ and $+(y_{k+1} - y_k)/\sigma^2$. Adding them, and
-using $\nabla_y \norm{y} = y/\norm{y}$ for the ring term,
-\begin{align}
-  \score_0(y,0)
-    &= \frac{1-\norm{y_0}}{\lambda}\,\frac{y_0}{\norm{y_0}}
-       + \frac{y_1 - y_0}{\sigma^2},
-  \notag \\
-  \score_k(y,0)
-    &= \frac{y_{k-1} - 2y_k + y_{k+1}}{\sigma^2},
-       \qquad 1 \le k \le K-2,
-  \label{eq:ring-clean-score} \\
-  \score_{K-1}(y,0)
-    &= \frac{y_{K-2}-y_{K-1}}{\sigma^2} .
-  \notag
-\end{align} The interior clean score is a
-discrete second derivative along internal time, that is a discrete Laplacian:
-each block measures how far frame $k$ departs from the average of its
-neighbours. It is strictly local, and it vanishes identically on the model's
-own noiseless solution, because a trajectory rotating at radius exactly one
-maps under the gauge to a constant $y_k$, for which every second difference
-vanishes and, with $\norm{y_0} = 1$, so does the ring term. That vanishing is
-verified to machine zero (Table~\ref{tab:ring-validation}).
-
+Iterating \eqref{eq:ring-gauged-rw} and cancelling the intermediate terms gives
+the anchored representation \eqref{eq:ring-unrolled}, whose derivation, together
+with the second-difference identity it satisfies, is in
+Appendix~\ref{app:ring}. The identity is verified to machine zero
+(Table~\ref{tab:ring-validation}).
 \subsection{The noised law and the exact score}
 
 Conditioning on the anchor, \eqref{eq:ring-unrolled} gives
@@ -368,15 +296,7 @@ and the score and response blocks are
 \end{proposition}
 
 \begin{proof}
-Expanding the exponent of \eqref{eq:ring-Ct} in powers of $\alpha$, with the
-correlated covariance $C_t \otimes I_2$, gives
-\eqref{eq:ring-anchor-posterior}. Writing
-$\log P_t(x) = \text{const} - \tfrac12 x^{\T}(C_t^{-1}\otimes I_2)x
-+ \log Z(h(x))$, the gradient of the first term is $-(C_t^{-1}x)_k$ in block
-$k$, while $\partial h/\partial x_k = e^{-t}q_k I_2$ and
-$\nabla_h \log Z = \E[A\,|\,x]$, the first cumulant identity for the
-exponential family in $h$. Differentiating once more, so that the second
-derivative of $\log Z$ returns $\mathrm{Cov}(A\,|\,x)$, gives the response.
+Appendix~\ref{app:ring}.
 \end{proof}
 
 The $2K$-dimensional integral over clean trajectories has collapsed to a

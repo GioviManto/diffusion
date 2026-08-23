@@ -55,203 +55,108 @@ source of false confidence to read ``the algorithm converged'' as ``the
 algorithm found the best answer''.
 \end{remark}
 
-Carrying out the variation gives the Euler--Lagrange equations. Writing
-$q(t) \to q(t) + \delta q(t)$ and expanding to first order,
-\[
-  \delta S = \int_{t_1}^{t_2}
-  \left(\frac{\partial L}{\partial q}\,\delta q
-      + \frac{\partial L}{\partial \dot q}\,\delta \dot q\right)\dd t ,
-\]
-and integrating the second term by parts, with the boundary term vanishing
-because $\delta q(t_1) = \delta q(t_2) = 0$,
-\[
-  \delta S = \int_{t_1}^{t_2}
-  \left(\frac{\partial L}{\partial q}
-      - \frac{\dd}{\dd t}\frac{\partial L}{\partial \dot q}\right)\delta q \,\dd t .
-\]
-Since this must vanish for every admissible $\delta q$, the bracket must
-vanish pointwise:
+Carrying out the variation and integrating by parts, with the boundary term
+vanishing because $\delta q$ is fixed at the endpoints, gives the
+Euler--Lagrange equations
 \begin{equation}
   \frac{\dd}{\dd t}\frac{\partial L}{\partial \dot q_i}
   \;-\; \frac{\partial L}{\partial q_i} \;=\; 0,
-  \qquad i = 1, \dots, n.
+  \qquad i = 1, \dots, n,
   \label{eq:euler-lagrange}
 \end{equation}
-For $L = \sum_i \tfrac12 m_i \dot q_i^2 - U(q)$ this returns
-$m_i \ddot q_i = -\partial U/\partial q_i$, which is Newton's second law. The
-variational principle is therefore not a reformulation for its own sake: it
-derives the dynamics from a scalar functional, and that is the move which
-generalises.
-
-\paragraph{From Lagrange to Hamilton.} The passage to the Hamiltonian
-picture is a Legendre transform. Define the conjugate momentum
-$p_i = \partial L/\partial \dot q_i$ and set
-\begin{equation}
-  H(q,p) \;=\; \sum_i p_i \dot q_i \;-\; L(q,\dot q),
-  \label{eq:legendre}
-\end{equation}
-with $\dot q$ eliminated in favour of $p$. For $L = T - U$ with $T$ quadratic
-in the velocities this gives $H = T + U$, the total energy, which is
-\eqref{eq:hamiltonian} below; and \eqref{eq:euler-lagrange} becomes the pair
-of first-order equations \eqref{eq:hamilton}. The gain is not the equations
-themselves but the arena: the Hamiltonian formulation lives on phase space,
-where the state is a \emph{point} whose evolution preserves volume, and that
-is precisely the structure statistical mechanics needs to speak about
+which for $L = \sum_i \tfrac12 m_i \dot q_i^2 - U(q)$ return Newton's second
+law (Appendix~\ref{sec:hamiltonian}). The variational principle is therefore
+not a reformulation for its own sake: it derives the dynamics from a scalar
+functional, and that is the move which generalises. A Legendre transform then
+carries \eqref{eq:euler-lagrange} to Hamilton's equations
+\eqref{eq:hamilton}, whose gain is not the equations but the arena --- phase
+space, where a state is a \emph{point} whose evolution preserves volume, which
+is exactly the structure statistical mechanics needs in order to speak about
 probability densities over states.
 
-\section{Interacting systems: the Ising paradigm}\label{sec:ising}
+\section{From the Ising model to neural networks}\label{sec:ising}
 
-Everything so far holds for arbitrary $H$; the physics (and the
-difficulty) enters when the energy couples many degrees of freedom. The
-canonical example is the \emph{Ising model} \citep{ising1925beitrag}:
-binary spins $\sigma_i \in \{-1, +1\}$ on the nodes of a graph
-$G = (V, \mathcal{E})$, with energy
+Everything so far holds for arbitrary $H$; the physics, and the difficulty,
+enters when the energy couples many degrees of freedom. The canonical example
+is the \emph{Ising model} \citep{ising1925beitrag}: binary spins
+$\sigma_i \in \{-1, +1\}$ on the nodes of a graph $G = (V, \mathcal{E})$, with
 \begin{equation}
   H(\sigma) \;=\; -\sum_{(i,j) \in \mathcal{E}} J_{ij}\, \sigma_i \sigma_j
   \;-\; \sum_{i \in V} h_i\, \sigma_i ,
   \label{eq:ising}
 \end{equation}
-where $J_{ij}$ are pairwise couplings and $h_i$ external fields. The
-Gibbs distribution $p(\sigma) \propto e^{-\beta H(\sigma)}$ makes
-neighbouring spins prefer alignment when $J_{ij} > 0$. Three lessons from
-this model shape the rest of the thesis.
+and the Gibbs distribution $p(\sigma) \propto e^{-\beta H(\sigma)}$. Three
+features of it shape the rest of the thesis.
 
-\paragraph{(i) The partition function is the hard part.}
-$Z = \sum_\sigma e^{-\beta H(\sigma)}$ runs over $2^{|V|}$
-configurations. On two-dimensional lattices Onsager computed it exactly
-\citep{onsager1944crystal}; on general graphs the computation is
-\#P-hard, and all of approximate inference (Monte Carlo sampling,
-variational methods, message passing) exists because of this wall. On
-\emph{trees}, however, $Z$ and all marginals are computable exactly in
-time linear in the system size by the transfer-matrix recursion, the same
-recursion that Chapter~\ref{ch:graphs} presents as belief propagation.
-This tractable island is precisely where our research model lives.
+\emph{The partition function is the hard part.}
+$Z = \sum_\sigma e^{-\beta H(\sigma)}$ runs over $2^{|V|}$ configurations and is
+\#P-hard on general graphs; all of approximate inference exists because of that
+wall. On \emph{trees}, however, $Z$ and every marginal are computable exactly
+in linear time by the transfer-matrix recursion --- the same recursion
+Chapter~\ref{ch:graphs} presents as belief propagation. That tractable island
+is precisely where the research model of this thesis lives.
 
-\paragraph{(ii) Collective order emerges.} For $\beta$ beyond a critical
-value the two-dimensional model magnetises spontaneously: a macroscopic
-fraction of spins align even at $h = 0$, and the symmetric state splits
-into two ergodic components. This spontaneous symmetry breaking is the
-archetype of a \emph{phase transition}, and its dynamical counterpart, a
-generation trajectory committing to one mode of a multimodal
-distribution, is exactly the \emph{speciation} phenomenon of diffusion
-models \citep{biroli2024dynamical, raya2023spontaneous}.
+\emph{Collective order emerges.} Beyond a critical $\beta$ the two-dimensional
+model magnetises spontaneously and the symmetric state splits into two ergodic
+components. The dynamical counterpart of that symmetry breaking --- a
+generation trajectory committing to one mode of a multimodal distribution ---
+is the \emph{speciation} phenomenon of diffusion models
+\citep{biroli2024dynamical, raya2023spontaneous}.
 
-\paragraph{(iii) Disorder creates complexity.} Making the couplings
-$J_{ij}$ random (of both signs) yields spin glasses, and, as the next
-sections recount, spin glasses yielded neural networks. This is where the
-physics of this chapter stops being background and becomes the
-literature this thesis belongs to.
-
-\section{Disorder, frustration, and spin glasses}\label{sec:spinglass}
-
-In a ferromagnet all couplings agree, and the two ground states (all
-spins up, all spins down) are found by inspection. Draw the couplings
-$J_{ij}$ at random with both signs \citep{edwards1975theory,
-sherrington1975solvable} and this transparency collapses. A triangle with
-two positive bonds and one negative bond already cannot satisfy all
-three: whatever the spins do, at least one bond pays. This is
-\emph{frustration}, and its large-$N$ consequence is a free-energy
-landscape shattered into exponentially many valleys separated by
-extensive barriers: the system has many near-equally-good ways of being,
-none of them readable off the couplings. The mean-field theory of this
-phenomenon, developed through the replica and cavity methods
-\citep{mezard1987spin}, and the Thouless--Anderson--Palmer (TAP)
-self-consistency equations \citep{thouless1977solution}, took a decade to
-control and earned Parisi the 2021 Nobel Prize in Physics.
-
-Two exports from this episode matter here. First, a language: rugged
-landscapes, metastable states, order parameters that measure similarity
-rather than magnetisation. Machine learning speaks this language every
-time it discusses loss surfaces and local minima. Second, a technology:
-the cavity and TAP equations are recursions on \emph{local} quantities
-that solve a \emph{global} inference problem, and they are the direct
+\emph{Disorder creates complexity.}\label{sec:spinglass} Draw the $J_{ij}$ at
+random with both signs \citep{edwards1975theory, sherrington1975solvable} and
+transparency collapses: a triangle with two positive and one negative bond
+cannot satisfy all three, and the large-$N$ consequence of this
+\emph{frustration} is a free-energy landscape shattered into exponentially many
+valleys. Controlling it took a decade of replica and cavity theory
+\citep{mezard1987spin} and the Thouless--Anderson--Palmer equations
+\citep{thouless1977solution}, and earned Parisi the 2021 Nobel Prize. Two
+exports matter here: a language of rugged landscapes and metastable states,
+which machine learning speaks whenever it discusses loss surfaces; and a
+technology, since the cavity and TAP equations are recursions on \emph{local}
+quantities solving a \emph{global} inference problem, and are the direct
 ancestors of the message-passing algorithms \citep{mezard2009information,
-zdeborova2016statistical, krzakala2024statphys} that
-Chapter~\ref{ch:graphs} develops and that the research chapters deploy on
-diffusion scores. The connection between disordered magnets and these
-algorithms is historical descent, not analogy.
+zdeborova2016statistical, krzakala2024statphys} that Chapter~\ref{ch:graphs}
+develops. That connection is historical descent, not analogy.
 
-\section{The Hopfield network: memory as a phase of matter}
-\label{sec:hopfield}
-
-\citet{hopfield1982neural} asked a physicist's question about memory: can
-a system of simple binary units \emph{store} and \emph{retrieve} patterns
-as a collective effect, the way a magnet stores a magnetisation? His
-construction is an Ising system \eqref{eq:ising} in disguise. Take $N$
-binary neurons $\sigma_i \in \{-1,+1\}$ and $P$ patterns
-$\xi^\mu \in \{-1,+1\}^N$ to be memorised, and wire the couplings by the
-\emph{Hebb rule}, ``neurons that fire together wire together''
-\citep{hebb1949organization}:
+\paragraph{Memory as a phase of matter.}\label{sec:hopfield}
+\citet{hopfield1982neural} asked whether simple binary units could
+\emph{store} and \emph{retrieve} patterns collectively, the way a magnet stores
+a magnetisation. His construction is \eqref{eq:ising} in disguise: wire $N$
+neurons to $P$ patterns $\xi^\mu$ by the Hebb rule
+\citep{hebb1949organization},
 \begin{equation}
   J_{ij} \;=\; \frac{1}{N} \sum_{\mu=1}^{P} \xi_i^\mu \xi_j^\mu ,
   \qquad
-  H(\sigma) \;=\; -\frac{1}{2}\sum_{i \neq j} J_{ij}\, \sigma_i \sigma_j .
+  H(\sigma) \;=\; -\frac{1}{2}\sum_{i \neq j} J_{ij}\, \sigma_i \sigma_j ,
   \label{eq:hopfield}
 \end{equation}
-The dynamics is the simplest imaginable: pick a neuron, align it with its
-local field, repeat,
+and iterate the simplest possible dynamics, aligning each neuron with its local
+field:
 \begin{equation}
   \sigma_i \;\leftarrow\; \operatorname{sign}\Big( \textstyle\sum_{j \neq i}
   J_{ij}\, \sigma_j \Big).
   \label{eq:hopfield-dynamics}
 \end{equation}
+This descends $H$ at every flip (Appendix~\ref{sec:hopfield-descent}), so on a
+finite configuration space every initial condition falls into an attractor, and
+retrieval \emph{is} that fall. How many memories fit is a genuine
+phase-transition question: for random patterns with $P = \alpha N$, retrieval
+survives only below $\alpha_c \approx 0.138$ \citep{amit1985storing}, beyond
+which the memories are crushed into a glassy phase. Memory here is a phase of
+matter in the technical sense --- entered and left through sharp transitions.
+The 2024 Nobel Prize in Physics went to Hopfield and Hinton
+\citep{nobel2024physics}: formal recognition that this lineage is physics
+rather than merely inspired by it.
 
-\begin{toolbox}{The Hopfield dynamics descends the energy}
-Let $h_i = \sum_{j \neq i} J_{ij} \sigma_j$ be the local field on neuron
-$i$ and suppose the update \eqref{eq:hopfield-dynamics} flips it,
-$\sigma_i' = -\sigma_i$. Only the terms of $H$ containing $\sigma_i$
-change, so
-\begin{equation*}
-  \Delta H
-  \;=\; H(\sigma') - H(\sigma)
-  \;=\; -\,(\sigma_i' - \sigma_i)\, h_i
-  \;=\; -\,2\,\sigma_i'\, h_i .
-\end{equation*}
-The update sets $\sigma_i' = \operatorname{sign}(h_i)$, hence
-$\sigma_i' h_i = |h_i| \geq 0$ and $\Delta H \leq 0$, with strict
-decrease whenever a flip actually occurs. Since $H$ is bounded below on a
-finite configuration space, the dynamics must terminate in a local
-minimum: \emph{every} initial condition falls into an attractor. Memory
-retrieval is this fall: initialise at a corrupted pattern, descend, and
-read off the fixed point. \hfill$\square$
-\end{toolbox}
-
-The patterns are, by construction, near the bottoms of the energy
-\eqref{eq:hopfield}: retrieval works because each memory is an attractor
-with a basin. How many memories fit is a genuine phase-transition
-question, answered with spin-glass tools by \citet{amit1985storing}: for
-random patterns with $P = \alpha N$, retrieval survives only below a
-critical load $\alpha_c \approx 0.138$, beyond which the memories are
-crushed into a useless glassy phase. In this model, memory is a phase
-of matter in the technical sense: it is entered and left through sharp
-transitions. The
-single-pattern case $P=1$, known as the Mattis model
-\citep{mattis1976solvable}, is gauge-equivalent to the uniform
-ferromagnet: flipping $\sigma_i \to \xi_i \sigma_i$ maps the stored
-pattern onto the all-up state. This observation is worth keeping in mind:
-the Mattis model returns in Section~\ref{sec:cascade} as the exactly
-solvable teacher in a modern analysis of how energy-based models learn.
-
-In 2024 the Nobel Prize in Physics went to John Hopfield and Geoffrey
-Hinton ``for foundational discoveries and inventions that enable machine
-learning with artificial neural networks'' \citep{nobel2024physics}:
-formal recognition that the lineage traced in this section is physics,
-not just inspired by it.
-
-\section{From Hopfield to Boltzmann machines: learning enters}
-\label{sec:boltzmann-machines}
-
-The Hopfield network stores what its designer wires into it. The decisive
-step towards machine \emph{learning} was to make the couplings themselves
-the unknowns. Promote the zero-temperature dynamics
-\eqref{eq:hopfield-dynamics} to stochastic updates at temperature
-$T = 1/\beta$ (each neuron aligns with its field only with probability
-given by the Boltzmann factor); the stationary law of this dynamics is
-exactly the Gibbs measure $p(\sigma) \propto e^{-\beta H(\sigma)}$ of the
-Ising energy. A \emph{Boltzmann machine} \citep{ackley1985learning} is
-this object run backwards: fix a dataset, and ask for the couplings $J$
-that make the Gibbs measure reproduce it. Gradient ascent on the
-log-likelihood gives a rule of striking symmetry,
+\paragraph{Learning enters.}\label{sec:boltzmann-machines} The Hopfield network
+stores what its designer wires into it; the decisive step was to make the
+couplings the unknowns. Run the dynamics stochastically at temperature
+$1/\beta$ and its stationary law is exactly the Gibbs measure of
+\eqref{eq:ising}. A \emph{Boltzmann machine} \citep{ackley1985learning} is that
+object run backwards --- find the $J$ making the Gibbs measure reproduce a
+dataset --- and gradient ascent on the log-likelihood gives a rule of striking
+symmetry,
 \begin{equation}
   \frac{\partial}{\partial J_{ij}} \,\E_{\text{data}}\big[\log p(\sigma)\big]
   \;=\; \beta\,\Big(
@@ -261,82 +166,56 @@ log-likelihood gives a rule of striking symmetry,
   \Big),
   \label{eq:bm-learning}
 \end{equation}
-and learning stops when the model's correlations match the data's. This
-is the maximum-entropy principle of Toolbox~\ref{tb:maxent} turned into
-an algorithm: matching prescribed moments with an exponential-family
-measure. The rule also contains, in miniature, the central obstruction of
-the field. The positive phase is an average over data, which is cheap.
-The negative phase is an average over the \emph{model's} Gibbs measure: a
-partition-function computation, the wall of Section~\ref{sec:ising},
-approachable only through sampling
-(Section~\ref{sec:mcmc}).
-
-The \emph{restricted} Boltzmann machine (RBM) tames this cost by
-architecture \citep{smolensky1986information}: split the units into a
-visible layer $v$ and a hidden layer $h$ with couplings only across
-layers, $E(v,h) = -v^\T W h - b^\T v - c^\T h$. On this bipartite graph
-each layer is conditionally independent given the other, so Gibbs
-sampling alternates two exact, fully parallel steps, and the
-contrastive-divergence approximation to \eqref{eq:bm-learning} made
-training practical \citep{hinton2002training}. Stacked RBMs, the deep
-belief networks, delivered the first working deep architectures and
-relaunched neural networks as a field \citep{hinton2006fast}. The lineage
-then split. The supervised branch, powered by backpropagation
-\citep{rumelhart1986learning}, scaled through convolutional networks to
-the modern deep-learning era \citep{krizhevsky2012imagenet,
-lecun2015deep} and largely left equilibrium physics behind. The
-\emph{generative} branch, the one this thesis lives in, kept the Gibbsian
-core: a model is an energy, learning is moment matching, sampling is
-dynamics. Chapter~\ref{ch:diffusion} follows that branch from
-energy-based models to diffusion.
+which stops when model and data correlations agree. This is the
+maximum-entropy principle of Toolbox~\ref{tb:maxent} turned into an algorithm,
+and it contains the field's central obstruction in miniature: the positive
+phase is a cheap average over data, while the negative phase is an average over
+the model's Gibbs measure --- a partition-function computation, approachable
+only by sampling (Section~\ref{sec:mcmc}). Restricting the couplings to a
+bipartite visible/hidden graph \citep{smolensky1986information} makes each
+layer conditionally independent given the other and made training practical
+\citep{hinton2002training, hinton2006fast}. The lineage then split: the
+supervised branch scaled through backpropagation and convolutional networks
+\citep{rumelhart1986learning, krizhevsky2012imagenet, lecun2015deep} and left
+equilibrium physics behind, while the \emph{generative} branch --- the one this
+thesis lives in --- kept the Gibbsian core, in which a model is an energy,
+learning is moment matching, and sampling is dynamics.
 
 \section{The statistical mechanics of learning}\label{sec:statmech-learning}
 
-Physics did not stop contributing machines; it also built the theory of
-their behaviour. \citet{gardner1988space} showed that learning itself can
-be treated as an equilibrium problem: fix a set of examples and compute,
-by replica methods, the volume of coupling space compatible with them;
-capacity, generalisation, and their transitions then come out as
-thermodynamics in \emph{weight} space. This programme, extended through
-teacher--student settings, matured into the modern statistical physics of
-inference \citep{zdeborova2016statistical}, whose central lesson recurs
-throughout this thesis: high-dimensional inference problems have phases,
-and algorithms fail or succeed at sharp boundaries.
+Physics also built the theory of these machines' behaviour.
+\citet{gardner1988space} showed that learning itself is an equilibrium problem:
+compute, by replica methods, the volume of coupling space compatible with a set
+of examples, and capacity and generalisation come out as thermodynamics in
+\emph{weight} space. That programme matured into the modern statistical physics
+of inference \citep{zdeborova2016statistical}, whose central lesson recurs
+throughout this thesis: high-dimensional inference problems have phases, and
+algorithms fail or succeed at sharp boundaries.
 
-Two strands of this literature frame our research questions directly.
-The first is algorithmic: \citet{mezard2017meanfield} derived the
-mean-field message-passing (TAP) equations of the Hopfield model and its
-generalisations, exhibiting the equivalence between Hopfield networks and
-RBMs and showing that retrieval can be organised as a message-passing
-computation. It is the same machinery, transplanted from memories to
-diffusion scores, that the research chapters run on our model. The second
-is dynamical: training itself undergoes phase transitions. In linear
-networks, gradient descent learns the singular modes of the data
-covariance sequentially \citep{saxe2014exact}; in RBMs, the weight
-matrix's singular vectors align with the data's principal components in
-the early phase of learning \citep{decelle2017spectral}, and hidden units
-develop compositional receptive fields through condensation transitions
-\citep{tubiana2017emergence}. The sharpest result in this line,
-\citet{bachtis2024cascade}, examined in depth in
-Section~\ref{sec:cascade}, shows that RBM training is an entire
-\emph{cascade} of second-order phase transitions, one per learned
-feature. Learning, like memory, turns out to be a sequence of symmetry
-breakings.
+Two strands frame the research questions directly. The first is algorithmic:
+\citet{mezard2017meanfield} derived the TAP equations of the Hopfield model,
+exhibited the equivalence between Hopfield networks and restricted Boltzmann
+machines, and showed retrieval can be organised as message passing --- the same
+machinery, transplanted from memories to diffusion scores, that the research
+chapters run. The second is dynamical: training undergoes phase transitions.
+Gradient descent in linear networks learns the singular modes of the data
+covariance in sequence \citep{saxe2014exact}; an RBM's weight matrix aligns
+with the data's principal components early in training
+\citep{decelle2017spectral}, and hidden units acquire compositional receptive
+fields through condensation transitions \citep{tubiana2017emergence}. The
+sharpest result in this line, \citet{bachtis2024cascade}, examined in
+Section~\ref{sec:cascade}, shows RBM training to be an entire \emph{cascade} of
+second-order transitions, one per learned feature. Learning, like memory, is a
+sequence of symmetry breakings.
 
-The order of a transition is the order of the derivative of the free energy
-that first misbehaves, and the distinction matters for reading these results.
-At a \emph{first-order} transition the first derivative jumps: the order
-parameter is discontinuous, latent heat is absorbed, the two phases coexist at
-the transition, and correlation lengths stay finite. At a \emph{second-order}
-transition the first derivative is continuous and the second diverges: the
-order parameter grows continuously from zero, the susceptibility
-\eqref{eq:static-response} and the correlation length diverge, and observables
-acquire power laws. The cascade above is of the second kind, which is why it is
-detected through susceptibilities rather than through jumps. Both notions
-require the thermodynamic limit; in the finite models of
-Chapters~\ref{ch:gaussian} to~\ref{ch:ring} a correlation length that grows
-until it reaches the size of the system and then stops is a finite-size
-ceiling, not a divergence.
+The order of a transition --- which derivative of the free energy first
+misbehaves --- matters for reading these results, and is set out in
+Appendix~\ref{sec:transition-order}. The cascade above is second-order, which
+is why it is detected through susceptibilities rather than jumps. Both notions
+require the thermodynamic limit: in the finite models of
+Chapters~\ref{ch:gaussian} to~\ref{ch:ring}, a correlation length that grows
+until it reaches the system size and then stops is a finite-size ceiling, not a
+divergence.
 
 \section{What this thesis takes from physics}
 
@@ -863,84 +742,15 @@ that learning itself is a sequence of symmetry breakings. The object of
 study is the restricted Boltzmann machine of
 Section~\ref{sec:boltzmann-machines}, the minimal trainable EBM, with
 energy $E(v, h) = -v^\T W h - b^\T v - c^\T h$ and the moment-matching
-gradient \eqref{eq:bm-learning}. The central idea is to track training
-through the singular value decomposition of the weight matrix,
-\begin{equation}
-  W \;=\; \sum_{\gamma=1}^{r} w_\gamma\, u_\gamma \bar u_\gamma^\T ,
-  \label{eq:rbm-svd}
-\end{equation}
-whose modes $(u_\gamma, \bar u_\gamma)$ act as candidate order
-parameters: the magnetisation of the visible layer along mode $\gamma$,
-$m_\gamma = u_\gamma \cdot v / \sqrt{N_v}$, measures whether the learned
-Gibbs measure has developed structure in that direction. At
-initialisation the weights are small and the model is a paramagnet: no
-direction in configuration space is preferred. The claim of
-\citet{bachtis2024cascade} is that training is an \emph{effective
-cooling}: as the singular values grow, the model crosses a sequence of
-genuine second-order phase transitions, one for each feature it learns,
-each signalled by a diverging susceptibility and falling in the
-mean-field (Curie--Weiss) universality class. The mechanism is visible in
-a two-line calculation.
-
-\begin{toolbox}{The retrieval transition of a one-mode RBM}
-Following \citet{bachtis2024cascade}, take a single Gaussian hidden unit
-of variance $1/N_v$ coupled to $N_v$ binary visibles through a weight
-vector $w$: the energy is
-$E(v, h) = -h\, w \cdot v + \tfrac{N_v}{2} h^2$. Integrating out the
-Gaussian $h$ gives the visible marginal
-\begin{equation*}
-  p(v) \;\propto\; \exp\!\Big[ \tfrac{1}{2 N_v}\, (w \cdot v)^2 \Big] :
-\end{equation*}
-a Mattis/Hopfield measure (Section~\ref{sec:hopfield}) whose single
-pattern is $w$ itself, made extensive by the $1/N_v$ variance scaling.
-Write $w = \bar w\, \xi$ with $\xi \in \{-1,+1\}^{N_v}$ and let
-$m = \tfrac{1}{N_v} \sum_i \xi_i v_i$ be the overlap; then
-$p(v) \propto \exp[\tfrac{N_v \bar w^2}{2} m^2]$. Counting configurations
-at fixed overlap ($\asymp \exp[N_v H(\tfrac{1+m}{2})]$ with $H$ the
-binary entropy) gives the free-entropy density
-\begin{equation*}
-  \phi(m) \;=\; \frac{\bar w^2}{2}\, m^2 + H\!\Big(\frac{1+m}{2}\Big)
-  \;=\; \log 2 + \frac{\bar w^2 - 1}{2}\, m^2 - \frac{m^4}{12} + O(m^6).
-\end{equation*}
-This is a Landau expansion: the quadratic coefficient changes sign at
-$\bar w^2 = \norm{w}^2 / N_v = 1$. Below the threshold the maximiser is
-$m = 0$ (paramagnet); above it two symmetric maximisers $\pm m^*$ appear
-continuously (retrieval). The transition is second order with mean-field
-exponents, and the susceptibility along $w$ diverges as
-$\norm{w}^2/N_v \uparrow 1$. Growing a singular value during training is
-therefore literally a quench through a Curie--Weiss critical point.
-\hfill$\square$
-\end{toolbox}
-
-\paragraph{Why a cascade.} With data generated by a Hopfield teacher
-whose two patterns are correlated combinations
-$\xi^{1,2} = \eta_1 \pm \eta_2$ of orthogonal directions, the data
-covariance is rank two with unequal strengths, and the early-time
-gradient flow of the student's SVD amplitudes along $\eta_1$ and $\eta_2$
-is exponential with \emph{two different rates}. The stronger direction
-(the centre of mass of the clusters) reaches its critical magnitude
-first: the learned measure splits into two lumps along $\pm\eta_1$. The
-weaker direction keeps growing at its own rate and crosses criticality
-later, splitting each lump again: four modes, the full teacher, retrieved
-in hierarchical order. Each crossing is a distinct second-order
-transition with its own critical time, its own diverging susceptibility,
-and hysteresis below it. Learning proceeds coarse-to-fine not by accident
-of optimisation but because the critical times are ordered by the
-spectrum of the data.
-
-\paragraph{Evidence on real data.} On MNIST, CelebA, and human-genome
-data, \citet{bachtis2024cascade} track the susceptibilities of individual
-SVD modes during training of binary--binary RBMs and observe the same
-signatures: successive susceptibility peaks that sharpen with system
-size, finite-size-scaling collapses consistent with mean-field exponents
-$(\gamma, \nu) = (1, \tfrac12)$ at upper critical dimension four, and
-hysteresis, the operational fingerprints of genuine transitions rather
-than smooth crossovers. This confirms and sharpens the earlier picture of
-RBM learning as progressive alignment with the data's principal
-components \citep{decelle2017spectral}, of feature emergence as
-condensation \citep{tubiana2017emergence}, and of sequential mode
-learning in linear networks \citep{saxe2014exact}; a broad review of the
-EBM--physics interface is \citet{carbone2025hitchhiker}.
+gradient \eqref{eq:bm-learning}. The central idea is to track training as a
+sequence of symmetry breakings in the student's singular modes, and the result
+is that an RBM learning a Hopfield teacher with two correlated patterns
+undergoes not one transition but a \emph{cascade}: each singular direction
+condenses at its own critical time, in order of the strength of the data
+covariance along it, and each condensation is a second-order transition of
+Curie--Weiss type. The mapping onto Curie--Weiss, the two-rate argument that
+produces the ordering, and the confirmation on MNIST, CelebA and human-genome
+data are in Appendix~\ref{sec:cascade-detail}.
 
 \paragraph{What this means for the thesis.} Phase transitions now appear
 on both faces of generative diffusion: in \emph{sampling}, as speciation

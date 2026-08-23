@@ -378,3 +378,135 @@ Kullback--Leibler divergence. Every variational method in machine
 learning is a restriction of \eqref{eq:gibbs-variational} to a tractable
 family of trial densities.
 
+
+\section{The Hopfield dynamics descends the energy}\label{sec:hopfield-descent}
+
+Moved here from Chapter~\ref{ch:statmech}, where the statement is used but the
+two lines of algebra behind it are not the point.
+
+Let $h_i = \sum_{j \neq i} J_{ij} \sigma_j$ be the local field on neuron $i$
+and suppose the update \eqref{eq:hopfield-dynamics} flips it, so
+$\sigma_i' = -\sigma_i$. Only the terms of $H$ containing $\sigma_i$ change,
+hence
+\begin{equation*}
+  \Delta H
+  \;=\; H(\sigma') - H(\sigma)
+  \;=\; -\,(\sigma_i' - \sigma_i)\, h_i
+  \;=\; -\,2\,\sigma_i'\, h_i .
+\end{equation*}
+The update sets $\sigma_i' = \operatorname{sign}(h_i)$, so
+$\sigma_i' h_i = |h_i| \geq 0$ and $\Delta H \leq 0$, strictly whenever a flip
+actually occurs. $H$ is bounded below on a finite configuration space, so the
+dynamics terminates in a local minimum and \emph{every} initial condition falls
+into an attractor.
+
+The single-pattern case $P=1$, the Mattis model \citep{mattis1976solvable}, is
+gauge-equivalent to the uniform ferromagnet: the relabelling
+$\sigma_i \to \xi_i \sigma_i$ maps the stored pattern onto the all-up state.
+It returns in Section~\ref{sec:cascade} as the exactly solvable teacher in a
+modern analysis of how energy-based models learn.
+
+\section{First- and second-order transitions}\label{sec:transition-order}
+
+The order of a transition is the order of the derivative of the free energy
+that first misbehaves.
+
+At a \emph{first-order} transition the first derivative jumps: the order
+parameter is discontinuous, latent heat is absorbed, the two phases coexist at
+the transition, and correlation lengths stay finite. At a \emph{second-order}
+transition the first derivative is continuous and the second diverges: the
+order parameter grows continuously from zero, the susceptibility
+\eqref{eq:static-response} and the correlation length diverge, and observables
+acquire power laws.
+
+The distinction is what makes the learning cascade of Section~\ref{sec:cascade}
+detectable through susceptibilities rather than through jumps, and it is also
+why the finite models of this thesis cannot exhibit either in the strict sense:
+both notions require the thermodynamic limit, and a correlation length that
+grows until it reaches the system size and then stops is a finite-size ceiling.
+
+\section{The learning cascade in detail}\label{sec:cascade-detail}
+
+Supporting Section~\ref{sec:cascade}. The chapter states that RBM training is
+a cascade of second-order transitions and what that means for this thesis; the
+mapping that establishes it, and the empirical evidence, are here.
+
+gradient \eqref{eq:bm-learning}. The central idea is to track training
+through the singular value decomposition of the weight matrix,
+\begin{equation}
+  W \;=\; \sum_{\gamma=1}^{r} w_\gamma\, u_\gamma \bar u_\gamma^\T ,
+  \label{eq:rbm-svd}
+\end{equation}
+whose modes $(u_\gamma, \bar u_\gamma)$ act as candidate order
+parameters: the magnetisation of the visible layer along mode $\gamma$,
+$m_\gamma = u_\gamma \cdot v / \sqrt{N_v}$, measures whether the learned
+Gibbs measure has developed structure in that direction. At
+initialisation the weights are small and the model is a paramagnet: no
+direction in configuration space is preferred. The claim of
+\citet{bachtis2024cascade} is that training is an \emph{effective
+cooling}: as the singular values grow, the model crosses a sequence of
+genuine second-order phase transitions, one for each feature it learns,
+each signalled by a diverging susceptibility and falling in the
+mean-field (Curie--Weiss) universality class. The mechanism is visible in
+a two-line calculation.
+
+\begin{toolbox}{The retrieval transition of a one-mode RBM}
+Following \citet{bachtis2024cascade}, take a single Gaussian hidden unit
+of variance $1/N_v$ coupled to $N_v$ binary visibles through a weight
+vector $w$: the energy is
+$E(v, h) = -h\, w \cdot v + \tfrac{N_v}{2} h^2$. Integrating out the
+Gaussian $h$ gives the visible marginal
+\begin{equation*}
+  p(v) \;\propto\; \exp\!\Big[ \tfrac{1}{2 N_v}\, (w \cdot v)^2 \Big] :
+\end{equation*}
+a Mattis/Hopfield measure (Section~\ref{sec:hopfield}) whose single
+pattern is $w$ itself, made extensive by the $1/N_v$ variance scaling.
+Write $w = \bar w\, \xi$ with $\xi \in \{-1,+1\}^{N_v}$ and let
+$m = \tfrac{1}{N_v} \sum_i \xi_i v_i$ be the overlap; then
+$p(v) \propto \exp[\tfrac{N_v \bar w^2}{2} m^2]$. Counting configurations
+at fixed overlap ($\asymp \exp[N_v H(\tfrac{1+m}{2})]$ with $H$ the
+binary entropy) gives the free-entropy density
+\begin{equation*}
+  \phi(m) \;=\; \frac{\bar w^2}{2}\, m^2 + H\!\Big(\frac{1+m}{2}\Big)
+  \;=\; \log 2 + \frac{\bar w^2 - 1}{2}\, m^2 - \frac{m^4}{12} + O(m^6).
+\end{equation*}
+This is a Landau expansion: the quadratic coefficient changes sign at
+$\bar w^2 = \norm{w}^2 / N_v = 1$. Below the threshold the maximiser is
+$m = 0$ (paramagnet); above it two symmetric maximisers $\pm m^*$ appear
+continuously (retrieval). The transition is second order with mean-field
+exponents, and the susceptibility along $w$ diverges as
+$\norm{w}^2/N_v \uparrow 1$. Growing a singular value during training is
+therefore literally a quench through a Curie--Weiss critical point.
+\hfill$\square$
+\end{toolbox}
+
+\paragraph{Why a cascade.} With data generated by a Hopfield teacher
+whose two patterns are correlated combinations
+$\xi^{1,2} = \eta_1 \pm \eta_2$ of orthogonal directions, the data
+covariance is rank two with unequal strengths, and the early-time
+gradient flow of the student's SVD amplitudes along $\eta_1$ and $\eta_2$
+is exponential with \emph{two different rates}. The stronger direction
+(the centre of mass of the clusters) reaches its critical magnitude
+first: the learned measure splits into two lumps along $\pm\eta_1$. The
+weaker direction keeps growing at its own rate and crosses criticality
+later, splitting each lump again: four modes, the full teacher, retrieved
+in hierarchical order. Each crossing is a distinct second-order
+transition with its own critical time, its own diverging susceptibility,
+and hysteresis below it. Learning proceeds coarse-to-fine not by accident
+of optimisation but because the critical times are ordered by the
+spectrum of the data.
+
+\paragraph{Evidence on real data.} On MNIST, CelebA, and human-genome
+data, \citet{bachtis2024cascade} track the susceptibilities of individual
+SVD modes during training of binary--binary RBMs and observe the same
+signatures: successive susceptibility peaks that sharpen with system
+size, finite-size-scaling collapses consistent with mean-field exponents
+$(\gamma, \nu) = (1, \tfrac12)$ at upper critical dimension four, and
+hysteresis, the operational fingerprints of genuine transitions rather
+than smooth crossovers. This confirms and sharpens the earlier picture of
+RBM learning as progressive alignment with the data's principal
+components \citep{decelle2017spectral}, of feature emergence as
+condensation \citep{tubiana2017emergence}, and of sequential mode
+learning in linear networks \citep{saxe2014exact}; a broad review of the
+EBM--physics interface is \citet{carbone2025hitchhiker}.
+
