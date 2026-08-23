@@ -28,6 +28,7 @@
 \usepackage{booktabs}
 \usepackage[font=small,labelfont=bf,margin=1em]{caption}
 \usepackage{subcaption}
+\usepackage{capt-of}          % \captionof, used by the shared generated tables
 \usepackage{xcolor}
 
 % ---------- code listings ----------
@@ -101,6 +102,11 @@
 % (it carries its own notation block). Kept in step with it deliberately: a
 % chapter that cites a file by name should look the same in every document.
 \providecommand{\codefile}[1]{\texttt{\small #1}}
+% The thesis writes the training-set size N where the paper writes M. Shared
+% generated sections use \nseq, so alias it here rather than forking the
+% generator: the numbers must be identical in both documents, and a second copy
+% of the file is exactly how they would stop being.
+\providecommand{\nseq}{N}
 \newcommand{\R}{\mathbb{R}}
 \newcommand{\E}{\mathbb{E}}
 \newcommand{\Prob}{\mathbb{P}}

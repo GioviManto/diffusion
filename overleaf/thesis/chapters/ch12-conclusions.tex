@@ -103,8 +103,12 @@ components, and that pointwise accuracy and generative fidelity can move in
 opposite directions within one estimator. Neither survives its own convergence
 analysis: most shape coordinates in the capacity sweep had not settled within
 the iteration budget used, and the generation study is built on those same
-fits. Both are recorded in Appendix~\ref{app:repro} as methodological negative
-results. They are reported because a budget-limited comparison answers ``how do
+fits. The capacity statement additionally overreached in a second way, which
+is worth separating because it would have survived a converged rerun: failing
+to resolve a difference between $C=8$ and $C=16$ at six seeds is not evidence
+that none exists, and nothing here predeclared how small a difference would
+count as none. Both results are recorded in
+Appendix~\ref{app:withdrawn} as methodological negative results. They are reported because a budget-limited comparison answers ``how do
 these behave after this much optimisation'', which is not the question either
 was asked --- and that distinction is itself one of the findings under RQ5.
 
