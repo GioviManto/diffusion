@@ -452,6 +452,11 @@ def part5_sample_efficiency_val(grid, weights, sizes, hidden, n_steps, out,
                 "em_min_weight": em_certificate[em_it]["min_weight"],
                 "em_inner_sweeps": ckpts[em_it].inner_sweeps,
                 "em_inner_converged": int(ckpts[em_it].inner_converged),
+                # The gain itself, not just the flag. Auditing whether any
+                # production fit ever stopped on a *decrease* previously meant
+                # re-running an instrumented copy of the fit, because the
+                # kernel carried `inner_q_gain` and nothing wrote it down.
+                "em_inner_q_gain": float(ckpts[em_it].inner_q_gain),
                 "em_outer_converged": int(em_trace.converged),
                 "em_outer_stop_reason": em_trace.stop_reason,
                 "net_score_rel_l2_selected": test_err[chosen]["score_rel_l2"],

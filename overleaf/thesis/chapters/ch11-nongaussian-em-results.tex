@@ -72,6 +72,15 @@ conclusion.
 
 \section{How much mixture capacity is enough}\label{sec:em-capacity}
 
+This section reports two things that must be kept apart, because an earlier
+version of it did not and the claim audit withdrew the result as a
+consequence. The \emph{evidence-based} saturation below stands. The
+\emph{shape-based} capacity curves that follow it do not: they are confounded
+with convergence rate, as Remark~\ref{rmk:em-capacity-confound} sets out. The
+distinction is metric, not rhetoric --- held-out evidence settles early in the
+optimisation and the fitted shape does not, so the same fits support one
+statement and not the other.
+
 Enlarging $C$ in \eqref{eq:em-mixture-kernel} should help until the mixture
 can represent the true innovation law and stop helping after. Held-out
 log-evidence per edge, fit and scored on disjoint data, rises with $C$ but
@@ -92,7 +101,10 @@ $C$ & paired $\Delta$(evidence/edge) & s.e. & beyond 2 s.e.? & effective $C$ \\
 \end{center}
 \noindent$C=2$ buys nothing over a single Gaussian innovation; capacity
 begins to pay at $C=4$; and $C=8$ and $C=16$ differ by $5\times10^{-6}$,
-inside one standard error, so nothing further is bought past $C\approx8$. The
+inside one standard error, so nothing further is bought past $C\approx8$
+\emph{on this metric}. That last qualifier is the whole of the distinction
+drawn above: it is a statement about held-out evidence, not about the
+converged innovation shape, and it must not be restated as the latter. The
 same pattern holds on the primary pointwise metric --- held-out denoising MSE
 against the Bayes denoiser, paired the same way --- where $C=8$ is the paired
 optimum at both $N=128$ and $N=512$, $C=16$ is not distinguishable from it,

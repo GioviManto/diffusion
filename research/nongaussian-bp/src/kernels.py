@@ -51,6 +51,13 @@ from src.nnet import MLP
 _LOG_2PI = float(np.log(2.0 * np.pi))
 _VAR_FLOOR = 1e-6
 
+# How far below zero a per-edge Q gain may fall before the mixture ECM inner
+# loop treats it as a defect rather than as floating-point noise. Q per edge is
+# O(1) and accumulated over an (M, M) matrix, so rounding lives around 1e-13;
+# 1e-10 is three orders above that and still far below the ~1e-7 plateau the
+# loop actually stops at, so it cannot fire on a genuine small step.
+_Q_GAIN_TOL = 1e-10
+
 
 class ParametricKernel(Protocol):
     """Interface consumed by `em` and by `bp_grid` alike."""
@@ -486,10 +493,28 @@ class MixtureInnovationKernel:
         room to spare, and `scale_diagnostics` is now recorded per cell so this is
         a checked fact rather than a spot check.
 
-        The inner loop does not reach a tight tolerance at all -- the per-edge Q
-        gain plateaus near 1e-7 and stops falling -- so `inner_converged` is
-        normally False at these settings. That is the honest record rather than a
-        defect to tune away: it says the cap is what stopped the loop.
+        On the sweep those numbers came from, the per-edge Q gain plateaus near
+        1e-7 and stops falling, so the cap rather than the tolerance ends the
+        loop. That was written up as the general case -- "`inner_converged` is
+        normally False at these settings" -- and the frozen outputs say
+        otherwise. Across the 1,728 certified exp_07 cells the flag is True in
+        53%, and the rate climbs with the sample size:
+
+            n_seq      32    128    512   2048   8192
+            % early    15     22     57     78     96
+
+        447 of those cells stop after a SINGLE sweep. So at the sizes carrying
+        the headline the tolerance is what stops the loop, not the cap, and the
+        opposite claim should not be relied on.
+
+        That makes the sign of the gain load-bearing rather than academic, which
+        is why the test below is signed. Instrumenting a faithful replay of the
+        production fit (frozen config, n = 512 and n = 2048, 60 outer iterations)
+        recorded 1,764 inner gains and *no* negative one, including across the
+        41-of-60 outer iterations that stopped early at n = 2048. Every early
+        stop measured so far is a genuine small positive step, which is what the
+        conditional-maximiser argument predicts; the guard exists because
+        nothing enforced it.
 
         The complete-data problem has a *second* latent variable, the mixture
         label, so the M-step is itself an EM whose responsibilities are computed
@@ -542,6 +567,22 @@ class MixtureInnovationKernel:
             q_now = q_per_edge(current)
             gain = q_now - q_prev
             q_prev = q_now
+            # Signed, like the outer loop's stopping test. `gain <= inner_tol`
+            # accepted a DECREASE as convergence and returned the descending
+            # iterate -- the same defect `fit_em` was corrected for one level
+            # up, missed one level down. Each block here is a closed-form
+            # conditional maximiser, so Q ascends by construction and a
+            # materially negative gain means the block algebra is wrong, not
+            # that the loop has finished. Raise rather than roll back: a
+            # broken M-step should stop a fit, not quietly return the last
+            # good iterate and let the run look successful.
+            if gain < -_Q_GAIN_TOL:
+                raise FloatingPointError(
+                    f"mixture ECM inner sweep {sweeps} decreased Q by "
+                    f"{-gain:.3e} per edge (tolerance {_Q_GAIN_TOL:.1e}). "
+                    "Each block is a conditional maximiser, so this is a "
+                    "defect in the block updates, not a convergence signal."
+                )
             if gain <= inner_tol:
                 converged = True
                 break

@@ -1,0 +1,130 @@
+"""Emit the non-Markov robustness table from the frozen outputs.
+
+Written because the hand-typed version could not be reproduced. The compendium
+quotes 18.3 for (Gaussian, vs CNN, beta=0); averaging `ratio_to_em` over t in
+outputs/exp_21/gauss_beta0.0 gives 10.76, the median gives 11.43, and no single
+t exceeds 14.21. The gamma rows are near but not equal (published 24.1, 1.19,
+0.98, 0.86, 0.77 against computed 20.94, 1.24, 1.03, 0.85, 0.76), which is the
+signature of a different RUN rather than a different aggregation. Whatever its
+provenance, a table nobody can regenerate from the committed outputs is not
+evidence, and this is the one table in the document that was still typed.
+
+Source is the FROZEN rerun (array 633406), not the original (627165). The
+original used em_iters=80 and net_steps=8000 against the frozen protocol's 400
+and 20000, so its BASELINE was trained on 40% of the budget with no checkpoint
+selection. Undertraining the baseline inflates every ratio in the table, and it
+is the one direction of error that would not survive review -- so the numbers
+here come from the rerun and the original is kept only for the comparison in the
+docstring below.
+
+What the rerun changed, beyond making the numbers quotable:
+
+  * beta=0 and gamma=0 are the SAME configuration -- no contamination, a pure
+    Markov chain. At the old budget they gave 10.76 and 20.94, a factor of two
+    apart. At the frozen budget they give 16.41 and 16.07, agreeing to 2%. The
+    uncontaminated control now reproduces across two independent runs; before,
+    it did not, and that alone should have blocked the table.
+  * The old beta sweep ran 10.76 -> 31.47 -> 8.27 -> 3.44 -> 2.43. Contamination
+    appeared to HELP at beta=0.1, which is not physical. The rerun gives
+    16.41 -> 14.84 -> 6.68 -> 3.21 -> 2.16, monotone.
+
+The qualitative conclusion is unchanged and is what the section should lead with:
+rank-one contamination is survivable, long-range coupling is not, and the
+crossover sits at gamma ~ 0.10.
+"""
+import csv, glob, re, sys
+import numpy as np
+
+SOURCE = "outputs/exp_21_frozen"
+MECHANISMS = (
+    ("beta", "global latent, rank-one, strength $\\beta$", (0.0, 0.1, 0.25, 0.5, 1.0)),
+    ("gamma", "long-range precision coupling, strength $\\gamma$", (0.0, 0.05, 0.1, 0.2, 0.4)),
+)
+ARMS = ("cnn", "mlp")
+
+
+def ratio(family, mech, strength, arm):
+    """Mean of `ratio_to_em` over the noise schedule for one cell.
+
+    Aggregated over t and stated as such, because the quantity varies by a factor
+    of two across the schedule and any single-t number would be a choice the
+    reader cannot see.
+    """
+    # Directory names carry the strength as it was formatted at submission, so
+    # match numerically rather than by string to avoid 0.1 vs 0.10 misses.
+    for d in glob.glob(f"{SOURCE}/{family}_{mech}*"):
+        m = re.search(rf"{mech}([0-9.]+)$", d)
+        if not m or abs(float(m.group(1)) - strength) > 1e-9:
+            continue
+        files = glob.glob(f"{d}/nonmarkov_{family}.csv")
+        if not files:
+            return None
+        rows = [r for r in csv.DictReader(open(files[0])) if r["arm"] == arm]
+        if not rows:
+            return None
+        return float(np.mean([float(r["ratio_to_em"]) for r in rows]))
+    return None
+
+
+families = sorted({d.split("/")[-1].split("_")[0] for d in glob.glob(f"{SOURCE}/*")})
+if not families:
+    sys.exit(f"REFUSING: no frozen non-Markov output at {SOURCE}")
+
+# The family directories are named `gauss_*` / `laplace_*`; the table names the
+# innovation LAW, which is what the reader is tracking.
+PRETTY = {"gauss": "Gaussian", "laplace": "Laplace"}
+
+lines, missing = [], []
+for i, (mech, header, strengths) in enumerate(MECHANISMS):
+    if i:  # \toprule already supplies the rule above the first block
+        lines.append("\\midrule")
+    lines.append(f"& \\multicolumn{{{len(strengths)}}}{{c}}{{{header}}} \\\\")
+    lines.append(f"\\cmidrule(lr){{2-{len(strengths)+1}}}")
+    lines.append("& " + " & ".join(f"${s:.2f}$" for s in strengths) + " \\\\")
+    lines.append("\\midrule")
+    for family in families:
+        for arm in ARMS:
+            vals = [ratio(family, mech, s, arm) for s in strengths]
+            if all(v is None for v in vals):
+                continue
+            missing += [(family, mech, s) for s, v in zip(strengths, vals) if v is None]
+            cells = []
+            for v in vals:
+                if v is None:
+                    cells.append("--")
+                # Bold the crossover: below 1 the baseline wins, and that is the
+                # scope statement, not a detail.
+                elif v < 1.0:
+                    cells.append(f"$\\mathbf{{{v:.2f}}}$")
+                else:
+                    cells.append(f"${v:.2f}$")
+            lines.append(f"{PRETTY.get(family, family.capitalize())}, vs "
+                         f"{arm.upper()} & " + " & ".join(cells) + " \\\\")
+
+if missing:
+    print(f"  {len(missing)} cell(s) absent, emitted as '--': "
+          + ", ".join(f"{f}/{m}={s}" for f, m, s in missing[:6]), file=sys.stderr)
+
+body = "\n".join(lines)
+tex = f"""%% GENERATED by tools/make_tab_nonmarkov.py from {SOURCE}/ -- do not hand-edit.
+%%
+%% Supersedes the hand-typed table, whose numbers could not be reproduced from
+%% any committed output by any aggregation. Source is the frozen-budget rerun
+%% (array 633406: em_iters=400, net_steps=20000), NOT the original 627165, whose
+%% baseline trained for 8,000 steps against the frozen protocol's 20,000 and
+%% whose ratios are inflated accordingly.
+
+\\begin{{center}}\\small
+\\begin{{tabular}}{{@{{}}lccccc@{{}}}}
+\\toprule
+{body}
+\\bottomrule
+\\end{{tabular}}
+\\end{{center}}
+"""
+
+dest = "../../overleaf/shared/sections/tab-nonmarkov.tex"
+open(dest, "w").write(tex)
+print(f"wrote {dest}: {len(families)} famil(y/ies), {len(ARMS)} baselines, "
+      f"{sum(len(s) for _, _, s in MECHANISMS)} strengths per arm")
+print("  ratio_to_em > 1 means EM-BP wins; bolded cells are where it loses")

@@ -270,12 +270,12 @@ class ScaleMixtureKernel:
     def magnitude_ratio(self, grid: np.ndarray) -> float:
         """Model analogue of `exp_23`'s empirical `std_ratio_q4_q1`.
 
-        Defined to be *directly comparable* to the sample statistic rather than
-        merely analogous to it. The empirical version takes the standard
-        deviation of all children whose parent lies in the top quartile of |a|,
-        over the same for the bottom quartile. So this integrates the conditional
-        law over those same two sets under a standard-normal parent, using the
-        variance decomposition
+        Comparable to the sample statistic, but not exactly: see the caveat
+        below. The empirical version takes the standard deviation of all children
+        whose parent lies in the top quartile of |a|, over the same for the
+        bottom quartile. So this integrates the conditional law over those same
+        two sets under a standard-normal parent, using the variance
+        decomposition
 
             Var(child | a in S) = E[Var(child|a) | S] + Var(E[child|a] | S),
 
@@ -286,6 +286,28 @@ class ScaleMixtureKernel:
         the fitted dependence.
 
         Quartiles of |a| for a standard normal: 0.3186 and 1.1503.
+
+        THE CAVEAT, measured 21 Aug 2026. `wavelet_stats` cuts the empirical
+        bands at the EMPIRICAL quantiles of |a|, and standardised wavelet
+        coefficients are far from normal -- excess kurtosis rises from ~0.2 at
+        the coarsest subband to ~7 at the finest, so unit variance is reached
+        with a compressed bulk and heavy tails. The real cuts at depth 4 are
+        about 0.09 and 0.78, against 0.3186 and 1.1503 here: the Q1 band assumed
+        by this function is nearly four times too wide, which carries extra
+        spread into the denominator and DEPRESSES the ratio.
+
+        The bias was quantified against the fitted kernels by re-integrating on
+        the empirical bands with the empirical parent density: it is under 1% at
+        depth 2 and up to 8% at depth 3 (HL 1.183 -> 1.270). So it is real, it
+        runs in the direction that flatters a linear model, and it is small. It
+        does NOT explain the gap between fitted excess (1.15-1.31 at the finest
+        boundary) and measured (1.86-2.33) -- that gap survives the correction
+        and remains open.
+
+        Left as the normal-parent version because this function has no access to
+        the data, and a diagnostic whose value depends on which sample it was
+        handed is worse than one with a stated convention. Quote it against the
+        empirical statistic only with the above in mind.
         """
         w = self.gate(grid)                                   # (M, C)
         cond_mean = (w @ self.rho) * grid

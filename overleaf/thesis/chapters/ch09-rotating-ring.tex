@@ -547,6 +547,32 @@ range $0.00\times10^{0}$ nats. This is a machine-precision zero rather than a
 small number, which is what a theorem predicting exactly no information
 requires.
 
+It is worth being precise about what that zero does and does not evidence. The
+per-frame likelihood is implemented by a function that takes no $\psi$
+argument, so its independence of $\psi$ is a property of the code path, not a
+measurement: the zero confirms that the estimator is wired to the marginal it
+is supposed to use, and would catch a leak, but it cannot corroborate the
+theorem against an independently constructed alternative.
+
+The independent check is a paired one. Trajectories are simulated separately at
+$\psi \in \{0,\,\pi/6,\,\pi/3,\,1.1\}$, sharing no code with the estimator, and
+two statistics are computed on the \emph{samples}. As a negative control, the
+energy distance between one-frame clouds at different $\psi$ is compared
+against the same distance between two independent draws at \emph{equal} $\psi$,
+which is the sampling floor: the floor is $1.5\times10^{-2}$ and the
+cross-$\psi$ distances are $2.6$ to $4.7\times10^{-3}$ --- strictly
+\emph{below} the noise of having drawn twice, both on clean trajectories and
+after OU noising at $t=0.5$. As a positive control, the lag-one cross-covariance
+of those same samples must equal $s^2 R_\psi$, so its antisymmetric part is
+$\sin\psi$; measured, it is $-0.001,\,0.503,\,0.865,\,0.893$ against
+$\sin\psi = 0,\,0.500,\,0.866,\,0.891$.
+
+The pairing is the point. A null result on its own cannot distinguish a true
+invariance from a statistic too blunt to detect anything; here the same
+samples, at the same size, move by $0.9$ in the joint statistic and by less
+than their own resampling noise in the marginal one. Both controls are in
+\codefile{tests/test\_ring\_blindness\_controls.py}.
+
 \paragraph{The joint arm recovers the rotation, and loses it to the channel.}
 Estimating a single angle, the error is $2.1\pm0.7^\circ$ pooled over the whole
 schedule. Recovering the two-species law
@@ -626,7 +652,11 @@ Marginal blindness (Theorem~\ref{thm:ring-blindness}) & exact \\
 Recovery of $p(\psi)$ from the joint, and its decay with $t$
   & numerical, sixteen seeds \\
 The blind arm returning the null to machine precision
-  & numerical, $1{,}824$ cells \\
+  & numerical, $1{,}824$ cells; a consistency check on the estimator's
+    wiring, not on the theorem \\
+Paired sample-level controls: one-frame law invariant to $\psi$ below the
+  resampling floor, lag-one joint tracking $\sin\psi$
+  & numerical, independent of the estimator \\
 Recovery of the confining potential $(\lambda, r_*)$
   & numerical, in progress \\
 Behaviour in $K$, and inference of the phase rather than its use

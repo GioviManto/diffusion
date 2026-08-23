@@ -280,10 +280,12 @@ Since $x = e^{-t}a + \sqrt{\Dt}z$ with $z$ independent, $(a,x)$ is jointly Gauss
 $\Cov(a,x) = e^{-t}\Sigma_0$ and $\Cov(x) = e^{-2t}\Sigma_0 + \Dt I =: \Sigma_t$, whence
 $\E[a\mid x] = e^{-t}\Sigma_0\Sigma_t^{-1}x$ and, by \eqref{eq:score},
 $\score(x,t) = -\Sigma_t^{-1}x$. For zero-mean jointly Gaussian variables the conditional
-expectation is linear, so it coincides with the LMMSE estimator \citep{kay1993}, which proves the
-second half of Proposition~\ref{prop:lmmse}. The first half is the observation that both maps in
-\eqref{eq:closure} read only the mean and variance of $\innov$, so the whole recursion is a
-function of $(0,\ivar)$ alone and therefore returns what it returns on the Gaussian chain.
+expectation is linear, so it coincides with the LMMSE estimator \citep{kay1993}. That supplies the
+covariance identity the proposition's proof appeals to; the proof itself, an induction over the
+forward and backward recursions establishing that every projected message equals the Gaussian
+chain's, follows.
+
+\input{../shared/sections/prop-lmmse-proof}
 
 Consequently, on this model, the \emph{message-representation error} and the \emph{model error}
 coincide: projecting messages onto Gaussians and replacing the prior by its covariance-matched
@@ -296,9 +298,24 @@ families.
 
 Messages are represented on a uniform grid $\gridpt{1},\dots,\gridpt{\ngrid}$ spanning
 $[-\halfwidth,\halfwidth]$ with spacing $\gridh = 2\halfwidth/(\ngrid-1)$ and composite
-trapezoidal weights $w_k = \gridh$ for interior points, $\gridh/2$ at the two ends. All
-recursions run in the log domain with a per-step maximum subtracted before exponentiating, and
-the removed constants are restored in the evidence, so no message underflows.
+trapezoidal weights $w_k = \gridh$ for interior points, $\gridh/2$ at the two ends.
+
+The recursions are \emph{scaled linear-domain} forward--backward, not log-semiring belief
+propagation. The transition matrix and the unary likelihoods are built in logs --- the likelihood
+with a per-site maximum subtracted before exponentiating --- and are then exponentiated once, so
+each message update is an ordinary $(\ngrid,\ngrid)$ matrix product followed by renormalisation to
+unit quadrature mass. The removed constants are accumulated and restored in the evidence, which is
+therefore exact. This is the standard scaled recursion and it is what keeps the \emph{total} mass
+of every message at unity, so no message vanishes as a whole.
+
+It does not, however, guarantee that no individual entry underflows: a single likelihood or
+transition value far in a tail can round to zero while the message it belongs to remains
+well-normalised. An earlier version of this appendix claimed the recursions ran in the log domain
+and that ``no message underflows''; neither is what the implementation does, and the
+$10^{-14}$ agreement reported below is evidence at the Gaussian configuration tested rather than a
+uniform bound over innovation families, noise levels and fitted kernels. Where that distinction
+could matter --- the narrowest fitted mixture components, the smallest $\Delta_t$, tail
+observations --- it is a limitation, recorded in Appendix~\ref{app:limits} rather than resolved.
 
 \begin{figure}[h]
 \centering
@@ -388,9 +405,16 @@ sense of Appendix~\ref{app:exactness}(ii). Implementation \coderef{src/em.py}{e\
       residual, whose exact solution is a weighted median. Exact maximisation.
 \item \emph{Mixture} \eqref{eq:kernel}: the complete-data problem carries a second latent
       variable, so the M-step is itself an inner EM over the mixture label with
-      $\Xis$ held fixed. We run \textbf{four} inner conditional-maximisation sweeps, alternating
-      the $(\pi,\nu,s^2)$ block and the $\corr$ block, both closed form. This increases $\Qfun$
+      $\Xis$ held fixed. We alternate the $(\pi,\nu,s^2)$ block and the $\corr$ block, both
+      closed form, for at most \textbf{sixteen} inner sweeps, stopping early when the per-edge
+      gain in $\Qfun$ drops below $10^{-8}$. This increases $\Qfun$
       without maximising it: \textbf{generalised EM / ECM} \citep{meng1993}, not exact EM.
+      The cap was four in an earlier draft, which measurably under-converged the innovation
+      shape whenever the outer loop was also cut short --- the coordinate every non-Gaussian
+      claim depends on --- so the budget is reported here rather than left as a default.
+      Because each block is a conditional \emph{maximiser}, $\Qfun$ cannot decrease along an
+      inner sweep; the implementation raises rather than stopping if it ever does, and across
+      the certified fits it never has.
 \item \emph{Mixture-density network}: one backtracked Adam step, accepted only if $\Qfun$
       increased, halving the step up to five times otherwise and standing still if no ascent is
       found. Also generalised EM.
@@ -507,6 +531,8 @@ in the body is the qualitative one.
 
 \section{Experimental protocol}
 \label{app:protocol}
+
+\input{../shared/sections/prop-fisher-scope}
 
 Every number here comes from one frozen configuration, defined in a single file and imported by
 every experiment so that no run can silently diverge from it: Laplace chain unless stated,
@@ -649,3 +675,46 @@ Every figure in this note is produced by \codefile{paper/figures/make\_figures.p
 the outputs above and fails loudly if one is missing; no number in any figure is entered by hand.
 Exact commands, environment and HPC job configuration are in \codefile{REPRODUCIBILITY.md}, and
 the claim-level audit behind this revision is \codefile{REVISION\_AUDIT.md}.
+
+\section{The structured baseline}
+\label{app:structured}
+
+The headline comparison of Section~\ref{sec:networks} uses a fully connected network, which
+carries no locality prior and no weight sharing. This appendix carries the comparison that
+separates those from the structural assumption, summarised in the body: a weight-shared window
+predictor, its receptive-field radius and its $\varepsilon$/$x_0$ parameterisation both selected
+on a validation bundle disjoint from test, with EM--BP refitted on the same chains so that nothing
+is imported from a different protocol.
+
+\input{../shared/sections/tab-structured}
+
+\noindent The MLP column is the same architecture as Table~\ref{tab:pointwise} but at this
+experiment's chain length and noise schedule, so the two tables' MLP figures are not directly
+comparable; what is comparable is each row's own three arms.
+
+\section{Density-level recovery: the Hellinger figures}
+\label{app:hellinger}
+
+Both kernels are put on the same grid and renormalised under the same quadrature, so the
+comparison measures fit rather than normalisation convention. The scalar reported is the
+\emph{unweighted median over interior parent states}, and its interpretation needs care: absent a
+law over parent states a conditional kernel $\kernel(\cdot\mid a)$ has no canonical scalar
+distance, and an unweighted median over grid columns gives a rarely-visited tail parent the same
+standing as a typical one. It is therefore a diagnostic on the fitted density, not an intrinsic
+distance between transition laws; the trend across $\nseq$ is what we read, not the level.
+
+\begin{center}\small
+\begin{tabular}{@{}lccccccc@{}}
+\toprule
+$\nseq$ & $32$ & $64$ & $128$ & $256$ & $512$ & $1024$ & $2048$ \\
+\midrule
+relative score error & $0.059$ & $0.050$ & $0.034$ & $0.026$ & $0.022$ & $0.016$ & $0.013$ \\
+transition Hellinger & $0.100$ & $0.090$ & $0.076$ & $0.064$ & $0.060$ & $0.052$ & $0.050$ \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\noindent Both fall with $\nseq$, so the transition is being recovered and not merely fitted.
+A $\pi$-weighted variant --- $\E_{A\sim\pi_0}[H^2(\kernel_{\hat\params}(\cdot\mid A),
+\kernel_0(\cdot\mid A))]$ under the true parent-state law --- would be the intrinsic quantity and
+is the right upgrade; it is not computed here.

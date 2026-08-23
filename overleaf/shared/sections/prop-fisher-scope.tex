@@ -1,0 +1,21 @@
+%% SHARED SECTION -- the scope remark for Proposition~\ref{prop:fisher},
+%% included from the appendix. The body carries the statement; a reader asking
+%% "exact for WHICH likelihood?" is served here, where there is room to answer.
+
+\begin{remark}[Discrete and continuous are separate claims]
+\label{rem:fisher-scope}
+Proposition~\ref{prop:fisher} is a statement about the \emph{finite-state model on the grid}. There
+the interchange of $\nabla_\params$ with a finite sum is unconditional, and the returned gradient
+is exact for the discretised likelihood up to floating point --- which is what the
+$10^{-9}$ finite-difference agreement of Appendix~\ref{app:protocol} measures.
+
+The corresponding continuum identity,
+$\nabla_\params \Lik = \int\!\!\int \xi_\params(a,a')\,\nabla_\params \log
+\kernel_\params(a'\mid a)\,\dd a\,\dd a'$, also holds, but it needs hypotheses the discrete
+statement does not: $\kernel_\params(a'\mid a)$ differentiable in $\params$, support not depending
+on $\params$, and an integrable dominating function for $\partial_\params \kernel_\params$ so that
+differentiation and integration may be exchanged. Our kernels satisfy these --- Gaussian and
+Gaussian-mixture innovations are smooth in $\params$ with full support, and Laplace is smooth in
+$\corr$ away from the residual's kink --- but the two results should not be conflated, and the
+numbers we report certify the discrete one.
+\end{remark}

@@ -51,7 +51,22 @@ N_SITES = 33
 GRID_A = 8.0
 GRID_M = 401
 T_TRAIN = (0.1, 0.2, 0.4, 0.8, 1.6)
+
+
 N_TEST = 256
+
+
+def eff_seed_range(cfg):
+    """The seed indices this run is responsible for.
+
+    Sharded rather than a bare `range(eff_seeds)` so a 16-seed sweep can go out
+    as a Slurm array of one seed each: the whole run is several hours, a single
+    seed is minutes. `eff_seed0` shifts the window without touching the RNG
+    keys, which are built from the absolute seed index -- so shard 7 draws
+    exactly the chains a monolithic 16-seed run would have drawn for seed 7,
+    and the existing four-seed results reproduce unchanged at the default.
+    """
+    return range(cfg["eff_seed0"], cfg["eff_seed0"] + cfg["eff_seeds"])
 
 
 def _families(rho):
@@ -203,7 +218,7 @@ def part3_efficiency(cfg, out):
     bundle = _reference(prior, grid, weights, A_test, T_TRAIN)
 
     rows = []
-    for seed in range(cfg["eff_seeds"]):
+    for seed in eff_seed_range(cfg):
         for n_chains in cfg["eff_sizes"]:
             rng = rng_for("exp12-eff", seed, n_chains)
             A = np.stack([prior.sample(rng, N_SITES) for _ in range(n_chains)])
@@ -287,7 +302,7 @@ def part3_efficiency(cfg, out):
                 float(np.mean([r["score_rel_l2"] for r in rows
                                if r["method"] == method and r["n_chains"] == n
                                and r["seed"] == s_]))
-                for s_ in range(cfg["eff_seeds"])
+                for s_ in eff_seed_range(cfg)
             ]
             means.append(float(np.mean(per_seed)))
             ses.append(float(np.std(per_seed, ddof=1) / np.sqrt(len(per_seed)))
@@ -337,7 +352,7 @@ def part4_efficiency_val(cfg, out):
     val_bundle = _reference(prior, grid, weights, A_val, T_TRAIN, tag="exp12-valnoise")
 
     rows = []
-    for seed in range(cfg["eff_seeds"]):
+    for seed in eff_seed_range(cfg):
         for n_chains in cfg["eff_sizes"]:
             # Same keys as part 3: these are the same fitted models.
             rng = rng_for("exp12-eff", seed, n_chains)
@@ -449,15 +464,20 @@ def main() -> None:
         "grid_size": 301, "rho": 0.85, "n_chains": 256, "n_test": 128,
         "radii": (0, 1, 2, 4), "hidden": (64, 64), "global_hidden": (64, 64),
         "n_steps": 2000, "parameterizations": ("eps",), "compare_radius": 4,
-        "eff_seeds": 2, "eff_sizes": (128, 512), "eff_radii": (3, 6),
-        "eff_steps": 1500, "n_val": 128,
+        "eff_seeds": 2, "eff_seed0": 0, "eff_sizes": (128, 512),
+        "eff_radii": (3, 6), "eff_steps": 1500, "n_val": 128,
     }
     full = {
         "grid_size": GRID_M, "rho": 0.85, "n_chains": 1024, "n_test": N_TEST,
         "radii": (0, 1, 2, 3, 4, 6, 8, 12, 16),
         "hidden": (64, 64), "global_hidden": (128, 128),
         "n_steps": 20000, "parameterizations": ("eps", "x0"), "compare_radius": 6,
-        "eff_seeds": 4, "eff_sizes": (128, 512, 2048), "eff_radii": (3, 6, 12),
+        "eff_seeds": 4, "eff_seed0": 0, "eff_sizes": (128, 512, 2048),
+        # r = 16 is the FULL receptive field at n_sites = 33: a window of
+        # 2r+1 = 33 sees every site, so the swept family now spans genuinely
+        # local through globally-connected-but-weight-shared. Without it the
+        # comparison cannot answer "is the gap just a bounded receptive field?"
+        "eff_radii": (3, 6, 12, 16),
         "eff_steps": 8000, "n_val": N_TEST,
     }
     cfg = apply_overrides(quick if args.quick else full, args.set)

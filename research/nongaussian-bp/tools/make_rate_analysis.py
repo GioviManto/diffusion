@@ -112,6 +112,23 @@ def main():
 
     # Robustness: the nseq=4096 row runs a different protocol (raised budget), so
     # the fit must not depend on it.
+    #
+    # The exclusion below is hardcoded to 4096, and \rategapnofourk is named for
+    # it. nseq=8192 now exists (array 633361, 16 seeds) and also runs a raised
+    # budget, so adding it to EXTENDED without touching this line would leave the
+    # macro claiming to exclude the raised-budget rows while including one of
+    # them -- and the prose quotes that macro. Fail loudly instead: the fix is to
+    # exclude every raised-budget size and RENAME the macro, so that any prose
+    # still carrying the old name breaks the build rather than rendering a number
+    # that no longer means what its sentence says.
+    RAISED_BUDGET = {4096}
+    present_raised = {n for n in sizes if n in RAISED_BUDGET} | {
+        n for n in sizes if n > max(RAISED_BUDGET)}
+    if present_raised != RAISED_BUDGET:
+        sys.exit(
+            f"REFUSING: sizes {sorted(present_raised)} run a raised budget but the "
+            f"robustness exclusion and \\rategapnofourk are hardcoded to 4096. "
+            f"Exclude all of them and rename the macro before regenerating.")
     no4096 = [n for n in sizes if n != 4096]
     d_no4096 = (fitted_slopes(rows, EM, no4096, seeds)
                 - fitted_slopes(rows, NET, no4096, seeds))

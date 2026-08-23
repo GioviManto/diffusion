@@ -25,14 +25,19 @@ def _h(a, b, grid, weights, key="hellinger_median_interior"):
     )[key]
 
 
-def test_identical_kernels_sit_at_the_resolution_floor():
-    """A kernel against itself gives ~4e-8, not 0, and that is the metric's floor.
+def test_identical_kernels_are_exactly_zero_apart():
+    """A kernel against itself is 0, not 4e-8.
 
-    H = sqrt(1 - BC), and BC carries ~1e-15 of arithmetic error, so the square
-    root amplifies it to ~1e-8. Pinning the floor rather than asserting an exact
-    zero is the honest version: it records what the metric can actually resolve,
-    so a reported 1e-8 is read as "identical to arithmetic" and not as a real
-    distance. Score-level metrics do not have this floor.
+    This test used to assert the opposite -- `hellinger_max > 0.0` -- and
+    justified it as pinning a floor "inherent to the metric". It was pinning an
+    artefact of how the metric was written. `sqrt(1 - BC)` subtracts two numbers
+    near 1 and loses the bottom 1e-15 to cancellation; the square root turns
+    that into 1e-8. The equivalent sum-of-squared-sqrt-differences form never
+    forms BC, so identity is exact.
+
+    Worth keeping the story in the name: the module docstring claimed "zero
+    exactly at identity" the whole time this test asserted it was positive, and
+    nothing caught the contradiction because both were true of *something*.
     """
     grid, weights = make_grid(8.0, 401)
     k = GaussianAR1Kernel(RHO, 1 - RHO**2)
@@ -40,10 +45,22 @@ def test_identical_kernels_sit_at_the_resolution_floor():
         k.log_transition_matrix(grid), k.log_transition_matrix(grid), grid, weights
     )
     for name, v in out.items():
-        assert v < 1e-7, f"{name} = {v:.3e} for a kernel against itself"
-    assert out["hellinger_max"] > 0.0, (
-        "an exact zero would mean the floor moved; if this fires, the metric "
-        "changed and the ~4e-8 documented in transition_hellinger is stale")
+        assert v == 0.0, f"{name} = {v:.3e} for a kernel against itself, want 0"
+
+
+def test_near_identity_distances_are_resolved_below_the_old_floor():
+    """The point of removing the floor: 1e-10 apart now reads as 1e-10 apart.
+
+    Under `sqrt(1 - BC)` every pair closer than ~4e-8 collapsed onto the same
+    number, so "identical" and "different in the tenth digit" were
+    indistinguishable. Perturbing rho by 1e-9 gives a distance the old
+    expression could not have represented.
+    """
+    grid, weights = make_grid(8.0, 401)
+    a = GaussianAR1Kernel(RHO, 1 - RHO**2)
+    b = GaussianAR1Kernel(RHO + 1e-9, 1 - RHO**2)
+    d = _h(a, b, grid, weights, key="hellinger_max")
+    assert 0.0 < d < 4e-8, f"expected a resolved sub-floor distance, got {d:.3e}"
 
 
 def test_distance_grows_with_the_gap_in_rho():

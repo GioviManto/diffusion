@@ -65,3 +65,6 @@ overleaf/*/*.synctex.gz
 # old notebooks and drafts whose successors are all in research/ -- worth having
 # locally, not worth carrying in every clone. See archive/README.md.
 archive/
+
+# External advisor review, kept local: not our writing and not for distribution.
+research/Review-GPT.md

@@ -28,7 +28,8 @@ N_FREE = 3 * FROZEN.n_components
 # for and the sentence needs rereading, not a wider lookup table.
 _WORDS = {6: "six", 7: "seven", 8: "eight", 9: "nine", 10: "ten", 11: "eleven",
           12: "twelve", 13: "thirteen", 14: "fourteen", 15: "fifteen",
-          16: "sixteen", 17: "seventeen", 18: "eighteen"}
+          16: "sixteen", 17: "seventeen", 18: "eighteen", 19: "nineteen",
+          20: "twenty", 21: "twenty-one", 22: "twenty-two"}
 
 # The certified run (job 630845): same protocol and seeds as exp_07_symmetric,
 # plus the resolution certificate, the density-level Hellinger columns, and the
@@ -37,11 +38,20 @@ _WORDS = {6: "six", 7: "seven", 8: "eight", 9: "nine", 10: "ten", 11: "eleven",
 # carries no em_resolved and the gate below would then have nothing to check.
 SOURCE = "outputs/frozen/exp_07_certified_seed*/sample_efficiency_val.csv"
 
-# nseq=4096 (job 631496/631497, H200): the same protocol at a larger sample than
-# the certified grid reaches, run at a raised budget because the certified caps
-# were chosen for nseq <= 2048. That budget difference is not assumed harmless --
-# it is measured, by CALIB below.
-EXTENDED = "outputs/frozen/exp_07_n4096_seed*/sample_efficiency_val.csv"
+# Sizes beyond the certified grid, each run at a raised budget because the
+# certified caps were chosen for nseq <= 2048. That budget difference is not
+# assumed harmless -- it is measured, by CALIB below.
+#
+#   nseq=4096  jobs 631496/631497, H200, em_iters=2400, net_steps=60000
+#   nseq=8192  job 633361, H200, em_iters=3200, net_steps=100000
+#
+# 8192 only became affordable once the EM E-step went on the device: until then
+# BP_DEVICE reached bp_grid and denoiser but not src/em.py, so the arm that
+# dominates the cost ran on the CPU whatever partition the job was sent to.
+EXTENDED = (
+    "outputs/frozen/exp_07_n4096_seed*/sample_efficiency_val.csv",
+    "outputs/frozen/exp_07_n8192_seed*/sample_efficiency_val.csv",
+)
 
 # nseq=2048 at the raised budget (job 631467), the same seeds and bundles as the
 # certified run. This exists to answer one question and no other: the caption used
@@ -69,14 +79,17 @@ def load(pattern, what):
 
 
 rows = load(SOURCE, "certified")
-ext = load(EXTENDED, "extended-nseq")
+ext_blocks = [load(p, f"extended-nseq ({p.split('exp_07_')[1].split('_seed')[0]})")
+              for p in EXTENDED]
 calib = load(CALIB, "budget-calibration")
 
 seeds = sorted({r["seed"] for r in rows}, key=int)
 F = lambda r, k: float(r[k])
 
 EXPECTED = 16
-for label, block in (("certified", rows), ("extended", ext), ("calibration", calib)):
+checks = [("certified", rows), ("calibration", calib)]
+checks += [(f"extended[{i}]", b) for i, b in enumerate(ext_blocks)]
+for label, block in checks:
     s = sorted({r["seed"] for r in block}, key=int)
     if len(s) != EXPECTED:
         print(f"REFUSING: {label} has {len(s)} seeds, expected {EXPECTED}: "
@@ -88,18 +101,43 @@ for label, block in (("certified", rows), ("extended", ext), ("calibration", cal
         print(f"REFUSING: {label} seeds differ from certified", file=sys.stderr)
         sys.exit(1)
 
-# The extended run must be a different size from the certified grid, or it is not
-# extending anything and the table would silently gain a duplicate row.
-ext_sizes = {int(r["n_chains"]) for r in ext}
+# Each extended run must contribute exactly one size, and one the table does not
+# already have. Two runs landing on the same nseq would silently average two
+# different budgets into one row, which is the failure this whole file exists to
+# prevent.
 base_sizes = {int(r["n_chains"]) for r in rows}
-if len(ext_sizes) != 1 or (ext_sizes & base_sizes):
-    print(f"REFUSING: extended run covers {sorted(ext_sizes)}, which is not a "
-          f"single new size beyond {sorted(base_sizes)}", file=sys.stderr)
-    sys.exit(1)
-EXT_N = ext_sizes.pop()
+seen = set(base_sizes)
+ext_ns = []
+for pattern, block in zip(EXTENDED, ext_blocks):
+    s = {int(r["n_chains"]) for r in block}
+    if len(s) != 1 or (s & seen):
+        print(f"REFUSING: {pattern} covers {sorted(s)}, which is not a single "
+              f"new size beyond {sorted(seen)}", file=sys.stderr)
+        sys.exit(1)
+    n = s.pop()
+    seen.add(n)
+    ext_ns.append(n)
+    rows = rows + block
 
-rows = rows + ext
-sizes = sorted(base_sizes | {EXT_N})
+# The largest extended size is the one the refusal message names; the caption
+# names them all, since a reader checking which rows share a protocol should not
+# have to infer it from the largest.
+EXT_N = max(ext_ns)
+sizes = sorted(seen)
+_ns = sorted(ext_ns)
+# Named from the globs actually loaded, so the provenance header cannot go on
+# crediting exp_07_n4096_seed*/ for rows that came from somewhere else.
+ext_provenance = " and ".join(
+    p.split("/")[2] + "/" for p in EXTENDED
+)
+
+# The verb has to agree with the number of extended rows, or the caption reads
+# "The nseq = 4096 and nseq = 8192 rows uses a raised budget" the moment a
+# second size is added -- which is exactly what happened when 8192 landed.
+ext_phrase = (f"The $\\nseq = {_ns[0]}$ row uses"
+              if len(_ns) == 1 else
+              "The $\\nseq = " + "$ and $\\nseq = ".join(str(n) for n in _ns)
+              + "$ rows use")
 
 # Resolution gate.
 #
@@ -252,7 +290,7 @@ tex = f"""%% Included by overleaf/paper/main.tex only. The workshop no longer ca
 %% content is a protocol cannot be defended in the space available.
 %%
 %% GENERATED by tools/make_tab_efficiency.py from outputs/frozen/
-%% exp_07_certified_seed*/ (nseq <= {CALIB_N}) and exp_07_n4096_seed*/
+%% exp_07_certified_seed*/ (nseq <= {CALIB_N}) and {ext_provenance}
 %% ({len(seeds)} seeds, {n_cells} cells). The budget calibration in the caption comes
 %% from exp_07_budget2048_seed*/. Do not hand-edit the numbers; rerun the generator.
 
@@ -262,7 +300,7 @@ schedule; {len(seeds)} seeds $\\pm$ one standard error, aggregated per seed. Bot
 disjoint validation bundle --- the network selects its parameterisation \\emph{{and}} training
 length, EM--BP its iteration count --- agreeing with the test-set optimum in ${net_agree:.1f}\\%$ and
 ${em_agree:.1f}\\%$ of cells. EM--BP is more accurate in ${th(n_cells - wins)}$ of ${th(n_cells)}$.
-The $\\nseq = {EXT_N}$ row uses a raised budget, the caps having been set for $\\nseq \\le {CALIB_N}$;
+{ext_phrase} a raised budget, the caps having been set for $\\nseq \\le {CALIB_N}$;
 rerunning $\\nseq = {CALIB_N}$ at that budget on the same seeds moves its ratio by
 ${cal_d:+.2f} \\pm {cal_se:.2f}$.{drop_note}}}
 \\label{{tab:pointwise}}
@@ -278,7 +316,18 @@ sequences $\\nseq$ & network & EM--BP (${N_FREE}$ free) & ratio \\\\
 """
 
 dest = "../../overleaf/shared/sections/tab-efficiency.tex"
-open(dest, "w").write(tex)
+
+# NOTHING IS WRITTEN UNTIL BOTH FILES ARE BUILT.
+#
+# The table used to be written here, before the macro block below. That made the
+# two outputs non-atomic, and the failure is not hypothetical: when the ratio
+# first exceeded eighteen, the deliberate KeyError in _WORDS fired *after* the
+# table had already been written, leaving a nine-row table quoting 20.2 beside a
+# macro file still saying \ratiohi{17.6} and \biggestn{4096}. The paper would
+# have built, with the prose and the table disagreeing -- which is the single
+# thing this generator exists to make impossible.
+#
+# So both strings are constructed first and written only once neither can fail.
 
 # The prose gets macros, not typed numbers.
 #
@@ -319,6 +368,9 @@ macros = f"""%% GENERATED by tools/make_tab_efficiency.py -- do not hand-edit.
 \\newcommand{{\\budgetdeltase}}{{{cal_se:.2f}}}
 """
 mdest = "../../overleaf/shared/sections/efficiency-numbers.tex"
+
+# Both strings exist and neither construction raised. Now write.
+open(dest, "w").write(tex)
 open(mdest, "w").write(macros)
 
 print(f"wrote {dest}: {len(seeds)} seeds, {n_cells} cells, "

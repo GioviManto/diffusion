@@ -85,6 +85,12 @@
 \newcommand{\Var}{\operatorname{Var}}
 \newcommand{\KL}{D_{\mathrm{KL}}}
 \newcommand{\normal}[2]{\mathcal{N}\!\left(#1,#2\right)}
+% Gaussian moment projection, defined formally in prop-lmmse: the Gaussian with
+% the same first two moments as its (normalised) argument. Named rather than
+% written inline because the LMMSE proposition is a statement about WHERE this
+% operator is applied, and an unnamed operator cannot carry that.
+\newcommand{\Pgauss}{\Pi_{\mathrm{G}}}
+\newcommand{\dd}{\,\mathrm{d}}
 
 % --- Estimators ------------------------------------------------------------
 \newcommand{\mmse}{\widehat{\va}_{\mathrm{MMSE}}}

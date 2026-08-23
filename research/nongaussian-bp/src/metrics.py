@@ -58,14 +58,20 @@ def transition_hellinger(
     `interior_frac` is the fraction of the half-width kept, matching
     `bp_grid`'s convention.
 
-    RESOLUTION FLOOR, ~4e-8. H is the square root of 1 - BC, and BC is computed
-    to about 1e-15, so the root amplifies that to 1e-8 -- measured at 3.7e-8 for a
-    kernel against itself at M = 401. Two densities closer than that are
-    indistinguishable here, and a reported Hellinger of 1e-8 means "identical to
-    arithmetic", not "identical". This is inherent to the metric, not to the
-    implementation: nothing in double precision recovers the difference between
-    BC = 1 and BC = 1 - 1e-17. Score-level metrics do NOT have this floor, which
-    is one reason to keep reporting both.
+    THERE IS NO RESOLUTION FLOOR, and the claim that there was one was wrong.
+    This function used to compute H = sqrt(1 - BC) directly, which subtracts two
+    numbers near 1: identical kernels came back at 3.7e-8 rather than 0, and that
+    3.7e-8 was documented here as "inherent to the metric, not to the
+    implementation", on the argument that nothing in double precision separates
+    BC = 1 from BC = 1 - 1e-17. The argument is sound and the conclusion does not
+    follow, because it assumes BC has to be formed. Expanding the square,
+
+        H^2 = (1/2) sum_k w_k (sqrt(p_k) - sqrt(q_k))^2
+
+    is the same number, never subtracts from 1, and returns exactly 0 at
+    identity. The floor was an artefact of the expression, and it is gone. The
+    fitted distances this is used on are ~0.05, so no reported result moves;
+    what changes is that a small Hellinger can now be believed.
     """
     # Column-normalise under the SAME quadrature both kernels are represented
     # in. Comparing an analytically normalised density against a grid-normalised
@@ -81,10 +87,19 @@ def transition_hellinger(
         return k / np.maximum(mass, 1e-300)
 
     p, q = cols(log_k_est), cols(log_k_ref)
-    overlap = (weights[:, None] * np.sqrt(p * q)).sum(axis=0)
-    # BC <= 1 by Cauchy-Schwarz; anything above is arithmetic, and clipping the
-    # negative that would otherwise reach the sqrt is the only reason to clamp.
-    h = np.sqrt(np.maximum(0.0, 1.0 - np.minimum(overlap, 1.0)))
+    # H^2 = 1 - BC is the definition, but computing it that way subtracts two
+    # numbers near 1 and loses everything below ~1e-15 to cancellation, which
+    # the sqrt then amplifies to ~1e-8. The algebraically identical
+    #
+    #     H^2 = (1/2) sum_k w_k (sqrt(p_k) - sqrt(q_k))^2
+    #
+    # -- identical because sum w p = sum w q = 1 after column-normalisation --
+    # never forms BC at all, so identical columns give exactly 0 and small
+    # differences keep their relative accuracy. No clamp is needed either: the
+    # summand is a square, so it cannot go negative and reach the sqrt.
+    h = np.sqrt(
+        0.5 * (weights[:, None] * (np.sqrt(p) - np.sqrt(q)) ** 2).sum(axis=0)
+    )
 
     interior = np.abs(grid) <= interior_frac * float(np.max(np.abs(grid)))
     return {

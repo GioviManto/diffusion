@@ -97,6 +97,10 @@
 \urlstyle{same}
 
 % ---------- notation macros (consistent with the research notes) ----------
+% Same rendering as shared/notation.tex, which the thesis does not \input
+% (it carries its own notation block). Kept in step with it deliberately: a
+% chapter that cites a file by name should look the same in every document.
+\providecommand{\codefile}[1]{\texttt{\small #1}}
 \newcommand{\R}{\mathbb{R}}
 \newcommand{\E}{\mathbb{E}}
 \newcommand{\Prob}{\mathbb{P}}

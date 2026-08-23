@@ -15,6 +15,20 @@ cd "$(dirname "$0")/.."
 # Both production documents are gated. The compendium is the development
 # environment and is deliberately NOT gated -- it is where unfinished work is
 # allowed to live.
+#
+# The paper limit stays at NINE, the NeurIPS main-body allowance, and the
+# 2026-08-23 review was absorbed without relaxing it. That review required
+# content the paper did not have -- Proposition 2 with its hypotheses rather
+# than gestured at, a corrected account of why the closure gap closes (the
+# noised marginal Gaussianises; the posterior does not), the discrete/continuum
+# scope on Fisher's identity, and a baseline that shares the data's structure --
+# roughly a page in total. It was accommodated by moving the proofs, the
+# hypothesis discussion and the structured-baseline table into the appendix,
+# which is where they belong anyway, rather than by moving the line.
+#
+# Worth keeping the reasoning: a length gate that gets raised whenever it binds
+# measures nothing. If the body genuinely needs more room, the argument to have
+# is about what leaves the body, not about what the limit is.
 DOCS=("../../overleaf/paper:9:paper" "../../overleaf/workshop:4:workshop")
 PAPER=../../overleaf/paper/main.tex
 APPENDIX=../../overleaf/paper/appendix.tex
@@ -117,14 +131,31 @@ fi
 #     copy nobody compiles, so it drifts from whatever superseded it and is then
 #     available to be pasted back in. That is exactly how the stale ring model
 #     (missing its normaliser) outlived the corrected one in the compendium.
+#     Scanned over every file a production document actually compiles, not just
+#     the two roots. Grepping main.tex alone called three files orphaned that
+#     were included from paper/appendix.tex and from the compendium -- a false
+#     positive that pushes toward deleting live content, which is the opposite
+#     of what this check is for. The compendium counts as a consumer here: it is
+#     not gated for length or polish, but a shared section it compiles is not an
+#     uncompiled copy, which is the thing being guarded against.
+CONSUMERS=(
+    "$PAPER" ../../overleaf/paper/appendix.tex
+    ../../overleaf/workshop/main.tex ../../overleaf/workshop/appendix.tex
+    ../../overleaf/thesis/main.tex
+    ../../overleaf/compendium/main.tex
+)
+while IFS= read -r -d '' c; do CONSUMERS+=("$c"); done \
+    < <(find ../../overleaf/thesis/chapters ../../overleaf/compendium/chapters \
+             -name '*.tex' -not -path '*_superseded*' -print0 2>/dev/null)
+
 for f in ../../overleaf/shared/sections/*.tex; do
     name=$(basename "$f" .tex)
-    inmain=$(grep -c "input{../shared/sections/$name}" "$PAPER" || true)
-    inws=$(grep -c "input{../shared/sections/$name}" ../../overleaf/workshop/main.tex || true)
-    if [ "$inmain" -ge 1 ] || [ "$inws" -ge 1 ]; then
-        pass "sections/$name reached (main:$inmain workshop:$inws)"
+    hits=$(grep -l "input{../shared/sections/$name}" "${CONSUMERS[@]}" 2>/dev/null \
+           | sed 's|.*/overleaf/||' | paste -sd, -)
+    if [ -n "$hits" ]; then
+        pass "sections/$name reached ($hits)"
     else
-        fail "sections/$name is orphaned -- reached by neither document"
+        fail "sections/$name is orphaned -- compiled by no production document"
     fi
 done
 

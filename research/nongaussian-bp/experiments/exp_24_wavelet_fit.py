@@ -304,7 +304,13 @@ def part_fit(settings, out_dir):
                       f"{np.mean(d):+.2f} +/- {se:.2f} nats/image "
                       f"(t={pair_rows[-1]['t']:.1f}, "
                       f"{pair_rows[-1]['a_better_on_images']}/{n} images)")
-        write_csv(out_dir / "loglik_paired.csv", pair_rows)
+        # A single-family run has no pairs, and `write_csv` refuses an empty
+        # list. Guarding rather than letting it raise: the pairing is a
+        # convenience, and it crashed jobs 633540-2 AFTER a 15-minute fit had
+        # already succeeded and been written. A diagnostic must not be able to
+        # fail a run whose results are already on disk.
+        if pair_rows:
+            write_csv(out_dir / "loglik_paired.csv", pair_rows)
     return rows
 
 

@@ -36,6 +36,7 @@
 \usepackage[T1]{fontenc}
 \usepackage{url}
 \usepackage{booktabs}
+\usepackage{capt-of}
 \usepackage{array}
 \usepackage{amsfonts}
 \usepackage{amsmath}
@@ -61,6 +62,11 @@
 \newtheorem{proposition}{Proposition}
 \newtheorem{theorem}{Theorem}
 \newtheorem{remark}{Remark}
+% prop-lmmse states the projection operator as a definition rather than leaving
+% "moment-projected sum-product" to be inferred from the surrounding prose.
+\theoremstyle{definition}
+\newtheorem{definition}{Definition}
+\theoremstyle{plain}
 
 \title{Exact diffusion scores for non-Gaussian Markov chains:\\
 what second-order message closure computes}
@@ -145,9 +151,13 @@ characterisation, which turns a heuristic into a measurement:
 \noindent
 So the gap between moment-projected and full sum-product is precisely the price of replacing the
 prior by its covariance twin --- not an artefact of a message representation. It vanishes as $t$
-grows, because noising Gaussianises the posterior, so the shape of $\innov$ survives only where
-the likelihood is weak: on the Laplace chain the median relative score error falls from $0.241$ at
-$t=0.05$ to $7.3\times10^{-6}$ at $t=3$ (Figure~\ref{fig:closure}).
+grows, because the noised marginal $\Pt$ Gaussianises and Tweedie's prefactor
+$\alpha_t/\Delta_t$ attenuates the score's sensitivity to structure beyond second moments --- not
+because the latent posterior becomes Gaussian, which it does not: as $t\to\infty$ the observation
+becomes uninformative and $P(\va\mid\vx,t)$ approaches the (non-Gaussian) prior. On the Laplace
+chain the median relative score error falls from $0.241$ at $t=0.05$ to $7.3\times10^{-6}$ at
+$t=3$ (Figure~\ref{fig:closure}). The hypotheses and the proof are in
+Appendix~\ref{app:ws-lmmse}.
 
 \begin{figure}[!htbp]
 \centering
