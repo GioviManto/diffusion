@@ -139,35 +139,80 @@ def fig_closure() -> None:
 # ---------------------------------------------------------------------------
 
 def fig_sample_efficiency() -> None:
-    rows = read(Path("replicates/merged_summary.csv"))
-    by = defaultdict(list)
-    for r in rows:
-        by[r["method"]].append(
-            (int(r["n_chains"]), float(r["mean_rel_l2_mean"]), float(r["mean_rel_l2_se"]))
-        )
+    """The same data, protocol and estimand as Table~\\ref{tab:pointwise}.
+
+    THIS USED TO READ A DIFFERENT RUN FROM THE TABLE IT SITS BESIDE.
+    `outputs/replicates/merged_summary.csv` is a six-seed, pre-certification
+    sweep that stops at nseq=4096; the certified table is sixteen seeds and runs
+    to 8192. So the thesis showed a figure and a table, adjacent, drawn from
+    different experiments at different replicate counts -- and because the
+    figure plotted posterior-mean error while the table reports score error,
+    the disagreement did not even look like one. Nothing was wrong with either
+    number; they were answers to different questions presented as one.
+
+    Reading the certified directories directly, with the seed-first aggregation
+    the table uses, is the only way the two can be guaranteed to agree. The
+    estimand is score error, matching the table.
+    """
+    import glob
+
+    patterns = [
+        "frozen/exp_07_certified_seed*/sample_efficiency_val.csv",
+        "frozen/exp_07_n4096_seed*/sample_efficiency_val.csv",
+        "frozen/exp_07_n8192_seed*/sample_efficiency_val.csv",
+    ]
+    rows = []
+    for pattern in patterns:
+        files = sorted(glob.glob(str(OUT / pattern)))
+        if not files:
+            raise SystemExit(
+                f"fig_sample_efficiency: no certified output at {pattern}. "
+                "Refusing to fall back to outputs/replicates/, which is a "
+                "six-seed pre-certification run and does not match the table."
+            )
+        for f in files:
+            seed = f.split("seed")[1].split("/")[0]
+            with open(f) as fh:
+                for r in csv.DictReader(fh):
+                    r["seed"] = seed
+                    rows.append(r)
+
+    # Same resolution gate as the table, or the figure would show cells the
+    # table excludes.
+    rows = [r for r in rows if "em_resolved" not in r or int(r["em_resolved"])]
+    seeds = sorted({r["seed"] for r in rows}, key=int)
+    sizes = sorted({int(r["n_chains"]) for r in rows})
+
+    def per_seed(n, key):
+        """Average the schedule within a seed, then across seeds: the seed is
+        the inferential unit, because the twelve levels share a fitted model."""
+        g = [r for r in rows if int(r["n_chains"]) == n]
+        v = np.array([
+            np.mean([float(r[key]) for r in g if r["seed"] == s]) for s in seeds
+        ])
+        return v.mean(), v.std(ddof=1) / np.sqrt(v.size)
+
     fig, ax = plt.subplots(figsize=(3.6, 2.7))
-    names = {
+    series = {
         # Derived from the frozen component count, not typed: theta is
         # [rho, pi(C), mu(C), s2(C)] with pi simplex-constrained, so 3C are free.
-        # This label read "12" (correct at C=4) after the config moved to C=8.
-        "em_bp": ("em_bp", f"EM\u2013BP ({3 * FROZEN.n_components} free parameters)"),
-        "dsm_net_eps": ("mlp", r"MLP, $\varepsilon$-parameterisation"),
-        "dsm_net_x0": ("cnn", r"MLP, $a$-parameterisation"),
+        "em_bp_score_rel_l2": (
+            "em_bp", f"EM\u2013BP ({3 * FROZEN.n_components} free parameters)"),
+        "net_score_rel_l2_selected": ("mlp", "network (tuned on validation)"),
     }
-    for key, (style, label) in names.items():
-        if key not in by:
-            continue
-        pts = sorted(by[key])
-        n, m, se = zip(*pts)
+    for key, (style, label) in series.items():
+        m, se = zip(*(per_seed(n, key) for n in sizes))
         st = dict(STYLE[style])
         st["label"] = label
-        ax.errorbar(n, m, yerr=se, capsize=2, **st)
+        ax.errorbar(sizes, m, yerr=se, capsize=2, **st)
     ax.set_xscale("log", base=2)
     ax.set_yscale("log")
-    ax.set_xlabel(r"training sequences $M$")
-    ax.set_ylabel("relative denoising error")
+    ax.set_xlabel(r"training sequences $\nseq$".replace(r"\nseq", "M"))
+    ax.set_ylabel("relative score error")
     ax.legend()
     save(fig, "fig_sample_efficiency")
+    print(f"  fig_sample_efficiency: {len(seeds)} seeds, sizes {sizes}, "
+          f"{len(rows)} cells (certified)")
 
 
 # ---------------------------------------------------------------------------
@@ -188,6 +233,30 @@ def _capacity_tables():
             by[r["arm"]].append(float(r["innov_kurtosis"]))
         gen[c] = {k: median(v) for k, v in by.items()}
     return point, gen
+
+
+def _stamp_unconverged(fig) -> None:
+    """Mark a figure whose fits used the withdrawn fixed 40-iteration budget.
+
+    Every panel drawn from `outputs/exp_16/` rests on fits that stopped at 40 EM
+    iterations, and the shape coordinate needs of order 2,000 -- 93% of those
+    seed-configurations had not settled. The claim audit withdraws the capacity
+    attribution on exactly that basis.
+
+    The thesis says so in a remark next to the figure, which is necessary and
+    not sufficient: a figure that leaves the document -- into a slide, a poster,
+    a supervisor's email -- leaves the caveat behind and reads as evidence for
+    a claim that has been withdrawn. Being generated from committed outputs
+    guarantees the number matches its CSV; it guarantees nothing about the
+    estimand still being one anybody stands behind. So the caveat travels on the
+    canvas.
+    """
+    fig.text(
+        0.5, -0.06,
+        "Fixed 40-iteration EM budget: shape-dependent curves are confounded "
+        "with convergence rate (claim audit §corr-capacity).",
+        ha="center", va="top", fontsize=6.5, style="italic", color="#a03020",
+    )
 
 
 def fig_capacity() -> None:
@@ -216,6 +285,7 @@ def fig_capacity() -> None:
     ax[1].set_ylabel("generated innovation excess kurtosis")
     ax[1].set_title("generative fidelity")
     ax[1].legend()
+    _stamp_unconverged(fig)
     save(fig, "fig_capacity")
 
 
@@ -244,6 +314,7 @@ def fig_pointwise_vs_generative() -> None:
     ax.set_xlabel("MSE against the Bayes denoiser (lower better)")
     ax.set_ylabel("generated kurtosis deficit (lower better)")
     ax.legend()
+    _stamp_unconverged(fig)
     save(fig, "fig_pointwise_vs_generative")
 
 
