@@ -84,12 +84,33 @@ Gauss--Markov chains is classical: the Kalman filter and smoother
 \citep{kalman1960new, rauch1965maximum}, hidden Markov models
 \citep{rabiner1989tutorial}, and their unifying formulation as
 sum--product message passing on factor graphs
-\citep{kschischang2001factor, mezard2009information}. What this
-literature does not ask is the question that matters for generative
-modelling: how does the exact posterior, and therefore the exact score,
-deform as a function of the diffusion time, and what does that
-deformation imply for anything, algorithm or network, that must compute
-it at every noise level?
+\citep{kschischang2001factor, mezard2009information}. Continuous,
+non-Gaussian state spaces have a long literature of their own, and it is
+worth saying precisely how this work sits inside it, because the
+machinery is familiar enough to look like a reapplication. Kalman--RTS is
+exact only for linear-Gaussian models. Assumed-density filtering and
+expectation propagation keep tractability by projecting each message back
+into a parametric family, so the approximation is in the messages
+themselves. Gaussian-sum filters widen that family without removing the
+restriction. Particle filters and smoothers place no parametric
+restriction but substitute Monte Carlo error, which is a different thing
+from no error and cannot serve as a reference one measures other methods
+against. Grid-based filtering for continuous-state HMMs is the closest
+relative of what is done here, and is normally treated as an
+approximation to be tolerated rather than as an object whose error is
+itself the measurement.
+
+Two things distinguish the present use. Deterministic quadrature is
+adopted precisely so that the reference carries \emph{no} sampling error
+and its discretisation error can be bounded separately and reported,
+which is what makes it usable as ground truth rather than as another
+competitor. And the target is not filtering: it is the diffusion score at
+every noise level, obtained from the same recursion that learns the
+kernel from noised sequences. What the classical literature does not ask
+is the question generative modelling forces --- how the exact posterior,
+and therefore the exact score, deforms as a function of the diffusion
+time, and what that deformation implies for anything, algorithm or
+network, that must compute it at every level.
 
 \paragraph{Message passing with continuous variables.} BP is exact on
 trees for discrete variables, where messages are finite probability
@@ -105,10 +126,35 @@ fails by construction, and we are not aware of a quantitative assessment
 of the Gaussian message closure on chain-structured diffusion
 posteriors.
 
+\paragraph{Amortising inference into a network.} The three strands above
+concern how the score can be \emph{computed}. A diffusion model does not
+compute it; it trains a network to reproduce it, and the distinction is
+one of kind rather than of accuracy. Sum--product on the posterior chain
+determines a whole distribution over the latent sequence, by making a
+free energy stationary over a family rich enough --- because the graph is
+a tree --- that the minimiser is exact rather than approximate. A score
+network is a fixed-depth feed-forward map: it spends the same computation
+on every input and has no mechanism to search, so it cannot represent
+that inference, only the answers it produces. Reversal is iterative and
+unbounded, but each step's score still comes from the fixed-compute map,
+so the network stands to the inference as an \emph{amortisation}
+\citep{lecun2006tutorial}.
+
+Whether that amortisation is cheap or expensive is, in general,
+unmeasurable: it would require the very object the network was trained to
+stand in for. On the family of this thesis that object is available, so
+the question becomes an experiment --- and the answer has structure. The
+cost is small when there is little to amortise and grows with the data,
+which is what one should expect of a fixed-compute approximator facing a
+posterior that becomes better determined as evidence accumulates. Nothing
+in the literature above measures it, because nothing in it has the exact
+target to measure against.
+
 The gap, in one sentence: there is no end-to-end, exactly solvable
 account of the joint diffusion score of a structured sequence, covering
-its matrix structure, its message-passing computation, and the price of
-the Gaussian closure when the sequence is not Gaussian.
+its matrix structure, its message-passing computation, the price of the
+Gaussian closure when the sequence is not Gaussian, and the price of
+amortising the whole computation into a network.
 
 \section{Research questions}\label{sec:rq}
 
