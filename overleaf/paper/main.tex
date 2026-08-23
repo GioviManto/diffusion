@@ -567,11 +567,13 @@ crossing and therefore quote no data-equivalence factor.
 
 \paragraph{How much of this is the architecture?} A ratio against a fully connected network cannot
 separate knowing the Markov structure from sharing weights across sites, and the second is the
-cheaper explanation. Against a weight-shared convolution instead --- radius and parameterisation
-tuned the same way, EM--BP refitted on the same chains --- \emph{most of the headline gap is
-architectural}: the ratio falls to $\cnnratiolo$--$\cnnratiohi$, so roughly two thirds of it is the
-MLP's missing locality prior. What survives is real and widening, EM--BP winning $\cnnemwins$ of
-$\cnncells$ cells with the ratio still growing in $\nseq$ (Appendix~\ref{app:structured}).
+cheaper explanation. Against a weight-shared convolution instead --- radius swept to the full chain
+width, radius and parameterisation selected on validation, EM--BP refitted on the same chains ---
+\emph{most of the headline gap is architectural}: the ratio falls to $\cnnratiolo$--$\cnnratiohi$,
+and what survives \emph{widens} with $\nseq$, from $\cnnratiolo$ at $32$ to $\cnnratiohi$ at
+$2048$ (EM--BP better in $\cnnemwins$ of $\cnncells$ cells, the exceptions all at the two smallest
+sizes; Appendix~\ref{app:structured}). The structural advantage is therefore not what a locality
+prior supplies, but what the convolution fails to acquire as data grows.
 
 The asymmetry in supplied information is the point of the measurement, but it also bounds what the
 measurement supports. The scoped statement is: \emph{on this family, at these sizes, and with each
@@ -594,13 +596,11 @@ $\corr$ certifies a converged-looking trace over an unconverged kernel.
 \label{sec:limits}
 
 The model assumes exact first-order Markov structure, and under a non-Markov prior the estimator
-is misspecified in a way more data does not repair: a shared global latent adds a rank-one term a
-chain absorbs, while long-range precision coupling is not low-rank and cannot be represented.
-Both are measured in the compendium against an exact reference; neither is claimed here, and nine
-further scope conditions are in Appendix~\ref{app:limits}. The open question is architectural ---
-sum-product on a chain suggests a network narrow but as deep as twice the chain, unlike trees
-\citep{mei2024unet,garnierbrun2024transformers}, yet the convolution of
-Appendix~\ref{app:structured} closes two thirds of the gap without that depth.
+is misspecified in a way more data does not repair: a global latent adds a rank-one term a chain
+absorbs, while long-range precision coupling is not low-rank. Both are measured in the compendium,
+and nine further scope conditions are in Appendix~\ref{app:limits}. The open question is
+architectural: which architectures exploit Markovianity, and at what depth
+\citep{mei2024unet,garnierbrun2024transformers}.
 
 % The closing summary that stood here restated the abstract sentence for
 % sentence -- moment closure is an LMMSE estimator, Fisher's identity gives the

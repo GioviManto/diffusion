@@ -692,6 +692,15 @@ is imported from a different protocol.
 experiment's chain length and noise schedule, so the two tables' MLP figures are not directly
 comparable; what is comparable is each row's own three arms.
 
+The $\cnnlosses$ cells in which the tuned convolution matches or beats EM--BP are not scattered:
+every one is at $\nseq \in \{\cnnlosssizes\}$, the two smallest sizes here, and $\cnnlossloweest$
+of them at the lowest noise level. That is the regime the rest of the paper would predict --- at
+$\nseq=32$ the structured estimator is itself data-starved, and at low noise the likelihood
+dominates the prior, so knowing the transition buys least. The advantage appears as data
+accumulates rather than being present throughout, which is the opposite of what a fixed
+architectural handicap would produce and is the reason the widening in $\nseq$ is the load-bearing
+observation rather than the level.
+
 \section{Density-level recovery: the Hellinger figures}
 \label{app:hellinger}
 
