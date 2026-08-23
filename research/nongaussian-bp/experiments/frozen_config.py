@@ -213,6 +213,27 @@ def frozen_settings(**overrides) -> dict:
     return settings
 
 
+def config_hash(config: FrozenConfig = FROZEN) -> str:
+    """A short stable digest of the whole configuration.
+
+    The full dict is already written into every params.json, which is what you
+    need to reproduce a run. What it does not give you is a way to ask "did
+    these two outputs come from the same configuration?" without diffing two
+    dictionaries and knowing which key differences matter. A digest turns that
+    into a string comparison, so a merge step can refuse mismatched shards
+    instead of averaging them.
+
+    Sorted keys and `repr` so the digest depends on the values and not on field
+    declaration order; tuples and floats both round-trip through `repr` exactly.
+    """
+    import hashlib
+
+    payload = "\n".join(
+        f"{k}={v!r}" for k, v in sorted(config.as_dict().items())
+    )
+    return hashlib.sha256(payload.encode()).hexdigest()[:12]
+
+
 def provenance(config: FrozenConfig = FROZEN) -> dict:
     """What to write into every params.json, so an output file says which
     configuration produced it and whether that was the frozen one."""
@@ -222,6 +243,8 @@ def provenance(config: FrozenConfig = FROZEN) -> dict:
     }
     return {
         "config": config.as_dict(),
+        "config_hash": config_hash(config),
+        "frozen_hash": config_hash(FROZEN),
         "is_frozen": not diff,
         "deviations_from_frozen": diff,
     }
@@ -233,4 +256,5 @@ __all__ = [
     "FROZEN_ROOT",
     "frozen_settings",
     "provenance",
+    "config_hash",
 ]

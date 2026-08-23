@@ -249,6 +249,7 @@ def part1_sample_efficiency(grid, weights, sizes, hidden, n_steps, out):
                 N_COMPONENTS, rho=0.3, var=0.8, rng=train_rng("exp07-init")
             ),
             grid, weights, noisy_groups(A, T_TRAIN, rng), n_iters=EM_ITERS,
+            tol=FROZEN.em_loglik_tol,
         )
         em_seconds = time.perf_counter() - t0
 
@@ -348,6 +349,7 @@ def part5_sample_efficiency_val(grid, weights, sizes, hidden, n_steps, out,
                 N_COMPONENTS, rho=0.3, var=0.8, rng=train_rng("exp07-init")
             ),
             grid, weights, noisy_groups(A, T_TRAIN, rng), n_iters=em_iters,
+            tol=FROZEN.em_loglik_tol,
             checkpoints=em_ckpts,
         )
         # Resolution and convergence certificate for the EM arm, per selected
@@ -516,6 +518,7 @@ def part2_capacity(grid, weights, n_chains, archs, step_counts, out):
             N_COMPONENTS, rho=0.3, var=0.8, rng=train_rng("exp07-init")
         ),
         grid, weights, noisy_groups(A, T_TRAIN, rng), n_iters=EM_ITERS,
+            tol=FROZEN.em_loglik_tol,
     )
     em_err = float(np.mean([
         evaluate_denoiser(
@@ -583,6 +586,7 @@ def part3_transfer(grid, weights, n_chains, t_probe, hidden, n_steps, out):
             N_COMPONENTS, rho=0.3, var=0.8, rng=train_rng("exp07-init")
         ),
         grid, weights, noisy_groups(A, T_TRAIN, rng), n_iters=EM_ITERS,
+            tol=FROZEN.em_loglik_tol,
     )
     nets = train_nets(A, ("exp07-net", n_chains), hidden, n_steps)
 
