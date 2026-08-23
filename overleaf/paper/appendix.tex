@@ -313,9 +313,39 @@ transition value far in a tail can round to zero while the message it belongs to
 well-normalised. An earlier version of this appendix claimed the recursions ran in the log domain
 and that ``no message underflows''; neither is what the implementation does, and the
 $10^{-14}$ agreement reported below is evidence at the Gaussian configuration tested rather than a
-uniform bound over innovation families, noise levels and fitted kernels. Where that distinction
-could matter --- the narrowest fitted mixture components, the smallest $\Delta_t$, tail
-observations --- it is a limitation, recorded in Appendix~\ref{app:limits} rather than resolved.
+uniform bound over innovation families, noise levels and fitted kernels.
+
+\paragraph{How far from a bound, measured.} Sweeping $\ngrid\in\{201,401,801\}$ and
+$\halfwidth\in\{6,8,10\}$ against a finer reference ($\ngrid=1601$, $\halfwidth=12$), over all
+twelve noise levels and four innovation families, with observations drawn from the prior and again
+conditioned into the tail at ${\sim}3$ standard deviations:
+
+\begin{center}\small
+\begin{tabular}{@{}lcccc@{}}
+\toprule
+worst relative score error at $\ngrid=401,\ \halfwidth=8$
+  & Gaussian & bimodal & Laplace & Student \\
+\midrule
+observations drawn from the prior & $2\times10^{-13}$ & $1\times10^{-15}$
+  & $1\times10^{-5}$ & $\mathbf{9.9\times10^{-4}}$ \\
+observations conditioned into the tail & $2\times10^{-7}$ & $1\times10^{-11}$
+  & $\mathbf{1.7\times10^{-2}}$ & $8.3\times10^{-3}$ \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\noindent The $10^{-14}$ figure is the \emph{best} cell in this table, not a bound on it. Under
+ordinary draws the production grid resolves the whole schedule to $10^{-3}$ or better across every
+family, which is the regime all reported results are in and is the threshold the generator
+enforces. Under tail-conditioned observations the two heavy-tailed families lose two further
+orders. Partial underflow is real rather than hypothetical: up to $0.27\%$ of likelihood entries
+round to exactly zero at the production configuration, rising to $3.8\%$ at $\ngrid=201$ --- always
+under tail conditioning, never under ordinary draws. Boundary mass reaches $4\%$ at the largest
+$t$, where the posterior is widest relative to the window.
+
+None of this moves a reported number, all of which sit in the ordinary-draw regime. It bounds what
+the discretisation claim covers, which the single Gaussian figure did not.
+Section~\ref{app:limits} records the residual limitation.
 
 \begin{figure}[h]
 \centering
