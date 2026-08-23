@@ -128,7 +128,7 @@ ln -sfn '${HOME}/${OUT}' research/nongaussian-bp/outputs-run 2>/dev/null || true
 echo "extracted \$(find research/nongaussian-bp -name '*.py' | wc -l) python files"
 REMOTE
 
-cat > "hpc/.last_deploy.env" <<EOF
+cat > "research/nongaussian-bp/hpc/.last_deploy.env" <<EOF
 # Written by deploy_clean.sh. Source this in a job script.
 NGBP_SRC=${SRC}
 NGBP_OUT=${OUT}

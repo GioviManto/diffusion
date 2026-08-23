@@ -42,6 +42,19 @@ import numpy as np
 from .nnet import time_features
 
 
+def _ein(subscripts: str, *operands: np.ndarray) -> np.ndarray:
+    """`np.einsum` with `optimize=True`, which here is an 18x speedup, not a tweak.
+
+    Every channel mix in this file has the shape (O,C) x (B,C,L) -> (B,O,L).
+    Plain `np.einsum` runs that through its own nested-loop kernel instead of
+    handing it to BLAS: measured at 3.05 ms per call against 0.16 ms with
+    `optimize=True`, at B=C=O=64, L=32. Over a 64,000-step run that is the
+    difference between roughly 3.5 hours and 11 minutes for one candidate --
+    the difference between the architecture sweep being affordable and not.
+    """
+    return np.einsum(subscripts, *operands, optimize=True)
+
+
 def _shift(a: np.ndarray, s: int) -> np.ndarray:
     """Shift along the last axis by `s`, zero-filling: out[..., i] = a[..., i-s]."""
     if s == 0:
@@ -133,21 +146,21 @@ class DilatedConv1d:
         """feat: (B, C_in, L) -> out (B, L), plus cache."""
         p = self.params
         cache = {"feat": feat, "blocks": []}
-        h = np.einsum("hc,bcl->bhl", p[0], feat) + p[1][None, :, None]
+        h = _ein("hc,bcl->bhl", p[0], feat) + p[1][None, :, None]
         h = np.tanh(h)
         cache["stem"] = h
         i = 2
         for d in self.dilations:
             W, b, P, pb = p[i], p[i + 1], p[i + 2], p[i + 3]
             taps = [_shift(h, d), h, _shift(h, -d)]      # sites i-d, i, i+d
-            z = sum(np.einsum("oc,bcl->bol", W[k], taps[k]) for k in range(3))
+            z = sum(_ein("oc,bcl->bol", W[k], taps[k]) for k in range(3))
             z = z + b[None, :, None]
             a = np.tanh(z)
-            proj = np.einsum("oc,bcl->bol", P, a) + pb[None, :, None]
+            proj = _ein("oc,bcl->bol", P, a) + pb[None, :, None]
             cache["blocks"].append({"h_in": h, "taps": taps, "a": a})
             h = h + proj                                  # residual
             i += 4
-        out = np.einsum("oc,bcl->bol", p[i], h) + p[i + 1][None, :, None]
+        out = _ein("oc,bcl->bol", p[i], h) + p[i + 1][None, :, None]
         cache["h_final"] = h
         return out[:, 0, :], cache
 
@@ -158,29 +171,29 @@ class DilatedConv1d:
         g = grad_out[:, None, :]                          # (B,1,L)
 
         i = 2 + 4 * len(self.dilations)
-        grads[i] = np.einsum("bol,bcl->oc", g, cache["h_final"])
+        grads[i] = _ein("bol,bcl->oc", g, cache["h_final"])
         grads[i + 1] = g.sum(axis=(0, 2))
-        gh = np.einsum("oc,bol->bcl", p[i], g)
+        gh = _ein("oc,bol->bcl", p[i], g)
 
         for d, blk in zip(reversed(self.dilations), reversed(cache["blocks"])):
             i -= 4
             W, P = p[i], p[i + 2]
             # residual: gradient flows both to the projection and straight past
             gproj = gh
-            grads[i + 2] = np.einsum("bol,bcl->oc", gproj, blk["a"])
+            grads[i + 2] = _ein("bol,bcl->oc", gproj, blk["a"])
             grads[i + 3] = gproj.sum(axis=(0, 2))
-            ga = np.einsum("oc,bol->bcl", P, gproj)
+            ga = _ein("oc,bol->bcl", P, gproj)
             gz = ga * (1.0 - blk["a"] ** 2)
             grads[i + 1] = gz.sum(axis=(0, 2))
             gtaps = np.zeros_like(blk["h_in"])
             for k, s in enumerate((d, 0, -d)):
-                grads[i][k] = np.einsum("bol,bcl->oc", gz, blk["taps"][k])
+                grads[i][k] = _ein("bol,bcl->oc", gz, blk["taps"][k])
                 # y = _shift(x, s)  =>  dL/dx = _shift(g, -s)
-                gtaps += _shift(np.einsum("oc,bol->bcl", W[k], gz), -s)
+                gtaps += _shift(_ein("oc,bol->bcl", W[k], gz), -s)
             gh = gh + gtaps
 
         gstem = gh * (1.0 - cache["stem"] ** 2)
-        grads[0] = np.einsum("bhl,bcl->hc", gstem, cache["feat"])
+        grads[0] = _ein("bhl,bcl->hc", gstem, cache["feat"])
         grads[1] = gstem.sum(axis=(0, 2))
         return grads
 
@@ -225,8 +238,8 @@ class BiMessagePassing:
         B, _, L = feat.shape
         hf = np.zeros((B, self.hidden, L))
         hb = np.zeros((B, self.hidden, L))
-        xa = np.einsum("hc,bcl->bhl", A, feat)
-        xb = np.einsum("hc,bcl->bhl", Bm, feat)
+        xa = _ein("hc,bcl->bhl", A, feat)
+        xb = _ein("hc,bcl->bhl", Bm, feat)
 
         prev = np.zeros((B, self.hidden))
         for i in range(L):
@@ -238,7 +251,7 @@ class BiMessagePassing:
             nxt = hb[:, :, i]
 
         cat = np.concatenate([hf, hb, feat], axis=1)
-        out = np.einsum("oc,bcl->bol", C, cat) + c[None, :, None]
+        out = _ein("oc,bcl->bol", C, cat) + c[None, :, None]
         return out[:, 0, :], {"feat": feat, "hf": hf, "hb": hb, "cat": cat}
 
     def backward(self, cache, grad_out: np.ndarray) -> list[np.ndarray]:
@@ -247,9 +260,9 @@ class BiMessagePassing:
         Bn, _, L = feat.shape
         g = grad_out[:, None, :]
 
-        gC = np.einsum("bol,bcl->oc", g, cache["cat"])
+        gC = _ein("bol,bcl->oc", g, cache["cat"])
         gc = g.sum(axis=(0, 2))
-        gcat = np.einsum("oc,bol->bcl", C, g)
+        gcat = _ein("oc,bol->bcl", C, g)
         H = self.hidden
         ghf, ghb, gfeat = gcat[:, :H], gcat[:, H:2 * H], gcat[:, 2 * H:].copy()
 
