@@ -355,15 +355,36 @@ def part_screen(cfg, out):
     # Development seeds live above the confirmatory block so the two cannot
     # overlap however the confirmatory range is later sharded.
     dev = range(10_000, 10_000 + cfg["dev_seeds"])
-    rows = []
+
+    # Resume, per candidate. Screening is the longer of the two stages and
+    # writes nothing until it ends, so a wall-clock timeout at hour 70 would
+    # discard all of it AND leave the dependent confirmatory job permanently
+    # unsatisfiable, since `afterok` never fires on TIMEOUT. Flushing per
+    # candidate makes a resubmission continue. The unit is the candidate rather
+    # than the cell because a single candidate is at most ~36 minutes.
+    dest = out / "screening.csv"
+    rows, done = [], set()
+    if dest.exists():
+        import csv as _csv
+        rows = list(_csv.DictReader(dest.open()))
+        done = {(int(r["seed"]), int(r["n_chains"]), r["arch"], r["hp"]) for r in rows}
+        print(f"resuming: {len(done)} candidate(s) already on disk", flush=True)
+
     for seed in dev:
+        todo = [
+            (n, arch, hp)
+            for n in cfg["sizes"] for arch in cfg["screen_arch"]
+            for hp in _candidates(cfg, arch)
+            if (seed, n, arch, json.dumps(hp, sort_keys=True)) not in done
+        ]
+        if not todo:
+            continue
         _, val = _bundle(prior, grid, weights, "exp31-val", seed, cfg["n_val"], T_SCHEDULE)
         _, test = _bundle(prior, grid, weights, "exp31-test", seed, cfg["n_test"], T_SCHEDULE)
-        for n_chains in cfg["sizes"]:
+        for n_chains in sorted({n for n, _, _ in todo}):
             A, _ = _bundle(prior, grid, weights, "exp31-train",
                            (seed, n_chains), n_chains, ())
-            for arch in cfg["screen_arch"]:
-                for hp in _candidates(cfg, arch):
+            for n, arch, hp in [x for x in todo if x[0] == n_chains]:
                     res = _net_arm(cfg, arch, hp, A, val, test, seed)
                     for region in REGIONS:
                         err, ref = map(sum, zip(*res["eval"](region)))
@@ -382,7 +403,8 @@ def part_screen(cfg, out):
                     print(f"  seed={seed} n={n_chains} {arch} {hp} "
                           f"ck={res['checkpoint']}{' CAP' if res['at_cap'] else ''} "
                           f"val={res['val_risk']:.4f}", flush=True)
-    write_csv(out / "screening.csv", rows)
+                    write_csv(dest, rows)
+    write_csv(dest, rows)
     return rows
 
 
