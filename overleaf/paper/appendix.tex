@@ -849,27 +849,21 @@ dominates the prior --- but not as a quantitative one, for the reasons above.
 \label{app:hellinger}
 
 Both kernels are put on the same grid and renormalised under the same quadrature, so the
-comparison measures fit rather than normalisation convention. The scalar reported is the
-\emph{unweighted median over interior parent states}, and its interpretation needs care: absent a
-law over parent states a conditional kernel $\kernel(\cdot\mid a)$ has no canonical scalar
-distance, and an unweighted median over grid columns gives a rarely-visited tail parent the same
-standing as a typical one. It is therefore a diagnostic on the fitted density, not an intrinsic
-distance between transition laws; the trend across $\nseq$ is what we read, not the level.
+comparison measures fit rather than normalisation convention. Absent a law over parent states a
+conditional kernel $\kernel(\cdot\mid a)$ has no canonical scalar distance, and an unweighted
+median over grid columns gives a rarely-visited tail parent the same standing as a typical one ---
+so it was, until this revision, a diagnostic on the fitted density rather than an intrinsic
+distance between transition laws. The intrinsic version is $\E_{A\sim\pi_0}[H(\kernel_{\hat\params}
+(\cdot\mid A), \kernel_0(\cdot\mid A))]$ under the true parent law $\pi_0$, and both are reported
+below, computed by the same run (\texttt{outputs/exp\_07\_certified\_clean\_seed*/}, sixteen
+seeds, clean-deployed and gated; independently verified bit-identical to the certified table's
+own score-based fields, \texttt{outputs/README\_exp07\_certified\_clean.md}).
 
-\begin{center}\small
-\begin{tabular}{@{}lccccccc@{}}
-\toprule
-$\nseq$ & $32$ & $64$ & $128$ & $256$ & $512$ & $1024$ & $2048$ \\
-\midrule
-relative score error & $0.059$ & $0.050$ & $0.034$ & $0.026$ & $0.022$ & $0.016$ & $0.013$ \\
-transition Hellinger & $0.100$ & $0.090$ & $0.076$ & $0.064$ & $0.060$ & $0.052$ & $0.050$ \\
-\bottomrule
-\end{tabular}
-\end{center}
+\input{../shared/sections/tab-hellinger}
 
-\noindent Both fall with $\nseq$, so the transition is being recovered and not merely fitted.
-A $\pi$-weighted variant --- $\E_{A\sim\pi_0}[H^2(\kernel_{\hat\params}(\cdot\mid A),
-\kernel_0(\cdot\mid A))]$ under the true parent-state law --- would be the intrinsic quantity and
-is the right upgrade; it is not computed here.
+\noindent All three rows fall with $\nseq$, so the transition is being recovered and not merely
+fitted. The weighted mean sits consistently a little below the unweighted median --- the parent
+law downweights exactly the tail columns an unweighted vote overweights --- without changing the
+qualitative story.
 
 \input{../shared/sections/tab-aggregation}

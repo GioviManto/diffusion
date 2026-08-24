@@ -216,6 +216,20 @@ else
     echo "$typed" | sed 's/^/         /'
 fi
 
+# 4d. The Hellinger table specifically -- it hid from 4c above once. The check
+# there only matches "between $X$ and $Y$ times", and a row of seven literal
+# decimals under a "transition Hellinger" label is a different shape entirely,
+# so a hand-typed table sat undetected until read by eye. The label may only
+# appear in the generated section; if it appears directly in the paper body,
+# someone pasted the numbers back in.
+helltyped=$(grep -n 'transition Hellinger' "$PAPER" 2>/dev/null || true)
+if [ -n "$helltyped" ]; then
+    fail "the Hellinger row belongs in shared/sections/tab-hellinger.tex, not inline in $PAPER:"
+    echo "$helltyped" | sed 's/^/         /'
+else
+    pass "Hellinger table comes from the generated section, not inline text"
+fi
+
 # 5b. Replicate counts, checked block-aware.
 #
 #     Delegated to a Python checker because a line-based grep cannot tell a
