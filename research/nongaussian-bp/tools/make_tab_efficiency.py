@@ -323,9 +323,14 @@ if WITHDRAWN:
     # disappearing with no trace, since it set the top of the quoted range in
     # earlier drafts.
     _w = ", ".join(f"$\\nseq={n}$" for n in sorted(WITHDRAWN))
+    # \provenanceappendix, not a hard \ref: this file is included by BOTH the
+    # paper and the thesis, and they keep the provenance discussion in
+    # differently-named appendices. A literal label resolves in one document
+    # and prints "??" in the other -- which is how the thesis came to reference
+    # the paper's app:protocol.
     withdrawn_note = (
         f" {_w} was in earlier drafts and is withdrawn "
-        f"(Appendix~\\ref{{app:protocol}})."
+        f"(\\provenanceappendix)."
     )
 
 body = "\n".join(lines)

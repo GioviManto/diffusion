@@ -107,6 +107,11 @@
 % generator: the numbers must be identical in both documents, and a second copy
 % of the file is exactly how they would stop being.
 \providecommand{\nseq}{N}
+% Where THIS document keeps its provenance discussion. Shared generated
+% sections cite it through this macro instead of a literal label, because the
+% paper and the thesis file that material under different appendix names and a
+% hard \ref resolves in one and prints "??" in the other.
+\providecommand{\provenanceappendix}{Appendix~\ref{app:withdrawn}}
 \newcommand{\R}{\mathbb{R}}
 \newcommand{\E}{\mathbb{E}}
 \newcommand{\Prob}{\mathbb{P}}
