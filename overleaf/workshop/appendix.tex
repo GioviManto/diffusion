@@ -39,13 +39,15 @@ law is determined by its first two moments.
 \section{Protocol}
 \label{app:protocol}
 
-One frozen configuration, defined in a single file and imported by every experiment so that no run
-can diverge from it: Laplace chain unless stated, $\corr=0.85$, $\nsites=32$, $\ngrid=401$,
-$\halfwidth=8$, twelve log-spaced noise levels on $[0.05,3.0]$, budgets
-$\nseq\in\{32,\dots,4096\}$, and $256$ held-out sequences on a disjoint seed. The ring uses
-$T=12$. EM stops when the fitted innovation excess kurtosis stops moving,
-$|\Delta\kappa_4|<10^{-3}$, never when $\corr$ does: a settled $\corr$ certifies a
-converged-looking trace over a kernel that is nowhere near converged.
+The reported numbers come from one frozen configuration, defined in a single file and imported by
+the experiments that produce them: Laplace chain unless stated, $\corr=0.85$, $\nsites=32$,
+$\ngrid=401$, $\halfwidth=8$, twelve log-spaced noise levels on $[0.05,3.0]$, budgets
+$\nseq\in\{32,\dots,4096\}$, and $256$ held-out sequences on a disjoint seed. The ring uses $T=12$.
+Both arms select their optimisation budget on a disjoint validation bundle; EM's own internal stop
+is a signed log-evidence tolerance, never $\corr$, since a settled $\corr$ certifies a
+converged-looking trace over a kernel that is nowhere near converged. (An earlier draft stated
+this guard as a fitted-kurtosis threshold; that rule is not implemented and produced no reported
+number -- see the longer paper's protocol appendix for the correction in full.)
 
 \section{Proposition~\ref{prop:lmmse}: hypotheses and proof}
 \label{app:ws-lmmse}
