@@ -146,3 +146,83 @@ def test_a_fitted_mixture_approaches_the_truth_it_was_fitted_to():
     far = MixtureInnovationKernel.init(
         8, rho=0.2, var=3.0, rng=rng_for("hellinger-far"))
     assert _h(near, truth, grid, weights) < _h(far, truth, grid, weights)
+
+
+def test_weighted_summary_matches_unweighted_under_a_uniform_parent_law():
+    """A flat parent law should reduce the weighted stats to the unweighted ones.
+
+    `weights` alone (the quadrature weights, without a parent density) are
+    already non-uniform near the domain edge on some grids, so this test builds
+    a `parent_law` that exactly cancels them -- 1/weights -- making the combined
+    probability mass `weights * parent_law` uniform over grid points. Under that
+    the weighted median and mean should coincide with the plain ones to within
+    the discretisation the two summaries share.
+    """
+    grid, weights = make_grid(8.0, 401)
+    a = GaussianAR1Kernel(RHO, 1 - RHO**2)
+    b = MixtureInnovationKernel.init(8, rho=0.4, var=1.2, rng=rng_for("hellinger-uniform"))
+    flat_law = 1.0 / weights
+    out = transition_hellinger(
+        a.log_transition_matrix(grid), b.log_transition_matrix(grid), grid, weights,
+        parent_law=flat_law,
+    )
+    assert out["hellinger_weighted_mean"] == pytest.approx(out["hellinger_mean"], abs=1e-9)
+    assert out["hellinger_weighted_median"] == pytest.approx(
+        out["hellinger_median"], abs=2.0 / grid.size)
+
+
+def test_weighted_summary_is_pulled_toward_where_the_parent_law_concentrates():
+    """Concentrating parent mass on the worst-fit region should raise the
+    weighted mean, and concentrating it on the best-fit region should lower it
+    -- the property the review asked for: a single number should describe the
+    regime that is actually exercised, not an equal vote per grid point
+    regardless of how much mass ever lands there.
+
+    Two Gaussian AR(1) kernels with different rho are used because their
+    disagreement grows with |u| BY CONSTRUCTION and not by luck: the column at
+    parent u is N(rho*u, q) against N(rho'*u, q), same variance, means rho*u
+    and rho'*u, so the mean gap is |rho-rho'|*|u| and the Hellinger distance
+    between two same-variance Gaussians is a strictly increasing function of
+    the mean gap. So the truth about where the two kernels disagree most (the
+    tails) is known analytically, not just empirically for this one draw.
+    """
+    grid, weights = make_grid(8.0, 401)
+    truth = GaussianAR1Kernel(RHO, 1 - RHO**2)
+    off = GaussianAR1Kernel(RHO - 0.3, 1 - RHO**2)
+
+    default = transition_hellinger(
+        off.log_transition_matrix(grid), truth.log_transition_matrix(grid), grid, weights)
+
+    tail_law = np.where(np.abs(grid) > 4.0, 1.0, 1e-6)
+    core_law = np.where(np.abs(grid) <= 1.0, 1.0, 1e-6)
+    tail_weighted = transition_hellinger(
+        off.log_transition_matrix(grid), truth.log_transition_matrix(grid), grid, weights,
+        parent_law=tail_law)
+    core_weighted = transition_hellinger(
+        off.log_transition_matrix(grid), truth.log_transition_matrix(grid), grid, weights,
+        parent_law=core_law)
+
+    assert tail_weighted["hellinger_weighted_mean"] > default["hellinger_mean"], (
+        "weighting toward a region where the fit is known to be worse should "
+        "not decrease the reported distance"
+    )
+    assert core_weighted["hellinger_weighted_mean"] < tail_weighted["hellinger_weighted_mean"], (
+        "weighting toward the well-fit core should read lower than weighting "
+        "toward the poorly-fit tail -- otherwise the weighting is not doing "
+        "anything the unweighted summary didn't already do"
+    )
+
+
+def test_default_parent_law_is_the_standard_normal():
+    """The documented default -- Var(a_i) = 1 everywhere in this project -- is
+    what actually gets used when no `parent_law` is passed."""
+    grid, weights = make_grid(8.0, 401)
+    a = GaussianAR1Kernel(RHO, 1 - RHO**2)
+    b = MixtureInnovationKernel.init(6, rho=0.3, var=1.0, rng=rng_for("hellinger-default"))
+    implicit = transition_hellinger(
+        a.log_transition_matrix(grid), b.log_transition_matrix(grid), grid, weights)
+    explicit = transition_hellinger(
+        a.log_transition_matrix(grid), b.log_transition_matrix(grid), grid, weights,
+        parent_law=np.exp(-0.5 * grid**2) / np.sqrt(2.0 * np.pi))
+    assert implicit["hellinger_weighted_mean"] == explicit["hellinger_weighted_mean"]
+    assert implicit["hellinger_weighted_median"] == explicit["hellinger_weighted_median"]

@@ -30,6 +30,7 @@ def transition_hellinger(
     grid: np.ndarray,
     weights: np.ndarray,
     interior_frac: float = 0.5,
+    parent_law: np.ndarray | None = None,
 ) -> dict:
     """Hellinger distance between two transition kernels, at the density level.
 
@@ -72,6 +73,29 @@ def transition_hellinger(
     identity. The floor was an artefact of the expression, and it is gone. The
     fitted distances this is used on are ~0.05, so no reported result moves;
     what changes is that a small Hellinger can now be believed.
+
+    THE SUMMARY OVER PARENT STATES WAS ALSO SCOPED, NOT SOLVED (round-two
+    review, "Hellinger", closing paragraph). `hellinger_median` and friends are
+    an UNWEIGHTED median/mean/max over grid columns -- one vote per parent grid
+    POINT, regardless of how much posterior mass ever lands near that parent.
+    Since `grid` is typically wide and evenly spaced while the parent marginal
+    concentrates near zero, this over-weights parents in the tails, which is
+    exactly where a fitted mixture is most likely to disagree with the truth for
+    reasons that have nothing to do with the fit (a component with little
+    support there is barely constrained by the data). A single number meant to
+    say "how well was the transition recovered, in the regime that is actually
+    exercised" should be weighted by the parent LAW, not by the parent grid's
+    point density.
+
+    `parent_law` supplies that weighting: an array of shape `grid.shape` giving
+    the parent marginal density (unnormalised is fine; it is renormalised
+    against `weights` below). Defaults to the standard normal density, which is
+    the right default under this project's convention that `Var(a_i) = 1` at
+    every site (`FrozenConfig.innovation_variance`), so every family here shares
+    the same parent law by construction and a caller does not usually need to
+    pass one. Adds `hellinger_weighted_mean` and `hellinger_weighted_median`
+    without removing the unweighted fields, so existing callers and figures are
+    unaffected; new uses should prefer the weighted ones.
     """
     # Column-normalise under the SAME quadrature both kernels are represented
     # in. Comparing an analytically normalised density against a grid-normalised
@@ -102,6 +126,21 @@ def transition_hellinger(
     )
 
     interior = np.abs(grid) <= interior_frac * float(np.max(np.abs(grid)))
+
+    if parent_law is None:
+        # Standard normal: the shared parent law under Var(a_i) = 1.
+        parent_law = np.exp(-0.5 * grid**2) / np.sqrt(2.0 * np.pi)
+    pw = weights * parent_law
+    pw = pw / pw.sum()  # a probability mass over parent grid points
+
+    # Weighted median: the smallest h such that the weighted CDF reaches 1/2.
+    # Reduces to the ordinary median when pw is uniform, which is the check in
+    # tests/test_hellinger.py that pins this against the unweighted function.
+    order = np.argsort(h)
+    cdf = np.cumsum(pw[order])
+    med_idx = int(np.searchsorted(cdf, 0.5))
+    weighted_median = float(h[order[min(med_idx, len(h) - 1)]])
+
     return {
         "hellinger_median": float(np.median(h)),
         "hellinger_mean": float(h.mean()),
@@ -109,6 +148,8 @@ def transition_hellinger(
         "hellinger_max": float(h.max()),
         "hellinger_median_interior": float(np.median(h[interior])),
         "hellinger_max_interior": float(h[interior].max()),
+        "hellinger_weighted_mean": float((pw * h).sum()),
+        "hellinger_weighted_median": weighted_median,
     }
 
 

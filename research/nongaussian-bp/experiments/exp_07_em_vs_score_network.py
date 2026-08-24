@@ -443,10 +443,19 @@ def part5_sample_efficiency_val(grid, weights, sizes, hidden, n_steps, out,
                 # `em_resolved` false means the narrowest fitted component is
                 # under two grid cells wide, and the row may not be cited.
                 # Density-level recovery for the checkpoint this row reports.
-                # Floor is ~4e-8; anything at that level means "identical to
-                # arithmetic", not a resolved distance.
+                # There is no resolution floor -- see src/metrics.py -- so a
+                # value near 0 means genuinely near-identical, not "at the
+                # limit of what this metric can resolve". That used to be
+                # claimed here (a stale "floor is ~4e-8" comment left over from
+                # before the metric was rewritten to stop losing precision to
+                # cancellation) and it was wrong even before this file existed
+                # in its current form.
                 "em_hellinger": em_density[em_it]["hellinger_median_interior"],
                 "em_hellinger_max": em_density[em_it]["hellinger_max_interior"],
+                # Parent-law-weighted mean, under the default Var(a_i)=1 parent
+                # law (round-two review: the unweighted summary gives a rarely
+                # visited tail parent the same vote as a typical one).
+                "em_hellinger_weighted": em_density[em_it]["hellinger_weighted_mean"],
                 "em_s_min_over_h": em_certificate[em_it]["s_min_over_h"],
                 "em_resolved": int(em_certificate[em_it]["resolved"]),
                 "em_effective_n_components":
