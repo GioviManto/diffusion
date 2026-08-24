@@ -116,6 +116,38 @@ caveat = "" if scaled else (
     " These are pilot numbers at four seeds and are not yet on the frozen "
     "protocol.")
 
+# UNVERIFIABLE PROVENANCE (round-two review §3-4; outputs/README_exp12_scaled.md).
+# Every params file under outputs/exp_12_scaled/ names commit 286b305, which
+# does not define the `eff_seed0` override the recorded command passes --
+# apply_overrides raises SystemExit on an unknown key, so that command could
+# not have run at that commit. The source that produced these numbers is not
+# fully recoverable. This is checked directly rather than inferred from the
+# filename, so the caveat cannot go stale silently once the sweep is rerun
+# through hpc/deploy_clean.sh and actually becomes attributable.
+try:
+    import os
+    sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+    from provenance_gate import load_params, require_clean  # noqa: E402
+    require_clean(load_params([
+        "outputs/exp_12_scaled" if scaled else "outputs/exp_12_receptive_field"
+    ]))
+    provenance_verified = True
+except SystemExit:
+    provenance_verified = False
+except Exception:
+    provenance_verified = False
+
+if not provenance_verified:
+    caveat += (
+        " \\textbf{Provenance not independently verifiable}: the source tree "
+        "recorded a commit that does not define an override the run's own "
+        "command passes (\\texttt{outputs/README\\_exp12\\_scaled.md}), so this "
+        "table cannot be reconstructed from what was written down. Kept for "
+        "continuity, not cited as a certified result; "
+        "\\texttt{experiments/exp\\_31\\_structured\\_baseline.py} is the "
+        "clean-deployed replacement."
+    )
+
 # "the full width" is a claim about the sweep, not a phrase to keep in the
 # caption whatever the data says. At n_sites = 33 a window of 2r+1 covers every
 # site once r >= 16; the pilot stopped at 12 and the sentence would have

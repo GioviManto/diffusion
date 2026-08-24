@@ -805,26 +805,45 @@ the claim-level audit behind this revision is \codefile{REVISION\_AUDIT.md}.
 \label{app:structured}
 
 The headline comparison of Section~\ref{sec:networks} uses a fully connected network, which
-carries no locality prior and no weight sharing. This appendix carries the comparison that
-separates those from the structural assumption, summarised in the body: a weight-shared window
-predictor, its receptive-field radius and its $\varepsilon$/$x_0$ parameterisation both selected
-on a validation bundle disjoint from test, with EM--BP refitted on the same chains so that nothing
-is imported from a different protocol.
+carries no locality prior and no weight sharing. The table below was meant to separate that from
+the structural assumption --- a weight-shared window predictor, radius and parameterisation
+selected on a validation bundle disjoint from test, EM--BP refitted on the same chains --- and its
+caption now carries a correction that has to be read before the numbers are.
+
+\paragraph{This table's provenance could not be verified, and its protocol has three further
+problems.} The run it is generated from names a commit that does not define an override its own
+recorded command passes, so the source that produced it is not reconstructable
+(\texttt{outputs/README\_exp12\_scaled.md} has the detail). Independently of that: the reported
+error is scored at a \emph{single} interior coordinate rather than across the sequence: at
+$\nsites=33$, radius $16$, the interior slice used for scoring is one site wide, not the whole
+chain, so this is a centre-site comparison read as a whole-sequence one. Both network arms train
+for a fixed step count regardless of $\nseq$, so the number of times each training chain is
+presented falls by roughly $32\times$ from $\nseq=32$ to $\nseq=2048$ --- a widening ratio under
+that protocol cannot be separated from the training budget shrinking. And the protocol itself
+differs from the headline table's: $33$ sites, five noise levels and $C=4$, against $32$, twelve
+and $C=8$.
+
+None of that makes the table meaningless --- it is why a stronger baseline than the fully
+connected network narrows the gap is still visible in it, and that is a real, useful qualitative
+finding --- but no number in it should be cited as a certified result, and the main text does not
+cite one.
+\texttt{experiments/exp\_31\_structured\_baseline.py} is the replacement: the headline protocol
+throughout, all-site and predeclared-interior scoring alongside the centre-site diagnostic, both
+arms checkpointed and selected on validation, deployed and gated through
+\texttt{hpc/deploy\_clean.sh} so its provenance is verifiable by construction. It is running as of
+this revision; its results are not yet in this document.
 
 \input{../shared/sections/tab-structured}
 
 \noindent The MLP column is the same architecture as Table~\ref{tab:pointwise} but at this
 experiment's chain length and noise schedule, so the two tables' MLP figures are not directly
-comparable; what is comparable is each row's own three arms.
+comparable; what is comparable is each row's own three arms --- with the caveat above.
 
 The $\cnnlosses$ cells in which the tuned convolution matches or beats EM--BP are not scattered:
 every one is at $\nseq \in \{\cnnlosssizes\}$, the two smallest sizes here, and $\cnnlossloweest$
-of them at the lowest noise level. That is the regime the rest of the paper would predict --- at
-$\nseq=32$ the structured estimator is itself data-starved, and at low noise the likelihood
-dominates the prior, so knowing the transition buys least. The advantage appears as data
-accumulates rather than being present throughout, which is the opposite of what a fixed
-architectural handicap would produce and is the reason the widening in $\nseq$ is the load-bearing
-observation rather than the level.
+of them at the lowest noise level. That pattern is worth recording as a qualitative observation ---
+at $\nseq=32$ the structured estimator is itself data-starved, and at low noise the likelihood
+dominates the prior --- but not as a quantitative one, for the reasons above.
 
 \section{Density-level recovery: the Hellinger figures}
 \label{app:hellinger}

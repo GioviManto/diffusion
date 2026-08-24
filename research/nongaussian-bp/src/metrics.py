@@ -150,6 +150,12 @@ def transition_hellinger(
         "hellinger_max_interior": float(h[interior].max()),
         "hellinger_weighted_mean": float((pw * h).sum()),
         "hellinger_weighted_median": weighted_median,
+        # E_{parent law}[H^2], not (E[H])^2 -- the two differ because squaring
+        # does not commute with averaging (Jensen again). The capacity-
+        # equivalence experiment (round-two review §10.6) names this quantity
+        # specifically, so it is provided directly rather than left for a
+        # caller to reconstruct incorrectly by squaring hellinger_weighted_mean.
+        "hellinger_weighted_mean_sq": float((pw * h**2).sum()),
     }
 
 
