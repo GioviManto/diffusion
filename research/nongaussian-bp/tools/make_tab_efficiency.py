@@ -48,10 +48,36 @@ SOURCE = "outputs/frozen/exp_07_certified_seed*/sample_efficiency_val.csv"
 # 8192 only became affordable once the EM E-step went on the device: until then
 # BP_DEVICE reached bp_grid and denoiser but not src/em.py, so the arm that
 # dominates the cost ran on the CPU whatever partition the job was sent to.
+# nseq=8192 IS WITHDRAWN. Round-two review, blocking item 8.
+#
+# Its params record a tree with 207 uncommitted paths, and unlike the 4096 rows
+# that is not incidental. Intersecting the dirty list with exp_07's fifteen-file
+# import closure (tools/provenance_gate.import_closure) leaves three files that
+# this run actually executes:
+#
+#     experiments/exp_07_em_vs_score_network.py
+#     experiments/frozen_config.py
+#     src/em.py
+#
+# The experiment, the configuration and the EM implementation were all
+# uncommitted. Whatever produced those numbers is not recoverable, and the row
+# sits at the end of the curve where it carries the most rhetorical weight.
+#
+# The 4096 rows stay. Their tree carried eight uncommitted paths and the same
+# intersection is EMPTY -- all eight are wavelet and FID work, none of it on
+# this code path, so no edit in that tree could have moved these numbers. That
+# is a materially weaker defect than 8192's and is disclosed in the caption
+# rather than treated as equivalent. Refusing both alike would be over-strict
+# and, worse, would tell a reader nothing about which is which.
 EXTENDED = (
     "outputs/frozen/exp_07_n4096_seed*/sample_efficiency_val.csv",
-    "outputs/frozen/exp_07_n8192_seed*/sample_efficiency_val.csv",
 )
+WITHDRAWN = {
+    # LaTeX-safe: this string goes straight into a caption, and bare
+    # underscores in text mode are a build error.
+    8192: (r"source tree had \texttt{exp\_07}, \texttt{frozen\_config} and "
+           r"\texttt{src/em.py} uncommitted"),
+}
 
 # nseq=2048 at the raised budget (job 631467), the same seeds and bundles as the
 # certified run. This exists to answer one question and no other: the caption used
@@ -286,6 +312,22 @@ if dropped:
                  f"narrowest fitted mixture component is under two grid cells wide; "
                  f"including them changes no ratio by more than ${max(shifts):.2f}$.")
 
+# A withdrawn row must be visible in the artefact a reader actually looks at.
+# nseq=8192 was in earlier drafts and set the top of the quoted range; deleting
+# it silently would leave anyone who saw those drafts to conclude the number
+# drifted on its own.
+withdrawn_note = ""
+if WITHDRAWN:
+    # A pointer, not the argument: the caption is already dense and the
+    # appendix is where provenance belongs. What must not happen is the row
+    # disappearing with no trace, since it set the top of the quoted range in
+    # earlier drafts.
+    _w = ", ".join(f"$\\nseq={n}$" for n in sorted(WITHDRAWN))
+    withdrawn_note = (
+        f" {_w} was in earlier drafts and is withdrawn "
+        f"(Appendix~\\ref{{app:protocol}})."
+    )
+
 body = "\n".join(lines)
 # `$1,344$` sets the comma as a binary-operator-ish relation with the wrong
 # spacing; `$1{,}344$` is the correct way to write a thousands separator in math
@@ -308,7 +350,7 @@ length, EM--BP its iteration count --- agreeing with the test-set optimum in ${n
 ${em_agree:.1f}\\%$ of cells. EM--BP is more accurate in ${th(n_cells - wins)}$ of ${th(n_cells)}$.
 {ext_phrase} a raised budget, the caps having been set for $\\nseq \\le {CALIB_N}$;
 rerunning $\\nseq = {CALIB_N}$ at that budget on the same seeds moves its ratio by
-${cal_d:+.2f} \\pm {cal_se:.2f}$.{drop_note}}}
+${cal_d:+.2f} \\pm {cal_se:.2f}$.{drop_note}{withdrawn_note}}}
 \\label{{tab:pointwise}}
 \\centering
 \\begin{{tabular}}{{rccc}}

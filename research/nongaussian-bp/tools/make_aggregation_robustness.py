@@ -35,7 +35,10 @@ import numpy as np
 SOURCES = [
     "outputs/frozen/exp_07_certified_seed*/sample_efficiency_val.csv",
     "outputs/frozen/exp_07_n4096_seed*/sample_efficiency_val.csv",
-    "outputs/frozen/exp_07_n8192_seed*/sample_efficiency_val.csv",
+    # nseq=8192 is withdrawn -- see the WITHDRAWN note in make_tab_efficiency.
+    # This must track that file's source list exactly: an aggregation appendix
+    # computed over a different cell set than the table it qualifies would be
+    # worse than no appendix, because it would look like corroboration.
 ]
 BOOT = 20000
 RNG = np.random.default_rng(20260823)

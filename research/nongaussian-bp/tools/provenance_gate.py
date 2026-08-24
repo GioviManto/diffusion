@@ -171,6 +171,74 @@ def require_complete(rows, axes: dict, *, key=lambda r: r) -> None:
         )
 
 
+def import_closure(entry, root=None) -> set[str]:
+    """Every first-party module an experiment can reach, by static import walk.
+
+    Used to turn "the tree was dirty" into "a file THIS run executes was
+    dirty", which are very different facts. The n=4096 rows of the headline
+    table were produced from a tree carrying eight uncommitted paths, all of
+    them wavelet and FID work: none is in exp_07's fifteen-file closure, so no
+    edit could have changed those numbers. The n=8192 rows were produced from a
+    tree with three uncommitted files *on the code path* -- the experiment
+    itself, the frozen configuration, and the EM implementation.
+
+    Refusing both equally is over-strict and, worse, uninformative: it gives a
+    reader no way to tell an irrelevant edit from a fatal one. This is a static
+    over-approximation (it follows imports, not calls) and deliberately so --
+    erring toward including too much is the safe direction here.
+    """
+    import ast
+
+    root = Path(root or Path(__file__).resolve().parents[1]).resolve()
+    seen: set[Path] = set()
+    stack = [Path(entry).resolve()]
+    while stack:
+        f = stack.pop()
+        if f in seen or not f.exists():
+            continue
+        seen.add(f)
+        try:
+            tree = ast.parse(f.read_text())
+        except SyntaxError:
+            continue
+        for node in ast.walk(tree):
+            mods = []
+            if isinstance(node, ast.Import):
+                mods = [a.name for a in node.names]
+            elif isinstance(node, ast.ImportFrom) and node.module:
+                mods = [node.module]
+            for m in mods:
+                for cand in (root / (m.replace(".", "/") + ".py"),
+                             root / "experiments" / (m + ".py")):
+                    if cand.exists():
+                        stack.append(cand.resolve())
+    return {
+        str(p.relative_to(root)) for p in seen
+        if p.is_relative_to(root)
+    }
+
+
+def code_path_dirty(params, closure) -> dict:
+    """Which runs had an uncommitted file on their own execution path.
+
+    Returns {run_name: [paths]} for runs where the intersection is non-empty.
+    An empty result does NOT mean the outputs are reproducible -- it means the
+    dirt is elsewhere, which is a weaker and more honest claim.
+    """
+    out = {}
+    for path, d in params:
+        raw = str(d.get("git_dirty", ""))
+        dirty = [
+            ln.strip().split(None, 1)[-1]
+            for ln in raw.replace(";", "\n").splitlines() if ln.strip()
+        ]
+        dirty = [x.replace("research/nongaussian-bp/", "") for x in dirty]
+        hits = sorted(set(dirty) & set(closure))
+        if hits:
+            out[path.parent.name] = hits
+    return out
+
+
 def certify(dirs, rows, axes, *, allow_legacy=False) -> dict:
     """The whole gate. Returns the provenance a caption should quote."""
     params = load_params(dirs)

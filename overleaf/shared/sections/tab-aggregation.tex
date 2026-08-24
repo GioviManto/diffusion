@@ -29,7 +29,6 @@ $\nseq$ & (1) per-cell & (2) ratio of means & (3) geometric & (4) median
 1024 & $12.5$ & $9.7$ & $10.8$ & $11.1$ & $[10.5,\,14.7]$ \\
 2048 & $15.5$ & $10.0$ & $13.2$ & $12.9$ & $[13.0,\,18.9]$ \\
 4096 & $17.6$ & $12.4$ & $15.6$ & $16.0$ & $[15.4,\,19.9]$ \\
-8192 & $20.2$ & $16.1$ & $18.8$ & $19.5$ & $[18.3,\,22.0]$ \\
 \bottomrule
 \end{tabular}
 \end{center}
@@ -43,7 +42,7 @@ aggregation produces a reversal anywhere.
 But \textbf{the estimand we report is systematically the largest of the
 four}, and by a margin that grows with $\nseq$ --- up to $5.5$ at
 $\nseq=2048$. The ratio of per-seed averaged errors, which is the summary a
-reader is most likely to have in mind, runs $6.6$ to $16.1$
+reader is most likely to have in mind, runs $6.6$ to $12.4$
 rather than $\ratiolo$ to $\ratiohi$.
 
 An earlier version of this appendix attributed that ordering to Jensen's
@@ -63,7 +62,7 @@ falls at both ends. The weakest seed-averaged $(\nseq,t)$ aggregate in the
 grid is $3.6$. That is \emph{not} the weakest individual cell,
 and the two were previously conflated: the weakest individual cell is
 $0.92$, and EM--BP is beaten outright in $2$ of
-the $1,712$ cells summarised here.
+the $1,520$ cells summarised here.
 The estimator's advantage is largest at moderate noise, where the posterior is
 dominated by neither the likelihood nor the prior --- which is where knowing
 the transition structure should help most.

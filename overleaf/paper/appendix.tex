@@ -635,6 +635,21 @@ the build if a third appears. Separately, experiments carrying their own local s
 length, noise grid, architecture sweeps --- are not described by this file at all, so their
 outputs additionally record a digest of the settings actually resolved at run time.
 
+\paragraph{A withdrawn row, and why the neighbouring one stays.} Earlier drafts carried an
+$\nseq=8192$ row, which set the top of the quoted ratio range. It is withdrawn. Its parameter file
+records a source tree with $207$ uncommitted paths, and intersecting that list with the
+experiment's fifteen-file import closure leaves three that the run itself executes: the experiment,
+the frozen configuration, and the EM implementation. The program that produced those numbers is not
+recoverable, and removing the row lowers the top of the range.
+
+The $\nseq=4096$ rows are kept, and the distinction is not special pleading. Their tree carried
+eight uncommitted paths and the same intersection is \emph{empty} --- all eight are wavelet and
+image-metric work, none of it reachable from this experiment --- so no edit in that tree could have
+moved these numbers. ``The tree was dirty'' and ``a file this run executes was dirty'' are
+different facts, and only the second is disqualifying. The check is
+\texttt{tools/provenance\_gate.py}, which computes the closure statically and reports the
+intersection per run rather than refusing every dirty tree alike.
+
 \paragraph{One view per chain.} Each clean chain is noised at \emph{one} level, the chains being
 split evenly across the twelve levels, so a training set of $\nseq$ chains yields exactly $\nseq$
 observations and the likelihood is a genuine one-view marginal likelihood rather than a composite
