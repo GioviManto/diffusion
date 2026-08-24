@@ -8,7 +8,7 @@
 #SBATCH --mem=16G
 #SBATCH --output=/home/3164542/nongaussian-bp/logs/%x_%A_%a.out
 #SBATCH --error=/home/3164542/nongaussian-bp/logs/%x_%A_%a.err
-#SBATCH --array=0-15
+#SBATCH --array=0-15%4
 #SBATCH --propagate=NONE
 #
 # Rerun the certified headline table (16 seeds, sample_efficiency_val) through
@@ -41,6 +41,13 @@
 # Writes beside the frozen outputs, never into them -- diffing against
 # outputs/frozen/exp_07_certified_seed*/ is the whole point, so nothing here
 # may overwrite what it is being compared against.
+#
+# %4: the QOS caps a user at 10 RUNNING jobs total (sacctmgr show qos normal),
+# counted across every job regardless of partition or GPU use. Sixteen array
+# tasks running at once would consume most of that budget and block the
+# exp_31 screen/confirm chain and the M=1201 resolve rerun -- both of which
+# need a GPU slot and matter more than this diagnostic does -- from starting
+# at all. Four concurrent leaves six job slots free for everything else.
 set -euo pipefail
 
 SRC=${NGBP_SRC:?set NGBP_SRC}
