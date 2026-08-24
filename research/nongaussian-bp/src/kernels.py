@@ -544,6 +544,17 @@ class MixtureInnovationKernel:
             n_seq      32    128    512   2048   8192
             % early    15     22     57     78     96
 
+        The n_seq=8192 column is measured from the run later withdrawn from the
+        paper's headline table for a different reason (round-two review item 8:
+        three of its source files were uncommitted -- exp_07_em_vs_score_network.py,
+        frozen_config.py, src/em.py; tools/make_tab_efficiency.py and
+        outputs/README_exp12_scaled.md have the detail). That withdrawal is
+        about whether the score-error numbers in that row are reconstructible,
+        not about whether inner sweeps went negative, and it does not implicate
+        this signed-gain guard, which is a property of the M-step's algebra and
+        not of which commit ran it. Flagged anyway, because the honest answer
+        to "is the 96% figure re-verified under a clean deploy" is not yet.
+
         447 of those cells stop after a SINGLE sweep. So at the sizes carrying
         the headline the tolerance is what stops the loop, not the cap, and the
         opposite claim should not be relied on.
