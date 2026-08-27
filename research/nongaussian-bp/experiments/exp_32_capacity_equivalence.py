@@ -43,10 +43,24 @@ WHAT THIS DOES DIFFERENTLY
 EM iteration budget. The withdrawn shape-based capacity claims used a fixed
 40 iterations, and Section~sec:em-convergence separately measured that the
 fitted SHAPE can need ~2000 to settle while the evidence and rho settle by
-~25-40. Evidence-based conclusions are not the ones that confound was about,
-but this still uses the tolerance-based stop (FROZEN.em_loglik_tol) with a
-generous cap rather than a short fixed count, so a capacity difference cannot
-be an artefact of one C converging and another not.
+~25-40. Evidence-based conclusions are not the ones that confound was about --
+but "not the same confound" turned out not to mean "immune to any confound".
+
+CORRECTION, after the first run at em_cap=400. That run reported C=16 with
+measurably lower held-out evidence and higher score risk than C=8, resolved
+(not just unresolved) against the predeclared equivalence region -- and 0% of
+cells satisfied the formal tol=1e-9 criterion at either capacity. Checking the
+evidence trace directly: at iteration 400, C=8's gain over the last 100
+iterations was 0.025 nats (per-edge gain 9.9e-9, a hair past tolerance,
+practically flat) while C=16's was 0.77 nats over the same window (per-edge
+gain 6.9e-8, thirty times larger). C=16 was still climbing substantially when
+the cap stopped it; C=8 was not. The "C=16 is worse" result at em_cap=400 is
+therefore confounded with C=16 being less converged, which is exactly the
+capacity-vs-convergence-rate confound this experiment exists to avoid, arrived
+at from a different direction than the withdrawn shape claim. `em_cap` is
+raised accordingly, sized from measuring how long C=16 actually takes to reach
+a comparably tight per-edge gain (see the commit message / job log for the
+number used).
 """
 
 from __future__ import annotations
@@ -97,7 +111,16 @@ SETTINGS = dict(
     inits_per_cell=2,
     n_val=512,
     n_test=1024,
-    em_cap=400,
+    # Raised from 400 after the first run showed C=16 still moving 30x faster
+    # than C=8 in the last 100 iterations before the old cap -- see the module
+    # docstring's correction note and outputs/README_exp32_capacity.md. 1200
+    # is not a new number invented for this fix: it is this project's own
+    # established "generous EM cap" (exp_31's and exp_34's checkpoint ladders
+    # both top out here), chosen for consistency rather than picked to force
+    # a particular outcome. fit_em stops on its tol criterion regardless of
+    # the cap, so cells that already converged by 400 (the lower capacities)
+    # are unaffected; only the slow ones get the extra runway they needed.
+    em_cap=1200,
     # Equivalence region, predeclared (round-two review §10.6). Do not tune
     # these after seeing the contrast; that would defeat the point of
     # predeclaring them.
