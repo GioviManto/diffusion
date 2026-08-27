@@ -114,12 +114,20 @@ SETTINGS = dict(
     # Raised from 400 after the first run showed C=16 still moving 30x faster
     # than C=8 in the last 100 iterations before the old cap -- see the module
     # docstring's correction note and outputs/README_exp32_capacity.md. 1200
-    # is not a new number invented for this fix: it is this project's own
-    # established "generous EM cap" (exp_31's and exp_34's checkpoint ladders
-    # both top out here), chosen for consistency rather than picked to force
-    # a particular outcome. fit_em stops on its tol criterion regardless of
-    # the cap, so cells that already converged by 400 (the lower capacities)
-    # are unaffected; only the slow ones get the extra runway they needed.
+    # matches this project's established "generous EM cap" (exp_31's and
+    # exp_34's checkpoint ladders both top out here) and is independently
+    # confirmed by direct measurement: a representative C=16 fit run to 2000
+    # iterations shows gain/edge falling from 6.9e-8 at 400 to ~6e-9 by 800,
+    # then PLATEAUING there through 2000 (6.08e-9 @1200, 5.92e-9 @1600,
+    # 6.09e-9 @2000) -- it never crosses the strict tol=1e-9 threshold, but
+    # 800-1200 already captures essentially all of the real movement. So
+    # `em_converged` will likely still read False for C=16 even here, and
+    # that is expected: this cap targets the practical plateau, not the
+    # formal tolerance, which measurement shows this fit will not reach at
+    # any practical iteration count. fit_em stops on tol regardless of the
+    # cap either way, so cells that already converged by 400 (the lower
+    # capacities) are unaffected; only the slow ones get the runway they
+    # needed to reach THEIR plateau.
     em_cap=1200,
     # Equivalence region, predeclared (round-two review §10.6). Do not tune
     # these after seeing the contrast; that would defeat the point of
