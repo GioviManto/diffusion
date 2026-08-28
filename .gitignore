@@ -45,6 +45,15 @@ research/nongaussian-bp/REVISION
 
 # LaTeX build products. Each document is compiled in its own folder now.
 overleaf/*/main.pdf
+# ...except the four rendered PDFs themselves: tracked deliberately so the
+# thesis, paper, workshop and compendium are readable straight from GitHub
+# without a local build. Keep these current by rerunning overleaf/build.sh
+# and committing the result after any content change -- a stale committed PDF
+# would be worse than none, since a reader has no way to tell it's stale.
+!overleaf/paper/main.pdf
+!overleaf/workshop/main.pdf
+!overleaf/thesis/main.pdf
+!overleaf/compendium/main.pdf
 overleaf/*/*.aux
 overleaf/*/*.bbl
 overleaf/*/*.blg
