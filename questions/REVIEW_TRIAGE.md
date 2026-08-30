@@ -1,5 +1,20 @@
 # Triage of the ChatGPT Pro reviewer pass (30 Aug 2026)
 
+> **STATUS, end of 30 Aug.** Groups A, C and E are done and committed
+> (`a8548ff`, `9bac337`, `86e3b81`, `bf007d3`); all four documents build
+> clean, paper at 9 body pages, thesis at 177. Group B is waiting on the
+> cluster. Group D (length) and the Chapter 7 framing decision are open and
+> need a steer — see the bottom of this file.
+>
+> Two things turned up that the reviewer did not flag and that mattered:
+> `build.sh` could never detect an undefined reference (tectonic keeps the
+> engine log to itself unless `--print` is passed), which is why
+> `rem:asymmetry` rendered as "??" for so long — fixing the gate exposed
+> four dangling refs and a duplicate label. And the sample-efficiency
+> figure was plotting the `nseq=8192` point that the table had withdrawn
+> for unrecoverable provenance, under a caption asserting the two could not
+> disagree.
+
 Source: two reviews requested via `questions/PROMPT_single.md` — a NeurIPS-AC
 review of paper+workshop (score 3/6 weak reject) and a Bocconi committee
 review of the thesis (not ready, major revisions). Full text is in the chat
@@ -160,6 +175,27 @@ Move to `overleaf/compendium/` outright (not just reworded) rather than cut:
   needs actual citations added.
 
 ---
+
+## What is actually left
+
+**Group B — waiting on the cluster.** `exp_32` lane a is complete (70/70 at
+the corrected `em_cap=1200`); lanes b and c are running. `exp_31` — the
+structured-baseline measurement, which is the review's single biggest
+scientific objection — has not started: all six shards are PENDING behind
+priority and node-drain. Every document now says plainly that its results
+are not included, so nothing is blocked on it except the stronger claim
+itself.
+
+**Group D — length.** Thesis is 177pp against the reviewer's suggested
+120–140. The cuts they identify are Chapter 2's background arc, Appendices
+D–F (which re-derive what Ch2 covers), and Appendix B (AMP/TAP). This is a
+large structural change and depends on what you and Marc want the thesis to
+be, so it is not started.
+
+**Chapter 7 framing.** The reviewer says the rotating ring currently reads
+as neither a second major contribution nor a short side study, and that
+either is defensible. They explicitly call this your and Marc's call, not
+theirs.
 
 ## Suggested order of operations, given the 16 Sept deadline
 
