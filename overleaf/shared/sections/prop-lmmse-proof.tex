@@ -3,14 +3,21 @@
 %% limit and a full induction does not belong in it; the STATEMENT, the
 %% projection definition and the hypothesis discussion stay in the body, which
 %% is what a reader needs there.
+%%
+%% INCLUDED BY THE PAPER AND THE WORKSHOP, which do not carry the same
+%% equations: the workshop is a 4pp condensation and drops several the paper
+%% numbers. So refer to objects by name here, never by \eqref to a label that
+%% only one of the two documents defines -- that resolves in the paper and
+%% prints "??" in the workshop, which is how eq:closure came to dangle on
+%% page 5 of it.
 
 \begin{remark}[On the hypotheses]
 \label{rem:lmmse-hyp}
 Four are load-bearing and worth separating. \emph{Finite second moments} are what make $\Pgauss$
 defined at all. \emph{Zero mean} is not cosmetic: the general LMMSE carries
 $\E[\va] + \Cov(\va,\vx)\Cov(\vx)^{-1}(\vx-\E[\vx])$, and \eqref{eq:lmmse} is the centred
-special case. \emph{$\corr\neq0$} is required because the backward map in \eqref{eq:closure}
-divides by $\corr$; at $\corr=0$ the chain has no edges, the sites are independent, and the
+special case. \emph{$\corr\neq0$} is required because the backward map of the Gaussian closure
+recursion divides by $\corr$; at $\corr=0$ the chain has no edges, the sites are independent, and the
 claim holds trivially and separately, each site's posterior mean being the scalar Gaussian
 $e^{-t}\Sig_0(e^{-2t}\Sig_0+\Dt)^{-1}x_i = e^{t}\Sig_0(\Sig_0+\Dt e^{2t})^{-1}x_i$. \emph{Where the projection is applied} matters because
 $\Pgauss$ does not commute with multiplication by the likelihood; Proposition~\ref{prop:lmmse}

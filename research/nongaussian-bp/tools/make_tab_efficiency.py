@@ -312,24 +312,27 @@ if dropped:
                  f"narrowest fitted mixture component is under two grid cells wide; "
                  f"including them changes no ratio by more than ${max(shifts):.2f}$.")
 
-# A withdrawn row must be visible in the artefact a reader actually looks at.
-# nseq=8192 was in earlier drafts and set the top of the quoted range; deleting
-# it silently would leave anyone who saw those drafts to conclude the number
-# drifted on its own.
+# An excluded row must be visible in the artefact a reader actually looks at.
+# nseq=8192 set the top of the quoted range, so dropping it silently would let
+# a reader who saw an earlier circulated draft conclude the number drifted on
+# its own -- and would hide a real limit on what this table covers.
 withdrawn_note = ""
 if WITHDRAWN:
     # A pointer, not the argument: the caption is already dense and the
     # appendix is where provenance belongs. What must not happen is the row
-    # disappearing with no trace, since it set the top of the quoted range in
-    # earlier drafts.
+    # disappearing with no trace.
     _w = ", ".join(f"$\\nseq={n}$" for n in sorted(WITHDRAWN))
     # \provenanceappendix, not a hard \ref: this file is included by BOTH the
     # paper and the thesis, and they keep the provenance discussion in
     # differently-named appendices. A literal label resolves in one document
     # and prints "??" in the other -- which is how the thesis came to reference
     # the paper's app:protocol.
+    # State the exclusion as a current fact about the table, not as a
+    # revision history of it. A production caption should tell a reader what
+    # this table covers and why; which drafts once carried the row is the
+    # compendium's business.
     withdrawn_note = (
-        f" {_w} was in earlier drafts and is withdrawn "
+        f" {_w} was run but is excluded: its source is not recoverable "
         f"(\\provenanceappendix)."
     )
 

@@ -534,13 +534,12 @@ recovered should be stated on the law. The figures, and what the scalar summary 
 mean for a conditional kernel, are in Appendix~\ref{app:hellinger}.
 
 \noindent
-The practical consequence is a stopping rule. The autoregressive coefficient settles roughly an
-order of magnitude sooner than the shape, and a $\corr$-trace looks textbook-converged over a
-kernel that is nowhere near converged. Any stopping rule for this model must therefore be read off
-a \emph{shape} statistic; Appendix~\ref{app:protocol} states the one used, and it is the same rule at
-every rung. The fitted density itself is Figure~\ref{fig:density} in Appendix~\ref{app:rates}; the settling iterations, and
-the clean-against-channel comparison that separates the two slownesses, are
-Appendix~\ref{app:rates}.
+The practical consequence is that no convergence test can be trusted to select the reported model:
+$\corr$ settles roughly an order of magnitude sooner than the shape, so a $\corr$-trace --- or a
+flat likelihood --- looks textbook-converged over a kernel nowhere near converged in the
+coordinate every non-Gaussian claim depends on. Every reported estimator is therefore selected on
+a disjoint validation bundle, at every rung (Appendix~\ref{app:protocol}). The fitted density,
+the settling iterations and the clean-against-channel comparison are Appendix~\ref{app:rates}.
 
 
 \section{What the structure buys}

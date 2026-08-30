@@ -511,8 +511,7 @@ is zero in every run reported here.
 \section{Convergence rates, clean against channel}
 \label{app:rates}
 
-Two slownesses, measured separately, because they are independent and were once confused for one
-another.
+Two slownesses, measured separately, because they are independent and easily conflated.
 
 \paragraph{Optimisation: coordinates of the same kernel settle at very different rates.} Running
 EM to $800$ updates at $\nseq=512$, $\ncomp=8$ and recording the whole parameter trace, we measure
@@ -558,7 +557,7 @@ representation of it.}
 \end{figure}
 
 \section{The fitted rates in the efficiency comparison}
-\label{app:rates}
+\label{app:fitted-rates}
 
 The body reports fitted $\log$--$\log$ slopes of relative denoising error against
 $\nseq$. They are fitted \emph{per seed} and then averaged, not fitted to the
@@ -738,9 +737,9 @@ covariance-stationary rather than strictly stationary. Identifiability is a theo
 conditional at level 2. The implementation is a discretisation whose error, for the Laplace family,
 is second order rather than spectral. Inference costs $O(\nsites\ngrid^{2})$ per sequence, far above
 a network forward pass, so the estimator's advantage is in data and not in wall-clock. And the
-comparison is asymmetric in supplied information by construction (Remark~\ref{rem:asymmetry}): it
-measures what the Markov assumption buys where that assumption holds, and says nothing about a
-setting where it does not.
+comparison is asymmetric in supplied information by construction
+(Section~\ref{sec:networks}): it measures what the Markov assumption buys where that assumption
+holds, and says nothing about a setting where it does not.
 
 \section{Reproducibility map}
 \label{app:repro}

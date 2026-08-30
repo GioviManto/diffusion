@@ -21,14 +21,32 @@ for spec in "${DOCS[@]}"; do
     d="${spec%%:*}"; limit="${spec#*:}"
     printf '%-12s ' "$d"
     log="/tmp/overleaf_$d.log"
-    if ! (cd "$d" && tectonic -k main.tex) > "$log" 2>&1; then
+    # --print is REQUIRED, not cosmetic. Without it tectonic writes a 17-line
+    # summary and keeps the TeX engine's own log to itself, so
+    # "LaTeX Warning: Reference `x' undefined" never reaches this file and the
+    # grep below matches nothing -- for any document, however broken. That is
+    # exactly the green-but-wrong this script exists to catch, and it did not
+    # catch it: `rem:asymmetry` rendered as "??" on page 23 of the paper
+    # through every build until an outside reader pointed at it.
+    if ! (cd "$d" && tectonic -k --print main.tex) > "$log" 2>&1; then
         echo "BUILD FAILED"
         grep -E '^error|^!' "$log" | head -5 | sed 's/^/             /'
         fail=1
         continue
     fi
 
-    undef=$(grep -icE 'undefined (reference|citation)|multiply.defined' "$log" | tr -d ' ')
+    # Only the FINAL TeX pass counts. Tectonic reruns TeX until the .aux
+    # settles and --print concatenates every pass, so pass one -- which runs
+    # before any label exists -- reports every reference in the document as
+    # undefined. Grepping the whole log therefore fires on a perfectly clean
+    # document, which is just as useless as the silent version this replaced:
+    # a check that always says "broken" gets ignored exactly like one that
+    # never does. Take the segment after the last "Running TeX" marker.
+    last_pass=$(awk '/^note: (Re)?[Rr]unning TeX/{buf=""} {buf=buf $0 "\n"}
+                     END{printf "%s", buf}' "$log")
+    undef=$(printf '%s' "$last_pass" \
+            | grep -icE 'undefined (reference|citation)|multiply.defined' \
+            | tr -d ' ')
     # pdfinfo, not `mdls`: mdls reads Spotlight's index, which has not caught up
     # with a PDF written seconds ago and answers "(null)".
     pages=$(pdfinfo "$d/main.pdf" 2>/dev/null | awk '/^Pages:/{print $2}')
