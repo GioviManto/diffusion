@@ -124,13 +124,30 @@ aggregation figure in this thesis is typed. Each is defined once in
 cites the macro. The figures and the tables therefore share a size grid and
 an aggregation rule by construction rather than by inspection.
 
-\paragraph{Withdrawn inputs.} \texttt{nseq}~$=8192$ is excluded from both
+\paragraph{What Table~\ref{tab:pointwise} covers.} Four qualifications, kept
+here rather than in the caption, which had grown into a methods subsection
+set in small type. Both arms select their optimisation budget on a disjoint
+validation bundle --- the network its parameterisation \emph{and} training
+length, EM--BP its iteration count --- and that choice agrees with the
+test-set optimum in $\netagree\%$ and $\emagree\%$ of cells respectively, so
+the protocol is symmetric and the selection is close to an oracle without
+being one. The $\nseq=\extendedn$ row uses a raised budget, the caps having
+been set for $\nseq\le\nseqcalib$; rerunning $\nseq=\nseqcalib$ at that
+budget on the same seeds moves its ratio by $\budgetdelta\pm\budgetdeltase$,
+so the caps are selected without binding. $\ndropped$ of $\ncellstotal$ cells
+are excluded by the resolution gate, because the narrowest fitted mixture
+component is under two grid cells wide; including them changes no ratio by
+more than $\dropshift$. And the network is beaten in all but $2$ of the
+reported cells, both at the smallest sizes ---
+Appendix~\ref{app:aggregation} resolves where the advantage is largest.
+
+\paragraph{Excluded inputs.} $\nseq=8192$ is excluded from both
 Table~\ref{tab:pointwise} and Figure~\ref{fig:em-sample-eff}: the
 intersection of its dirty list with \texttt{exp\_07}'s import closure
 contains the experiment, the frozen configuration and \texttt{src/em.py}
-themselves. The \texttt{nseq}~$=4096$ rows are retained, with the reason
-given in the table caption --- their intersection is empty, so no edit in
-that tree could have moved those numbers.
+themselves, so the run is not recoverable. The $\nseq=4096$ rows are
+retained: their intersection is empty, so no edit in that tree could have
+moved those numbers.
 
 \section{Environment}
 

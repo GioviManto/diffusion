@@ -8,14 +8,11 @@
 %% from exp_07_budget2048_seed*/. Do not hand-edit the numbers; rerun the generator.
 
 \begin{table}[!htbp]
-\caption{Relative denoising error against the deterministic grid-BP reference under the true kernel, averaged over the noise
-schedule; 16 seeds $\pm$ one standard error, aggregated per seed. Both arms are tuned on a
-disjoint validation bundle --- the network selects its parameterisation \emph{and} training
-length, EM--BP its iteration count --- agreeing with the test-set optimum in $81.1\%$ and
-$77.6\%$ of cells. EM--BP is more accurate in $1{,}518$ of $1{,}520$.
-The $\nseq = 4096$ row uses a raised budget, the caps having been set for $\nseq \le 2048$;
-rerunning $\nseq = 2048$ at that budget on the same seeds moves its ratio by
-$-0.16 \pm 0.18$. 16 of 1536 cells are excluded because the narrowest fitted mixture component is under two grid cells wide; including them changes no ratio by more than $0.08$. $\nseq=8192$ was in earlier drafts and is withdrawn (\provenanceappendix).}
+\caption{Relative denoising error against the deterministic grid-BP reference under the true
+kernel, averaged over the noise schedule; 16 seeds $\pm$ one standard error, aggregated
+per seed. Both arms select their optimisation budget on a disjoint validation bundle. EM--BP is
+more accurate in $1{,}518$ of $1{,}520$ cells. Protocol, cell exclusions and
+the budget calibration are in \provenanceappendix.}
 \label{tab:pointwise}
 \centering
 \begin{tabular}{rccc}

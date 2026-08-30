@@ -632,6 +632,19 @@ Separately, experiments carrying their own local settings --- chain length, nois
 architecture sweeps --- are not described by this file at all, so their outputs additionally record
 a digest of the settings actually resolved at run time.
 
+\paragraph{What Table~\ref{tab:pointwise} covers.} Four qualifications, kept here rather than in
+the caption. Both arms select their optimisation budget on a disjoint validation bundle --- the
+network its parameterisation \emph{and} training length, EM--BP its iteration count --- and that
+choice agrees with the test-set optimum in $\netagree\%$ and $\emagree\%$ of cells respectively,
+so the protocol is symmetric and the selection is close to an oracle without being one. The
+$\nseq=\extendedn$ row uses a raised budget, the caps having been set for
+$\nseq\le\nseqcalib$; rerunning $\nseq=\nseqcalib$ at that budget on the same seeds moves its
+ratio by $\budgetdelta\pm\budgetdeltase$, so the caps are selected without binding.
+$\ndropped$ of $\ncellstotal$ cells are excluded by the resolution gate, because the narrowest
+fitted mixture component is under two grid cells wide; including them changes no ratio by more
+than $\dropshift$. And the network is beaten in all but $2$ of the reported cells, both at the
+smallest sizes --- Appendix~\ref{app:aggregation} resolves where the advantage is largest.
+
 \paragraph{An excluded row, and why the neighbouring one stays.} No $\nseq=8192$ row is reported,
 although one was run. Its parameter file records a source tree with $207$ uncommitted paths, and
 intersecting that list with the experiment's fifteen-file import closure leaves three that the run

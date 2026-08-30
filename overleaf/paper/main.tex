@@ -103,7 +103,7 @@ numerically to a validated tolerance once the continuous messages are discretise
 
 We then drop the assumption that the chain's parameters are known and learn them from noised
 sequences alone. Fisher's identity supplies the exact gradient of the marginal log-likelihood from
-a single sum-product pass, with no differentiation through the recursion, so both gradient ascent
+one complete forward--backward pass, with no differentiation through the recursion, so both gradient ascent
 and expectation--maximisation are available; for Gaussian innovations the maximisation step is
 closed form and the two routes reach the same optimum. We prove that single-Gaussian message
 closure computes \emph{exactly} the LMMSE estimator of the covariance-matched Gaussian model, so
@@ -139,22 +139,19 @@ driven by the score $\score(\vx,t)=\nabla_{\vx}\log\Pt(\vx)$, which is learned b
 against the posterior mean of the clean signal.
 
 \paragraph{The puzzle that motivates this.} A network never sees $\Pz$. It sees $\nseq$ samples,
-which is to say the empirical measure $\hat P_0 = \nseq^{-1}\sum_\mu \delta(\cdot - \va^\mu)$, and
-the global minimiser of the denoising objective is the score of \emph{that} --- the empirical
-score, a sum of point masses smoothed by the forward Gaussian. A model attaining it exactly would
-have a reverse process whose fixed points are the training samples, and would generate nothing
-else. Diffusion models nonetheless generate new data, and understanding when they memorise and
-when they generalise is an active question in the statistical mechanics of these models
+the empirical measure $\hat P_0 = \nseq^{-1}\sum_\mu \delta(\cdot - \va^\mu)$, and over an
+unrestricted function class the global minimiser of the denoising objective is the score of
+\emph{that}. A model attaining it exactly, integrated to zero noise, would have a reverse process
+whose fixed points are the training samples and would generate nothing else. Diffusion models
+nonetheless generate new data, and when they memorise rather than generalise is an active question
 \citep{biroli2023,biroli2024dynamical}.
 
-Measuring this is the difficulty. Deciding what a trained network has learned means comparing it
-against the score it \emph{should} have learned, and for realistic data that object is
-unavailable --- so a large error may indicate a poor model or a hard target, and nothing in the
-measurement distinguishes them. Distributions with tractable population scores are scarce, which
-is why the analytical literature leans on Gaussians and Gaussian mixtures. Both are poor probes of
-\emph{structure}: the Gaussian score is linear, so any question about exploiting correlation has a
-degenerate answer, and a mixture score --- nonlinear, through its responsibilities --- is nonlinear
-in the mixture index rather than in any dependence between coordinates.
+Measuring it is the difficulty: deciding what a network has learned means comparing it against the
+score it \emph{should} have learned, and for realistic data that object is unavailable, so a large
+error may indicate a poor model or a hard target with nothing to distinguish them. The tractable
+alternatives are poor probes of \emph{structure}. A Gaussian score is linear, so any question about
+exploiting correlation has a degenerate answer; a mixture score is nonlinear through its
+responsibilities --- in the mixture index, not in any dependence between coordinates.
 
 \paragraph{Why a Markov chain.} Two reasons. Diffusion is applied to sequential data --- video,
 audio, time series --- so a model of correlation along a sequence is the relevant caricature. And
@@ -172,18 +169,15 @@ Gaussian case, where the answer is known in closed form, is what validates that 
 before it is used where the answer is not known.
 
 \paragraph{The question this makes askable.} If the data is Markov, is it \emph{easier to learn}?
-The claim sounds trivial; the content is in saying why, and in measuring it. Sum-product reaches
-the exact score through very simple operations, and it is Markovianity that permits this. So we
-drop the assumption that the chain's parameters are known: keep the recursion, treat the
-transition kernel as unknown, start from a random initialisation, and ascend the likelihood in the
-parameters on a finite sample. Fisher's identity makes the exact gradient available from one
-sum-product pass. The resulting estimator is then compared against networks trained by denoising
-score matching on identical data.
+Sum-product reaches the exact score through very simple operations, and it is Markovianity that
+permits this. So we drop the assumption that the chain's parameters are known: keep the recursion,
+treat the kernel as unknown, start from a random initialisation, and ascend the likelihood on a
+finite sample, with Fisher's identity supplying the exact gradient. The resulting estimator is
+compared against networks trained by denoising score matching on identical data.
 
-\paragraph{One question, asked three times.} Rather than survey what the model can do, we ask a
-single question at three levels of difficulty and derive the answer at each before measuring it.
-The question is: \emph{given only sequences seen through the noising channel, what can be
-recovered?} The three levels are
+Rather than survey what the model can do, we ask one question --- \emph{given only sequences seen
+through the noising channel, what can be recovered?} --- at three levels of difficulty, deriving
+the answer at each before measuring it:
 
 \begin{center}\small
 \begin{tabular}{@{}clll@{}}
@@ -198,23 +192,22 @@ recovered?} The three levels are
 \end{center}
 
 \noindent
-The three share one model, one channel and one estimator, and differ only in how much of the
-transition is withheld; each adds exactly one difficulty to the one below it, and each experiment
-tests a statement derived beforehand.
+The three share one model, one channel and one estimator, differing only in how much of the
+transition is withheld; each adds exactly one difficulty to the one below it.
 
 \paragraph{Contributions.}
 \begin{itemize}\itemsep2pt
-\item An exact denoising reference for a continuous, non-Gaussian, correlated model, with
-      truncation and quadrature error separated and measured, validated against a closed form and
-      against brute-force enumeration (\S\ref{sec:rung0}).
-\item An identification of what single-Gaussian message closure computes on this model: exactly
-      the LMMSE estimator of the covariance-matched Gaussian model
-      (Proposition~\ref{prop:lmmse}), proved directly rather than argued asymptotically.
-\item Estimation of the kernel from noised sequences alone, by gradient ascent or EM, with the
-      exact gradient from one sum-product pass and no differentiation through the recursion
+\item A denoising reference for a continuous, non-Gaussian, correlated model, with truncation and
+      quadrature error separated and measured, validated against a closed form and against
+      brute-force enumeration (\S\ref{sec:rung0}).
+\item An identification of what single-Gaussian message closure computes here: exactly the LMMSE
+      estimator of the covariance-matched Gaussian model (Proposition~\ref{prop:lmmse}), proved
+      directly rather than argued asymptotically.
+\item Estimation of the kernel from noised sequences alone, with the exact gradient from one
+      complete forward--backward pass and no differentiation through the recursion
       (\S\ref{sec:rung1}--\S\ref{sec:rung2}).
 \item A measurement of what supplying that structure is worth against trained denoisers given none
-      of it, with both arms' optimisation budget selected on held-out data (\S\ref{sec:networks}).
+      of it, both arms' budget selected on held-out data (\S\ref{sec:networks}).
 \end{itemize}
 
 \section{Related work}
@@ -227,17 +220,15 @@ target is a posterior mean is Tweedie's formula \citep{robbins1956,miyasawa1961,
 
 \paragraph{Statistical mechanics, and the memorisation question.} The high-dimensional behaviour of
 these models is analysed as a phase-transition problem \citep{biroli2023,biroli2024dynamical,
-achilli2026speciation}, identifying distinct regimes along the schedule and the point past which
-the reverse process commits to a mode. The puzzle above is attacked within it from several
-directions: through training dynamics, where the time to memorise grows with sample size while the
-time to generalise does not \citep{bonnaire2025memorize,favero2025bigger}; through the learned
-representation, geometry-adaptive rather than sample-specific
-\citep{kadkhodaie2024generalization}; through the spectrum of the empirical score
-\citep{achilli2024losing}; and in solvable settings
-\citep{cui2025solvable,raya2023spontaneous,ghio2024sampling}. The window is not clean:
-\citet{garnierbrun2026biased} exhibits a phase where test loss still falls while samples drift
-anomalously close to the training set. Every one of these measures a network against a target
-unavailable in closed form --- which is what the model below supplies.
+achilli2026speciation}. The puzzle above is attacked within it through training dynamics, where the
+time to memorise grows with sample size while the time to generalise does not
+\citep{bonnaire2025memorize,favero2025bigger}; through the learned representation, geometry-adaptive
+rather than sample-specific \citep{kadkhodaie2024generalization}; through the spectrum of the
+empirical score \citep{achilli2024losing}; and in solvable settings
+\citep{cui2025solvable,raya2023spontaneous,ghio2024sampling}, with
+\citet{garnierbrun2026biased} exhibiting a phase where test loss still falls while samples drift
+anomalously close to the training set. Every one measures a network against a target unavailable in
+closed form --- which is what the model below supplies.
 
 \paragraph{Tractable structured data, and architectures that implement inference.} Hierarchical
 generative models supply tractable non-Gaussian families with a phase structure
@@ -257,6 +248,15 @@ forward--backward \citep{baum1970,rabiner1989}, reducing to Kalman and RTS in th
 \citep{kalman1960,rauch1965}. The estimation machinery is EM \citep{dempster1977}, its
 conditional-maximisation variants \citep{wu1983,meng1993}, and Fisher's identity
 \citep{fisher1925,louis1982,cappe2005}.
+
+\paragraph{What is not new here.} The numerics are classical too: messages on a grid, integrated by
+quadrature, is Kitagawa's non-Gaussian state-space smoother \citep{kitagawa1987}, alongside
+Gaussian-sum \citep{alspach1972}, expectation-propagation \citep{minka2001} and Monte Carlo
+\citep{gordon1993} alternatives \citep[see][]{sarkka2013}. Grid BP is Kitagawa's method at each
+diffusion time; Rung~1 is maximum likelihood for a discretised continuous-state HMM, whose
+identifiability under noisy observation is itself studied \citep{allman2009}. The contribution is
+not the estimator but what this model permits: a score known across the whole schedule at a
+controlled tolerance, turning ``what does an approximation cost'' into a measurement.
 
 \section{Setup}
 \label{sec:setting}
@@ -310,8 +310,9 @@ for a finite-state approximation whose error \S\ref{sec:rung0} measures. And Mon
 this note in exactly one place, when a statistic is computed from generated samples; every other
 number comes from deterministic quadrature and carries discretisation error but no sampling error.
 
-\paragraph{Cost.} Direct summation over the $\ngrid^{\nsites}$ joint configurations costs
-$O(\ngrid^{\nsites-1})$ --- about $10^{80}$ terms at $\ngrid=401$, $\nsites=32$. The recursion
+\paragraph{Cost.} The discretised posterior has $\ngrid^{\nsites}$ joint configurations, so one
+site marginal by direct summation fixes that site and sums over the other $\nsites-1$:
+$O(\ngrid^{\nsites-1})$ per marginal, about $10^{80}$ terms at $\ngrid=401$, $\nsites=32$. The recursion
 replaces it with $2(\nsites-1)$ matrix--vector products: $O(\nsites\ngrid^{2})$ time per sequence
 and $O(\nsites\ngrid)$ storage for the messages, plus one shared $O(\ngrid^{2})$ transition
 matrix. Exponential in the chain length becomes linear in it and quadratic in the representation
@@ -493,8 +494,9 @@ is a flexible representation of it rather than the truth in disguise. Identifiab
 correspondingly: finite mixtures are identifiable up to label permutation on the interior of the
 parameter set --- all $\pi_c>0$, the pairs $(\nu_c,s_c)$ distinct \citep{teicher1963,yakowitz1968}
 --- which is exactly where an over-specified $\ncomp$ need not stay. The condition is monitored
-(minimum component mass, minimum width in grid spacings) rather than assumed. This is weaker than
-Rung 1's theorem and stronger than what we can say at Rung 3.
+(minimum component mass, minimum width in grid spacings) rather than assumed. This sits between
+Rung 1's theorem and what could be said for a kernel left unconstrained in shape, where even
+conditional identifiability would not be available.
 
 \paragraph{Why the fourth cumulant, and not some other summary.} A density needs a scalar summary
 to be tracked, and the choice is forced rather than free. Every innovation family used here is
@@ -572,16 +574,15 @@ architectural}, and the residual is a small multiple rather than an order of mag
 structure's worth: a window head trained to a fixed step count sees each chain fewer times as
 $\nseq$ grows, so a residual widening with $\nseq$ cannot be separated from the budget shrinking,
 and its error falls throughout. \emph{Whether the residual reflects optimisation, approximation or
-statistical efficiency is unresolved}, and in particular a residual that widens with $\nseq$ is not
-evidence that the convolution fails to acquire the structure as data grows: this design cannot
-distinguish that mechanism from its own budget schedule. So the scoped statement is: \emph{on this
-family, at these sizes, and with each arm's budget chosen on held-out data, the structured
-estimator attains lower pointwise denoising error at equal training-set size than the networks we
-trained --- by roughly an order of magnitude against a generic function approximator, and by
-considerably less against a structure-aware one.} A window
-head is itself a weak test, since it cannot propagate past its radius however much data it sees;
-architectures that can --- dilated stacks, bidirectional message passing, attention --- are what a
-stronger claim must survive (Section~\ref{sec:limits}).
+statistical efficiency is unresolved}, and a residual widening with $\nseq$ is not evidence that
+the convolution fails to acquire the structure: this design cannot separate that from its own
+budget schedule. So the scoped statement is: \emph{on this family, at these sizes, and with each
+arm's budget chosen on held-out data, the structured estimator attains lower pointwise denoising
+error at equal training-set size than the networks we trained --- by roughly an order of magnitude
+against a generic function approximator, and considerably less against a structure-aware one.} A
+window head is itself a weak test, since it cannot propagate past its radius however much data it
+sees; architectures that can --- dilated stacks, bidirectional message passing --- are what a
+stronger claim must survive (\S\ref{sec:limits}).
 
 
 
@@ -595,11 +596,11 @@ stronger claim must survive (Section~\ref{sec:limits}).
 \section{Limitations and outlook}
 \label{sec:limits}
 
-The model assumes exact first-order Markov structure, and under a non-Markov prior the estimator
-is misspecified in a way more data does not repair: a global latent adds a rank-one term a chain
-absorbs, while long-range precision coupling is not low-rank. Both are measured in the compendium,
-and nine further scope conditions are in Appendix~\ref{app:limits}. The open question is
-architectural: which architectures exploit Markovianity, and at what depth
+The model assumes exact first-order Markov structure, and under a non-Markov prior the estimator is
+misspecified in a way more data does not repair: a global latent adds a rank-one term a chain
+absorbs, while long-range precision coupling is not low-rank. Nine further scope conditions are in
+Appendix~\ref{app:limits}, and the outstanding measurement is Appendix~\ref{app:structured}. The
+open question is architectural: which architectures exploit Markovianity, and at what depth
 \citep{mei2024unet,garnierbrun2024transformers}.
 
 % The closing summary that stood here restated the abstract sentence for
