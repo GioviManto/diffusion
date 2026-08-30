@@ -705,6 +705,61 @@ convergence.
 \codefile{experiments/exp\_27\_shape\_convergence.py} records the whole diagnostic set at every
 evaluated state, which is what the original experiment never did.
 
+\subsection{Pointwise accuracy against generative fidelity}
+\label{sec:corr-dissociation}
+
+\paragraph{The claim.} That pointwise denoising accuracy and generative fidelity
+\emph{dissociate}: that an estimator can be an order of magnitude better at predicting
+$\E[a \mid x]$ and simultaneously worse at generating samples with the right innovation
+shape. This was given as the central finding of the results chapter in circulated drafts of
+both the thesis and the note.
+
+\paragraph{What was wrong.} The same $40$-iteration budget as \S\ref{sec:corr-capacity},
+applied to the one statistic that needed more. The fitted innovation \emph{shape} needs on
+the order of $2000$ iterations to settle while $\corr$ is flat from about iteration $25$, and
+the generative metric is a shape statistic. So the comparison scored converged estimators
+against unconverged ones on precisely the coordinate that had not converged, and the ranking
+it produced is not attributable to the estimators.
+
+This is a confound rather than a refutation --- the dissociation may well be real --- but the
+experiment as run cannot distinguish it from the iteration budget, and that is enough to
+withdraw the claim. It is withdrawn and \textbf{unreplaced}: no corrected version has been
+run at a budget that would settle the question.
+
+\paragraph{The numbers, for the record.} Generated-sample residual excess kurtosis against
+the closed-form target of $1.9098$ derived in \S\ref{sec:corr-generation}, mean over four
+seeds per cell, under the corrected forward-noising protocol (the two network-free arms are
+bit-identical to the earlier protocol, and both trained networks improve under it).
+
+\begin{center}
+\begin{tabular}{@{}rrrl@{}}
+\toprule
+$\nseq$ & EM/BP & CNN & MLP \\
+\midrule
+32   & 0.491 & 0.728 & 14.803\ (2/4 seeds unstable) \\
+128  & 0.814 & 1.293 & 1.441 \\
+512  & 0.897 & \textbf{1.601} & 0.167 \\
+2048 & 0.902 & \textbf{1.572} & \textbf{0.046} \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\noindent The within-arm version was the sharpest form of the claim, and is worth recording
+because it needs no comparison between estimators: at $\nseq=2048$ the global MLP's four
+per-seed generated-kurtosis values were $0.097$, $0.069$, $0.019$ and $-0.002$ --- all
+indistinguishable from a Gaussian generated law --- while its own pointwise error improved
+monotonically over the same range. One estimator disagreeing with itself across two notions
+of correctness as its training data grows. The $40$-iteration confound applies to the arms it
+is compared against, and the proposed mechanism (a better $L_2$ fit to the posterior mean is
+smoother, and a smoother denoiser drives the reverse SDE toward a more Gaussian generated
+law) was never measured directly.
+
+\paragraph{The check that would have caught it.} Any convergence diagnostic on the reported
+statistic itself. Monitoring $\corr$ --- the natural thing to plot, and what was plotted ---
+certifies a run whose shape is still moving, because the two coordinates converge at rates
+differing by a factor of eighty. The lesson generalises past this claim: a convergence check
+must be run on the quantity being reported, not on the parameter that is easiest to watch.
+
 \subsection{The replicate counts the frozen configuration could not reach}
 \label{sec:corr-replicates}
 

@@ -232,10 +232,10 @@ main line rather than on it.
   remain exact, locate the precise step at which closed forms stop, and
   measure the accuracy of Gaussian-projected BP against a numerically
   validated grid implementation of the functional recursion: the median
-  relative score error is $0.39$ at $t = 0.02$ and decays below
-  $10^{-3}$ for $t \gtrsim 0.9$, with the score direction substantially
-  more accurate than its magnitude, in the tested regimes
-  (Chapter~\ref{ch:laplace}).
+  relative score error is $0.24$ at $t = 0.05$, falls below $10^{-2}$ by
+  $t \approx 1$ and below $10^{-3}$ by $t \approx 2.1$, with the score
+  direction substantially more accurate than its magnitude, in the tested
+  regimes (Chapter~\ref{ch:laplace}).
 
   \item In the Gaussian model we prove that the error of a radius-$r$
   local estimator of the score decays as $q(\alpha,t)^r$, and we measure
@@ -284,8 +284,14 @@ are proved for the Gaussian bulk only.
 The learning results (RQ5, RQ6) carry their own limits, and they are
 tighter than the analytical ones. The estimator is given the Markov
 factorisation, the autoregressive form, homogeneity across sites, and an
-innovation family containing the truth; nothing here speaks to a setting
-where those do not hold. The comparison in RQ6 is therefore a measurement
+innovation family flexible enough to represent the truth closely; nothing
+here speaks to a setting where those do not hold. The last of these is a
+representation rather than an exact containment: a $C$-component Gaussian
+mixture does not contain a Laplace density for any finite $C$, so what
+maximum likelihood approaches is the best approximation within the fitted
+family, and the recovery statements of Chapter~\ref{ch:em-results} are
+about specific summaries --- $\alpha$, the innovation variance, its excess
+kurtosis --- rather than about the transition density as a whole. The comparison in RQ6 is therefore a measurement
 of what a correct structural assumption buys on one family, and not
 evidence that likelihood learning through belief propagation is a better
 learning algorithm than score matching --- a distinction the thesis
@@ -349,6 +355,8 @@ structured estimator is compared against trained neural denoisers, both
 pointwise and generatively, along axes of model capacity and of
 misspecification of the Markov assumption itself.
 Chapter~\ref{ch:conclusions} states findings per research question,
-limitations, and the questions that follow. Three appendices collect the
+limitations, and the questions that follow. The appendices collect the
 Gaussian identities with proofs, the AMP/TAP analysis with its exact
-phase boundary, and the reproducibility protocol.
+phase boundary, the reproducibility protocol, the background derivations
+supporting Chapter~\ref{ch:background}, the graphical and rotating-ring
+derivations, and the robustness of the headline aggregation.

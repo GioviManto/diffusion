@@ -15,7 +15,10 @@ Path & Content \\
 \texttt{research/gaussian-bp/} & Gaussian chain note, code, 72-check audit \\
 \texttt{research/bp-from-scratch/} & independent BP derivation and implementation \\
 \texttt{research/unified-note/} & consolidated working note, code, 55-check audit \\
-\texttt{research/nongaussian-bp/} & grid BP vs Gaussian-projected BP experiments \\
+\texttt{research/nongaussian-bp/} & grid BP, EM, and the estimator comparisons \\
+\quad\texttt{src/}, \texttt{experiments/} & implementation and one driver per experiment \\
+\quad\texttt{hpc/}, \texttt{tools/} & deployment/provenance, and the table and figure generators \\
+\quad\texttt{outputs/frozen/} & the certified run directories the generators read \\
 \texttt{research/gaussian-ar1-bp/} & Gaussian AR(1) package (BP $=$ matrix score) \\
 \texttt{research/initial-experiments/} & early experiments and toy-model material \\
 \texttt{research/experiment1-rotating-ring/} & rotating-ring package: code, data, validation \\
@@ -89,11 +92,63 @@ Figure & File & Source of the numbers \\
 \end{tabular}
 \end{center}
 
+\section{The learning experiments of Chapters~\ref{ch:em-method}
+and~\ref{ch:em-results}}\label{sec:repro-learning}
+
+The closed-form and quadrature studies above are deterministic and run on a
+laptop. The estimator comparisons are neither, and they are gated
+differently.
+
+\paragraph{Provenance.} Every reported run is deployed by
+\texttt{hpc/deploy\_clean.sh}, which refuses to build from a dirty tree,
+ships a \texttt{git archive} of the commit rather than the working tree,
+records the SHA-256 of that tarball, and extracts on the cluster under the
+commit id so that a run cannot overwrite or edit its own source. The
+motivating failure is preserved in that script's header: an earlier
+two-step stamp-then-rsync path produced \texttt{outputs/exp\_12\_scaled/},
+whose recorded commit cannot have run the recorded command, and whose
+numbers are therefore not recoverable and are not cited in this thesis.
+\texttt{tools/provenance\_gate.py} intersects a run's recorded dirty-file
+list with the import closure of its own experiment module, so that
+uncommitted work elsewhere in the tree is distinguished from uncommitted
+work on the code path that produced the numbers; the table generators call
+it and mark any figure or table it cannot certify.
+
+\paragraph{Generated numbers.} No efficiency, structured-baseline or
+aggregation figure in this thesis is typed. Each is defined once in
+\texttt{overleaf/shared/sections/} by a generator
+(\texttt{tools/make\_tab\_efficiency.py},
+\texttt{tools/make\_tab\_structured.py},
+\texttt{tools/make\_aggregation\_robustness.py},
+\texttt{tools/make\_figures.py}) reading the frozen outputs, and the prose
+cites the macro. The figures and the tables therefore share a size grid and
+an aggregation rule by construction rather than by inspection.
+
+\paragraph{Withdrawn inputs.} \texttt{nseq}~$=8192$ is excluded from both
+Table~\ref{tab:pointwise} and Figure~\ref{fig:em-sample-eff}: the
+intersection of its dirty list with \texttt{exp\_07}'s import closure
+contains the experiment, the frozen configuration and \texttt{src/em.py}
+themselves. The \texttt{nseq}~$=4096$ rows are retained, with the reason
+given in the table caption --- their intersection is empty, so no edit in
+that tree could have moved those numbers.
+
 \section{Environment}
 
-Python $\geq 3.10$ with NumPy, SciPy, and Matplotlib; no GPU, no neural
-network framework, no stochastic training. All experiments are
-deterministic given the recorded seeds; the error measures of the
-locality and truncation studies are seed-free by construction
-(closed-form traces). The document compiles with a single run of
-\texttt{tectonic main.tex}.
+Python $\geq 3.10$ with NumPy, SciPy, pandas and Matplotlib. The neural
+baselines of Chapter~\ref{ch:em-results} are implemented in pure NumPy
+(\texttt{src/nnet.py} for the fully connected denoiser,
+\texttt{src/seq\_nets.py} and \texttt{src/local\_head.py} for the
+locality-respecting architectures) with an explicit
+\texttt{numpy.random.Generator} driving initialisation and minibatch order,
+so training is stochastic but reproducible from the recorded seed. Two
+optional dependencies are used and neither is on the exactness path: CuPy,
+selected by the \texttt{BP\_DEVICE} environment variable, runs the same
+single BP implementation on a GPU --- \texttt{tests/test\_backend\_parity.py}
+asserts the two devices agree, so a device change fails a test rather than
+moving a number quietly --- and PyTorch, imported lazily in
+\texttt{src/fid.py} alone, for the generative metric. Arithmetic is float64
+throughout.
+
+The sweeps of Chapters~\ref{ch:em-method} and~\ref{ch:em-results} run under
+SLURM from the batch scripts in \texttt{hpc/}, one per experiment. The
+document compiles with a single run of \texttt{tectonic main.tex}.

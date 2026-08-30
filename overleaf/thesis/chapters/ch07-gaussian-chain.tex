@@ -660,19 +660,31 @@ linear in $x$, so the error $m_k - m_k^{(r)} = e^\T x$ has a closed-form
 RMS over the data law, $\mathrm{RMS}_r = \sqrt{e^\T \Sigt e}$, a
 deterministic number with no sampling involved.
 
-\begin{theorem}[Locality error decays as $q^r$]\label{thm:g-locality}
-In the bulk, $\log \mathrm{RMS}_r$ decreases linearly in $r$ with slope
-$\log q(\alpha, t)$: truncating the evidence range costs a factor $q$ per
-discarded frame.
-\end{theorem}
+\begin{proposition}[Geometric locality: influence coefficients]
+\label{thm:g-locality}
+In the bulk, the influence of the observation at distance $d$ on the exact
+posterior mean is $(J^{-1})_{k,k\pm d} \propto q(\alpha,t)^{\,d}$, exactly,
+by Theorem~\ref{thm:g-bulk-cov}. Truncating the evidence at radius $r$
+therefore discards a leading term of order $q^{\,r+1}$.
+\end{proposition}
 
-The mechanism is Theorem~\ref{thm:g-bulk-cov}: the influence of evidence
-at distance $d$ on the posterior mean is proportional to
-$(J^{-1})_{k,k\pm d} \propto q^d$, and the leading discarded evidence sits
-at distance $r+1$. The audit verifies the rate: fitted slopes of
-$\log \mathrm{RMS}_r$ over $r = 2, \dots, 13$ at the centre of a $K = 121$
+What Proposition~\ref{thm:g-locality} controls is the size of the
+\emph{discarded} evidence, and that part is exact. It does not by itself
+prove that the radius-$r$ estimator's error inherits the rate: $m^{(r)}_k$
+is the posterior mean of a \emph{re-normalised} model on the window, so
+truncation changes the boundary conditions as well as removing the leading
+coefficient, and bounding the difference between those two effects is not
+done here.
+
+The rate is instead confirmed numerically, and closely. Fitted slopes of
+$\log\mathrm{RMS}_r$ over $r = 2, \dots, 13$ at the centre of a $K = 121$
 chain match $\log q$ within $0.2\%$ at $t \in \{0.1, 0.5, 2.0\}$
-($\alpha = 0.8$); see Figure~\ref{fig:g-locality}.
+($\alpha = 0.8$); see Figure~\ref{fig:g-locality}, where the dashed lines
+carry the predicted slope with no fitting. The claim this thesis makes is
+therefore: an exact geometric law for the influence coefficients, and a
+measured geometric law with the same rate for the windowed estimator's
+error, over the stated range of $r$. A two-sided bound establishing the
+second from the first is left open.
 
 \begin{figure}[t]\centering
 \includegraphics[width=\linewidth]{fig_local_vs_full.pdf}
@@ -713,8 +725,8 @@ at small $t$ truncating the algorithm beats truncating the answer
 correctly normalised problem on its window, while zeroing entries of an
 inverse produces a matrix that is the inverse of nothing and misstates the
 diagonal. The two coincide at large $t$, where the off-diagonal content
-vanishes. Either error decays geometrically in the allowed range at the
-rate $q(\alpha, t)$ of Theorem~\ref{thm:g-locality}.
+vanishes. Either error is measured to decay geometrically in the allowed
+range at the rate $q(\alpha, t)$ of Proposition~\ref{thm:g-locality}.
 
 \section{Status of the results}\label{sec:g-status}
 
@@ -723,10 +735,12 @@ Exact, by derivation: the score formulas
 \eqref{eq:g-Qt-spec}, the band-fill law \eqref{eq:g-bandfill} as a
 small-$t$ asymptotic, the large-$t$ law \eqref{eq:g-larget}, tree
 exactness and Gaussian closure of BP, the Kalman identification, and the
-bulk formulas \eqref{eq:g-bulk-params}--\eqref{eq:g-bulk-cov} with the
-locality rate. Numerical, within stated grids and tolerances: the
-agreement of the two score routes, the audited band-fill coefficients,
-the locality slopes, and the truncation table. Interpretation, limited to
+bulk formulas \eqref{eq:g-bulk-params}--\eqref{eq:g-bulk-cov}, including
+the $q^d$ decay of the influence coefficients. Numerical, within stated
+grids and tolerances: the agreement of the two score routes, the audited
+band-fill coefficients, the locality slopes of the \emph{windowed
+estimator} (whose rate is measured rather than derived, see
+Proposition~\ref{thm:g-locality}), and the truncation table. Interpretation, limited to
 this model: within the Gaussian benchmark, a local score computation with
 receptive field $r \gtrsim \xi \log(1/\varepsilon)$,
 $\xi = 1/\log(1/q)$, achieves relative error $\varepsilon$, and the

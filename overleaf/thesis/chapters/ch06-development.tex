@@ -1,139 +1,90 @@
-\chapter{Preliminary Work: From Toy Models to a Minimal Model}
+\chapter{The Object of Study, and the Minimal Model}
 \label{ch:development}\label{sec:development}
 
-This chapter records how the questions of Chapter~\ref{ch:intro} took
-their final form: the initial framing, the exploratory models built in
-the first months of the project, the conceptual error those models
-exposed, and the corrections from supervision that fixed the object of
-study. We record this material because each failed formulation
-constrained the next one, and the sequence explains why the final model
-looks the way it does. All preliminary code, interactive laboratories,
-and notes are archived in a dedicated preliminary-work repository
-(\texttt{Score\_Diffusion}, directory \texttt{Toy-models}), kept
-separate from the reproducibility package of Appendix~\ref{app:repro}
-and available together with it.
+Before any of the analysis, two choices have to be justified: that the
+quantity worth studying is the \emph{joint} score of a whole trajectory
+rather than a per-frame score, and that the stationary Gaussian AR(1) chain
+under coordinatewise OU noise is the right model in which to study it. This
+short chapter settles both. The exploratory models that led here, and the
+sequence of formulations they ruled out, are recorded in the companion
+compendium rather than in this document.
 
-\section{The initial framing: dynamic objects}\label{sec:dev-initial}
+\section{Why the joint score}\label{sec:dev-correction}
 
-The project began from a simple observation about the diffusion
-literature. Standard diffusion models generate \emph{static} objects; the
-data we wanted to understand are \emph{dynamic}: a data point is a
-sequence of frames indexed by an internal time $u = 0, 1, \dots, K-1$ (a
-video, a rotating shape, a stochastic trajectory). The naive treatment
-embeds the whole trajectory in $\R^{dK}$ and learns a single monolithic
-score, which ignores the fact that consecutive frames are strongly
-correlated. The initial research hypothesis was correspondingly
-ambitious: that the joint score field of a dynamic object has an internal
-structure of its own, concretely that consecutive frame-blocks of the
-score might be related by a fixed map (a ``propagator''),
+Standard diffusion models generate \emph{static} objects; the data of
+interest here are \emph{dynamic}, a data point being a sequence of frames
+indexed by an internal time $u = 0, 1, \dots, K-1$ --- a video, a rotating
+shape, a stochastic trajectory. Two times therefore appear from the outset,
+and keeping them apart is a permanent discipline of this thesis: the
+\emph{internal} time $u$ of the sequence, and the \emph{diffusion} time $t$
+of the noising channel, which acts independently on every frame.
+
+It is tempting to treat such a trajectory as $K$ separate samples, computing
+each frame's noisy marginal score independently. For the stationary models of
+this thesis that is not merely lossy --- it is empty. Under the
+variance-preserving channel every noisy frame is marginally $\Nd(0,1)$ at
+every diffusion time, so the per-frame marginal score is exactly $-x_k$:
+independent of $t$, independent of the dynamics, and identical for every
+model considered anywhere in this thesis. A per-frame treatment of a
+stationary sequence model cannot distinguish a fast chain from a slow one, or
+a Gaussian innovation from a Laplace one, because it returns the same
+function in all cases.
+
+A sequence is \emph{one} sample from a joint law, and the quantity that
+drives the reverse dynamics is the joint score of the whole noisy trajectory,
+the gradient of $\log P_t(x_0, \dots, x_{K-1})$, whose $k$-th component is a
+conditional expectation over the \emph{full} posterior of the clean frames,
+as in \eqref{eq:tweedie-joint}. All information about temporal structure
+lives in that object and in no marginal of it.
+Chapter~\ref{ch:gaussian} exhibits the contrast in closed form at $K = 2$.
+
+This also settles the shape of the structural question. One might hope that
+consecutive frame-blocks of the score are related by a fixed map, a
+``propagator'',
 \begin{equation}
   \score_{:,u}(x, t) \;\approx\; \mathcal{P}_t\big( \score_{:,u-1}(x, t) \big),
   \label{eq:dev-propagator}
 \end{equation}
-which a learning system could exploit by learning one block and one map
-instead of $K$ blocks. Two distinct times appear already in this
-formulation, and keeping them apart became a permanent discipline of the
-project: the \emph{internal} time $u$ of the sequence, and the
-\emph{diffusion} time $t$ of the noising channel, which acts
-independently on every frame.
-
-\section{The toy models}\label{sec:dev-toys}
-
-The exploratory phase produced seven small, self-contained interactive
-models (browser-based laboratories with exact formulas inside, no neural
-networks), built to make score fields visible before attempting theorems.
-In the numbering of the archive:
-
-\begin{itemize}
-  \item \emph{TM1: the OU channel on one frame.} A single univariate
-  distribution transported by the forward OU flow, with the score and the
-  reverse flow animated. The purpose was calibration: seeing
-  \eqref{eq:pt-convolution} act on a multimodal density, and the reverse
-  drift reassemble it.
-  \item \emph{TM2: two frames, additive dynamics.} The first genuinely
-  dynamic object: $x_1 = x_0 + c + \eta$ with a trimodal prior on $x_0$,
-  constant drift $c$, and Gaussian innovation $\eta$. The joint density
-  $p(x_0, x_1)$ is a product of the prior and the transition kernel, and
-  the two-dimensional joint score is computable in closed form.
-  Figure~\ref{fig:toymodel} shows the object this toy model was built
-  around: the joint density and its score field, whose diagonal
-  orientation is the visible fingerprint of the frame coupling.
-  \item \emph{TM3: rotation observed through OU noise.} The
-  deterministic-dynamics variant of the board models: a planar rotation
-  per frame, with the diffusion channel acting on the coordinates.
-  \item \emph{TM4: bounded deterministic dynamics.} A bouncing cube:
-  a deterministic bounded trajectory, chosen to probe score fields
-  for dynamics with reflections, where the stationary law is far from
-  Gaussian.
-  \item \emph{TM5: two clocks.} Two coupled periodic phases advancing at
-  different rates, the minimal model of a system with two internal
-  frequencies.
-  \item \emph{TM6: the circle prior.} The static circle distribution
-  itself, isolating the geometry of the score of a curved data manifold
-  from any internal dynamics.
-  \item \emph{TM7: the two-frame joint score laboratory.} The synthesis
-  of TM1--TM6 built after the correction described next: an interactive
-  computation of the \emph{joint} two-frame score, with the coupling
-  between frames on explicit display.
-\end{itemize}
+so that a learning system could hold one block and one map instead of $K$
+blocks. What the joint view shows is that the structure worth studying is not
+a map between per-frame scores at all, but the coupling pattern of the joint
+score --- a statement about a matrix in the Gaussian case, and about a
+posterior in general. That is the object the rest of this thesis analyses.
 
 \begin{figure}[t]\centering
 \includegraphics[width=\linewidth]{fig_toymodel_score.pdf}
-\caption{The two-frame toy model (TM2/TM7): $x_1 = x_0 + c + \eta$ with a
-trimodal Gaussian-mixture prior on $x_0$, drift $c = 1$, innovation
-standard deviation $\sigma = 0.45$, after diffusion time $t = 0.15$.
-Left: the noised joint density $p_t(x_0, x_1)$. Right: the joint score
-field $\nabla \log p_t$ (arrows) over the same density (contours). Both
-panels are computed from the closed-form mixture expressions, on a grid;
-the arrows point towards the modes and tilt along the diagonal, the
-visible effect of the coupling between the two frames.}
+\caption{The coupling made visible, in the smallest case where it exists:
+$x_1 = x_0 + c + \eta$ with a trimodal Gaussian-mixture prior on $x_0$, drift
+$c = 1$, innovation standard deviation $\sigma = 0.45$, after diffusion time
+$t = 0.15$. Left: the noised joint density $p_t(x_0, x_1)$. Right: the joint
+score field $\nabla \log p_t$ (arrows) over the same density (contours). Both
+panels are computed from the closed-form mixture expressions on a grid. The
+arrows point towards the modes and tilt along the diagonal, and that tilt is
+the entire effect of the coupling between frames --- it is exactly what the
+per-frame score $-x_k$ discards.}
 \label{fig:toymodel}
 \end{figure}
 
-The toy models delivered the geometric intuition they were built for,
-and one lasting technical observation: everywhere a closed form
-existed, the score's cross-frame components were controlled by the
-\emph{conditional} structure of the joint law, not by the marginal law
-of single frames. The toy models also exposed a conceptual error in
-how the project was computing scores.
-
-\section{The joint-score correction}\label{sec:dev-correction}
-
-In the early experiments, scores were computed \emph{per frame}: each
-frame's noisy marginal was treated as a one-dimensional distribution,
-its score computed independently, and the trajectory treated in effect
-as $K$ separate samples. Supervision corrected the object of study: a
-sequence is \emph{one} sample from a joint law, and the quantity that
-drives the reverse dynamics of the sequence is the joint score of the
-whole noisy trajectory, i.e.\ the gradient of $\log P_t(x_0, \dots,
-x_{K-1})$, whose $k$-th component is a conditional expectation over the
-\emph{full} posterior of the clean frames, as in
-\eqref{eq:tweedie-joint}.
-
-For the stationary models of this thesis the correction changes the
-object of study completely. Under the variance-preserving channel every
-noisy frame is marginally $\Nd(0, 1)$ at every diffusion time, so the
-per-frame marginal score is $-x_k$: independent of $t$, independent of
-the dynamics, identical for every model in this thesis. All information
-about the temporal structure lives in the joint object.
-Chapter~\ref{ch:gaussian} exhibits the contrast in closed form at
-$K = 2$. The correction also reframed the propagator hypothesis
-\eqref{eq:dev-propagator}: the structure worth studying is not a map
-between per-frame scores but the coupling pattern of the joint score,
-which is a statement about a matrix (in the Gaussian case) or about a
-posterior (in general).
-
 \section{The minimal model}\label{sec:dev-minimal}
 
-The joint-score reframing selected the model of the research chapters.
-Among the candidate dynamic objects (circles, rotations, clocks), the
-stationary Gaussian AR(1) chain under coordinatewise OU noise is the
-minimal one in which the joint score is nontrivial yet exactly
-computable: one coupling parameter $\alpha$ for the internal dynamics
-against one noise parameter $t$ for the corruption, linear algebra
-available at every step, and every structural question (coupling range,
-locality, message passing) posable in closed form. The nonlinear board
-models were set aside at that point, deliberately and explicitly, as targets
-for after the solvable case was understood. Chapter~\ref{ch:ring} takes up the
-first of them.
+Among the candidate dynamic objects --- rotations, coupled phases, bounded
+trajectories with reflections, curved data manifolds --- the stationary
+Gaussian AR(1) chain under coordinatewise OU noise is the minimal one in
+which the joint score is nontrivial yet exactly computable: one coupling
+parameter $\alpha$ for the internal dynamics against one noise parameter $t$
+for the corruption, linear algebra available at every step, and every
+structural question (coupling range, locality, message passing) posable in
+closed form.
 
+The requirement doing the work here is \emph{exact computability}. The whole
+programme of this thesis is to measure what approximations cost --- Gaussian
+message closure in Chapter~\ref{ch:laplace}, an estimated transition kernel
+in Chapters~\ref{ch:em-method} and~\ref{ch:em-results}, a finite receptive
+field in Chapter~\ref{ch:gaussian} --- and every one of those measurements
+needs a reference that is known rather than approximated. A model in which
+the answer is available in closed form is not a simplification of the
+question; it is what makes the question answerable at all.
+
+The nonlinear models are set aside at that point deliberately, as targets for
+after the solvable case is understood. Chapter~\ref{ch:ring} takes up the
+first of them.

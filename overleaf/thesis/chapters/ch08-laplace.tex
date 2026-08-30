@@ -19,15 +19,26 @@ message family costs.
 \section{What changes, and what survives}\label{sec:l-model}
 
 The Laplace AR(1) chain replaces the Gaussian innovations of
-\eqref{eq:ar1} with Laplace ones:
+\eqref{eq:ar1} with Laplace ones, keeping the initial law and the
+second-order structure fixed:
 \begin{equation}
-  P_0(a) = \frac{1}{(2b)^K}
-  \exp\!\left( -\frac{1}{b} \sum_{k=0}^{K-1}
-    \big| a_k - \alpha a_{k-1} \big| \right),
-  \qquad a_{-1} := 0 ,
+  a_0 \sim \Nd(0,1), \qquad
+  a_k = \alpha\, a_{k-1} + \varepsilon_k, \qquad
+  \varepsilon_k \sim \mathrm{Laplace}(0, b) \ \text{i.i.d.}, \qquad
+  k = 1,\dots,K-1 ,
   \label{eq:l-chain-prior}
 \end{equation}
-observed through the same per-frame OU channel. Three structural facts
+observed through the same per-frame OU channel. The innovation scale is
+\emph{not} free: $b = \sqrt{(1-\alpha^2)/2}$, so that
+$\operatorname{Var}(\varepsilon_k) = 1-\alpha^2$ and the chain has unit
+marginal variance and $\operatorname{Cov}(a_j,a_k)=\alpha^{|j-k|}$, exactly
+as in the Gaussian case. This is what makes the comparison in this chapter
+a comparison: the Gaussian and Laplace chains agree on every second moment
+and differ \emph{only} beyond them, the innovation's excess kurtosis
+($0$ against $+3$) being the single non-Gaussianity knob. The same
+convention --- Gaussian initial state, variance-matched innovations --- is
+used for every non-Gaussian family in this thesis, and carries forward
+unchanged to the estimated chain of \eqref{eq:em-chain}. Three structural facts
 survive unchanged, because none of them used Gaussianity of the prior.
 The score--posterior identity \eqref{eq:tweedie-joint} holds for any
 $p_0$. The posterior factorises over the same tree-shaped factor graph
@@ -214,7 +225,8 @@ error to be measured, not an identity.
 A change of coordinates shows the obstruction is intrinsic, not an
 artefact of the frame basis. In innovation coordinates $r_0 = a_0$,
 $r_k = a_k - \alpha a_{k-1}$ (unit Jacobian), the prior factorises into
-i.i.d.\ Laplace variables, but the likelihood becomes
+independent variables --- $r_0$ Gaussian and $r_{k\geq1}$ i.i.d.\
+Laplace --- but the likelihood becomes
 $p(x|r) \propto \exp(-\tfrac{\mu^2}{2\Deltat} r^\T L^\T L r
 + \tfrac{\mu}{\Deltat} x^\T L r)$ with $L$ the unit lower-triangular
 map $a = Lr$, and $L^\T L$ is dense. The coupling does not disappear; it
@@ -271,34 +283,40 @@ On the Laplace chain (chain correlation $\alpha = 0.85$, $K = 40$ frames, $60$ t
 $t$, reference $M = 801$), the median relative score error of the
 Gaussian closure is
 \begin{center}
-\begin{tabular}{@{}lcccc@{}}
+\begin{tabular}{@{}lccccc@{}}
 \toprule
-$t$ & $0.02$ & $0.08$ & $0.4$ & $2.4$ \\
+$t$ & $0.05$ & $0.32$ & $0.98$ & $2.07$ & $3.0$ \\
 \midrule
-median relative score error & $0.39$ & $0.17$ & $3.5 \times 10^{-2}$
-& $7.6 \times 10^{-5}$ \\
+median relative score error & $0.24$ & $4.6\times10^{-2}$
+& $6.8\times10^{-3}$ & $2.5\times10^{-4}$ & $7.3\times10^{-6}$ \\
+$\Prob(\mathrm{err} > 0.1)$ & $1.00$ & $0.08$ & $0.00$ & $0.00$ & $0.00$ \\
 \bottomrule
 \end{tabular}
 \end{center}
-with failure probability $\Prob(\mathrm{err} > 0.1)$ equal to $1$ for
-$t \leq 0.08$ and $0$ for $t \geq 0.9$ (Figure~\ref{fig:bp-closure}). The
-closure error is of order tens of percent at small diffusion time and
-decays below $10^{-3}$ once diffusion noise Gaussianises the tilted
-posteriors. Inspection of the worst trials shows the mechanism: the
-reference belief is sharply non-Gaussian, occasionally bimodal; the
-single Gaussian commits to a compromise mean; and
-\eqref{eq:bp-master-error} amplifies the shift. The score
-\emph{direction} is much more robust than its magnitude: the median
-cosine similarity between projected and reference scores is $0.92$ at
-$t = 0.02$ (where the magnitude error is $39\%$), exceeds $0.99$ for all
-$t \geq 0.12$, and the worst single trial of the sweep stays above
-$0.78$. These are numerical observations for the stated parameter ranges,
-not theorems.
+\noindent(Figure~\ref{fig:bp-closure}). Two thresholds are worth separating,
+because they are different statistics and sit an order of magnitude apart in
+$t$. The probability of a trial exceeding $10\%$ relative error first reaches
+zero at $t \approx 0.98$; the \emph{median} error first falls below $10^{-3}$
+only at $t \approx 2.1$. In between --- around $t \approx 1$, where the
+failure probability has already vanished --- the typical error is still
+$\sim\!7\times10^{-3}$.
+
+The closure error is of order tens of percent at small diffusion time and
+decays as diffusion noise Gaussianises the tilted posteriors. Inspection of
+the worst trials shows the mechanism: the reference belief is sharply
+non-Gaussian, occasionally bimodal; the single Gaussian commits to a
+compromise mean; and \eqref{eq:bp-master-error} amplifies the shift. The
+score \emph{direction} is much more robust than its magnitude: the median
+cosine similarity between projected and reference scores is $0.976$ at
+$t = 0.05$ (where the magnitude error is $24\%$), exceeds $0.99$ for all
+$t \geq 0.11$, and the worst single trial of the sweep stays above $0.879$.
+These are numerical observations for the stated parameter ranges, not
+theorems.
 
 \begin{figure}[t]\centering
 \includegraphics[width=0.74\linewidth]{fig_laplace_closure.pdf}
 \caption{Gaussian-closure score error on the Laplace chain
-($\alpha = 0.85$, $K = 40$, $60$ trials per $t$; median and 10--90\%
+($\alpha = 0.85$, $K = 32$, $60$ trials per $t$; median and 10--90\%
 band) against the grid error budget measured on identical data. The
 closure error exceeds the reference error by $10^4$ to $10^7$ at every
 $t$, so the measurement is trustworthy where it is used.}

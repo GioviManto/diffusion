@@ -35,15 +35,17 @@ Chapter~\ref{ch:em-results} answers the \emph{how much}.
 
 \section{Model: an estimated mixture innovation}\label{sec:em-model}
 
-The clean chain is, as in \eqref{eq:l-chain-prior},
+The clean chain is the one of \eqref{eq:l-chain-prior}, in the index
+convention of this chapter,
 \begin{equation}
   a_1 \sim \Nd(0,1), \qquad a_i = \alpha\, a_{i-1} + \varepsilon_i,
   \qquad i = 2,\dots,n,
   \label{eq:em-chain}
 \end{equation}
 with innovations $\varepsilon_i$ i.i.d., mean zero, variance
-$q = 1-\alpha^2$, and now drawn from a member of a \emph{parametric family}
-rather than a fixed law. Forward noising is the coordinatewise
+$q = 1-\alpha^2$ --- the same Gaussian initial state and the same
+variance-matching that Chapter~\ref{ch:laplace} used --- but now drawn from
+a member of a \emph{parametric family} rather than a fixed law. Forward noising is the coordinatewise
 Ornstein--Uhlenbeck channel of Section~\ref{sec:ou},
 $x = e^{-t} a + \sqrt{\Deltat}\,\xi$, unchanged from every earlier chapter.
 
@@ -80,9 +82,8 @@ make the chain strictly stationary: for a non-Gaussian innovation the
 invariant marginal law of the chain is not $\Nd(0,1)$, so fixing $a_1\sim
 \Nd(0,1)$ starts every family off its own invariant distribution. Nothing
 compared in this or the next chapter depends on the distinction, because every
-family compared shares the same $a_1$ and the same covariance structure --- but
-it is worth stating plainly, since an earlier draft of this material claimed
-strict stationarity and that claim was too strong.
+family compared shares the same $a_1$ and the same covariance structure. The
+claim available here is covariance-stationarity, and it is the one used.
 \end{remark}
 
 \section{What remains exact}\label{sec:em-exact}
@@ -138,22 +139,36 @@ inside an optimiser.
 
 The M-step for the mixture kernel is \emph{not} an exact maximisation. Given
 $\Xi(\theta^{(k)})$, updating $(\pi_c,\nu_c,s_c)_{c=1}^C$ exactly would
-require solving a mixture-likelihood problem with its own latent label, so the
-implementation runs four inner conditional-maximisation sweeps instead --- the
-algorithm is therefore generalised EM, or ECM \citep{meng1993maximum}, rather
-than exact EM. Monotone ascent of $\mathcal L$ is guaranteed in theory by the
-standard EM argument applied at the level of the surrogate $Q(\theta \mid
-\theta^{(k)}) = \langle \Xi(\theta^{(k)}), \log K_\theta\rangle$, and was
-checked directly: across an executable audit of the implementation, the
-minimum increase in $Q$ over twelve consecutive steps was $+2.61$ for a
-Gaussian kernel, $+4.34$ for Laplace, and $+4.18$ for an eight-component
-mixture, with zero decreases recorded in every run logged by the project. One
-correctness issue was found and fixed during that audit: two exit paths of
-the fitting routine returned the kernel from one M-step \emph{before} the
-last logged evidence value, so the reported convergence trace never covered
-the model actually returned. The fix makes the returned kernel's evidence
-equal to \texttt{trace.log\_evidence[-1]} by construction, with a regression
-test asserting it.
+require solving a mixture-likelihood problem with its own latent label, so
+the implementation alternates closed-form \emph{conditional} maximisers ---
+the mixture block and $\alpha$ --- until the per-edge gain in $Q$ falls below
+a tolerance or a cap of sixteen sweeps is reached, recording on the returned
+kernel which of the two occurred. The algorithm is therefore generalised EM,
+or ECM \citep{meng1993maximum}, rather than exact EM: a sweep ascends $Q$
+without maximising it.
+
+The cap of sixteen is set by measurement, not convention. Varying only this
+budget at $C=8$, $n=256$, and a fixed outer count of $40$, the fitted
+innovation excess kurtosis moves by $28\%$ between four sweeps and sixteen
+($1.68 \to 2.14$, against a true value of $3.0$) while $\alpha$ moves in the
+fourth decimal --- the same rate asymmetry between shape and correlation that
+Section~\ref{sec:em-convergence} finds in the outer loop, appearing one level
+down. The effect is confined to short outer runs: by $60$ outer iterations
+the two loops substitute for one another and the inner budget stops
+mattering. Sixteen removes the interaction rather than requiring a reader to
+establish which regime a given cell is in.
+
+Monotone ascent of $\mathcal L$ is guaranteed by the standard EM argument
+applied to the surrogate $Q(\theta \mid \theta^{(k)}) = \langle
+\Xi(\theta^{(k)}), \log K_\theta\rangle$ --- ascending $Q$ is all
+monotonicity requires --- and is checked directly: across an executable audit
+of the implementation, the minimum increase in $Q$ over twelve consecutive
+steps was $+2.61$ for a Gaussian kernel, $+4.34$ for Laplace, and $+4.18$
+for an eight-component mixture, with zero decreases recorded in any logged
+run. The returned kernel's evidence equals
+\texttt{trace.log\_evidence[-1]} by construction, with a regression test
+asserting it, so the reported convergence trace always describes the model
+actually returned.
 
 \section{The numerical representation: grid BP, again}\label{sec:em-numerical}
 
@@ -169,7 +184,8 @@ percentile from $2.7\times10^{-4}$ to $1.5\times10^{-8}$, and neither depends on
 the grid resolution $M$. The gap between the two rows matters, because a figure
 read off a single trajectory sits near the median and so understates the tail by
 two orders of magnitude. Quadrature error, from the
-finite spacing $h=2A/M$ on an otherwise exact interior update, falls as
+finite spacing $h=2A/(M-1)$ --- the grid holds $M$ points including both
+endpoints --- on an otherwise exact interior update, falls as
 $O(h^2)$: a factor of four per halving of $h$, matching the trapezoidal
 rate on a smooth integrand. At the working configuration used for every
 experiment in this and the next chapter, $M=401$, $A=8$, both sources sit far

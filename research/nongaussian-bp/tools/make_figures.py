@@ -141,25 +141,25 @@ def fig_closure() -> None:
 def fig_sample_efficiency() -> None:
     """The same data, protocol and estimand as Table~\\ref{tab:pointwise}.
 
-    THIS USED TO READ A DIFFERENT RUN FROM THE TABLE IT SITS BESIDE.
-    `outputs/replicates/merged_summary.csv` is a six-seed, pre-certification
-    sweep that stops at nseq=4096; the certified table is sixteen seeds and runs
-    to 8192. So the thesis showed a figure and a table, adjacent, drawn from
-    different experiments at different replicate counts -- and because the
-    figure plotted posterior-mean error while the table reports score error,
-    the disagreement did not even look like one. Nothing was wrong with either
-    number; they were answers to different questions presented as one.
-
-    Reading the certified directories directly, with the seed-first aggregation
-    the table uses, is the only way the two can be guaranteed to agree. The
+    The figure reads the certified directories directly, with the seed-first
+    aggregation the table uses, so that the two are guaranteed to agree. The
     estimand is score error, matching the table.
+
+    THE SIZE GRID MUST MATCH make_tab_efficiency.py. nseq=8192 is withdrawn
+    there (its source tree had exp_07, frozen_config and src/em.py all
+    uncommitted, so the run is not recoverable) and is therefore not plotted
+    here either. It used to be: the table stopped at 4096 while the curve
+    beside it ran to 8192, so the figure displayed, at the far right where it
+    carries the most rhetorical weight, the one point the table had removed
+    for being unreproducible. A caption asserting the two cannot disagree does
+    not make them agree.
     """
     import glob
 
+    # Keep in step with EXTENDED/WITHDRAWN in make_tab_efficiency.py.
     patterns = [
         "frozen/exp_07_certified_seed*/sample_efficiency_val.csv",
         "frozen/exp_07_n4096_seed*/sample_efficiency_val.csv",
-        "frozen/exp_07_n8192_seed*/sample_efficiency_val.csv",
     ]
     rows = []
     for pattern in patterns:

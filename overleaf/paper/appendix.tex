@@ -26,11 +26,11 @@ $\tmin,\ \tmax$ & reverse-integration endpoints & $\lmmse$ & LMMSE estimator \\
 \end{tabular}
 \end{center}
 
-Two symbols carry a history worth stating, because an earlier draft of this work used them
-differently. \textbf{$\kernel$ always means the transition kernel} and never a grid size; the
-grid size is always $\ngrid$. The ambient dimension is written $\nsites$ because it \emph{is} the
-chain length and every graphical-model statement is indexed by sites; the diffusion literature
-more often writes $n$ for the sample count, which here is $\nseq$.
+Two symbols are worth pinning down, because neighbouring literatures use them differently.
+\textbf{$\kernel$ always means the transition kernel} and never a grid size; the grid size is
+always $\ngrid$. The ambient dimension is written $\nsites$ because it \emph{is} the chain length
+and every graphical-model statement is indexed by sites; the diffusion literature more often
+writes $n$ for the sample count, which here is $\nseq$.
 
 \subsection{Time orientation and the reverse SDE}
 
@@ -326,10 +326,10 @@ of every message at unity, so no message vanishes as a whole.
 
 It does not, however, guarantee that no individual entry underflows: a single likelihood or
 transition value far in a tail can round to zero while the message it belongs to remains
-well-normalised. An earlier version of this appendix claimed the recursions ran in the log domain
-and that ``no message underflows''; neither is what the implementation does, and the
-$10^{-14}$ agreement reported below is evidence at the Gaussian configuration tested rather than a
-uniform bound over innovation families, noise levels and fitted kernels.
+well-normalised. The recursion is scaled, not logarithmic, so this is a real possibility and is
+measured below rather than excluded by construction. The $10^{-14}$ agreement reported below is
+correspondingly evidence at the Gaussian configuration tested, not a uniform bound over innovation
+families, noise levels and fitted kernels.
 
 \paragraph{How far from a bound, measured.} Sweeping $\ngrid\in\{201,401,801\}$ and
 $\halfwidth\in\{6,8,10\}$ against a finer reference ($\ngrid=1601$, $\halfwidth=12$), over all
@@ -358,28 +358,24 @@ Partial underflow is real rather than hypothetical: up to $0.27\%$ of likelihood
 exactly zero at the production configuration, rising to $3.8\%$ at $\ngrid=201$ --- always under
 displacement, never under ordinary draws.
 
-\paragraph{Two corrections to how this was measured.} The stress row is a three-standard-deviation
-\emph{displacement} of the whole chain, not conditioning on a tail event of the prior: a translate
-and a conditional law are different objects, and only the first was computed. It is a legitimate
-stress test and is named as one.
+\paragraph{What the stress row is, exactly.} It is a three-standard-deviation
+\emph{displacement} of the whole chain, not conditioning on a tail event of the prior. A translate
+and a conditional law are different objects, and it is the translate that is computed: a
+legitimate stress test, named as one.
 
-Second, an earlier version of this section reported that ``boundary mass reaches $4\%$ at the
-largest $t$''. That number came from a quantity that was not a boundary mass of anything the
-recursion propagates --- the diagnostic multiplied the unary likelihood by a column-wise maximum of
-the transition matrix and normalised, involving no forward message, no backward message, no
-quadrature weights and no initial law. It is withdrawn. Measured inside the recursion instead, on
-the objects BP actually carries, the worst forward-message edge occupancy over the schedule is
-$\gcfwdedge$ and the worst node-belief edge occupancy is $\gcbeledge$, both over $\gccells$
-production cells --- two to three orders below the figure previously quoted. The evidence
-diagnostic named in the generator's own header was likewise never computed; it now is, and the
-worst per-site log-evidence shift against the reference resolution is $\gcworstev$ nats.
+\paragraph{Boundary occupancy, measured inside the recursion.} The quantity that matters is how
+much mass the objects BP actually propagates place at the edge of the domain, so it is measured on
+those objects rather than on a proxy assembled from the likelihood and the transition matrix. The
+worst forward-message edge occupancy over the schedule is $\gcfwdedge$ and the worst node-belief
+edge occupancy is $\gcbeledge$, both over $\gccells$ production cells. The worst per-site
+log-evidence shift against the reference resolution is $\gcworstev$ nats.
 
-\paragraph{The regime that had not been tested, and what it shows.} The families exercised here
-were four analytic priors. The kernels the reported runs actually use are \emph{fitted} mixtures,
-which can place a component far narrower than any smooth law --- and the narrowest component
-relative to the mesh is precisely what the grid must resolve, so the untested case was the one most
-likely to fail. Adding a fitted mixture with a component two grid cells wide changes the picture in
-one place and not the other. Under ordinary draws it is unremarkable and the schedule still
+\paragraph{Fitted kernels, the hardest case for the grid.} The families above are four analytic
+priors, but the kernels the reported runs actually use are \emph{fitted} mixtures, which can place
+a component far narrower than any smooth law. Since the narrowest component relative to the mesh is
+precisely what the grid must resolve, this is the case most likely to fail and is tested directly.
+Adding a fitted mixture with a component two grid cells wide changes the picture in one place and
+not the other. Under ordinary draws it is unremarkable and the schedule still
 resolves to $\gcworstord$. Under three-standard-deviation displacement at the narrowest domain
 tried ($\halfwidth=6$) it is the worst cell in the entire sweep, with $96\%$ of node-belief mass
 against the boundary: a narrow component displaced toward the edge of a too-small window is not
@@ -485,9 +481,11 @@ sense of Appendix~\ref{app:exactness}(ii). Implementation \coderef{src/em.py}{e\
       closed form, for at most \textbf{sixteen} inner sweeps, stopping early when the per-edge
       gain in $\Qfun$ drops below $10^{-8}$. This increases $\Qfun$
       without maximising it: \textbf{generalised EM / ECM} \citep{meng1993}, not exact EM.
-      The cap was four in an earlier draft, which measurably under-converged the innovation
-      shape whenever the outer loop was also cut short --- the coordinate every non-Gaussian
-      claim depends on --- so the budget is reported here rather than left as a default.
+      Sixteen is chosen by measurement: at four sweeps the fitted innovation excess kurtosis
+      is $28\%$ below its value at sixteen whenever the outer loop is also cut short, while
+      $\corr$ moves in the fourth decimal --- the same shape-versus-correlation rate asymmetry
+      the outer loop shows, one level down. Since shape is the coordinate every non-Gaussian
+      claim depends on, the budget is reported here rather than left as a default.
       Because each block is a conditional \emph{maximiser}, $\Qfun$ cannot decrease along an
       inner sweep; the implementation raises rather than stopping if it ever does, and across
       the certified fits it never has.
@@ -547,8 +545,8 @@ The clean arm sits on the parametric $\nseq^{-1/2}$ to two decimal places on bot
 which is the check that the estimator itself is not the bottleneck; the noised arm is slower, and
 more so on the shape than on the correlation. Note that the clean arm is \emph{not} flat in
 $\nseq$ --- its error falls by a factor of $3.4$ on $\corr$ and $4.3$ on the variance across the
-range --- which is worth stating explicitly because an earlier three-replicate version of this
-comparison appeared flat and was misread as a discretisation floor.
+range. This is worth stating explicitly: a flat clean arm would indicate a discretisation floor,
+and at three replicates the curve is noisy enough to look flat when it is not.
 
 \begin{figure}[t]
 \centering
@@ -626,21 +624,22 @@ the experiments that produce them: Laplace chain unless stated, $\corr=0.85$, $\
 $\ngrid=401$, $\halfwidth=8$, twelve log-spaced noise levels on $[0.05,3.0]$, sixteen replicates,
 and $256$ held-out sequences on a disjoint seed.
 
-Two qualifications, because the stronger claim --- that no run can diverge from the file --- has
-twice been false. A declared field is not necessarily a \emph{read} field: importing a
-configuration does not make the code consult it, and the provenance stamp compares the
-configuration against itself, so it cannot see a setting nobody reads. Two such fields survive
-today and are listed as defects in \texttt{tests/test\_frozen\_config\_is\_read.py}, which fails
-the build if a third appears. Separately, experiments carrying their own local settings --- chain
-length, noise grid, architecture sweeps --- are not described by this file at all, so their
-outputs additionally record a digest of the settings actually resolved at run time.
+Two qualifications limit how much the frozen file guarantees on its own. A declared field is not
+necessarily a \emph{read} field: importing a configuration does not make the code consult it, and
+the provenance stamp compares the configuration against itself, so it cannot see a setting nobody
+reads. Two such fields exist today and are listed as defects in
+\texttt{tests/test\_frozen\_config\_is\_read.py}, which fails the build if a third appears.
+Separately, experiments carrying their own local settings --- chain length, noise grid,
+architecture sweeps --- are not described by this file at all, so their outputs additionally record
+a digest of the settings actually resolved at run time.
 
-\paragraph{A withdrawn row, and why the neighbouring one stays.} Earlier drafts carried an
-$\nseq=8192$ row, which set the top of the quoted ratio range. It is withdrawn. Its parameter file
-records a source tree with $207$ uncommitted paths, and intersecting that list with the
-experiment's fifteen-file import closure leaves three that the run itself executes: the experiment,
-the frozen configuration, and the EM implementation. The program that produced those numbers is not
-recoverable, and removing the row lowers the top of the range.
+\paragraph{An excluded row, and why the neighbouring one stays.} No $\nseq=8192$ row is reported,
+although one was run. Its parameter file records a source tree with $207$ uncommitted paths, and
+intersecting that list with the experiment's fifteen-file import closure leaves three that the run
+itself executes: the experiment, the frozen configuration, and the EM implementation. The program
+that produced those numbers is not recoverable, so the row is excluded from
+Table~\ref{tab:pointwise} and from every figure drawn on the same grid; it would otherwise have
+set the top of the quoted ratio range.
 
 The $\nseq=4096$ rows are kept, and the distinction is not special pleading. Their tree carried
 eight uncommitted paths and the same intersection is \emph{empty} --- all eight are wavelet and
@@ -657,25 +656,27 @@ objective over repeated views of the same latent sequence. This costs resolution
 --- at $\nseq=32$ a level carries two or three chains --- and it is what makes $\nseq$ a count of
 independent latent sequences, so that the sample-efficiency axis means what it says.
 
-\paragraph{The stopping rule, stated once, and a correction.} Earlier versions of this appendix
-stated that EM stops when the fitted innovation excess kurtosis stops moving,
-$|\Delta\kappa_4|<10^{-3}$. \textbf{That rule is not implemented and no reported number was
-produced by it.} A threshold of that name is declared in the configuration file, and nothing reads
-it. What \texttt{fit\_em} actually does is stop when the signed log-evidence gain per transition
-falls in $[0,10^{-9}]$ --- signed, so a decrease is recorded as a defect rather than accepted as
-convergence --- subject to a cap of $400$ iterations, after which the run is labelled
-\emph{censored} rather than converged. The headline estimator does not rely on that rule at all:
-it selects an iteration count on the disjoint validation bundle, exactly as the network arm
-selects its training length.
+\paragraph{The stopping rule, and what actually gates a reported number.} Two mechanisms are in
+play and only the second determines any headline result.
 
-Shape convergence is monitored, and the monitoring is why the discrepancy matters rather than
-being a typographical slip. The coordinates converge at very different rates: at $\corr=0.85$,
-$\nseq=512$, $C=8$ the autoregressive coefficient is flat from iteration ${\sim}25$ while the
-fitted excess kurtosis reads $0.84$ at $30$ iterations, $1.85$ at $60$, $2.30$ at $120$ and $2.29$
-at $400$. Stopping on $\corr$ would therefore certify a kernel still missing a third of the
-higher-order structure, which is why it is not permitted anywhere. But the remedy the text
-described was never wired in, and the actual guard against that failure is the validation
-selection, not a kurtosis threshold.
+\texttt{fit\_em} stops when the signed log-evidence gain per transition falls in $[0,10^{-9}]$ ---
+signed, so a decrease is recorded as a defect rather than accepted as convergence --- subject to an
+iteration cap supplied by the caller, after which the run is labelled \emph{censored} rather than
+converged. This is a diagnostic: it says whether a fit ran to a flat likelihood, and nothing more.
+
+The headline estimator does not rely on it. It selects an iteration count on the disjoint
+validation bundle, from the grid listed below, exactly as the network arm selects its training
+length --- so the reported model is chosen by held-out risk, not by a convergence test, and a
+censored fit is not thereby disqualified.
+
+That distinction carries real weight here, because the coordinates converge at very different
+rates: at $\corr=0.85$, $\nseq=512$, $C=8$ the autoregressive coefficient is flat from iteration
+${\sim}25$ while the fitted excess kurtosis reads $0.84$ at $30$ iterations, $1.85$ at $60$,
+$2.30$ at $120$ and $2.29$ at $400$. A likelihood- or $\corr$-based stopping rule would certify a
+kernel still missing a third of the higher-order structure. Validation selection is what guards
+against that, and it is the guard every reported number passes through. The configuration file
+also declares a shape-based threshold, $|\Delta\kappa_4|<10^{-3}$; nothing reads it, it is one of
+the two unread fields recorded above, and no reported number was produced by it.
 
 \begin{center}
 \small
@@ -805,45 +806,39 @@ the claim-level audit behind this revision is \codefile{REVISION\_AUDIT.md}.
 \label{app:structured}
 
 The headline comparison of Section~\ref{sec:networks} uses a fully connected network, which
-carries no locality prior and no weight sharing. The table below was meant to separate that from
-the structural assumption --- a weight-shared window predictor, radius and parameterisation
-selected on a validation bundle disjoint from test, EM--BP refitted on the same chains --- and its
-caption now carries a correction that has to be read before the numbers are.
+carries no locality prior and no weight sharing. Separating that from the structural assumption
+requires a weight-shared window predictor with radius and parameterisation selected on a
+validation bundle disjoint from test, and EM--BP refitted on the same chains. This is the
+comparison whose residual Section~\ref{sec:networks} identifies as the quantity of interest, and
+this appendix reports its status rather than a number, because the exploratory run that exists
+does not meet the standard the rest of this paper is held to.
 
-\paragraph{This table's provenance could not be verified, and its protocol has three further
-problems.} The run it is generated from names a commit that does not define an override its own
-recorded command passes, so the source that produced it is not reconstructable
-(\texttt{outputs/README\_exp12\_scaled.md} has the detail). Independently of that: the reported
-error is scored at a \emph{single} interior coordinate rather than across the sequence: at
-$\nsites=33$, radius $16$, the interior slice used for scoring is one site wide, not the whole
-chain, so this is a centre-site comparison read as a whole-sequence one. Both network arms train
-for a fixed step count regardless of $\nseq$, so the number of times each training chain is
-presented falls by roughly $32\times$ from $\nseq=32$ to $\nseq=2048$ --- a widening ratio under
-that protocol cannot be separated from the training budget shrinking. And the protocol itself
-differs from the headline table's: $33$ sites, five noise levels and $C=4$, against $32$, twelve
-and $C=8$.
+\paragraph{Why no table appears here.} The available run fails on provenance and on three
+protocol counts. It names a commit that does not define an override its own recorded command
+passes, so the source that produced it is not reconstructable
+(\texttt{outputs/README\_exp12\_scaled.md} has the detail). Its reported error is scored at a
+\emph{single} interior coordinate rather than across the sequence: at $\nsites=33$ and radius
+$16$ the interior slice is one site wide, so a centre-site comparison would be read as a
+whole-sequence one. Both network arms train for a fixed step count regardless of $\nseq$, so the
+number of times each training chain is presented falls by roughly $32\times$ from $\nseq=32$ to
+$\nseq=2048$, and a widening ratio under that protocol cannot be separated from the training
+budget shrinking. And its protocol differs from the headline table's throughout: $33$ sites, five
+noise levels and $C=4$, against $32$, twelve and $C=8$.
 
-None of that makes the table meaningless --- it is why a stronger baseline than the fully
-connected network narrows the gap is still visible in it, and that is a real, useful qualitative
-finding --- but no number in it should be cited as a certified result, and the main text does not
-cite one.
-\texttt{experiments/exp\_31\_structured\_baseline.py} is the replacement: the headline protocol
-throughout, all-site and predeclared-interior scoring alongside the centre-site diagnostic, both
-arms checkpointed and selected on validation, deployed and gated through
-\texttt{hpc/deploy\_clean.sh} so its provenance is verifiable by construction. It is running as of
-this revision; its results are not yet in this document.
+What that run supports is one qualitative statement, which Section~\ref{sec:networks} makes and
+this paper does not go beyond: a locality-respecting, weight-shared baseline closes most of the
+gap that the fully connected network leaves open, so the headline ratio bounds the value of the
+structural assumption rather than measuring it. No quantitative claim is drawn from it, here or
+in the main text.
 
-\input{../shared/sections/tab-structured}
-
-\noindent The MLP column is the same architecture as Table~\ref{tab:pointwise} but at this
-experiment's chain length and noise schedule, so the two tables' MLP figures are not directly
-comparable; what is comparable is each row's own three arms --- with the caveat above.
-
-The $\cnnlosses$ cells in which the tuned convolution matches or beats EM--BP are not scattered:
-every one is at $\nseq \in \{\cnnlosssizes\}$, the two smallest sizes here, and $\cnnlossloweest$
-of them at the lowest noise level. That pattern is worth recording as a qualitative observation ---
-at $\nseq=32$ the structured estimator is itself data-starved, and at low noise the likelihood
-dominates the prior --- but not as a quantitative one, for the reasons above.
+\paragraph{The measurement that would settle it.}
+\texttt{experiments/exp\_31\_structured\_baseline.py} runs the headline protocol throughout, with
+all-site and predeclared-interior scoring alongside the centre-site diagnostic, both arms
+checkpointed and selected on validation, and deployment gated through
+\texttt{hpc/deploy\_clean.sh} so its provenance is verifiable by construction. It also adds
+baselines that can propagate across the whole chain --- dilated stacks and bidirectional message
+passing --- rather than only a fixed window, since a window head cannot represent chain inference
+however much data it is given. Its results are not in this paper.
 
 \section{Density-level recovery: the Hellinger figures}
 \label{app:hellinger}

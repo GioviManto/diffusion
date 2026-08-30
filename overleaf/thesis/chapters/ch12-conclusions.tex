@@ -16,8 +16,10 @@ $t \to \infty$. The posterior of the noisy chain lives on a tree-shaped
 factor graph, on which one forward and one backward BP sweep compute all
 smoothing marginals; on the Gaussian chain the messages close
 algebraically in the Gaussian family, and the recursion is the Kalman
-filter followed by the RTS smoother (RQ2). The
-error of a radius-$r$ local score estimator decays exactly as $q^r$
+filter followed by the RTS smoother (RQ2). The influence of evidence at
+distance $d$ on the posterior mean decays exactly as $q^d$; the radius-$r$
+local score estimator's error is measured to decay at the same rate over
+the tested range, which is stated as a measurement rather than derived
 (RQ4). On the same model, the per-node AMP/TAP closure returns the exact
 score (the mean fixed point is closure-independent) but a different
 variance, with existence boundary, breakdown time $t_c(\alpha)$, and
@@ -29,12 +31,13 @@ independently.
 $10^{-15}$--$10^{-14}$ across the tested $(K, \alpha, t)$ grid, with an
 independently written implementation reproducing the agreement. On
 Laplace chains, Gaussian-projected BP measured against validated grid
-quadrature has median relative score error $0.39$ at $t = 0.02$,
-decaying below $10^{-3}$ for $t \gtrsim 0.9$; the error is amplified at
-small $t$ by the exact factor $e^{-t}/\Deltat$, is worst for bimodal
-innovation laws, and decreases with stronger chain correlation, while
-the score direction remains accurate (median cosine $\geq 0.92$
-throughout) (RQ3). At equal locality budget, truncating the inference is
+quadrature has median relative score error $0.24$ at $t = 0.05$, falling
+below $10^{-2}$ by $t \approx 1$ and below $10^{-3}$ by $t \approx 2.1$;
+no trial exceeds $10\%$ relative error beyond $t \approx 0.98$. The error
+is amplified at small $t$ by the exact factor $e^{-t}/\Deltat$, is worst
+for bimodal innovation laws, and decreases with stronger chain
+correlation, while the score direction remains accurate (median cosine
+$\geq 0.976$ throughout, worst single trial $0.879$) (RQ3). At equal locality budget, truncating the inference is
 more accurate than truncating the score matrix at small $t$ ($12.3\%$
 against $21.0\%$ at $t = 0.05$).
 
@@ -56,11 +59,13 @@ for any innovation law and a generalised M-step.
 
 Answering RQ6, the resulting estimator attains between $\ratiolo$ and $\ratiohi$ times
 lower pointwise denoising error than networks trained by denoising score
-matching on identical data, across the \nsizesused{} training-set sizes tested.
-The ratio is \emph{not} monotone in the training-set size, and an earlier draft
-of this chapter said it rose with it; the reported summary is also the largest
-of several defensible aggregations of the same cells, which
-Appendix~\ref{app:aggregation} sets out. At the larger sizes each side
+matching on identical data, at equal training-set size, across the
+\nsizesused{} sizes tested. This is a ratio of errors at fixed data and not
+a ratio of the data each method needs to reach a fixed error: the two curves
+do not cross in the measured range, so no data-equivalence factor follows
+from it. The ratio is \emph{not} monotone in the training-set size, and the
+reported summary is the largest of several defensible aggregations of the
+same cells, which Appendix~\ref{app:aggregation} sets out. At the larger sizes each side
 often selects the largest budget on offer; that is not the same as being limited
 by it, since an arm selects its last checkpoint whenever validation error is
 still falling at any rate at all. Rerunning the \nseqcalib-sequence case with
@@ -85,11 +90,16 @@ most of the margin turns out to be attributable to that choice rather than to
 estimation. A weight-shared window baseline --- the same object as a one-layer
 convolution --- closes the greater part of the gap, which means the headline
 figure should be read as an upper bound on the value of the structural
-assumption and not as its size. How much survives against a baseline that can
+assumption and not as its size. What survives against a baseline that can
 actually represent chain inference, rather than one restricted to a fixed
-window, is measured in Chapter~\ref{ch:em-results} and is materially smaller;
-that measurement is the one to quote, and its own limits are stated where it
-appears.
+window, is the quantity of real interest, and this thesis does not measure
+it: the comparison available here scores one site, at a shorter chain and a
+coarser noise schedule, under a budget that contracts as the training set
+grows (Section~\ref{sec:em-architecture}). The corrected experiment is
+specified in \codefile{experiments/exp\_31\_structured\_baseline.py} and its
+results are not in this thesis. What can be said without it is the direction
+and its order: roughly an order of magnitude against an unstructured
+network, and considerably less against a structure-aware one.
 
 The chain-Markov assumption itself tolerates a violation it can absorb into
 its own fitted parameters (a shared global latent, up to the point where it
@@ -98,19 +108,21 @@ intuition about misspecification would suggest, on one it structurally cannot
 represent (long-range coupling, by a coupling strength of roughly one tenth).
 
 \paragraph{Two questions this thesis leaves open rather than answers.}
-Fixed-budget experiments suggested that mixture capacity saturates near eight
-components, and that pointwise accuracy and generative fidelity can move in
-opposite directions within one estimator. Neither survives its own convergence
-analysis: most shape coordinates in the capacity sweep had not settled within
-the iteration budget used, and the generation study is built on those same
-fits. The capacity statement additionally overreached in a second way, which
-is worth separating because it would have survived a converged rerun: failing
-to resolve a difference between $C=8$ and $C=16$ at six seeds is not evidence
-that none exists, and nothing here predeclared how small a difference would
-count as none. Both results are recorded in
-Appendix~\ref{app:withdrawn} as methodological negative results. They are reported because a budget-limited comparison answers ``how do
-these behave after this much optimisation'', which is not the question either
-was asked --- and that distinction is itself one of the findings under RQ5.
+Whether mixture capacity saturates near eight components, and whether
+pointwise accuracy and generative fidelity can move in opposite directions
+within one estimator, are both unresolved here, and for the same reason: the
+experiments that address them share a fixed iteration budget under which most
+shape coordinates had not settled, and the shape is what both questions turn
+on. On capacity there is a second, independent limitation, worth separating
+because it would apply even to a fully converged rerun --- failing to resolve
+a difference between $C=8$ and $C=16$ at six seeds is not evidence that none
+exists, and no equivalence region was predeclared against which ``none''
+could be judged. A budget-limited comparison answers ``how do these behave
+after this much optimisation'', which is not the question either was asked;
+that distinction is itself one of the findings under RQ5, and the
+convergence measurement that establishes it
+(Section~\ref{sec:em-convergence}) is what the corrected reruns are designed
+around.
 
 \section{What the model suggests but does not establish}
 
@@ -131,9 +143,9 @@ BP is a reference only within its validated resolution regime
 ($\sqrt{2t} \gtrsim 3\,\dd x$), and the Laplace closure error is a
 measured curve, not a formula. (iii) The locality laws are proved for
 the Gaussian bulk; their non-Gaussian counterparts are only structurally
-delimited. (iv) An earlier conjecture on low-rank structure of the Laplace
-$K = 2$ posterior Hessian failed outside a narrow regime and is not
-asserted. (v) The EM-learning results of Chapters~\ref{ch:em-method}
+delimited; in particular no low-rank structure is asserted for the Laplace
+$K = 2$ posterior Hessian, which holds only in a narrow regime.
+(v) The EM-learning results of Chapters~\ref{ch:em-method}
 and~\ref{ch:em-results} use a fixed, generous but ultimately insufficient
 iteration budget for several of the reported sweeps; any conclusion in
 those chapters resting on fitted or generated \emph{shape} at that budget
@@ -148,18 +160,17 @@ this thesis and are not reported here.
 
 \section{Future work}
 
-One of the three directions identified earlier in this project has been
-carried out and is reported in Chapters~\ref{ch:em-method}
-and~\ref{ch:em-results}: mixture messages, in the form of a fully estimated
-$C$-component innovation kernel rather than a fixed two-component closure.
-Reverse dynamics was attempted --- Section~\ref{sec:em-generative} integrates
-the reverse SDE under the estimated EM/BP score and under two trained neural
-scores --- but rests on fits that the convergence analysis showed to be
-unsettled, so it stands as an exploratory study to be redone with certified
-estimators rather than as a completed direction. Discrete chains
-remain untouched by this thesis: with a finite alphabet the BP messages are
-finite vectors and inference is exact with no closure at all, which would
-give a second solvable benchmark alongside the Gaussian one.
+Mixture messages, in the form of a fully estimated $C$-component innovation
+kernel rather than a fixed two-component closure, are carried out in
+Chapters~\ref{ch:em-method} and~\ref{ch:em-results}. Reverse dynamics
+remains open: Section~\ref{sec:em-generative} integrates the reverse SDE
+under the estimated EM/BP score and under two trained neural scores, but on
+fits the convergence analysis shows to be unsettled, so the comparison needs
+redoing with estimators selected on a convergence criterion before it can
+answer the question it was built for. Discrete chains remain untouched by
+this thesis: with a finite alphabet the BP messages are finite vectors and
+inference is exact with no closure at all, which would give a second
+solvable benchmark alongside the Gaussian one.
 
 What the new chapters measured opens further directions of their own.
 Re-running the capacity sweep of Section~\ref{sec:em-capacity} to a
@@ -171,7 +182,8 @@ probes two violations at a time; a paired design across violation strengths,
 and further violation types beyond a global latent and long-range coupling,
 would generalise the finding that the two mechanisms are not
 interchangeable. And the reverse-dynamics comparison itself used a fixed,
-small chain length and one innovation family; whether the pointwise/generative
-dissociation of Section~\ref{sec:em-generative} scales with sequence length,
-and whether it appears under other non-Gaussian innovation laws, remain
-open.
+small chain length and one innovation family; whether pointwise accuracy and
+generative fidelity dissociate at all once both arms are converged, and if
+so whether that behaviour scales with sequence length or survives other
+non-Gaussian innovation laws, is the question
+Section~\ref{sec:em-generative} leaves open.

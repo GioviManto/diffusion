@@ -74,31 +74,32 @@ tree-exact inference and transition learning}
 
 \begin{center}
 \fbox{\parbox{0.92\textwidth}{\small
-\textbf{Internal note, work in progress.} Circulated for discussion, not submitted anywhere.
-Every number reported here comes from a single frozen configuration
-(Appendix~\ref{app:protocol}); the derivations, the code and the full experimental record are in the
-accompanying compendium.
+Every number reported here is generated from frozen experimental outputs by
+the scripts named in Appendix~\ref{app:protocol}, which also records the
+provenance gate each run must pass to be cited. The derivations, the code and
+the full experimental record are in the accompanying compendium.
 }}
 \end{center}
 
 \begin{abstract}
-The global minimiser of the denoising objective that trains a diffusion model is not the score of
-the data distribution: it is the score of the \emph{empirical} distribution, a sum of point masses
-at the training samples smoothed by the forward noise. A model holding that score exactly would
-reproduce its training set and nothing else, yet diffusion models generate new data. Deciding what
-a trained network has actually learned requires comparing it against the score it should have
-learned --- and for essentially every distribution of interest that target is unavailable, so a
-network's error cannot be separated from the difficulty of its target. The analytical literature
-therefore works with Gaussians, whose scores are linear, and Gaussian mixtures, whose scores stay
-available in closed form; in the Gaussian case any question about how structure is exploited has a
-degenerate answer.
+Over an unrestricted function class, the global minimiser of the denoising objective that trains a
+diffusion model is not the score of the data distribution: it is the score of the \emph{empirical}
+distribution, a sum of point masses at the training samples smoothed by the forward noise. A model
+attaining that target exactly, integrated to zero noise, would reproduce its training set and
+nothing else, yet diffusion models generate new data. Deciding what a trained network has actually
+learned requires comparing it against the score it should have learned --- and for essentially
+every distribution of interest that target is unavailable, so a network's error cannot be
+separated from the difficulty of its target. Tractable analytical models exist, but the most
+common are Gaussian, whose linear scores cannot probe how an approximation handles genuinely
+nonlinear posterior structure.
 
 We study a family where the target is computable and non-trivial: a first-order Markov chain on
 $\Reals^{\nsites}$ with continuous, non-Gaussian transitions, variance-matched so that innovation
 families differ only beyond second moments. Coordinatewise Ornstein--Uhlenbeck noising multiplies
 the prior by \emph{unary} factors, adding no edges among the latent variables, so the posterior
-factor graph is still the prior's chain --- a tree, on which sum-product is exact. The exact score
-is therefore available for a correlated, non-Gaussian model.
+factor graph is still the prior's chain --- a tree, on which sum-product is exact. The score is
+therefore available as an exact functional recursion for a correlated, non-Gaussian model, and
+numerically to a validated tolerance once the continuous messages are discretised.
 
 We then drop the assumption that the chain's parameters are known and learn them from noised
 sequences alone. Fisher's identity supplies the exact gradient of the marginal log-likelihood from
@@ -108,20 +109,25 @@ closed form and the two routes reach the same optimum. We prove that single-Gaus
 closure computes \emph{exactly} the LMMSE estimator of the covariance-matched Gaussian model, so
 the gap between it and full sum-product is precisely the price of discarding everything beyond
 second moments. Estimating a transition \emph{density} rather than its parameters exposes a
-convergence-rate asymmetry, which we trace to the innovation mixture's own latent label rather
-than to the channel.
+convergence-rate asymmetry between the correlation and shape coordinates, to which two mechanisms
+contribute: the innovation mixture's own latent label, which makes the shape slow even on clean
+transitions, and the observation channel, which compounds it and removes far more Fisher
+information about shape than about correlation.
 
 Against an \emph{unstructured} network trained by denoising score matching on identical data, with
 the optimisation budget of both arms selected on a held-out bundle, the structured estimator
-attains between \ratioloword{} and \ratiohiword{} times lower pointwise denoising error across
-\nsizesused{} training-set sizes. That figure bounds what the structural assumption is worth rather
-than measuring it: most of the margin is architectural, and a weight-shared window baseline --- the
-same object as a one-layer convolution --- closes the greater part of it. What survives against a
-baseline that can represent chain inference at all is smaller, and is the quantity we treat as the
-result. The comparison is deliberately asymmetric in prior information --- the estimator is handed
-the Markov factorisation, the autoregressive form and a low-dimensional innovation family, the
-networks none of them --- so it measures the worth of that structure on this family, not a general
-ranking of the two approaches.
+attains between \ratioloword{} and \ratiohiword{} times lower pointwise denoising error, at equal
+training-set size, across \nsizesused{} sizes --- a ratio of errors at fixed data, not a reduction
+in the data required to reach a fixed error. It bounds what the structural assumption is worth
+rather than measuring it: most of the margin is architectural, and a weight-shared window baseline
+--- the same object as a one-layer convolution --- closes the greater part of it. What survives
+against a baseline that can represent chain inference at all is the quantity of interest and is
+smaller; we report its direction and order, and identify the provenance-clean comparison that
+would measure it as the outstanding experiment. The comparison is
+deliberately asymmetric in prior information --- the estimator is handed the Markov factorisation,
+the autoregressive form and a low-dimensional innovation family, the networks none of them --- so
+it measures the worth of that structure on this family, not a general ranking of the two
+approaches.
 \end{abstract}
 
 \section{Introduction}
@@ -567,12 +573,13 @@ architectural}, and the residual is a small multiple rather than an order of mag
 structure's worth: a window head trained to a fixed step count sees each chain fewer times as
 $\nseq$ grows, so a residual widening with $\nseq$ cannot be separated from the budget shrinking,
 and its error falls throughout. \emph{Whether the residual reflects optimisation, approximation or
-statistical efficiency is unresolved}; an earlier draft read it as the convolution failing to
-acquire the structure as data grows, a mechanism this design cannot distinguish from its own budget
-schedule. So the scoped statement is: \emph{on this family, at these sizes, and with each arm's
-budget chosen on held-out data, the correctly specified estimator is more sample-efficient in
-pointwise denoising than the networks we trained --- by roughly an order of magnitude against a
-generic function approximator, and by considerably less against a structure-aware one.} A window
+statistical efficiency is unresolved}, and in particular a residual that widens with $\nseq$ is not
+evidence that the convolution fails to acquire the structure as data grows: this design cannot
+distinguish that mechanism from its own budget schedule. So the scoped statement is: \emph{on this
+family, at these sizes, and with each arm's budget chosen on held-out data, the structured
+estimator attains lower pointwise denoising error at equal training-set size than the networks we
+trained --- by roughly an order of magnitude against a generic function approximator, and by
+considerably less against a structure-aware one.} A window
 head is itself a weak test, since it cannot propagate past its radius however much data it sees;
 architectures that can --- dilated stacks, bidirectional message passing, attention --- are what a
 stronger claim must survive (Section~\ref{sec:limits}).
