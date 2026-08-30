@@ -75,10 +75,43 @@ incomplete run and must not be cited**. Notably the N=512 confidence interval
 there is already visibly wider than in earlier partial checks, which is
 itself the demonstration of why the full seed count matters.
 
-**Do not** report anything from `capacity_contrasts.csv` until it has been
+**Do not** report anything from that file until the contrast has been
 regenerated after all three lanes finish and their `capacity_equivalence.csv`
 files are concatenated into one. That merge + rerun has not happened yet as
 of this note.
+
+To make accidental use harder rather than merely discouraged, the file has
+been renamed on the cluster:
+
+    outputs/35578c9-20260827T153657Z/exp_32_capacity/
+        DO_NOT_CITE_premature_contrasts_job639099.csv
+        DO_NOT_CITE_premature_params_contrast_job639099.json
+
+A merge script globbing `capacity_contrasts.csv` now finds nothing rather
+than finding a plausible-looking 16-row file computed on 40% of the seeds.
+Renamed rather than deleted: it is the evidence for what went wrong, and
+the wider CI in that N=512 interval is worth keeping as a demonstration of
+why the full seed count matters.
+
+## Progress as of 30 Aug 2026
+
+Deployed commit `35578c9`, verified on the cluster: `params_sweep.json`
+records `em_cap = 1200`, so the corrected cap is what is running.
+
+    lane                seeds   target cells   done
+    exp_32_capacity     0-6     70             70   COMPLETE
+    exp_32_capacity_b   7-11    50             13   running (job 641517)
+    exp_32_capacity_c   12-15   40             13   running (job 641519)
+
+Lane a is finished and correct. Nothing may be concluded from it alone ---
+that is exactly the mistake job 639099 made.
+
+`exp_31_confirm` is the more important of the two reruns, since it is the
+structured-baseline measurement the external review identifies as the
+outstanding one, and **it has not started**: all six of its shards sit
+PENDING behind priority and node-drain reasons. The 114 rows in
+`outputs/569a67c-.../exp_31_confirm/` are from the earlier partial run and
+are not the corrected protocol.
 
 **Do not** report "capacity is not equivalent past C=8" from either the
 em_cap=400 run or the incomplete em_cap=1200 partial run. **Do not** report

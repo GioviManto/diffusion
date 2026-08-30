@@ -266,10 +266,14 @@ long-range    & $\gamma=0.40$ & $0.47\to1.03$     & $+0.1010$ & \textbf{inverts 
 \noindent The two violations behave qualitatively differently, and the
 difference is principled rather than incidental. A global latent shared
 across every site makes the score residual \emph{exactly} rank one, by a
-Woodbury identity; a chain-structured estimator can absorb a rank-one
-correction into its fitted coefficients and does --- the fitted $\alpha$
-rises and the fitted innovation kurtosis flattens as $\beta$ grows, exactly
-tracking the contamination it is misattributing to the chain. Long-range
+Woodbury identity, and over the range tested a chain-structured estimator
+accommodates that correction within its own fitted coefficients: the fitted
+$\alpha$ rises and the fitted innovation kurtosis flattens as $\beta$ grows,
+tracking the contamination it is misattributing to the chain. This is
+partial accommodation over a measured range, not an exact representation ---
+a first-order Markov family does not contain the contaminated law, and what
+the numbers show is that the residual it cannot represent stays small enough
+not to invert the advantage. Long-range
 coupling is only \emph{approximately} low rank, and a chain family cannot
 represent it at all: the advantage is gone by $\gamma\approx0.05$--$0.10$ and
 the structured estimator's own relative error reaches $57\%$ at high noise
@@ -304,13 +308,33 @@ model is": they are different in kind.
 
 Section~\ref{sec:em-convergence} found that the innovation shape converges
 far slower than the autoregressive coefficient under EM. A direct
-information-theoretic measurement gives a structural reason: on a
-generalised-Gaussian innovation family where a shape parameter $\beta$
-moves the fourth moment at \emph{exactly fixed} variance, the efficient
-Fisher information for $\beta$ --- after projecting out the nuisance
-coordinates $(\alpha, q)$, since raw diagonal entries alone are misleading
-when parameters are correlated --- decays two to three orders of magnitude
-faster with diffusion noise than the information for $\alpha$ itself:
+information-theoretic measurement gives a structural reason.
+
+\paragraph{What is computed.} The innovation law is a generalised Gaussian
+$p(\varepsilon) \propto \exp(-|\varepsilon/s|^{\beta})$, with $s$ fixed by
+$\operatorname{Var}(\varepsilon) = q = 1-\alpha^2$ at every $\beta$, so
+$\beta$ moves the fourth moment at \emph{exactly fixed} variance and is a
+genuine shape coordinate rather than a reparameterised scale. For a
+three-parameter vector $\theta = (\alpha, q, \beta)$, Fisher's identity
+\eqref{eq:em-fisher} supplies the exact per-chain score of the marginal
+log-likelihood from one forward--backward pass, and the information matrix
+is estimated in \emph{outer-product} form, $J = D^{-1}\sum_d g_d g_d^\T$
+over $D=512$ chains of $n=32$ sites, at $M=401$, $A=8$. This is the
+outer-product estimator, not the observed negative Hessian, and it is an
+estimate at the true parameter rather than at a fitted one. The reported
+quantity is the \emph{efficient} information
+$I_{\beta\cdot(\alpha,q)} = 1/(J^{-1})_{\beta\beta}$, which is what remains
+about $\beta$ once the nuisance coordinates must be estimated too --- equal
+to the diagonal entry only when the coordinates are orthogonal and strictly
+smaller otherwise. The gap between $J_{\beta\beta}$ and this quantity is
+recorded per cell as the nuisance cost, and the condition number of $J$ is
+recorded alongside it, since the inversion is where a near-singular $J$
+would show up.
+
+\paragraph{What it shows.} The efficient information for $\beta$ decays two
+to three orders of magnitude faster with diffusion noise than the
+information for $\alpha$ itself. Reading the loss between the smallest and
+largest diffusion time tested ($t = 0.05$ against $t = 1.6$):
 
 \begin{center}
 \begin{tabular}{@{}rrrr@{}}
@@ -323,16 +347,26 @@ true $\beta$ & info loss, $\alpha$ & info loss, $q$ & info loss, $\beta$ (shape)
 \bottomrule
 \end{tabular}
 \end{center}
-\noindent (information loss measured between the smallest and largest
-diffusion time tested). This is not merely a restatement of the convergence
-finding: it is a property of the noised likelihood itself, independent of
-any optimiser, and it explains \emph{why} the shape coordinate is slow ---
-there is structurally less information about it in noised data at any fixed
-sample size, at every diffusion time past the smallest ones. It is also the
-reason the capacity sweep of Section~\ref{sec:em-capacity} is exactly the
-kind of measurement where an insufficient iteration budget is dangerous: the
+\noindent This is not merely a restatement of the convergence finding: it is
+a property of the noised likelihood itself, independent of any optimiser,
+and it explains \emph{why} the shape coordinate is slow --- there is
+structurally less information about it in noised data at any fixed sample
+size, at every diffusion time past the smallest ones. It is also the reason
+the capacity sweep of Section~\ref{sec:em-capacity} is exactly the kind of
+measurement where an insufficient iteration budget is dangerous: the
 coordinate that is hardest to move is also the one with the least signal per
 observation.
+
+Two limits on how far these figures should be pushed. They are ratios of
+outer-product estimates at $D=512$ chains, so the leading digits carry
+Monte Carlo error and the right reading of $64{,}227$ is ``four to five
+orders of magnitude'', not a five-significant-figure measurement. And the
+comparison is across the tested noise grid rather than a limit: the decay
+is measured between $t=0.05$ and $t=1.6$, and how it continues past the
+schedule's end is not established here. What the table supports is the
+direction and the order --- shape information collapses far faster than
+correlation information --- which is the claim the rest of the chapter
+rests on.
 
 \section{Scope not covered here}
 

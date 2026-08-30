@@ -134,21 +134,26 @@ determines a whole distribution over the latent sequence, by making a
 free energy stationary over a family rich enough --- because the graph is
 a tree --- that the minimiser is exact rather than approximate. A score
 network is a fixed-depth feed-forward map: it spends the same computation
-on every input and has no mechanism to search, so it cannot represent
-that inference, only the answers it produces. Reversal is iterative and
-unbounded, but each step's score still comes from the fixed-compute map,
-so the network stands to the inference as an \emph{amortisation}
-\citep{lecun2006tutorial}.
+on every input, whatever that input demands. The distinction is not that
+such a map cannot represent the \emph{result} of the inference --- a
+sufficiently expressive network can approximate the input--output function
+of an iterative algorithm, and Chapter~\ref{ch:graphical} discusses
+architectures argued to do exactly that on tree-structured data. It is
+that the network does not \emph{perform} instance-wise inference: it
+produces the answer directly rather than by a search whose length adapts
+to the instance. Reversal is iterative and unbounded, but each step's
+score still comes from the fixed-compute map, so the network stands to the
+inference as an \emph{amortisation} \citep{lecun2006tutorial}.
 
 Whether that amortisation is cheap or expensive is, in general,
 unmeasurable: it would require the very object the network was trained to
 stand in for. On the family of this thesis that object is available, so
-the question becomes an experiment --- and the answer has structure. The
-cost is small when there is little to amortise and grows with the data,
-which is what one should expect of a fixed-compute approximator facing a
-posterior that becomes better determined as evidence accumulates. Nothing
-in the literature above measures it, because nothing in it has the exact
-target to measure against.
+the question becomes an experiment. Nothing in the literature above
+measures it, because nothing in it has the exact target to measure
+against. What the measurement shows is reported in
+Chapter~\ref{ch:em-results}, including the respect in which it is
+\emph{not} a simple function of the sample size: the error ratio is not
+monotone in the training-set size, and no trend in it is claimed here.
 
 The gap, in one sentence: there is no end-to-end, exactly solvable
 account of the joint diffusion score of a structured sequence, covering
