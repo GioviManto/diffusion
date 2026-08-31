@@ -82,16 +82,18 @@ what second-order message closure computes}
 \maketitle
 
 \begin{abstract}
-The global minimiser of the objective that trains a diffusion model is the score of the
-\emph{empirical} distribution, not of the data distribution --- a model attaining it would
-reproduce its training set and nothing else. Deciding what a network actually learned means
+Over an unrestricted function class, the global minimiser of the objective that trains a diffusion
+model is the score of the \emph{empirical} distribution, not of the data distribution --- a model
+attaining it exactly, integrated to zero noise, would reproduce its training set and nothing
+else. Deciding what a network actually learned means
 comparing it against the score it should have learned, which for realistic data is unavailable.
 We exhibit a family where it is available and non-trivial: a first-order Markov chain with
 continuous, non-Gaussian transitions. Coordinatewise noising multiplies the prior by \emph{unary}
 factors, so the posterior factor graph is still the prior's chain --- a tree, on which sum-product
-is exact. The exact score is therefore available for a correlated, non-Gaussian model, and we
-validate the grid representation of the continuous messages against the Gaussian closed form and
-against brute-force enumeration of the discretised posterior. We then prove that single-Gaussian
+is exact. The score is therefore available as an exact functional recursion for a correlated,
+non-Gaussian model, and numerically to a validated tolerance once the continuous messages are
+discretised --- we validate that grid representation against the Gaussian closed form and against
+brute-force enumeration of the discretised posterior. We then prove that single-Gaussian
 message closure computes \emph{exactly} the LMMSE estimator of the covariance-matched Gaussian
 model, so the gap between it and full sum-product is precisely the price of discarding everything
 beyond second moments --- not an uncontrolled approximation but a named estimator. The same
@@ -111,17 +113,17 @@ the statistical mechanics of these models \citep{biroli2023,biroli2024dynamical}
 
 Progress on it needs a target one can compute. For realistic data the exact score is unavailable,
 so a network's error cannot be separated from the difficulty of what it was approximating.
-Tractable families are scarce and mostly Gaussian, where the score is linear and every question
-about structure has a degenerate answer. Gaussian mixtures keep a closed-form score, but it is
-nonlinear only in the mixture index, not in any dependence between coordinates.
+Tractable families exist but the most common are Gaussian, where the score is linear and every
+question about structure has a degenerate answer. Gaussian mixtures keep a closed-form score, but
+it is nonlinear only in the mixture index, not in any dependence between coordinates.
 
 \paragraph{This work.} We use a first-order Markov chain: diffusion is applied to sequential data,
 and studying how structure is exploited requires data that has structure one can dial. The chain
 is variance-matched, so Gaussian, Laplace, Student, uniform and bimodal innovations share a
 covariance exactly and differ only beyond second moments. Two things follow, and this note is about
-the first: the exact score is computable by local inference, and the standard second-order
-approximation to that inference turns out to be an identifiable estimator rather than an
-uncontrolled one. The same machinery also learns the kernel when it is unknown, which the longer
+the first: the score is computable by local inference --- exactly as a functional recursion, and
+to a measured tolerance once discretised --- and the standard second-order approximation to that
+inference turns out to be an identifiable estimator rather than an uncontrolled one. The same machinery also learns the kernel when it is unknown, which the longer
 paper develops.
 
 \section{The model, and why its score is computable}

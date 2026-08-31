@@ -105,7 +105,10 @@ twelve noise levels & log-spaced on $[0.05, 3.0]$ \\
 sixteen replicates & everywhere \\
 $\nseq \in \{32,\dots,4096\}$ & seven doublings \\
 $256$ held-out sequences & drawn from a seed disjoint from every training seed \\
-EM stopping & relative $10^{-9}$ on the log-evidence, cap $400$; \textbf{never} on $\corr$ \\
+EM stopping & relative $10^{-9}$ on the log-evidence; \textbf{never} on $\corr$. The cap is
+whatever the caller passes --- \codefile{exp\_07} a literal $120$,
+\codefile{exp\_32} $1200$ --- \emph{not} the \texttt{em\_max\_iters}
+declared here, which nothing reads (see the box below) \\
 ring & $T = 12$, so $\nsites = 24$ \\
 \bottomrule
 \end{tabular}
@@ -573,6 +576,41 @@ Any joint-versus-marginal margin from \texttt{629962} carries that caveat.
 \item \textbf{Rung 4a at a matched convergence budget} (\texttt{629962}), eight seeds split by
       sample size into sixteen shards, at a $3000$-step cap under the per-sequence tolerance. Until
       it lands, the joint-versus-marginal margin above stays out of every document.
+
+\item \textbf{The structure-aware baseline}
+      (\codefile{experiments/exp\_31\_structured\_baseline.py}). The measurement an outside
+      review identified as the outstanding one: what survives of the headline ratio against a
+      baseline that can represent chain inference, rather than the fixed window that closes most
+      of the gap. Runs the headline protocol throughout --- all-site and predeclared-interior
+      scoring alongside the centre-site diagnostic, both arms checkpointed and selected on
+      validation --- and adds dilated-stack and bidirectional message-passing arms, which a window
+      head cannot match however much data it sees. Deployed through
+      \codefile{hpc/deploy\_clean.sh}, so its provenance is verifiable by construction, unlike
+      the \texttt{exp\_12\_scaled} comparison it replaces. Three seed-range lanes, jobs
+      \texttt{641509}--\texttt{641514}. Until it lands, no quantitative structure-aware claim
+      appears in any document; the note and the thesis carry the direction and its order only.
+
+\item \textbf{Capacity equivalence at a sufficient budget}
+      (\codefile{experiments/exp\_32\_capacity\_equivalence.py}). The rerun that would settle
+      the withdrawn capacity attribution below, now with a predeclared equivalence region and
+      \texttt{em\_cap} raised from $400$ to $1200$. The raise is itself a measurement rather than
+      a convention: at the old cap every one of the $320$ fits was still censored, and a
+      representative $\ncomp=16$ fit was moving thirty times faster than $\ncomp=8$ over the last
+      hundred iterations --- the same capacity-versus-convergence-rate confound, one level up. Run
+      to $2000$ iterations, the per-edge gain falls to ${\sim}6\times10^{-9}$ by $800$ and then
+      plateaus, so $1200$ captures essentially all the real movement without pretending the strict
+      $10^{-9}$ tolerance is reachable. Jobs \texttt{641515}--\texttt{641520}; lane~a is complete
+      at $70/70$ cells, lanes~b and~c still running.
+
+      One artefact from this rerun must not be used. A contrast job (\texttt{639099}) fired early
+      because its \texttt{afterany} dependency was satisfied by the \emph{cancellation} of a
+      restructured upstream shard --- \texttt{afterany} fires on any terminal state and cannot
+      distinguish ``the work finished'' from ``something happened to that job id''. It computed
+      the contrast on seeds $0$--$6$ alone, roughly $40\%$ of the design. The file is renamed
+      \texttt{DO\_NOT\_CITE\_premature\_contrasts\_job639099.csv} on the cluster so that a
+      merge script globbing the ordinary name finds nothing; it is kept rather than deleted
+      because its visibly over-wide $\nseq=512$ interval is the demonstration of why the full seed
+      count matters.
 \end{itemize}
 
 \section{Withdrawn, and not replaced}
