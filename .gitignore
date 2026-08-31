@@ -34,6 +34,11 @@ research/nongaussian-bp/ANSWERS_AND_QUESTIONS_FOR_ADVISORS.tex
 
 # Overleaf upload bundle: regenerate from overleaf/ (see overleaf/README.md)
 research/nongaussian-bp/overleaf-bp-diffusion.zip
+# Any zip of overleaf/ made for uploading to Overleaf's web editor -- a local
+# convenience, not a build artifact worth tracking, and it drifts stale the
+# moment the source changes underneath it.
+/overleaf.zip
+*.zip
 
 # --- kept locally for reference, not for a reviewer's eyes ---
 # Internal revision/process notes -- not thesis content.
