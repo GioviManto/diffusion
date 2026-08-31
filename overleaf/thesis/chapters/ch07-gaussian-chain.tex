@@ -300,17 +300,19 @@ power of $t$: the band fills outward, one diagonal per order.
 \hfill$\square$
 \end{toolbox}
 
-\begin{remark}[Correction of an earlier formula]\label{rmk:g-correction}
-An earlier working note of this project stated \eqref{eq:g-bandfill} with
-an extraneous factor $1/(d-1)!$. The factor does not follow from the
-expansion (the leading distance-$d$ term is a single Neumann term, with no
-combinatorial sum behind it), and the numerical audit rejects it: the
-no-factorial coefficient matches the measured $(\Qt)_{i,i+d}/t^{d-1}$ to
-better than $0.9\%$ for every $d \in \{1,\dots,5\}$ (at $\alpha = 0.9$,
-$K = 25$), while the factorial version fails by $86\%$ already at $d = 3$.
-The error had survived because slope fits in $\log t$ are blind to
-constant prefactors; every prefactor in this thesis has since been
-audited, not only every exponent.
+\begin{remark}[The prefactor carries no factorial, and why that is checked]
+\label{rmk:g-correction}
+Equation~\eqref{eq:g-bandfill} has no $1/(d-1)!$: the leading distance-$d$
+term is a single Neumann term, with no combinatorial sum behind it. The
+distinction is easy to miss and worth verifying numerically, because slope
+fits in $\log t$ are blind to constant prefactors --- a wrong constant
+survives every check on the exponent. The audit therefore tests the
+coefficient itself, and it separates the two candidates cleanly: the
+no-factorial form matches the measured $(\Qt)_{i,i+d}/t^{d-1}$ to better
+than $0.9\%$ for every $d \in \{1,\dots,5\}$ (at $\alpha = 0.9$, $K = 25$),
+while a factorial version would be wrong by $86\%$ already at $d = 3$. Every
+prefactor in this thesis is audited on the same grounds, not only every
+exponent.
 \end{remark}
 
 \begin{figure}[t]\centering

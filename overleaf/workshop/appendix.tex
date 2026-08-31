@@ -45,9 +45,9 @@ $\ngrid=401$, $\halfwidth=8$, twelve log-spaced noise levels on $[0.05,3.0]$, bu
 $\nseq\in\{32,\dots,4096\}$, and $256$ held-out sequences on a disjoint seed. The ring uses $T=12$.
 Both arms select their optimisation budget on a disjoint validation bundle; EM's own internal stop
 is a signed log-evidence tolerance, never $\corr$, since a settled $\corr$ certifies a
-converged-looking trace over a kernel that is nowhere near converged. (An earlier draft stated
-this guard as a fitted-kurtosis threshold; that rule is not implemented and produced no reported
-number -- see the longer paper's protocol appendix for the correction in full.)
+converged-looking trace over a kernel that is nowhere near converged. The configuration file also
+declares a shape-based threshold; nothing reads it, and no reported number was produced by it (see
+the longer paper's protocol appendix).
 
 \section{Proposition~\ref{prop:lmmse}: hypotheses and proof}
 \label{app:ws-lmmse}
