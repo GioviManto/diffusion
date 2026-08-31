@@ -406,14 +406,19 @@ an interpretation rather than a measurement.
 
 \section{What can and cannot be concluded}\label{sec:l-open}
 
-Exact: the surviving structure of Section~\ref{sec:l-model}, the limits
+Classified in the four kinds of Section~\ref{sec:method}.
+Exact, by derivation: the surviving structure of Section~\ref{sec:l-model}, the limits
 \eqref{eq:l-score-limits}, the factorisation \eqref{eq:l-cf}, the
 screened Poisson equation \eqref{eq:l-screened}, the curvature identity
 \eqref{eq:l-curvature}, the message form \eqref{eq:l-markov-score}, the
 boundary integral \eqref{eq:l-onestep}, the breakdown argument of
 Remark~\ref{rmk:l-breakdown}, the identification of Gaussian closure with the
 covariance-matched LMMSE estimator (Theorem~\ref{thm:l-lmmse}), and the error
-identity \eqref{eq:bp-master-error}. Numerical, within validated regimes: the
+identity \eqref{eq:bp-master-error}. Exact for the discretised model: grid BP
+solves the finite-state chain that discretisation defines to floating-point
+accuracy --- a different statement from reproducing the continuum recursion,
+and the gap between them is what the calibration of
+Section~\ref{sec:l-grid} bounds. Numerical, within validated regimes: the
 quadrature audits of Section~\ref{sec:l-K1}, the grid-BP calibration, and
 the closure-error measurements, which are specific to the stated
 innovation laws, correlation levels, chain lengths, and diffusion times.
