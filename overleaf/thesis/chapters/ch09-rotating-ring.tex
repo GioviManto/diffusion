@@ -20,6 +20,14 @@ Cartesian surrogate of the model is exactly solvable, that the model as drawn
 is solvable numerically to a measured accuracy, and that both admit the same
 structural description of the joint score.
 
+This chapter is a self-contained secondary contribution. It does not feed the
+chain results of Chapters~\ref{ch:gaussian}--\ref{ch:em-results} and nothing
+there depends on it; it is included because it settles, exactly and in a model
+where the calculation can be done, a question the chain model raises but cannot
+answer --- whether per-frame marginals can carry the information that
+distinguishes one dynamics from another. Chapter~\ref{ch:development} argued
+on general grounds that they cannot; here that is a theorem.
+
 The question the chapter answers is narrower than the models it uses.
 
 \begin{quote}
@@ -444,6 +452,11 @@ which likelihood scores a trajectory:
 \end{tabular}
 \end{center}
 
+\noindent Target~(a) defines the contrast rather than supplying a result: it is
+the marginal-visible control against which (b) and (c) are read, and it is what
+makes the design isolate the structure rather than the estimator. \textbf{No
+measurement of (a) is reported in this thesis.} What follows is (b) and (c).
+
 For (c) the estimator is expectation--maximisation over a grid of angles, with
 responsibilities $r_\mu(\psi)\propto p(\psi)P_t(x^\mu\mid\psi)$ and the
 update $p(\psi)\leftarrow M^{-1}\sum_\mu r_\mu(\psi)$. The same sufficiency
@@ -577,7 +590,8 @@ Paired sample-level controls: one-frame law invariant to $\psi$ below the
   resampling floor, lag-one joint tracking $\sin\psi$
   & numerical, independent of the estimator \\
 Recovery of the confining potential $(\lambda, r_*)$
-  & numerical, in progress \\
+  & not reported here (defines the control, see
+    \S\ref{sec:ring-estimation}) \\
 Behaviour in $K$, and inference of the phase rather than its use
   & open \\
 \bottomrule
@@ -603,11 +617,11 @@ Behaviour in $K$, and inference of the phase rather than its use
   converged at these parameters but is a quadrature, not a symbolic closed
   form. The validation of \S\ref{sec:ring-validation} bounds the error; it does
   not remove it.
-  \item \textbf{The potential experiment is incomplete.} The $(\lambda,r_*)$
-  sweep runs 300 gradient steps per cell and had not finished at the time of
-  writing. Its preliminary reading --- that both arms recover the well, which
-  is the expected contrast with the rotation --- is stated as preliminary and
-  nothing else depends on it.
+  \item \textbf{The marginal-visible control is not measured.} Target~(a) of
+  \S\ref{sec:ring-estimation} specifies the contrast but no result for it is
+  reported, so the claim that the two targets behave differently rests on the
+  theorem rather than on a matched pair of measurements. Nothing else in the
+  chapter depends on it.
 \end{enumerate}
 
 The immediate extensions are to vary $K$ systematically, to infer the angular

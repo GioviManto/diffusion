@@ -254,6 +254,14 @@ grid self-convergence error remains $10^4$ to $10^7$ times smaller than
 every effect measured below. Within this regime we treat grid BP as the
 reference score; outside it no claim is made.
 
+\begin{remark}[Two symbols that are easy to swap]
+Throughout this thesis $M$ is the number of \emph{grid points} representing a
+message and $N$ is the number of training \emph{sequences}; they are
+independent, and every configuration states both. The companion paper uses
+$M$ for the sequence count and a separate symbol for the grid, so a figure
+quoting ``$M=401$'' here and ``$M=4096$'' there refers to different objects.
+\end{remark}
+
 All score errors are amplified posterior-mean errors: for any two solvers
 with means $\widehat m$ and $m_{\mathrm{ref}}$, the score--posterior
 identity gives, exactly,
@@ -302,7 +310,13 @@ failure probability has already vanished --- the typical error is still
 $\sim\!7\times10^{-3}$.
 
 The closure error is of order tens of percent at small diffusion time and
-decays as diffusion noise Gaussianises the tilted posteriors. Inspection of
+decays as diffusion noise grows. The natural explanation is that the tilted
+posteriors approach Gaussianity, and it is consistent with the measurement
+without being established by it: the Tweedie prefactor $e^{-t}/\Deltat$ also
+attenuates with $t$, so a falling score error does not by itself separate a
+posterior becoming more Gaussian from a prefactor damping the effect of any
+given posterior-mean discrepancy. Posterior non-Gaussianity is not measured
+directly here. Inspection of
 the worst trials shows the mechanism: the reference belief is sharply
 non-Gaussian, occasionally bimodal; the single Gaussian commits to a
 compromise mean; and \eqref{eq:bp-master-error} amplifies the shift. The
@@ -338,8 +352,9 @@ $0.07$ for a mildly bimodal mixture; a single Gaussian cannot represent
 two posterior modes and commits to the gap between them. Third, stronger
 chain correlation helps rather than hurts: for Laplace at $t = 0.05$ the
 error is $0.43$, $0.27$, $0.13$ at $\alpha = 0.5$, $0.85$, $0.95$;
-informative neighbours act like additional Gaussian observations and
-Gaussianise the local tilted posteriors.
+informative neighbours act like additional Gaussian observations, which is
+consistent with the local tilted posteriors becoming more Gaussian, again as
+an interpretation rather than a measurement.
 
 \section{What can and cannot be concluded}\label{sec:l-open}
 
