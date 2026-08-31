@@ -287,7 +287,55 @@ the algorithm one would deploy when quadrature is unaffordable, and the
 chain analogue of the per-node closures of statistical physics
 (Appendix~\ref{app:amp}).
 
-On the Laplace chain (chain correlation $\alpha = 0.85$, $K = 40$ frames, $60$ trials per
+Before measuring its error it is worth identifying exactly what it computes,
+because the answer turns this from an implementation-specific approximation
+study into a precise question. Write $\Pi_{\mathrm{G}} f$ for the Gaussian
+density matching the mean and variance of $f/\!\int\! f$.
+
+\begin{theorem}[Gaussian closure computes the LMMSE estimator]
+\label{thm:l-lmmse}
+Let \emph{moment-projected sum--product} be the forward--backward recursion of
+\eqref{eq:bp-fwd}--\eqref{eq:bp-bwd} that applies $\Pi_{\mathrm{G}}$ to each
+message immediately after every transition integral, multiplying by the site's
+unary likelihood before the next. Take the chain \eqref{eq:l-chain-prior} with
+$\alpha \neq 0$, Gaussian unary likelihoods, $\E[a_0] = 0$, an innovation law
+with mean zero and finite variance $q$, and an initial message that is Gaussian
+or projected by $\Pi_{\mathrm{G}}$. Then its posterior means are exactly those
+of the \emph{covariance-matched Gaussian model}:
+\begin{equation}
+  \widehat{a}_{\mathrm{LMMSE}}
+  = \operatorname{Cov}(a,x)\,\operatorname{Cov}(x)^{-1} x
+  = e^{-t}\Sig_0\big(e^{-2t}\Sig_0 + \Deltat I\big)^{-1} x ,
+  \label{eq:l-lmmse}
+\end{equation}
+and it returns the same estimator for \emph{every} innovation law sharing the
+moments $(0, q)$.
+\end{theorem}
+
+\begin{toolbox}{Why the projection cannot see past two moments}
+The recursion is linear in the message except at the projection, and
+$\Pi_{\mathrm{G}}$ retains only the first two moments of what it is given. A
+Gaussian message multiplied by a Gaussian likelihood and pushed through a
+linear-AR transition integral is Gaussian with mean and variance depending on
+the incoming mean and variance alone, so by induction along the chain every
+message the recursion carries is determined by second-order information ---
+and the second-order information of the Laplace chain is by construction
+\eqref{eq:l-chain-prior} identical to that of the Gaussian chain. The full
+induction, and the four hypotheses that are load-bearing (finite second
+moments, zero mean, $\alpha \neq 0$, and \emph{where} the projection is
+applied, since $\Pi_{\mathrm{G}}$ does not commute with multiplication by the
+likelihood), are given in the companion paper.
+\end{toolbox}
+
+Theorem~\ref{thm:l-lmmse} fixes the meaning of every number below. The
+comparison is not ``grid BP against one particular approximation'': it is
+\emph{full non-Gaussian posterior inference against the best second-order
+linear estimator}, and the measured gap is precisely the price of discarding
+everything beyond second moments. It also explains why the errors reported
+here are attributable to non-Gaussianity alone --- the projected arm is
+literally blind to the only thing that distinguishes the two chains.
+
+On the Laplace chain (chain correlation $\alpha = 0.85$, $K = 32$ frames, $60$ trials per
 $t$, reference $M = 801$), the median relative score error of the
 Gaussian closure is
 \begin{center}
@@ -363,14 +411,18 @@ Exact: the surviving structure of Section~\ref{sec:l-model}, the limits
 screened Poisson equation \eqref{eq:l-screened}, the curvature identity
 \eqref{eq:l-curvature}, the message form \eqref{eq:l-markov-score}, the
 boundary integral \eqref{eq:l-onestep}, the breakdown argument of
-Remark~\ref{rmk:l-breakdown}, and the error identity
-\eqref{eq:bp-master-error}. Numerical, within validated regimes: the
+Remark~\ref{rmk:l-breakdown}, the identification of Gaussian closure with the
+covariance-matched LMMSE estimator (Theorem~\ref{thm:l-lmmse}), and the error
+identity \eqref{eq:bp-master-error}. Numerical, within validated regimes: the
 quadrature audits of Section~\ref{sec:l-K1}, the grid-BP calibration, and
 the closure-error measurements, which are specific to the stated
 innovation laws, correlation levels, chain lengths, and diffusion times.
+Interpretation rather than measurement: that the decline of the closure error
+with $t$ reflects the tilted posteriors becoming Gaussian --- consistent with
+the data, but not separated here from the attenuation of the Tweedie
+prefactor.
 Not concluded: closed forms for general (non-boundary) messages at
 $K \geq 2$; any locality law for the non-Gaussian score beyond the
-structural delimitation above; and any statement about learned scores. An
-earlier conjecture of this project, that the Laplace $K = 2$ posterior
-Hessian is approximately rank-two, proved regime-dependent under
-numerical tests and is not asserted.
+structural delimitation above; and any statement about learned scores. No
+low-rank structure is asserted for the Laplace $K = 2$ posterior Hessian: it
+holds only in a narrow regime.

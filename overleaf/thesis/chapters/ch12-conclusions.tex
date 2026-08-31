@@ -44,11 +44,16 @@ against $21.0\%$ at $t = 0.05$).
 \paragraph{The Gaussian-to-Laplace comparison.} The structural lesson is
 where exactness is lost: the tree, the two-sweep schedule, and the
 score--posterior identity survive any innovation law; what breaks is the
-representability of messages in a finite-dimensional family. The
-practical lesson is when it matters: the Gaussian closure is essentially
-free at moderate and large diffusion times, and expensive precisely in
-the small-$t$ regime where the score magnitude is amplified, though even
-there the score direction is preserved much better than its magnitude.
+representability of messages in a finite-dimensional family. What the
+surviving approximation computes is identified exactly
+(Theorem~\ref{thm:l-lmmse}): moment-projected sum--product returns the LMMSE
+estimator of the covariance-matched Gaussian model, so the comparison against
+grid BP measures full non-Gaussian posterior inference against the best
+second-order linear estimator, and nothing else. The practical lesson is when
+that price matters: the Gaussian closure is essentially free at moderate and
+large diffusion times, and expensive precisely in the small-$t$ regime where
+the score magnitude is amplified, though even there the score direction is
+preserved much better than its magnitude.
 
 \paragraph{Learning the innovation law.} Chapters~\ref{ch:em-method}
 and~\ref{ch:em-results} relax the assumption, held throughout the rest of
