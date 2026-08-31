@@ -46,6 +46,13 @@ Structure is worth an order of magnitude against networks & conditional &
   supplied information \emph{by construction}, which is the point of the
   measurement and does not go away. The budget objection, which did, was closed
   by tripling both caps at $\nseq=2048$: the ratio moves $-0.16 \pm 0.18$ \\
+Against a weight-shared (not merely unstructured) baseline the margin is
+$2.3$--$6.1\times$ & settled &
+  \texttt{exp\_31\_structured\_baseline.py}, sixteen seeds, all-site scored,
+  provenance-clean; the weight-shared window head beat two architectures able
+  to propagate further across the chain in the screening that selected it, so
+  the confirmed baseline is the simplest one tested, not the strongest
+  conceivable one \\
 Local score estimation is near-optimal away from mid $t$ & settled &
   the windowed estimator is the exact conditional expectation under strictly
   stationary initialisation; the initial-law mismatch was measured at a median
@@ -571,24 +578,34 @@ and the honest fix --- selecting each arm's stopping point on held-out data, as
 \S\ref{sec:rec-efficiency} now does for EM-BP and the network --- is not implemented for this rung.
 Any joint-versus-marginal margin from \texttt{629962} carries that caveat.
 
+\paragraph{Landed: the structure-aware baseline}
+(\codefile{experiments/exp\_31\_structured\_baseline.py}, jobs
+\texttt{641509}--\texttt{641514}, sixteen seeds, all three lanes complete,
+provenance-clean at commit \texttt{569a67c}). The measurement an outside review
+identified as the outstanding one: what survives of the headline ratio against
+a baseline that can represent chain inference, rather than the fixed window
+that closes most of it. Screened three architectures on development seeds ---
+the weight-shared window head, a dilated convolutional stack, and a
+bidirectional message-passing network, the last two able in principle to
+propagate across the whole chain --- and \textbf{the window head won}, at
+radius $2$. Confirmed at the headline protocol on the full sixteen frozen
+seeds, all-site scored: EM--BP is more accurate than the window head in every
+one of $192$ scored (seed, size, region) cells, by a factor rising from
+$2.34\times$ at $\nseq=32$ to $6.14\times$ at $\nseq=2048$ --- monotone
+\emph{increasing} with $\nseq$, unlike the unstructured comparison, which is
+consistent with the estimator's structure paying off more precisely as it has
+more data to use it on while the window's receptive field stays fixed. This
+replaces the withdrawn \texttt{exp\_12\_scaled} comparison in every document
+and closes the review's largest single open item. The table generator is
+\texttt{tools/make\_tab\_structured.py}, rewritten for this run's schema and
+refusing to run if the screened architecture ever changes or provenance ever
+fails, rather than silently reporting a stale assumption.
+
 \paragraph{Still out.}
 \begin{itemize}\itemsep3pt
 \item \textbf{Rung 4a at a matched convergence budget} (\texttt{629962}), eight seeds split by
       sample size into sixteen shards, at a $3000$-step cap under the per-sequence tolerance. Until
       it lands, the joint-versus-marginal margin above stays out of every document.
-
-\item \textbf{The structure-aware baseline}
-      (\codefile{experiments/exp\_31\_structured\_baseline.py}). The measurement an outside
-      review identified as the outstanding one: what survives of the headline ratio against a
-      baseline that can represent chain inference, rather than the fixed window that closes most
-      of the gap. Runs the headline protocol throughout --- all-site and predeclared-interior
-      scoring alongside the centre-site diagnostic, both arms checkpointed and selected on
-      validation --- and adds dilated-stack and bidirectional message-passing arms, which a window
-      head cannot match however much data it sees. Deployed through
-      \codefile{hpc/deploy\_clean.sh}, so its provenance is verifiable by construction, unlike
-      the \texttt{exp\_12\_scaled} comparison it replaces. Three seed-range lanes, jobs
-      \texttt{641509}--\texttt{641514}. Until it lands, no quantitative structure-aware claim
-      appears in any document; the note and the thesis carry the direction and its order only.
 
 \item \textbf{Capacity equivalence at a sufficient budget}
       (\codefile{experiments/exp\_32\_capacity\_equivalence.py}). The rerun that would settle
@@ -599,8 +616,12 @@ Any joint-versus-marginal margin from \texttt{629962} carries that caveat.
       hundred iterations --- the same capacity-versus-convergence-rate confound, one level up. Run
       to $2000$ iterations, the per-edge gain falls to ${\sim}6\times10^{-9}$ by $800$ and then
       plateaus, so $1200$ captures essentially all the real movement without pretending the strict
-      $10^{-9}$ tolerance is reachable. Jobs \texttt{641515}--\texttt{641520}; lane~a is complete
-      at $70/70$ cells, lanes~b and~c still running.
+      $10^{-9}$ tolerance is reachable. Jobs \texttt{641515}--\texttt{641520}; lanes~a and~c are
+      complete ($70/70$, $40/40$), lane~b reached $39/50$ before two consecutive six-hour shards
+      both ran out of wall time and a third resume shard (job \texttt{643778}) is in flight ---
+      \texttt{part\_sweep}'s per-cell flush and its own on-disk resume check make a third shard
+      safe to run against the same output directory rather than overwriting the first thirty-nine
+      cells.
 
       One artefact from this rerun must not be used. A contrast job (\texttt{639099}) fired early
       because its \texttt{afterany} dependency was satisfied by the \emph{cancellation} of a

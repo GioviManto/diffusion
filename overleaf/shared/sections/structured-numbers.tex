@@ -3,15 +3,14 @@
 %% The prose cites these and never types the numbers, for the reason given in
 %% tools/make_tab_efficiency.py: a typed number and a computed number drift, and
 %% nothing catches it.
-\newcommand{\cnnratiolo}{1.8}
-\newcommand{\cnnratiohi}{5.5}
-\newcommand{\cnnseeds}{16}
-\newcommand{\cnncells}{320}
-\newcommand{\cnnemwins}{313}
-\newcommand{\cnnagree}{82}
-\newcommand{\cnnmaxradius}{16}
-\newcommand{\cnnscaled}{true}
-%% Where the CNN wins, so the body can say it rather than imply it never does.
-\newcommand{\cnnlosses}{7}
-\newcommand{\cnnlosssizes}{32, 128}
-\newcommand{\cnnlossloweest}{5}
+\newcommand{\structratiolo}{2.3}
+\newcommand{\structratiohi}{6.1}
+\newcommand{\structseeds}{16}
+\newcommand{\structcells}{192}
+\newcommand{\structemwins}{192}
+\newcommand{\structarch}{weight-shared window head}
+%% Iteration-cap censoring rate for each arm, over the n_chains x seed cells
+%% (not further split by region, since region is a scoring choice made after
+%% fitting, not a separate fit).
+\newcommand{\structcapem}{22}
+\newcommand{\structcapwindow}{27}

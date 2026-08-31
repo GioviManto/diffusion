@@ -95,16 +95,18 @@ most of the margin turns out to be attributable to that choice rather than to
 estimation. A weight-shared window baseline --- the same object as a one-layer
 convolution --- closes the greater part of the gap, which means the headline
 figure should be read as an upper bound on the value of the structural
-assumption and not as its size. What survives against a baseline that can
-actually represent chain inference, rather than one restricted to a fixed
-window, is the quantity of real interest, and this thesis does not measure
-it: the comparison available here scores one site, at a shorter chain and a
-coarser noise schedule, under a budget that contracts as the training set
-grows (Section~\ref{sec:em-architecture}). The corrected experiment is
-specified in \codefile{experiments/exp\_31\_structured\_baseline.py} and its
-results are not in this thesis. What can be said without it is the direction
-and its order: roughly an order of magnitude against an unstructured
-network, and considerably less against a structure-aware one.
+assumption and not as its size: against a network with no locality prior the
+advantage is $\ratiolo$--$\ratiohi\times$ (RQ6, above), and it falls to
+$\structratiolo$--$\structratiohi\times$ once the baseline shares weights
+across sites. That second figure is now measured at the headline
+protocol, every site scored, both arms selected on a disjoint validation
+bundle and the whole comparison deployed through the provenance gate
+(Section~\ref{sec:em-architecture}) --- and the weight-sharing baseline was
+chosen by screening against two architectures built to propagate further
+across the chain, a dilated stack and a bidirectional message-passing
+network, without losing to either. The strongest amortised-inference
+baseline this thesis tested is, on this family and at these sizes, the
+simplest one screened.
 
 The chain-Markov assumption itself tolerates a violation it can absorb into
 its own fitted parameters (a shared global latent, up to the point where it

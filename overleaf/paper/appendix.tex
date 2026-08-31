@@ -821,37 +821,32 @@ the claim-level audit behind this revision is \codefile{REVISION\_AUDIT.md}.
 The headline comparison of Section~\ref{sec:networks} uses a fully connected network, which
 carries no locality prior and no weight sharing. Separating that from the structural assumption
 requires a weight-shared window predictor with radius and parameterisation selected on a
-validation bundle disjoint from test, and EM--BP refitted on the same chains. This is the
-comparison whose residual Section~\ref{sec:networks} identifies as the quantity of interest, and
-this appendix reports its status rather than a number, because the exploratory run that exists
-does not meet the standard the rest of this paper is held to.
+validation bundle disjoint from test, and EM--BP refitted on the same chains --- at the headline
+protocol, with every site scored, deployed and provenance-gated through
+\texttt{hpc/deploy\_clean.sh}. \texttt{experiments/exp\_31\_structured\_baseline.py} is that
+measurement: it replaces an earlier exploratory run whose provenance did not verify and whose
+protocol differed from the headline table's in four ways (\texttt{outputs/README\_exp12\_scaled.md}
+records the detail; no number from that run is cited here or in the main text).
 
-\paragraph{Why no table appears here.} The available run fails on provenance and on three
-protocol counts. It names a commit that does not define an override its own recorded command
-passes, so the source that produced it is not reconstructable
-(\texttt{outputs/README\_exp12\_scaled.md} has the detail). Its reported error is scored at a
-\emph{single} interior coordinate rather than across the sequence: at $\nsites=33$ and radius
-$16$ the interior slice is one site wide, so a centre-site comparison would be read as a
-whole-sequence one. Both network arms train for a fixed step count regardless of $\nseq$, so the
-number of times each training chain is presented falls by roughly $32\times$ from $\nseq=32$ to
-$\nseq=2048$, and a widening ratio under that protocol cannot be separated from the training
-budget shrinking. And its protocol differs from the headline table's throughout: $33$ sites, five
-noise levels and $C=4$, against $32$, twelve and $C=8$.
+\paragraph{Which architecture.} Three candidates were screened on development seeds, disjoint
+from the sixteen used below: the weight-shared window head, a dilated convolutional stack, and a
+bidirectional message-passing network, the last two able in principle to propagate across the
+whole chain. \textbf{The window head won}, at radius $2$: neither architecture built to propagate
+further outperformed one that structurally cannot. The confirmatory comparison below is therefore
+against a fixed-radius window head, not against the strongest conceivable amortised-inference
+baseline, and every claim that follows is scoped to that.
 
-What that run supports is one qualitative statement, which Section~\ref{sec:networks} makes and
-this paper does not go beyond: a locality-respecting, weight-shared baseline closes most of the
-gap that the fully connected network leaves open, so the headline ratio bounds the value of the
-structural assumption rather than measuring it. No quantitative claim is drawn from it, here or
-in the main text.
+\input{../shared/sections/tab-structured}
 
-\paragraph{The measurement that would settle it.}
-\texttt{experiments/exp\_31\_structured\_baseline.py} runs the headline protocol throughout, with
-all-site and predeclared-interior scoring alongside the centre-site diagnostic, both arms
-checkpointed and selected on validation, and deployment gated through
-\texttt{hpc/deploy\_clean.sh} so its provenance is verifiable by construction. It also adds
-baselines that can propagate across the whole chain --- dilated stacks and bidirectional message
-passing --- rather than only a fixed window, since a window head cannot represent chain inference
-however much data it is given. Its results are not in this paper.
+EM--BP is more accurate in every one of the $\structcells$ scored (seed, size, region) cells. The
+ratio is monotone increasing in $\nseq$ over the range tested, from $\structratiolo\times$ at the
+smallest size to $\structratiohi\times$ at the largest --- the opposite of a purely architectural,
+data-independent gap, and consistent with the estimator's advantage compounding as more data lets
+it use its correctly specified structure more precisely while the window head's receptive field
+stays fixed. Both arms are protected from an under-trained comparison by validation selection
+rather than a fixed budget: $\structcapem\%$ of EM--BP cells and $\structcapwindow\%$ of
+window-head cells hit their respective cap, flagged rather than excluded, since the reported
+checkpoint is whichever the validation bundle preferred.
 
 \section{Density-level recovery: the Hellinger figures}
 \label{app:hellinger}

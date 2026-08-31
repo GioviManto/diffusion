@@ -118,12 +118,11 @@ Against an \emph{unstructured} network trained by denoising score matching on id
 the optimisation budget of both arms selected on a held-out bundle, the structured estimator
 attains between \ratioloword{} and \ratiohiword{} times lower pointwise denoising error, at equal
 training-set size, across \nsizesused{} sizes --- a ratio of errors at fixed data, not a reduction
-in the data required to reach a fixed error. It bounds what the structural assumption is worth
-rather than measuring it: most of the margin is architectural, and a weight-shared window baseline
---- the same object as a one-layer convolution --- closes the greater part of it. What survives
-against a baseline that can represent chain inference at all is the quantity of interest and is
-smaller; we report its direction and order, and identify the provenance-clean comparison that
-would measure it as the outstanding experiment. The comparison is
+in the data required to reach a fixed error. Most of that margin is architectural: against a
+weight-shared window head, selected by screening over three candidate architectures and measured
+at the same headline protocol, all-site scored, the advantage falls to
+$\structratiolo$--$\structratiohi\times$ and is monotone increasing in the sample size rather than
+falling. The comparison is
 deliberately asymmetric in prior information --- the estimator is handed the Markov factorisation,
 the autoregressive form and a low-dimensional innovation family, the networks none of them --- so
 it measures the worth of that structure on this family, not a general ranking of the two
@@ -567,22 +566,19 @@ We observe no crossing between the two curves and therefore quote no data-equiva
 
 \paragraph{How much of this is the architecture?} A ratio against a fully connected network cannot
 separate knowing the Markov structure from sharing weights across sites, and the second is the
-cheaper explanation. Against a weight-shared window head instead --- radius and parameterisation
-selected on validation, EM--BP refitted on the same chains --- \emph{most of the headline gap is
-architectural}, and the residual is a small multiple rather than an order of magnitude
-(Appendix~\ref{app:structured}). It bounds what remains to be explained rather than measuring
-structure's worth: a window head trained to a fixed step count sees each chain fewer times as
-$\nseq$ grows, so a residual widening with $\nseq$ cannot be separated from the budget shrinking,
-and its error falls throughout. \emph{Whether the residual reflects optimisation, approximation or
-statistical efficiency is unresolved}, and a residual widening with $\nseq$ is not evidence that
-the convolution fails to acquire the structure: this design cannot separate that from its own
-budget schedule. So the scoped statement is: \emph{on this family, at these sizes, and with each
-arm's budget chosen on held-out data, the structured estimator attains lower pointwise denoising
-error at equal training-set size than the networks we trained --- by roughly an order of magnitude
-against a generic function approximator, and considerably less against a structure-aware one.} A
-window head is itself a weak test, since it cannot propagate past its radius however much data it
-sees; architectures that can --- dilated stacks, bidirectional message passing --- are what a
-stronger claim must survive (\S\ref{sec:limits}).
+cheaper explanation. Measured at the headline protocol --- every site scored, both arms selected
+on a disjoint validation bundle, deployed and provenance-gated (Appendix~\ref{app:structured}) ---
+against a weight-shared window head the advantage is $\structratiolo$--$\structratiohi\times$,
+increasing rather than falling with $\nseq$: EM--BP is more accurate in every one of the
+$\structcells$ scored cells. The window head was chosen by screening against a dilated
+convolutional stack and a bidirectional message-passing network, both able in principle to
+propagate across the whole chain, and beat neither: on this family, at these sizes, the strongest
+amortised-inference baseline tested is the simplest one screened. So the scoped statement is:
+\emph{on this family, at these sizes, and with each arm's budget chosen on held-out data, the
+structured estimator attains lower pointwise denoising error at equal training-set size than the
+networks we trained --- by roughly an order of magnitude against a generic function approximator,
+and by $\structratiolo$--$\structratiohi\times$ against a baseline that shares weights across
+sites.}
 
 
 
