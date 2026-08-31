@@ -1,19 +1,28 @@
 # Triage of the ChatGPT Pro reviewer pass (30 Aug 2026)
 
-> **STATUS, end of 30 Aug.** Groups A, C and E are done and committed
-> (`a8548ff`, `9bac337`, `86e3b81`, `bf007d3`); all four documents build
-> clean, paper at 9 body pages, thesis at 177. Group B is waiting on the
-> cluster. Group D (length) and the Chapter 7 framing decision are open and
-> need a steer — see the bottom of this file.
+> **STATUS: all twelve blocking items closed.** Commits `a8548ff`,
+> `9bac337`, `86e3b81`, `bf007d3`, `b233b79`, `d696bd5`, `9f97afa`,
+> `40c27ea`, `c8b4694`. All four documents build clean; paper 9 body pages,
+> thesis 181. Verified by grep that no surviving text asserts the generative
+> dissociation, capacity saturation past C=8, the 9-14x data claim, or a
+> 2-4x structured-baseline figure.
 >
-> Two things turned up that the reviewer did not flag and that mattered:
-> `build.sh` could never detect an undefined reference (tectonic keeps the
-> engine log to itself unless `--print` is passed), which is why
-> `rem:asymmetry` rendered as "??" for so long — fixing the gate exposed
-> four dangling refs and a duplicate label. And the sample-efficiency
-> figure was plotting the `nseq=8192` point that the table had withdrawn
-> for unrecoverable provenance, under a caption asserting the two could not
-> disagree.
+> Blocking item 12 (missing title page and abstract) was **not a defect**:
+> `thesis/main.tex` implements the university's own format, "Guide to the
+> University" section 10.3 -- no title page and no abstract in this file,
+> four preliminary pages, content from page 5. The system prepends them.
+>
+> Two things turned up that the reviewer did not flag and that mattered more
+> than several that were. `build.sh` could never detect an undefined
+> reference -- tectonic keeps the engine log to itself unless `--print` is
+> passed -- so the check silently matched nothing for every document, always;
+> that is why `rem:asymmetry` rendered as "??" until an outside reader saw
+> it. Fixing the gate exposed four dangling refs and a duplicate label. And
+> the sample-efficiency figure was plotting the `nseq=8192` point the table
+> had withdrawn for unrecoverable provenance, at the far right where it
+> carries most weight, under a caption asserting the two could not disagree.
+>
+> **Still open, and it needs your decision: length.** See the bottom.
 
 Source: two reviews requested via `questions/PROMPT_single.md` — a NeurIPS-AC
 review of paper+workshop (score 3/6 weak reject) and a Bocconi committee
@@ -186,11 +195,45 @@ priority and node-drain. Every document now says plainly that its results
 are not included, so nothing is blocked on it except the stronger claim
 itself.
 
-**Group D — length.** Thesis is 177pp against the reviewer's suggested
-120–140. The cuts they identify are Chapter 2's background arc, Appendices
-D–F (which re-derive what Ch2 covers), and Appendix B (AMP/TAP). This is a
-large structural change and depends on what you and Marc want the thesis to
-be, so it is not started.
+**Group D — length. THE ONE OPEN DECISION.** Thesis is 181pp against the
+reviewer's suggested 120–140. Measured page counts:
+
+    body            Ch1 10   Ch2 20   Ch3 6   Ch4 3   Ch5 17
+                    Ch6 10   Ch7 15   Ch8 9   Ch9 12  Ch10 6   = 108pp
+    appendices      A 3   B 6 (AMP/TAP)   C 5   D 12 (statmech)
+                    E 8 (stochastic)  F 6 (diffusion)  G 6  H 3  I 2  = 51pp
+
+The reviewer wants Chapter 2 cut back and Appendices D–F reduced to "only
+derivations needed for self-containment". I checked what actually depends on
+them: **Appendices D, E and F are referenced from Chapter 2 and nowhere
+else** — no research chapter (5–10) cites any of them. On that evidence the
+reviewer is right that they are background supporting background, and
+26 pages is the largest single block available.
+
+Appendix B (AMP/TAP) is a different case and I would keep it: it is cited
+from Ch1, Ch5, Ch6, Ch10, App C and App G, so it is genuinely woven in, and
+the reviewer's objection there was only to headlining it.
+
+**Why I have not done this cut.** It is large, hard to reverse, and turns on
+what the thesis is *for* rather than on any defect — and the specific
+material at risk is the statistical-mechanics background, in a thesis being
+examined with Marc Mézard involved. Cutting a statistical physicist's
+framing because a reviewer persona recommended it is exactly the kind of
+call that should not be made on my own judgement. The options:
+
+1. **Cut hard** (~40pp): Ch2 to ~12pp, Appendices D–F to ~12pp combined.
+   Lands near the reviewer's 140. Highest risk to the physics framing.
+2. **Cut the appendices only** (~14pp): leave Ch2 intact, reduce D–F to what
+   Ch2 actually needs. Lands ~167. Low risk, since nothing but Ch2 cites
+   them.
+3. **Leave it.** Length was explicitly filed by the reviewer under
+   "important but non-blocking". Nothing about the thesis's correctness
+   depends on it, and everything blocking is now fixed.
+
+My recommendation is **2** — it removes the duplication the reviewer
+identified without touching the argument or the framing, and it is the only
+one of the three that is clearly right regardless of what Marc wants the
+thesis to look like.
 
 **Chapter 7 framing.** The reviewer says the rotating ring currently reads
 as neither a second major contribution nor a short side study, and that
