@@ -16,8 +16,9 @@ log-density of progressively noised data,
   \score(x, t) \;=\; \nabla_x \log p_t(x),
   \label{eq:intro-score}
 \end{equation}
-which is all a model needs to know in order to reverse a noising process
-and turn pure noise back into data \citep{anderson1982reverse}. In
+which is the one object a model must learn in order to reverse a noising
+process: given the forward process, its schedule and its terminal law, the score
+determines the reverse drift \citep{anderson1982reverse}. In
 practice the score is approximated by a neural network trained by
 denoising score matching \citep{hyvarinen2005estimation,
 vincent2011connection}; the network is a black box, and the structure of
@@ -93,9 +94,9 @@ expectation propagation keep tractability by projecting each message back
 into a parametric family, so the approximation is in the messages
 themselves. Gaussian-sum filters widen that family without removing the
 restriction. Particle filters and smoothers place no parametric
-restriction but substitute Monte Carlo error, which is a different thing
-from no error and cannot serve as a reference one measures other methods
-against. Grid-based filtering for continuous-state HMMs is the closest
+restriction but substitute Monte Carlo error, which can be quantified but adds a
+second error term to every comparison, so that what an approximation costs and
+what the reference costs have to be disentangled before either can be read. Grid-based filtering for continuous-state HMMs is the closest
 relative of what is done here, and is normally treated as an
 approximation to be tolerated rather than as an object whose error is
 itself the measurement.
@@ -103,7 +104,7 @@ itself the measurement.
 Two things distinguish the present use. Deterministic quadrature is
 adopted precisely so that the reference carries \emph{no} sampling error
 and its discretisation error can be bounded separately and reported,
-which is what makes it usable as ground truth rather than as another
+which is what makes it usable as a reference rather than as another
 competitor. And the target is not filtering: it is the diffusion score at
 every noise level, obtained from the same recursion that learns the
 kernel from noised sequences. What the classical literature does not ask
@@ -141,16 +142,18 @@ of an iterative algorithm, and Chapter~\ref{ch:graphical} discusses
 architectures argued to do exactly that on tree-structured data. It is
 that the network does not \emph{perform} instance-wise inference: it
 produces the answer directly rather than by a search whose length adapts
-to the instance. Reversal is iterative and unbounded, but each step's
+to the instance. Reversal is iterative, over a horizon and a discretisation
+the sampler fixes, but each step's
 score still comes from the fixed-compute map, so the network stands to the
 inference as an \emph{amortisation} \citep{lecun2006tutorial}.
 
 Whether that amortisation is cheap or expensive is, in general,
 unmeasurable: it would require the very object the network was trained to
 stand in for. On the family of this thesis that object is available, so
-the question becomes an experiment. Nothing in the literature above
-measures it, because nothing in it has the exact target to measure
-against. What the measurement shows is reported in
+the question becomes an experiment. The works above do not measure it,
+because none of them combines a correlated non-Gaussian target computable across
+the whole noise schedule with an estimator that learns the transition from
+noised data and a baseline trained on the same data. What the measurement shows is reported in
 Chapter~\ref{ch:em-results}, including the respect in which it is
 \emph{not} a simple function of the sample size: the error ratio is not
 monotone in the training-set size, and no trend in it is claimed here.
@@ -307,7 +310,7 @@ structured estimator against --- and never as an instrument for
 establishing anything about the model itself. Claims in this thesis are
 established in three ways, and the difference is not cosmetic. Most are proved by explicit
 algebra (with the longer passages isolated in numbered \emph{toolboxes}).
-Others are verified by deterministic numerical checks against ground truth
+Others are verified by deterministic numerical checks against a reference
 computed by an independent method, in the spirit of the exactly solvable
 programme of \citet{biroli2023generative}; where an approximation is introduced
 (the Gaussian closure of BP messages, local truncations), its error is

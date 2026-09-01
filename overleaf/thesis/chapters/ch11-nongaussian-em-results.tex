@@ -270,15 +270,12 @@ a property of the discretisation and not of the innovation law. Separating the
 two would need a finer grid at fixed capacity, which is not run here.
 \end{remark}
 
-\noindent This supersedes a smaller earlier design --- six seeds, one training
-size, one initialisation, a fixed forty-iteration budget --- which reported the
-opposite sign and was read as capacity beginning to pay at $C=4$. That reading
-does not reproduce at higher replication and longer budget, and the most likely
-reason is the budget itself: forty iterations leaves the larger mixtures
-under-fitted, which regularises them, and running them to their plateau exposes
-what they do with the freedom. That explanation is consistent with the
-convergence measurement of Section~\ref{sec:em-convergence} but is not
-separately tested here.
+\noindent A smaller design --- six seeds, one training size, one initialisation
+and a fixed $\convbudget$-iteration budget --- reported the opposite sign, and
+the reversal is worth recording rather than quietly dropping: it does not
+reproduce at sixteen seeds and a plateau-stopped budget. Which of the two
+readings the budget produced, and by what mechanism, is not separately tested
+here; \compendium{} carries the comparison.
 
 \begin{remark}[Why the iteration budget, and not the capacity, has to be
 controlled]\label{rmk:em-capacity-confound}
@@ -292,8 +289,7 @@ $\convunsettled$ of the $\convunsettledof$ configurations in that sweep had not
 settled in the shape coordinate. Because a larger $C$ has more shape
 parameters to move within the same budget, under-iteration alone produces a
 curve that looks exactly like a capacity effect whether or not capacity is doing
-anything, and a direct check attributes roughly $96\%$ of the apparent capacity
-effect at that budget to convergence rate rather than to capacity. This is why
+anything. This is why
 any quantity resting on fitted or generated \emph{shape} at a fixed budget --- in
 particular the reverse-dynamics comparison of
 Section~\ref{sec:em-generative}, which reuses forty-iteration fits --- is read
