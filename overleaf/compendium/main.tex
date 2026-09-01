@@ -8,18 +8,58 @@
 \usepackage[numbers,sort&compress]{natbib}
 \usepackage{booktabs}
 \usepackage{capt-of}   % \captionof, used by the shared generated tables
+
 \usepackage{graphicx}
 \usepackage{microtype}
 \usepackage{tikz}
 \usetikzlibrary{positioning, arrows.meta, fit, calc, decorations.pathreplacing}
 \usepackage[colorlinks=true,linkcolor=black,citecolor=black,urlcolor=black,filecolor=black]{hyperref}
 \usepackage{fancyhdr}
-\usepackage{tcolorbox}
+\usepackage[most]{tcolorbox}
 \tcbuselibrary{skins,breakable}
 \usepackage{enumitem}
 
 \graphicspath{{../shared/figures/}}
 \input{../shared/notation}
+
+
+% ---------- carried over with the background chapters -------------------
+% Chapters 13-18 came out of the thesis, which defines these in its own
+% preamble. They are reproduced rather than shared because the two documents
+% render a few of them differently and a single file would have to fork anyway.
+\providecommand{\Nd}{\mathcal{N}}
+\providecommand{\R}{\mathbb{R}}
+\providecommand{\E}{\mathbb{E}}
+\providecommand{\Prob}{\mathbb{P}}
+\providecommand{\dd}{\mathrm{d}}
+\providecommand{\T}{\mathsf{T}}
+\providecommand{\Deltat}{\Delta_t}
+\providecommand{\Sig}{\Sigma}
+\providecommand{\Sigz}{\Sigma_0}
+\providecommand{\Sigt}{\Sigma_t}
+\providecommand{\Qz}{Q_0}
+\providecommand{\Qt}{Q_t}
+\providecommand{\score}{S}
+\providecommand{\kl}[2]{D_{\mathrm{KL}}\!\left(#1 \,\|\, #2\right)}
+\providecommand{\inner}[2]{\left\langle #1, #2 \right\rangle}
+\providecommand{\norm}[1]{\left\lVert #1 \right\rVert}
+\providecommand{\Deltat}{\Delta_t}
+\providecommand{\Sigz}{\Sigma_0}
+\providecommand{\inner}[2]{\left\langle #1, #2 \right\rangle}
+\providecommand{\kl}[2]{D_{\mathrm{KL}}\!\left(#1 \,\|\, #2\right)}
+\providecommand{\norm}[1]{\left\lVert #1 \right\rVert}
+\usepackage{etoolbox}
+\newcounter{toolbox}[chapter]
+\renewcommand{\thetoolbox}{\thechapter.\arabic{toolbox}}
+\newtcolorbox{toolbox}[2][]{%
+  breakable, enhanced,
+  colback=black!3, colframe=black!55,
+  boxrule=0.4pt, arc=1.2mm, left=2mm, right=2mm, top=1.5mm, bottom=1.5mm,
+  phantom={\refstepcounter{toolbox}\ifblank{#1}{}{\label{#1}}},
+  title={\small\bfseries Toolbox~\thetoolbox\ --- #2},
+  fonttitle=\normalfont, coltitle=white, colbacktitle=black!55,
+  before skip=1.2em, after skip=1.2em
+}
 % Radial partition function of the ring model (Chapter 12).
 \newcommand{\Zring}{\mathcal{Z}}
 
@@ -138,6 +178,26 @@ without it.
 
 \part{Case studies alongside the main line}
 \input{chapters/ch12-rotating-ring}
+
+% ------------------------------------------------------------------------
+% Part VII exists because the thesis was cut to length and none of this was
+% worth losing. Chapters 13-15 are the derivations that stood as the thesis'
+% Appendices D-F: the statistical mechanics, the stochastic calculus and the
+% diffusion-model background, in full rather than in the compressed form the
+% submitted document carries. Chapters 16-18 are older still -- the three
+% separate background chapters that were merged into the thesis' Chapter 2, at
+% their original length. They overlap each other and the chapters above; that
+% is what an unbounded companion document is for.
+% ------------------------------------------------------------------------
+\part{Background, at full length}
+\input{chapters/ch13-statmech-derivations}
+\input{chapters/ch14-stochastic-derivations}
+\input{chapters/ch15-diffusion-derivations}
+
+\part{The background chapters as first written}
+\input{chapters/ch16-statmech-long}
+\input{chapters/ch17-stochastic-long}
+\input{chapters/ch18-generative-long}
 
 \bibliographystyle{unsrtnat}
 \bibliography{references}

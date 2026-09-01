@@ -13,7 +13,7 @@ partition function and free energy, and the Ising energy), with the
 derivations carried out in full: the Boltzmann distribution is the
 stationary law of Langevin dynamics (Chapter~\ref{ch:stochproc}), the free
 energy is the variational principle behind the diffusion-model training
-objective (Chapter~\ref{ch:diffusion}), and sampling by simulating a
+objective (Chapter~\ref{ch:diffusion-long}), and sampling by simulating a
 physical process is statistical mechanics turned into an algorithm. The
 second half is the part of the literature review that most histories of
 machine learning skip: how spin glasses became the Hopfield network, how
@@ -30,9 +30,9 @@ starting there rather than with Hamilton's equations, because the same
 statement --- \emph{a physical trajectory is a stationary point of a
 functional} --- returns three more times in this thesis: as the free-energy
 principle of \S\ref{sec:free-energy}, as the variational bound that trains a
-diffusion model (Chapter~\ref{ch:diffusion}), and as the maximum-likelihood
+diffusion model (Chapter~\ref{ch:diffusion-long}), and as the maximum-likelihood
 problem solved by expectation--maximisation in
-Chapter~\ref{ch:em-method}. The objects change; the shape of the argument
+Chapter~\ref{ch:estimation}. The objects change; the shape of the argument
 does not.
 
 Let a system be described by generalised coordinates $q(t)$ and let the
@@ -53,7 +53,7 @@ It is usually called the principle of \emph{least} action, and that is
 slightly wrong. The physical path is stationary, not necessarily minimal ---
 it can be a saddle. The same caution applies everywhere the pattern recurs:
 expectation--maximisation converges to a stationary point of the likelihood,
-not to a global maximum (Chapter~\ref{ch:em-method}), and it is a recurring
+not to a global maximum (Chapter~\ref{ch:estimation}), and it is a recurring
 source of false confidence to read ``the algorithm converged'' as ``the
 algorithm found the best answer''.
 \end{remark}
@@ -127,7 +127,7 @@ configurations. On two-dimensional lattices Onsager computed it exactly
 variational methods, message passing) exists because of this wall. On
 \emph{trees}, however, $Z$ and all marginals are computable exactly in
 time linear in the system size by the transfer-matrix recursion, the same
-recursion that Chapter~\ref{ch:graphs} presents as belief propagation.
+recursion that Chapter~\ref{ch:graphical} presents as belief propagation.
 This tractable island is precisely where our research model lives.
 
 \paragraph{(ii) Collective order emerges.} For $\beta$ beyond a critical
@@ -170,7 +170,7 @@ the cavity and TAP equations are recursions on \emph{local} quantities
 that solve a \emph{global} inference problem, and they are the direct
 ancestors of the message-passing algorithms \citep{mezard2009information,
 zdeborova2016statistical, krzakala2024statphys} that
-Chapter~\ref{ch:graphs} develops and that the research chapters deploy on
+Chapter~\ref{ch:graphical} develops and that the research chapters deploy on
 diffusion scores. The connection between disordered magnets and these
 algorithms is historical descent, not analogy.
 
@@ -290,7 +290,7 @@ the modern deep-learning era \citep{krizhevsky2012imagenet,
 lecun2015deep} and largely left equilibrium physics behind. The
 \emph{generative} branch, the one this thesis lives in, kept the Gibbsian
 core: a model is an energy, learning is moment matching, sampling is
-dynamics. Chapter~\ref{ch:diffusion} follows that branch from
+dynamics. Chapter~\ref{ch:diffusion-long} follows that branch from
 energy-based models to diffusion.
 
 \section{The statistical mechanics of learning}\label{sec:statmech-learning}

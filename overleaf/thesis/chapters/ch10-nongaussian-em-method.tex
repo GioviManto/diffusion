@@ -299,59 +299,47 @@ measurement, and it is the one that most directly qualifies the results of
 Chapter~\ref{ch:em-results}: how many EM iterations the algorithm of
 Section~\ref{sec:em-algorithm} actually needs.
 
-Table~\ref{tab:em-convergence} fits two arms of the same chains under identical
-initialisation and budget, one seeing clean data and the other the same chains
-once through the OU channel:
+Table~\ref{tab:em-convergence} shows what the channel costs, in two parts: the
+through-channel fit at four updates, and where a clean and a channel arm each
+finish.
 
-\begin{center}
-\begin{minipage}{\linewidth}\centering
-\captionof{table}[What the channel costs in convergence rate]{What the observation channel costs in convergence rate, not in attainable accuracy. Two arms of the same chains, identical initialisation and budget, one seeing clean transition pairs and the other the same chains once through the OU channel (generating values: $\alpha = 0.85$, innovation kurtosis $3.0$). Both arms approach the same fitted summaries within this experiment's resolution; what the channel changes is the rate. A finite mixture does not contain the generating law exactly, so what is approached is the best fit within the family rather than the law itself.}
-\label{tab:em-convergence}
-\begin{tabular}{@{}rcccc@{}}
-\toprule
-iteration & \multicolumn{2}{c}{clean} & \multicolumn{2}{c}{through the channel} \\
- & $\alpha$ & kurtosis & $\alpha$ & kurtosis \\
-\midrule
-1   & 0.8473 & 1.470 & 0.4276 & 0.112 \\
-30  & 0.8467 & 2.858 & 0.8366 & 1.527 \\
-120 & 0.8473 & 3.014 & 0.8464 & 3.164 \\
-600 & 0.8475 & 3.132 & 0.8466 & 3.096 \\
-\bottomrule
-\end{tabular}
-\end{minipage}
-\end{center}
-\noindent(truth: $\alpha=0.85$, innovation kurtosis $3.0$). Both arms reach
-the truth; what differs is the \emph{rate}. On clean data $\alpha$ is
-converged after a single M-step, since nothing about it is hidden at the
-chain level. Through the channel it takes on the order of $30$--$60$
-iterations --- the missing-information mechanism of
-\citet{dempster1977maximum} appearing directly in the convergence rate, where
-the theory places it. The innovation shape is slower still, and on \emph{clean}
-data already: tens of iterations against one for $\alpha$, because the
-mixture label is itself a latent variable even without an observation
-channel. The channel compounds this. A dedicated sweep measured the cost
-directly, recording for each fit the first iteration after which a coordinate
-stays within a fixed relative tolerance of its final value. At
+\input{../shared/sections/tab-convergence}
+
+\noindent The two halves say different things. The trace shows the coordinates
+separating: the correlation is essentially in place by thirty updates while the
+innovation shape is still climbing at a hundred and twenty, because the mixture
+label is a latent variable of its own and the channel compounds the missing
+information --- the mechanism of \citet{dempster1977maximum} appearing in the
+convergence rate, where the theory places it. The endpoints show that this is a
+cost in rate and not in where the fit lands: the clean and channel arms finish
+within $0.002$ of each other on the correlation and within a fifth of a unit on
+excess kurtosis, both close to the generating values.
+
+That is one configuration. A dedicated sweep measured the cost across sixteen
+seeds, recording for each fit the first update after which a coordinate stays
+within a fixed relative tolerance of its value at the end of the run. At
 $\nseq = \convsize$, $C = \convcomps$ and the \convdesign{} noise design, over
-$\convseeds$ seeds run to $\convcap$ iterations, the correlation coefficient
-settles at a median of $\convrhomed$ iterations and the innovation shape at
+$\convseeds$ seeds run to $\convcap$ updates, the correlation coefficient
+settles at a median of $\convrhomed$ updates and the innovation shape at
 $\convshapemed$, the largest observed value being $\convshapemax$. Forming the
 ratio within each fit and then taking the median over fits gives $\convratio$;
 the quotient of the two medians is $\convratioofmedians$, and the paired figure
-is the one reported, because the two coordinates are measured on the same fit.
-Two things about what is being measured. ``Settled'' means the first update
-after which the coordinate stays within a fixed relative tolerance of its value
-at the end of the run --- $10^{-3}$ for $\alpha$, $2\times10^{-2}$ for the
-excess kurtosis --- so it is a statement about the stability of a trace, not
-about distance to an optimiser. And the run has to be long enough for that to
-mean anything: the sweep was run at two lengths, and these medians come from the
-$\convcap$-update shard, the only one in which no configuration settles near its
-own cap. Against those numbers the fixed budget of $\convbudget$ iterations that
-several experiments in Chapter~\ref{ch:em-results} used as a default, before
-this measurement existed, is short of the shape coordinate's median by about a
-factor of six, and leaves $\convunsettled$ of the $\convunsettledof$
-configurations in the sweep --- both shards, since censoring can only shorten a
-settling time and so cannot inflate this count --- unsettled in it.
+is the one reported, because both coordinates are measured on the same fit.
+
+Two things about what that measures. ``Settled'' is trace stability --- the
+first update after which a coordinate stays within $10^{-3}$ of its end-of-run
+value for $\alpha$, or $2\times10^{-2}$ for the excess kurtosis --- and not
+distance to an optimiser; a coordinate can sit still while the density it
+belongs to moves along a shallow direction. And the run has to be long enough
+for the statistic to mean anything: the sweep was run at two lengths, and these
+medians come from the $\convcap$-update shard, the only one in which no
+configuration settles near its own cap. Against them, the fixed budget of
+$\convbudget$ iterations that several experiments in
+Chapter~\ref{ch:em-results} used as a default, before this measurement existed,
+falls short of the shape coordinate's median by about a factor of six and
+leaves $\convunsettled$ of the sweep's $\convunsettledof$ configurations ---
+both shards, since censoring can only shorten a settling time and so cannot
+inflate this count --- unsettled in it.
 
 \begin{remark}[Fixed budgets compare convergence rates, not estimators]
 \label{rmk:em-fixed-budget}

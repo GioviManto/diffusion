@@ -13,7 +13,7 @@ on every page of the research chapters); and the Fokker--Planck and
 time-reversal theorems of
 Sections~\ref{sec:fokker-planck}--\ref{sec:reversal} are the
 mathematical basis of the generative programme reviewed in
-Chapter~\ref{ch:diffusion}. Standard references are
+Chapter~\ref{ch:diffusion-long}. Standard references are
 \citet{robert2004monte, brockwell1991time, oksendal2003stochastic,
 gardiner2009stochastic, risken1996fokker}.
 
@@ -59,24 +59,24 @@ measurable $A \subseteq \mathcal{X}$,
 \begin{equation}
   \Prob\big(X_{k+1} \in A \,\big|\, X_k, X_{k-1}, \dots, X_0\big)
   \;=\; \Prob\big(X_{k+1} \in A \,\big|\, X_k\big) .
-  \label{eq:markov-property}
+  \label{eq:markov-property-long}
 \end{equation}
 The conditional law is encoded by a \emph{transition kernel}
 $M(x' \,|\, x)$: a density (or matrix, for discrete $\mathcal{X}$) with
 $\int M(x'|x)\,\dd x' = 1$ for every $x$.
 \end{definition}
 
-The Markov property \eqref{eq:markov-property} is exactly a statement
+The Markov property \eqref{eq:markov-property-long} is exactly a statement
 about \emph{factorisation}: the joint law of the first $K$ states is
 \begin{equation}
   p(x_0, x_1, \dots, x_{K-1})
   \;=\; p_0(x_0)\, \prod_{k=0}^{K-2} M(x_{k+1} \,|\, x_k) .
-  \label{eq:chain-factorisation}
+  \label{eq:chain-factorisation-long}
 \end{equation}
 This factorisation is the most heavily used equation of the thesis. It says that the joint distribution of a Markov trajectory is a
 product of \emph{local} terms, each touching two consecutive variables:
 the structure that makes the chain a tree in the factor-graph sense of
-Chapter~\ref{ch:graphs}, that makes its precision matrix tridiagonal in
+Chapter~\ref{ch:graphical}, that makes its precision matrix tridiagonal in
 the Gaussian case of Chapter~\ref{ch:gaussian}, and that makes belief
 propagation exact.
 
@@ -224,7 +224,7 @@ one unknown object:
 where time runs backwards from $T$ to $0$ and $\bar W$ is a reverse-time
 Wiener process. The correction to the drift is the \emph{score}
 $\nabla_x \log p_t$ of the noised marginal: the object defined in
-\eqref{eq:intro-score} and computed exactly, for Markov-chain data, in
+\eqref{eq:score-final} and computed exactly, for Markov-chain data, in
 the research chapters. A heuristic that makes \eqref{eq:reverse-sde}
 plausible follows from the Fokker--Planck equation: rewriting its
 diffusion term as a transport term,
@@ -246,15 +246,15 @@ rigorous statement and proof are in \citet{anderson1982reverse}.
 A closing change of perspective, to set up the research problem. In this
 chapter Markov chains began as \emph{algorithms}: their stationary law
 was the target, their trajectory a means to an end. From
-Chapter~\ref{ch:gaussian} onwards the chain \eqref{eq:ar1} plays the
+Chapter~\ref{ch:gaussian} onwards the chain \eqref{eq:ar1-long} plays the
 opposite role: it is the \emph{data-generating process}, its trajectory
 $(a_0, \dots, a_{K-1})$ is one data point (a video of $K$ frames), and
 the object of interest is the probability law of the whole trajectory
 after each frame has been independently corrupted by the OU channel
-\eqref{eq:ou-channel}. The factorisation \eqref{eq:chain-factorisation}
+\eqref{eq:ou-channel}. The factorisation \eqref{eq:chain-factorisation-long}
 then stops being a computational convenience and becomes the structure to
 be discovered: the research programme of this thesis asks how much of
-\eqref{eq:chain-factorisation} survives noising, and how an inference
+\eqref{eq:chain-factorisation-long} survives noising, and how an inference
 algorithm, or a neural network, can exploit what survives. In one
 sentence: the OU channel destroys data at a known rate, the
 Fokker--Planck equation describes the destruction at the level of

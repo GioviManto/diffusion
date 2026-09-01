@@ -1,5 +1,5 @@
 \chapter{From Energy-Based Models to Diffusion and Flows}
-\label{ch:diffusion}\label{ch:ebm}
+\label{ch:diffusion-long}\label{ch:ebm}
 
 Chapter~\ref{ch:statmech} left the generative branch of machine learning
 at the Boltzmann machine: a model is an energy, learning is moment
@@ -125,7 +125,7 @@ whatsoever on $p_0$. Three readings will recur:
   \item \emph{Algorithmic}: for sequence data with a Markov prior, that
   inference problem lives on a tree-shaped graph, so the score is
   computable by message passing, the programme made precise in
-  Chapter~\ref{ch:graphs} and executed in Chapter~\ref{ch:gaussian}.
+  Chapter~\ref{ch:graphical} and executed in Chapter~\ref{ch:gaussian}.
 \end{enumerate}
 
 For \emph{vector-valued} data $a \in \R^K$ noised coordinate-wise,
@@ -142,7 +142,7 @@ couples the frames. Equation \eqref{eq:tweedie-joint} is the precise
 reason the \emph{joint} score differs from the per-frame marginal score,
 a distinction that is easy to blur and whose importance for structured
 data was impressed on this project in supervision
-(Chapter~\ref{ch:development}); Chapter~\ref{ch:gaussian} quantifies
+(Chapter~\ref{ch:probability}); Chapter~\ref{ch:gaussian} quantifies
 exactly how much coupling the conditioning induces, as a function of $t$.
 
 \section{The statistical physics of generative diffusion}
@@ -243,7 +243,7 @@ gradient \eqref{eq:bm-learning}. The central idea is to track training
 through the singular value decomposition of the weight matrix,
 \begin{equation}
   W \;=\; \sum_{\gamma=1}^{r} w_\gamma\, u_\gamma \bar u_\gamma^\T ,
-  \label{eq:rbm-svd}
+  \label{eq:rbm-svd-gen}
 \end{equation}
 whose modes $(u_\gamma, \bar u_\gamma)$ act as candidate order
 parameters: the magnetisation of the visible layer along mode $\gamma$,
@@ -344,6 +344,6 @@ survives a Gaussian parametrisation of the messages when the data are not
 Gaussian? What limited guidance does that give for score architectures?
 Answering these questions, in the fully solvable setting of the AR(1)
 chain and its non-Gaussian perturbations, is the contribution of
-Chapters~\ref{ch:gaussian} and~\ref{ch:laplace}, with the inference tools
-prepared in Chapter~\ref{ch:graphs} and the path that led to the precise
-formulation recorded in Chapter~\ref{ch:development}.
+Chapters~\ref{ch:gaussian} and~\ref{ch:numerics}, with the inference tools
+prepared in Chapter~\ref{ch:graphical} and the path that led to the precise
+formulation recorded in Chapter~\ref{ch:probability}.

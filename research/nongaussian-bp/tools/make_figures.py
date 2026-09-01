@@ -299,6 +299,91 @@ ARCH_STYLE = {
 }
 
 
+# ---------------------------------------------------------------------------
+# The K=2 toy model: what the coupling looks like, and what a per-frame view
+# throws away.
+#
+# WHY THIS IS HERE. Figure 4.1 was the one figure in the thesis with no
+# surviving plotting code -- the script that produced it lived in the old
+# thesis/ tree, removed during the restructuring of 18 August 2026 and never
+# committed. Appendix C disclosed that, which is better than naming a script
+# that does not exist, but a figure nobody can regenerate is a standing
+# reproducibility hole in a document whose whole argument is that its numbers
+# are traceable. This recreates it from the closed forms its caption states, so
+# the exception can be removed rather than explained.
+#
+# Everything is analytic. A Gaussian-mixture prior on x0 with x1 = x0 + c + eta
+# makes the clean pair a Gaussian mixture; the variance-preserving channel adds
+# a multiple of the identity to every component covariance and scales every
+# mean, so the noised pair is a Gaussian mixture too, and its score is the
+# responsibility-weighted average of the component scores.
+# ---------------------------------------------------------------------------
+
+TOY_MEANS = (-2.0, 0.0, 2.0)   # trimodal prior on x0
+TOY_PRIOR_SD = 0.42
+TOY_DRIFT = 1.0                # c
+TOY_INNOV_SD = 0.45            # sigma
+TOY_T = 0.15                   # diffusion time
+
+
+def fig_toymodel_score() -> None:
+    a = float(np.exp(-TOY_T))                 # e^{-t}
+    d = float(1.0 - np.exp(-2.0 * TOY_T))     # 1 - e^{-2t}
+
+    # Clean pair per component: x0 ~ N(m, s^2), x1 = x0 + c + eta.
+    s2, g2 = TOY_PRIOR_SD ** 2, TOY_INNOV_SD ** 2
+    comps = []
+    for m in TOY_MEANS:
+        mu = np.array([m, m + TOY_DRIFT])
+        cov = np.array([[s2, s2], [s2, s2 + g2]])
+        # Variance-preserving channel, coordinatewise: x = a*clean + sqrt(d)*z.
+        comps.append((a * mu, a * a * cov + d * np.eye(2)))
+
+    lim, n = 4.4, 240
+    gx = np.linspace(-lim, lim, n)
+    X0, X1 = np.meshgrid(gx, gx)
+    pts = np.stack([X0.ravel(), X1.ravel()], axis=1)
+
+    dens = np.zeros(pts.shape[0])
+    grad = np.zeros_like(pts)
+    for mu, cov in comps:
+        P = np.linalg.inv(cov)
+        z = pts - mu
+        q = np.einsum("ni,ij,nj->n", z, P, z)
+        w = np.exp(-0.5 * q) / (2 * np.pi * np.sqrt(np.linalg.det(cov)))
+        dens += w / len(comps)
+        # Each component contributes -P z, weighted by its responsibility; the
+        # mixture score is the weighted average, which is what makes it
+        # nonlinear.
+        grad += (w / len(comps))[:, None] * (-(z @ P))
+    score = grad / np.maximum(dens, 1e-300)[:, None]
+
+    D = dens.reshape(n, n)
+    fig, ax = plt.subplots(1, 2, figsize=(7.0, 3.2))
+
+    ax[0].contour(X0, X1, D, levels=9, colors="#222222", linewidths=0.7)
+    ax[0].set_title(r"noised joint density $p_t(x_0, x_1)$")
+
+    ax[1].contour(X0, X1, D, levels=9, colors="#BBBBBB", linewidths=0.6)
+    step = 14
+    sel = (slice(None, None, step), slice(None, None, step))
+    U = score[:, 0].reshape(n, n)[sel]
+    V = score[:, 1].reshape(n, n)[sel]
+    mask = D[sel] > D.max() * 0.02      # no arrows where there is no density
+    ax[1].quiver(X0[sel][mask], X1[sel][mask], U[mask], V[mask],
+                 color="#222222", width=0.004, scale=90.0)
+    ax[1].set_title(r"joint score field $\nabla \log p_t$")
+
+    for k in (0, 1):
+        ax[k].set_xlabel(r"$x_0$")
+        ax[k].set_ylabel(r"$x_1$")
+        ax[k].set_xlim(-lim, lim)
+        ax[k].set_ylim(-lim, lim)
+        ax[k].set_aspect("equal")
+        ax[k].grid(False)
+    save(fig, "fig_toymodel_score")
+
+
 def fig_capacity() -> None:
     """Held-out evidence against a single Gaussian innovation, by capacity.
 
@@ -765,6 +850,7 @@ FIGURES = {
     "fig_closure": fig_closure,
     "fig_ring": fig_ring,
     "fig_sample_efficiency": fig_sample_efficiency,
+    "fig_toymodel_score": fig_toymodel_score,
     "fig_capacity": fig_capacity,
     "fig_nonmarkov": fig_nonmarkov,
     "fig_screening": fig_screening,

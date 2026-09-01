@@ -14,11 +14,11 @@ $\Nd(0, \sigma_\eta^2)$ innovations; define
 \begin{equation}
   a_{k+1} \;=\; \alpha\, a_k + \eta_k ,
   \qquad k = 0, 1, \dots, K-2 .
-  \label{eq:ar1}
+  \label{eq:ar1-long}
 \end{equation}
 The transition kernel is Gaussian,
 $M(a' | a) = \Nd(a'; \alpha a, \sigma_\eta^2)$, and the joint law of the
-trajectory follows from \eqref{eq:chain-factorisation}. Throughout the
+trajectory follows from \eqref{eq:chain-factorisation-long}. Throughout the
 thesis we use the stationary normalisation
 $\sigma_\eta^2 = 1 - \alpha^2$ and start the chain in its stationary law,
 $a_0 \sim \Nd(0,1)$, so that every frame has unit marginal variance. A
@@ -125,7 +125,7 @@ structure: for a Markov chain, $\pi(x_k | x_{\setminus k})$ depends only
 on the two neighbours, and for the bipartite RBM of
 Section~\ref{sec:boltzmann-machines} each layer updates in one parallel
 step. Inference cost follows graph structure, a principle that
-Chapter~\ref{ch:graphs} makes systematic.
+Chapter~\ref{ch:graphical} makes systematic.
 
 For continuous $x$ and differentiable energy, a different design
 principle uses gradients. Consider the discrete-time update
@@ -140,7 +140,7 @@ probability; the noise maintains exploration. Two observations prepare
 what follows. First, \eqref{eq:ula} requires only the \emph{score}
 $\nabla \log \pi$; the normalising constant is never needed. This is
 precisely why the score is the natural object for generative modelling
-(Chapter~\ref{ch:diffusion}), and why so much of this thesis is devoted
+(Chapter~\ref{ch:diffusion-long}), and why so much of this thesis is devoted
 to computing scores exactly. Second, as $\epsilon \to 0$ the recursion
 \eqref{eq:ula} becomes a stochastic differential equation, the Langevin
 diffusion, whose stationary law is exactly $\pi$. Making that limit

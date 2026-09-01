@@ -286,7 +286,7 @@ The second derivation deserves a remark. The Boltzmann distribution is
 not a statement about molecules but about \emph{inference under
 constraints}. Any time we posit a model of the form
 $p(x) \propto e^{-E(x)}$, as we will for Markov random fields
-(Chapter~\ref{ch:graphs}) and energy-based models
+(Chapter~\ref{ch:graphical}) and energy-based models
 (Appendix~\ref{app:diffusion-deriv}), we are doing statistical mechanics, whether the
 variables are spins, pixels, or the frames of a video.
 
@@ -364,7 +364,7 @@ transitions are the non-analyticities of $F$ where the winner changes.
 There is one more characterisation of $F$ worth recording, because it is
 the statistical-mechanics form of the variational principle that
 underlies both the training objective of diffusion models
-(Chapter~\ref{ch:diffusion}) and the Bethe free energies of message
+(Chapter~\ref{ch:diffusion-long}) and the Bethe free energies of message
 passing. For \emph{any} trial density $\mu$,
 \begin{equation}
   \underbrace{\E_\mu[H] - \tfrac{1}{\beta} S[\mu]/k_B}_{\text{variational free energy } F[\mu]}
@@ -435,7 +435,7 @@ gradient \eqref{eq:bm-learning}. The central idea is to track training
 through the singular value decomposition of the weight matrix,
 \begin{equation}
   W \;=\; \sum_{\gamma=1}^{r} w_\gamma\, u_\gamma \bar u_\gamma^\T ,
-  \label{eq:rbm-svd}
+  \label{eq:rbm-svd-long}
 \end{equation}
 whose modes $(u_\gamma, \bar u_\gamma)$ act as candidate order
 parameters: the magnetisation of the visible layer along mode $\gamma$,
