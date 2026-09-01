@@ -6,18 +6,21 @@
 \captionof{table}{EM--BP against the screened structure-aware baseline
 (a weight-shared window head, radius and parameterisation selected on a
 validation bundle disjoint from test, at the headline protocol throughout).
-Ratio is risk(window)/risk(EM--BP), paired per seed, 16 seeds
-$\pm$ one s.e. \emph{All} scores every site; \emph{centre} is the
-single-site diagnostic the retired comparison used, kept for continuity.}
+Risks are all-site and averaged over the 16 seeds; the ratio is
+risk(window)/risk(EM--BP) formed within each seed and then averaged, $\pm$ one
+s.e. \emph{All} scores every site, and is the headline; \emph{centre} is a
+single-site diagnostic. A third region, the predeclared interior slice, is scored
+in the stored output and used for architecture selection but not reported here.}
 \label{tab:structured}
-\begin{tabular}{rcc}
+\begin{tabular}{rcccc}
 \toprule
-$\nseq$ & ratio, all sites & ratio, centre site \\
+ & \multicolumn{2}{c}{risk, all sites} & \multicolumn{2}{c}{ratio} \\
+$\nseq$ & EM--BP & window & all sites & centre site \\
 \midrule
-32   & $2.34 \pm 0.26$ & $2.04 \pm 0.24$ \\
-128  & $2.82 \pm 0.30$ & $2.35 \pm 0.26$ \\
-512  & $3.58 \pm 0.18$ & $3.25 \pm 0.18$ \\
-2048 & $6.14 \pm 0.45$ & $5.43 \pm 0.39$ \\
+32   & $0.1005$ & $0.2006$ & $2.34 \pm 0.26$ & $2.04 \pm 0.24$ \\
+128  & $0.0652$ & $0.1594$ & $2.82 \pm 0.30$ & $2.35 \pm 0.26$ \\
+512  & $0.0394$ & $0.1353$ & $3.58 \pm 0.18$ & $3.25 \pm 0.18$ \\
+2048 & $0.0224$ & $0.1267$ & $6.14 \pm 0.45$ & $5.43 \pm 0.39$ \\
 \bottomrule
 \end{tabular}
 \end{center}

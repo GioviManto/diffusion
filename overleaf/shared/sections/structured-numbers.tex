@@ -6,7 +6,14 @@
 \newcommand{\structratiolo}{2.3}
 \newcommand{\structratiohi}{6.1}
 \newcommand{\structseeds}{16}
+\newcommand{\structsizes}{4}
+%% \structcells counts (seed, size, region) triples across THREE regions, which
+%% is why it is 192 and not the 128 a two-column table suggests. It is a
+%% descriptive diagnostic: the regions and sizes share fitted models and data, so
+%% the inferential unit for each displayed row is \structseeds paired seeds.
 \newcommand{\structcells}{192}
+\newcommand{\structregions}{3}
+\newcommand{\structregionlist}{all, bulk, centre}
 \newcommand{\structemwins}{192}
 \newcommand{\structarch}{weight-shared window head}
 %% Iteration-cap censoring rate for each arm, over the n_chains x seed cells
