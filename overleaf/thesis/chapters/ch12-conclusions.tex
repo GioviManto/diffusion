@@ -149,7 +149,9 @@ Within the Gaussian benchmark, local score computations are near-optimal
 away from intermediate diffusion times, and a local algorithm is preferable to
 a banded linear readout. The receptive-field scaling
 $r \gtrsim \xi \log(1/\varepsilon)$ with $\xi = 1/\log(1/q)$ follows from the
-\emph{measured} geometric decay of the windowed estimator's error over
+\emph{measured} geometric decay of the error of radius-$r$ windowed
+\emph{inference} --- exact BP run on a window of the chain, not the windowed
+network baseline of Section~\ref{sec:em-architecture} --- over
 $r = 2,\dots,13$, not from the exact influence-coefficient result, which does
 not by itself cover the boundary conditions windowing introduces; it is an
 empirical scaling over the tested range rather than a theorem. Those are
@@ -181,7 +183,7 @@ rather than at tolerance for every cell above $C=\capcappedfrom$.
 Section~\ref{sec:em-nonmarkov} probe exactly two violations of the Markov
 assumption; they establish that the two are not interchangeable in effect,
 not a general theory of how much non-Markov structure a chain estimator
-tolerates. (vii) The image and video extensions of the EM/BP estimator,
+tolerates. (vii) The image and video extensions of the EM--BP estimator,
 explored in the underlying research package, are outside the scope of
 this thesis and are not reported here.
 
@@ -189,7 +191,7 @@ this thesis and are not reported here.
 
 Reverse dynamics is the largest thing left open here:
 Section~\ref{sec:em-generative} integrates the reverse SDE
-under the estimated EM/BP score and under two trained neural scores, but on
+under the estimated EM--BP score and under two trained neural scores, but on
 fits the convergence analysis shows to be unsettled, so the comparison needs
 redoing with estimators selected on a convergence criterion before it can
 answer the question it was built for. Discrete chains remain untouched by

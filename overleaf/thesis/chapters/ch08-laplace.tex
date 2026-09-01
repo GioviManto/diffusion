@@ -255,12 +255,16 @@ grid self-convergence error remains $10^4$ to $10^7$ times smaller than
 every effect measured below. Within this regime we treat grid BP as the
 reference score; outside it no claim is made.
 
-\begin{remark}[Two symbols that are easy to swap]
+\begin{remark}[Symbols that are easy to swap]
 Throughout this thesis $M$ is the number of \emph{grid points} representing a
-message and $N$ is the number of training \emph{sequences}; they are
+message and $\nseq$ is the number of training \emph{sequences}; they are
 independent, and every configuration states both. The companion paper uses
 $M$ for the sequence count and a separate symbol for the grid, so a figure
 quoting ``$M=401$'' here and ``$M=4096$'' there refers to different objects.
+Two more pairs, for the same reason. The chain length is $K$ and its internal
+index is $u$, never $t$, which is reserved for diffusion time throughout. And
+$q$ always means the geometric decay rate $q(\alpha,t)$ of
+Section~\ref{sec:g-bulk}; the innovation variance is $\ivar$, never $q$.
 \end{remark}
 
 All score errors are amplified posterior-mean errors: for any two solvers
@@ -300,7 +304,7 @@ of \eqref{eq:bp-fwd}--\eqref{eq:bp-bwd} that applies $\Pi_{\mathrm{G}}$ to each
 message right after every transition integral, multiplying by the site's unary
 likelihood before the next. Take the chain \eqref{eq:l-chain-prior} with
 $\alpha \neq 0$, Gaussian unary likelihoods, $\E[a_0] = 0$, an innovation law
-with mean zero and finite variance $q$, and an initial message that is Gaussian
+with mean zero and finite variance $\ivar$, and an initial message that is Gaussian
 or projected by $\Pi_{\mathrm{G}}$. Then its posterior means are exactly those
 of the \emph{covariance-matched Gaussian model}:
 \begin{equation}
@@ -310,7 +314,7 @@ of the \emph{covariance-matched Gaussian model}:
   \label{eq:l-lmmse}
 \end{equation}
 and it returns the same estimator for \emph{every} innovation law sharing the
-moments $(0, q)$.
+moments $(0, \ivar)$.
 \end{theorem}
 
 \begin{toolbox}{Why the projection cannot see past two moments}

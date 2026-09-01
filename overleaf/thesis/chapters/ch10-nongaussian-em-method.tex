@@ -43,7 +43,7 @@ convention of this chapter,
   \label{eq:em-chain}
 \end{equation}
 with innovations $\varepsilon_i$ i.i.d., mean zero, variance
-$q = 1-\alpha^2$ --- the same Gaussian initial state and the same
+$\ivar = 1-\alpha^2$ --- the same Gaussian initial state and the same
 variance-matching that Chapter~\ref{ch:laplace} used --- but now drawn from
 a member of a \emph{parametric family} rather than a fixed law. Forward noising is the coordinatewise
 Ornstein--Uhlenbeck channel of Section~\ref{sec:ou},
@@ -75,7 +75,7 @@ what happens when the first of these is false by a controlled amount; the
 second is never relaxed anywhere in this thesis.
 
 \begin{remark}[Covariance-stationary, not strictly stationary]
-Choosing $q=1-\alpha^2$ makes the chain covariance-stationary --- $\operatorname{Var}(a_i)=1$
+Choosing $\ivar=1-\alpha^2$ makes the chain covariance-stationary --- $\operatorname{Var}(a_i)=1$
 and $\operatorname{Cov}(a_i,a_j)=\alpha^{|i-j|}$ hold exactly for \emph{every} innovation
 law, by the same second-moment recursion as the Gaussian case. It does not
 make the chain strictly stationary: for a non-Gaussian innovation the
@@ -103,7 +103,7 @@ same chain graph as the prior.
 
 \begin{proposition}[The E-step is exact]\label{prop:em-estep}
 Since the posterior graph is a tree, one forward and one backward
-sum-product sweep return the exact single-site and pairwise marginals of the
+sum--product sweep return the exact single-site and pairwise marginals of the
 posterior, at the level of functional messages, for \emph{any} innovation
 law. Consequently the E-step of an EM procedure for $\theta$ requires no
 variational approximation and no sampling: the sufficient statistics EM needs

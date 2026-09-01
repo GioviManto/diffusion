@@ -73,7 +73,7 @@ Chapter~\ref{ch:gaussian}.
 \begin{figure}[t]\centering
 \includegraphics[width=0.62\linewidth]{fig_sample_efficiency.pdf}
 \caption{Relative score error against training-set size, mean over
-\nseedsused{} replicates with standard errors, for the EM/BP estimator and
+\nseedsused{} replicates with standard errors, for the EM--BP estimator and
 the validation-tuned MLP. The window-head baseline of
 Section~\ref{sec:em-architecture} scores every site rather than the aggregate
 plotted here and is reported as a ratio table (Table~\ref{tab:structured})
@@ -122,6 +122,23 @@ $\screenwinnerwidth$, with the \screenrunnerup{} network next
 ($\screenwinnerrisk$ against $\screenrunneruprisk$).
 
 \input{../shared/sections/tab-screening}
+
+\begin{figure}[t]\centering
+\includegraphics[width=0.62\linewidth]{fig_screening.pdf}
+\caption{Every configuration of the screen, scored on the \screenregion{}
+region and averaged over the $\screendevseeds$ development seeds. One marker per
+architecture; the outlined marker is each architecture's best configuration. The
+horizontal axis is what makes the comparison readable: the dilated stack sits an
+order of magnitude to the right and does not reach the window head's risk
+anywhere, so the long-range arms did not lose for want of capacity. Drawn from
+the same artifact as Table~\ref{tab:screening}.}
+\label{fig:em-screening}
+\end{figure}
+
+Figure~\ref{fig:em-screening} shows the whole search rather than its winner, and
+it is the more useful object: the three architectures separate by parameter
+count far more cleanly than by risk, and the two arms built to propagate further
+occupy the expensive half of the axis without buying anything there.
 
 What that does and does not license is worth stating, because the two are
 easily confused. It is a \emph{model-selection} fact: under this search space,
@@ -191,6 +208,19 @@ Section~\ref{sec:em-convergence} measures the fitted shape as settling far later
 than the correlation coefficient does, and shape is what capacity moves.
 
 \input{../shared/sections/tab-capacity}
+
+\begin{figure}[t]\centering
+\includegraphics[width=\linewidth]{fig_capacity.pdf}
+\caption{Left: the paired difference in held-out log-evidence per edge against
+$C=1$, with one standard error over the $\capseeds$ seeds. Every interval lies
+below zero at both training sizes, which is the result of this section. Right:
+the share of fits whose narrowest component falls under the grid's resolution
+floor of $\capsminfloor$ spacings, which climbs monotonically with $C$ --- the
+second caveat of Remark~\ref{rmk:em-capacity-caveats}, and the reason the left
+panel is a statement about this estimator on this grid. Both panels are drawn
+from the cells of Table~\ref{tab:capacity}.}
+\label{fig:em-capacity}
+\end{figure}
 
 \noindent The result is that \textbf{no mixture capacity improves on a single
 Gaussian innovation}, at either training size. The means are dominated by a few
@@ -310,6 +340,19 @@ rerun that fixed it.
 
 \input{../shared/sections/tab-nonmarkov}
 
+\begin{figure}[t]\centering
+\includegraphics[width=\linewidth]{fig_nonmarkov.pdf}
+\caption{The same cells as Table~\ref{tab:nonmarkov}, on a logarithmic vertical
+axis with the break-even line drawn. The two mechanisms are not two amounts of
+the same thing: under a rank-one global latent the advantage decays smoothly and
+never reaches the line, even where half the marginal variance is a shared
+constant; under long-range coupling it crosses within the first tested strength
+and stays below. Both curves fall because the estimator degrades, not because
+the baselines improve --- the last row of each block in
+Table~\ref{tab:nonmarkov} carries EM--BP's own error.}
+\label{fig:em-nonmarkov}
+\end{figure}
+
 \noindent The two violations behave qualitatively differently, and the
 difference is principled rather than incidental. A global latent shared across
 every site makes the score residual \emph{exactly} rank one, by a Woodbury
@@ -366,10 +409,10 @@ information-theoretic measurement gives a structural reason.
 
 \paragraph{What is computed.} The innovation law is a generalised Gaussian
 $p(\varepsilon) \propto \exp(-|\varepsilon/s|^{\beta})$, with $s$ fixed by
-$\operatorname{Var}(\varepsilon) = q = 1-\alpha^2$ at every $\beta$, so
+$\operatorname{Var}(\varepsilon) = \ivar = 1-\alpha^2$ at every $\beta$, so
 $\beta$ moves the fourth moment at \emph{exactly fixed} variance and is a
 genuine shape coordinate rather than a reparameterised scale. For a
-three-parameter vector $\theta = (\alpha, q, \beta)$, Fisher's identity
+three-parameter vector $\theta = (\alpha, \ivar, \beta)$, Fisher's identity
 \eqref{eq:em-fisher} supplies the exact per-chain score of the marginal
 log-likelihood from one forward--backward pass, and the information matrix
 is estimated in \emph{outer-product} form, $J = D^{-1}\sum_d g_d g_d^\T$
@@ -377,7 +420,7 @@ over $D=512$ chains of $n=32$ sites, at $M=401$, $A=8$. This is the
 outer-product estimator, not the observed negative Hessian, and it is an
 estimate at the true parameter rather than at a fitted one. The reported
 quantity is the \emph{efficient} information
-$I_{\beta\cdot(\alpha,q)} = 1/(J^{-1})_{\beta\beta}$, which is what remains
+$I_{\beta\cdot(\alpha,\ivar)} = 1/(J^{-1})_{\beta\beta}$, which is what remains
 about $\beta$ once the nuisance coordinates must be estimated too --- equal
 to the diagonal entry only when the coordinates are orthogonal and strictly
 smaller otherwise. The gap between $J_{\beta\beta}$ and this quantity is
@@ -393,7 +436,7 @@ largest diffusion time tested ($t = 0.05$ against $t = 1.6$):
 \begin{center}
 \begin{tabular}{@{}rrrr@{}}
 \toprule
-true $\beta$ & info loss, $\alpha$ & info loss, $q$ & info loss, $\beta$ (shape) \\
+true $\beta$ & info loss, $\alpha$ & info loss, $\ivar$ & info loss, $\beta$ (shape) \\
 \midrule
 1.0 & $78\times$ & $235\times$ & $\mathbf{8{,}738\times}$ \\
 1.5 & $83\times$ & $459\times$ & $\mathbf{64{,}227\times}$ \\

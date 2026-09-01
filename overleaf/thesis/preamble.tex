@@ -110,6 +110,11 @@
 % Same reason, for the autoregressive coefficient: shared/notation.tex sets
 % \corr to \rho, and the shared non-Markov table is written through it.
 \providecommand{\corr}{\alpha}
+% The innovation variance. Chapters 5 and Appendix B already wrote it
+% \sigma_\eta^2; Chapters 6, 8 and 9 wrote it q, which is also the geometric
+% decay rate q(\alpha,t) of Chapter 5. One macro, so the two cannot drift apart
+% again and so the collision with q stays fixed.
+\newcommand{\ivar}{\sigma_\eta^2}
 % Where THIS document keeps its provenance discussion. Shared generated
 % sections cite it through this macro instead of a literal label, because the
 % paper and the thesis file that material under different appendix names and a

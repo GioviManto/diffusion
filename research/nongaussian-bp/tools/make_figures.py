@@ -262,34 +262,141 @@ def _stamp_unconverged(fig) -> None:
     )
 
 
-def fig_capacity() -> None:
-    point, gen = _capacity_tables()
-    cs = sorted(point)
-    fig, ax = plt.subplots(1, 2, figsize=(7.0, 2.6))
+# ---------------------------------------------------------------------------
+# Capacity, non-Markov robustness and the architecture screen.
+#
+# These three read the frozen outputs behind Chapter 9's Sections 9.2, 9.3 and
+# 9.5, which carried tables and no picture. Each shows the one thing its table
+# makes the reader assemble: that no capacity clears zero, that one
+# contamination crosses the break-even line and the other does not, and that the
+# screen's winner is also its smallest arm.
+# ---------------------------------------------------------------------------
 
-    for arm in ("em_bp", "cnn", "mlp"):
-        if arm not in point[cs[0]]:
-            continue
-        ax[0].plot(cs, [point[c][arm] for c in cs], **STYLE[arm])
-    ax[0].set_yscale("log")
+CAPACITY_SRC = Path("frozen/exp_32_capacity_merged/capacity_equivalence.csv")
+NONMARKOV_SRC = Path("exp_21_frozen")
+SCREEN_SRC = Path("frozen/exp_31_screen/screening.csv")
+RESOLUTION_FLOOR = 2.0
+SELECTION_REGION = "bulk"
+
+# One colour and marker per architecture, as STYLE does for estimators.
+ARCH_STYLE = {
+    "window": dict(color="#0072B2", marker="s", label="weight-shared window head"),
+    "conv": dict(color="#D55E00", marker="^", label="dilated convolutional stack"),
+    "bimp": dict(color="#009E73", marker="v", label="bidirectional message passing"),
+}
+
+
+def fig_capacity() -> None:
+    """Held-out evidence against a single Gaussian innovation, by capacity.
+
+    Rebuilt on exp_32. The previous version drew exp_16, whose six seeds at a
+    fixed forty-iteration budget reported the opposite sign and are withdrawn;
+    a figure of withdrawn numbers is worse than no figure, which is why the
+    chapter carried none in between.
+    """
+    rows = read(CAPACITY_SRC)
+    sizes = sorted({int(r["n_chains"]) for r in rows})
+    comps = sorted({int(r["n_components"]) for r in rows})
+    others = [c for c in comps if c != 1]
+
+    fig, ax = plt.subplots(1, 2, figsize=(7.0, 2.7))
+    for k, n in enumerate(sizes):
+        base = {int(r["seed"]): float(r["test_log_evidence_per_edge"])
+                for r in rows if int(r["n_chains"]) == n
+                and int(r["n_components"]) == 1}
+        mean, err = [], []
+        for c in others:
+            here = {int(r["seed"]): float(r["test_log_evidence_per_edge"])
+                    for r in rows if int(r["n_chains"]) == n
+                    and int(r["n_components"]) == c}
+            d = np.array([here[s] - base[s] for s in sorted(set(base) & set(here))])
+            mean.append(d.mean())
+            err.append(d.std(ddof=1) / np.sqrt(d.size))
+        ax[0].errorbar(others, mean, yerr=err, capsize=2.5,
+                       color=("#0072B2", "#CC79A7")[k % 2],
+                       marker=("s", "D")[k % 2], ls="-",
+                       label=rf"$N = {n}$")
+    ax[0].axhline(0.0, color="#222222", ls="--", lw=1.0)
+    ax[0].set_xscale("log", base=2)
+    ax[0].set_xticks(others)
+    ax[0].set_xticklabels([str(c) for c in others])
     ax[0].set_xlabel(r"mixture components $C$")
-    ax[0].set_ylabel("MSE against the Bayes denoiser")
-    ax[0].set_title("pointwise accuracy")
+    ax[0].set_ylabel("held-out log-evidence per edge,\npaired difference from $C=1$")
+    ax[0].set_title("no capacity clears zero")
     ax[0].legend()
 
-    target = 1.9098
-    for arm in ("em_bp", "cnn", "mlp"):
-        if arm not in gen[cs[0]]:
-            continue
-        ax[1].plot(cs, [gen[c][arm] for c in cs], **STYLE[arm])
-    ax[1].axhline(target, color="#222222", ls="--", lw=1.0,
-                  label=f"closed-form target {target:.3f}")
+    share = [100.0 * sum(1 for r in rows if int(r["n_components"]) == c
+                         and float(r["s_min_over_h"]) < RESOLUTION_FLOOR)
+             / sum(1 for r in rows if int(r["n_components"]) == c)
+             for c in comps]
+    ax[1].plot(comps, share, color="#D55E00", marker="o", ls="-")
+    ax[1].set_xscale("log", base=2)
+    ax[1].set_xticks(comps)
+    ax[1].set_xticklabels([str(c) for c in comps])
     ax[1].set_xlabel(r"mixture components $C$")
-    ax[1].set_ylabel("generated innovation excess kurtosis")
-    ax[1].set_title("generative fidelity")
-    ax[1].legend()
-    _stamp_unconverged(fig)
+    ax[1].set_ylabel("cells below the grid's resolution floor (%)")
+    ax[1].set_title("and the fits get harder to resolve")
     save(fig, "fig_capacity")
+
+
+def fig_nonmarkov() -> None:
+    """Where each violation of the Markov assumption stops paying."""
+    import glob as _glob
+    import re as _re
+
+    panels = (("beta", r"global latent, rank-one strength $\beta$"),
+              ("gamma", r"long-range coupling strength $\gamma$"))
+    fig, ax = plt.subplots(1, 2, figsize=(7.0, 2.7), sharey=True)
+    for k, (mech, xlabel) in enumerate(panels):
+        cells = {}
+        for d in sorted(_glob.glob(str(OUT / NONMARKOV_SRC / f"gauss_{mech}*"))):
+            m = _re.search(rf"{mech}([0-9.]+)$", d)
+            f = Path(d) / "nonmarkov_gauss.csv"
+            if not m or not f.exists():
+                continue
+            cells[float(m.group(1))] = list(csv.DictReader(f.open()))
+        if not cells:
+            raise FileNotFoundError(f"missing committed output: {OUT / NONMARKOV_SRC}")
+        xs = sorted(cells)
+        for arm in ("cnn", "mlp"):
+            ys = [float(np.mean([float(r["ratio_to_em"]) for r in cells[x]
+                                 if r["arm"] == arm])) for x in xs]
+            ax[k].plot(xs, ys, **STYLE[arm])
+        ax[k].axhline(1.0, color="#222222", ls="--", lw=1.0)
+        ax[k].set_yscale("log")
+        ax[k].set_xlabel(xlabel)
+        ax[k].set_title(("absorbed into the fitted chain",
+                         "not representable by a chain")[k])
+    ax[0].set_ylabel("baseline error / EM\u2013BP error")
+    ax[0].legend()
+    save(fig, "fig_nonmarkov")
+
+
+def fig_screening() -> None:
+    """Risk against parameter count for the three screened architectures."""
+    rows = [r for r in read(SCREEN_SRC) if r["region"] == SELECTION_REGION]
+    fig, ax = plt.subplots(figsize=(3.9, 2.9))
+    for arch, st in ARCH_STYLE.items():
+        by_hp = defaultdict(list)
+        for r in rows:
+            if r["arch"] == arch:
+                by_hp[r["hp"]].append((float(r["n_params"]), float(r["risk"])))
+        if not by_hp:
+            continue
+        pts = sorted((np.mean([p for p, _ in v]), np.mean([q for _, q in v]))
+                     for v in by_hp.values())
+        ax.plot([p for p, _ in pts], [q for _, q in pts], ls="none",
+                marker=st["marker"], color=st["color"], label=st["label"],
+                alpha=0.85)
+        best = min(pts, key=lambda z: z[1])
+        ax.plot(*best, marker=st["marker"], color=st["color"], ms=9,
+                markeredgecolor="#222222", markeredgewidth=0.8, ls="none")
+    ax.set_xscale("log")
+    ax.set_xlabel("trainable parameters")
+    ax.set_ylabel(f"mean risk on the {SELECTION_REGION} region")
+    ax.set_title("the screen's winner is also its smallest arm")
+    ax.legend(loc="upper left")
+    save(fig, "fig_screening")
 
 
 def fig_pointwise_vs_generative() -> None:
@@ -646,6 +753,8 @@ FIGURES = {
     "fig_ring": fig_ring,
     "fig_sample_efficiency": fig_sample_efficiency,
     "fig_capacity": fig_capacity,
+    "fig_nonmarkov": fig_nonmarkov,
+    "fig_screening": fig_screening,
     "fig_pointwise_vs_generative": fig_pointwise_vs_generative,
     "fig_grid_domain": fig_grid_domain,
     "fig_sampler_steps": fig_sampler_steps,
