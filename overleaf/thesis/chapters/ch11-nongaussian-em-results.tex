@@ -77,8 +77,8 @@ Chapter~\ref{ch:gaussian}.
 the validation-tuned MLP. The window-head baseline of
 Section~\ref{sec:em-architecture} scores every site rather than the aggregate
 plotted here and is reported as a ratio table (Table~\ref{tab:structured})
-rather than superimposed on this figure. Drawn from the same certified frozen
-outputs, over the same size grid and with the same seed-first aggregation, as
+rather than superimposed on this figure. Drawn from the same outputs, over the
+same size grid and with the same seed-first aggregation, as
 Table~\ref{tab:pointwise}.}
 \label{fig:em-sample-eff}
 \end{figure}
@@ -97,12 +97,13 @@ one independently of the size of the correction it produces.
 
 A ratio against a fully connected network cannot separate knowing the Markov
 structure from sharing weights across sites, and the second is the cheaper
-explanation. This section reports the corrected, headline-protocol
-measurement against a structure-aware baseline: the same twelve noise levels
-and sixteen frozen seeds as Table~\ref{tab:pointwise}, every site scored (not
-only the centre), and the network's architecture, radius and checkpoint all
-selected on a validation bundle disjoint from test, deployed and provenance-
-gated through \codefile{hpc/deploy\_clean.sh}.
+explanation. This section measures against a structure-aware baseline at the
+headline protocol: the same twelve noise levels and the same sixteen seeds as
+Table~\ref{tab:pointwise}, every site scored rather than the centre alone, the
+baseline's architecture and radius fixed by a screen on separate development
+seeds, and each arm's checkpoint chosen on a validation bundle disjoint from
+test. The deployment and provenance conditions are in
+Appendix~\ref{app:repro}.
 
 \paragraph{Which architecture, and under what search.} Three candidates were
 screened on $\screendevseeds$ development seeds, disjoint from the
@@ -112,9 +113,9 @@ bidirectional message-passing network (both able, in principle, to propagate
 across the whole chain). Each was run over its own hyperparameter grid --- a
 shared learning-rate grid, both output parameterisations, and a common
 checkpoint ladder from $\screenckptlo$ to $\screenckpthi$ steps ---
-$\screenconfigs$ configurations in all, scored on the $\screenregion$ region.
+$\screenconfigs$ configurations in all, scored on the \screenregion{} region.
 \textbf{The window head won}, at radius $\screenwinnerradius$ and width
-$\screenwinnerwidth$, with the $\screenrunnerup$ next
+$\screenwinnerwidth$, with the \screenrunnerup{} network next
 ($\screenwinnerrisk$ against $\screenrunneruprisk$).
 
 \input{../shared/sections/tab-screening}
@@ -144,7 +145,7 @@ window head --- is $\structratiolo$--$\structratiohi\times$, all-site scored,
 across the same four sizes as Table~\ref{tab:pointwise}. EM--BP is more
 accurate in every one of the $\structcells$ scored cells; that count is
 $\structseeds$ seeds $\times$ $\structsizes$ sizes $\times$ $\structregions$
-scoring regions ($\structregionlist$), of which the table displays two, and it
+scoring regions (\structregionlist{}), of which the table displays two, and it
 is a descriptive diagnostic rather than a replication count --- the regions and
 sizes share fitted models and training data, so the inferential unit behind each
 displayed row is the $\structseeds$ paired seeds.

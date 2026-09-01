@@ -147,7 +147,7 @@ reported cells, both at the smallest sizes ---
 Appendix~\ref{app:aggregation} resolves where the advantage is largest.
 
 \paragraph{What Table~\ref{tab:structured} covers.} The confirmatory run scores
-three regions per cell --- $\structregionlist$ --- of which the table displays
+three regions per cell --- \structregionlist{} --- of which the table displays
 two; the third is the predeclared interior slice, and it is the one the
 architecture screen selects on. That is why the $\structcells$ scored cells are
 $\structseeds \times \structsizes \times \structregions$ and not the
@@ -164,14 +164,14 @@ full, from \texttt{outputs/frozen/exp\_31\_screen/screening.csv} at commit
 recorded configuration (\texttt{winners=auto:} that path) rather than a
 reconstruction. $\screenconfigs$ configurations over $\screendevseeds$
 development seeds, at two training sizes, with learning rates
-$\screenlrs$, both output parameterisations, and a checkpoint ladder from
+\screenlrs{}, both output parameterisations, and a checkpoint ladder from
 $\screenckptlo$ to $\screenckpthi$ steps shared across all three
 architectures. Selection is on mean risk over the development seeds, scored on
-the $\screenregion$ region; the development seeds are numbered from $10000$ and
+the \screenregion{} region; the development seeds are numbered from $10000$ and
 share no seed with the confirmatory set, so the reported interval is not a
 selection artefact. The winner is the window head at radius
 $\screenwinnerradius$, width $\screenwinnerwidth$, learning rate
-$\screenwinnerlr$, $\screenwinnermode$ parameterisation. Parameter counts
+$\screenwinnerlr$, \screenwinnermode{} parameterisation. Parameter counts
 across the grids are $\screenwindowparams$ (window), $\screenbimpparams$
 (message passing) and $\screenconvparams$ (dilated convolution): the arm with
 the most capacity placed last, which is the relevant check on whether the

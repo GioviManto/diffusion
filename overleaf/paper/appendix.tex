@@ -834,7 +834,7 @@ weight-shared window head, a dilated convolutional stack, and a bidirectional me
 network, the last two able in principle to propagate across the whole chain. Each ran over its own
 hyperparameter grid, with a shared learning-rate grid, both output parameterisations and a common
 checkpoint ladder ($\screenckptlo$ to $\screenckpthi$ steps), $\screenconfigs$ configurations in
-all, selected on mean risk over development seeds on the $\screenregion$ region. \textbf{The window
+all, selected on mean risk over development seeds on the \screenregion{} region. \textbf{The window
 head won}, at radius $\screenwinnerradius$, width $\screenwinnerwidth$.
 
 \input{../shared/sections/tab-screening}
@@ -850,7 +850,7 @@ one, and every claim that follows is scoped to that.
 \input{../shared/sections/tab-structured}
 
 EM--BP is more accurate in every one of the $\structcells$ scored cells --- $\structseeds$ seeds
-$\times$ $\structsizes$ sizes $\times$ $\structregions$ regions ($\structregionlist$), of which the
+$\times$ $\structsizes$ sizes $\times$ $\structregions$ regions (\structregionlist{}), of which the
 table shows two. That count is descriptive: regions and sizes share fitted models and data, so the
 inferential unit behind each row is the $\structseeds$ paired seeds. The ratio increases across the
 four sizes tested. That is a description of four measurements and not evidence that the residual is
