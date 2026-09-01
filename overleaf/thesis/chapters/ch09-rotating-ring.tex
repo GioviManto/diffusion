@@ -86,8 +86,9 @@ consequence of that asymmetry for the score is one purpose of the chapter.
 
 \subsection{The radial drift is a confining force}
 
-Equation~\eqref{eq:ring-radial-sde} is the overdamped Langevin equation
-\eqref{eq:langevin-sde} for the quadratic potential
+Equation~\eqref{eq:ring-radial-sde} is an overdamped Langevin equation,
+$\dd x_u = -\nabla V(x_u)\,\dd u + \sqrt{2D}\,\dd B_u$, for the quadratic
+potential
 \begin{equation}
   V(r) = \tfrac{\kappa}{2}\,(r-1)^2 .
   \label{eq:ring-potential}
@@ -102,8 +103,9 @@ since $\tfrac{\dd}{\dd u} V(r_u) = V'(r)\,\dot r = -V'(r)^2 \le 0$. Reading the
 two cases of \eqref{eq:ring-force}, if $r > 1$ then $F < 0$ and the force points
 inward, and if $r < 1$ then $F > 0$ and it points outward. The radius is driven
 towards one from either side at a rate proportional to the displacement, with
-$\kappa$ setting the stiffness. By \eqref{eq:langevin-boltzmann} the stationary
-radial law is $\Nd(1, D_r/\kappa)$.
+$\kappa$ setting the stiffness. Overdamped Langevin dynamics equilibrates to
+$p_\infty \propto e^{-V/D}$, so the stationary radial law is
+$\Nd(1, D_r/\kappa)$.
 
 \subsection{One trajectory is one data point}
 

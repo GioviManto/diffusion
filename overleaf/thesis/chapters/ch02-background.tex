@@ -6,16 +6,15 @@ principle, the statistical mechanics that grew out of it, the stochastic
 processes that turn it into an algorithm, and the diffusion models that are the
 subject of the work. It is deliberately a narrative rather than a development.
 Every derivation it states is carried out in full in
-Appendices~\ref{app:statmech}, \ref{app:stochastic} and
-\ref{app:diffusion-deriv}, which are unbounded in length; the body's job is the
-thread connecting them.
+\compendium{}, which is unbounded in length; the body's job is the thread
+connecting them.
 
 A recurring technique organises the chapter, though it should not be
 mistaken for a single theorem. A physical trajectory is a stationary point of
 the action (\S\ref{sec:action}); an equilibrium distribution is a stationary
-point of the free energy (Appendix~\ref{app:statmech}); a diffusion model is
+point of the free energy; a diffusion model is
 trained by making a variational bound stationary
-(Appendix~\ref{app:diffusion-deriv}); and the transition kernel of
+; and the transition kernel of
 Chapter~\ref{ch:em-method} is estimated by making a likelihood stationary.
 These are four different variational problems over four different objects, and
 nothing here claims they are instances of one result --- what they share is a
@@ -28,53 +27,37 @@ Mechanics can be built from a single variational statement, and it is worth
 starting there rather than with Hamilton's equations, because the same
 statement --- \emph{a physical trajectory is a stationary point of a
 functional} --- returns three more times in this thesis: as the free-energy
-principle of \S\ref{sec:free-energy}, as the variational bound that trains a
+free-energy principle of thermodynamics, as the variational bound that trains a
 diffusion model (\S\ref{sec:diffusion-idea}), and as the maximum-likelihood
 problem solved by expectation--maximisation in
 Chapter~\ref{ch:em-method}. The objects change; the shape of the argument
 does not.
 
-Let a system be described by generalised coordinates $q(t)$ and let the
-\emph{Lagrangian} $L(q, \dot q, t)$ be the difference between kinetic and
-potential energy, $L = T - U$. For a path $q(t)$ joining fixed endpoints
-$q(t_1) = q_1$ and $q(t_2) = q_2$, define the \emph{action}
+Let a system be described by generalised coordinates $q(t)$, let the
+\emph{Lagrangian} $L(q,\dot q,t)$ be the difference between kinetic and
+potential energy, and define the \emph{action} of a path joining fixed
+endpoints,
 \begin{equation}
   S[q] \;=\; \int_{t_1}^{t_2} L\big(q(t), \dot q(t), t\big)\,\dd t .
   \label{eq:action}
 \end{equation}
-The action assigns one number to a whole path. Hamilton's principle states
-that the path actually taken is a \emph{stationary point} of $S$: for any
-smooth variation $\delta q(t)$ vanishing at the endpoints,
-$\delta S = 0$.
+The action assigns one number to a whole path, and Hamilton's principle states
+that the path actually taken is a \emph{stationary point} of it: $\delta S = 0$
+for every smooth variation vanishing at the endpoints. Carrying out that
+variation gives the Euler--Lagrange equations, which for
+$L = \sum_i \tfrac12 m_i\dot q_i^2 - U(q)$ return Newton's second law. What
+generalises is not the equations but the move: dynamics derived from a scalar
+functional made stationary.
 
 \begin{remark}[Stationary, not minimal]
-It is usually called the principle of \emph{least} action, and that is
-slightly wrong. The physical path is stationary, not necessarily minimal ---
-it can be a saddle. The same caution applies everywhere the pattern recurs:
-expectation--maximisation converges to a stationary point of the likelihood,
-not to a global maximum (Chapter~\ref{ch:em-method}), and it is a recurring
-source of false confidence to read ``the algorithm converged'' as ``the
-algorithm found the best answer''.
+It is usually called the principle of \emph{least} action, and that is slightly
+wrong. The physical path is stationary, not necessarily minimal --- it can be a
+saddle. The same caution applies everywhere the pattern recurs:
+expectation--maximisation converges to a stationary point of the likelihood, not
+to a global maximum (Chapter~\ref{ch:em-method}), and reading ``the algorithm
+converged'' as ``the algorithm found the best answer'' is a recurring source of
+false confidence.
 \end{remark}
-
-Carrying out the variation and integrating by parts, with the boundary term
-vanishing because $\delta q$ is fixed at the endpoints, gives the
-Euler--Lagrange equations
-\begin{equation}
-  \frac{\dd}{\dd t}\frac{\partial L}{\partial \dot q_i}
-  \;-\; \frac{\partial L}{\partial q_i} \;=\; 0,
-  \qquad i = 1, \dots, n,
-  \label{eq:euler-lagrange}
-\end{equation}
-which for $L = \sum_i \tfrac12 m_i \dot q_i^2 - U(q)$ return Newton's second
-law (Appendix~\ref{sec:hamiltonian}). The variational principle is therefore
-not a reformulation for its own sake: it derives the dynamics from a scalar
-functional, and that is the move which generalises. A Legendre transform then
-carries \eqref{eq:euler-lagrange} to Hamilton's equations
-\eqref{eq:hamilton}, whose gain is not the equations but the arena --- phase
-space, where a state is a \emph{point} whose evolution preserves volume, which
-is exactly the structure statistical mechanics needs in order to speak about
-probability densities over states.
 
 \section{From the Ising model to neural networks}\label{sec:ising}
 
@@ -122,34 +105,18 @@ zdeborova2016statistical, krzakala2024statphys} that Chapter~\ref{ch:graphs}
 develops. That connection is historical descent, not analogy.
 
 \paragraph{Memory as a phase of matter.}\label{sec:hopfield}
-\citet{hopfield1982neural} asked whether simple binary units could
-\emph{store} and \emph{retrieve} patterns collectively, the way a magnet stores
-a magnetisation. His construction is \eqref{eq:ising} in disguise: wire $N$
-neurons to $P$ patterns $\xi^\mu$ by the Hebb rule
-\citep{hebb1949organization},
-\begin{equation}
-  J_{ij} \;=\; \frac{1}{N} \sum_{\mu=1}^{P} \xi_i^\mu \xi_j^\mu ,
-  \qquad
-  H(\sigma) \;=\; -\frac{1}{2}\sum_{i \neq j} J_{ij}\, \sigma_i \sigma_j ,
-  \label{eq:hopfield}
-\end{equation}
-and iterate the simplest possible dynamics, aligning each neuron with its local
-field:
-\begin{equation}
-  \sigma_i \;\leftarrow\; \operatorname{sign}\Big( \textstyle\sum_{j \neq i}
-  J_{ij}\, \sigma_j \Big).
-  \label{eq:hopfield-dynamics}
-\end{equation}
-This descends $H$ at every flip (Appendix~\ref{sec:hopfield-descent}), so on a
-finite configuration space every initial condition falls into an attractor, and
-retrieval \emph{is} that fall. How many memories fit is a genuine
-phase-transition question: for random patterns with $P = \alpha N$, retrieval
-survives only below $\alpha_c \approx 0.138$ \citep{amit1985storing}, beyond
-which the memories are crushed into a glassy phase. Memory here is a phase of
-matter in the technical sense --- entered and left through sharp transitions.
-The 2024 Nobel Prize in Physics went to Hopfield and Hinton
-\citep{nobel2024physics}: formal recognition that this lineage is physics
-rather than merely inspired by it.
+\citet{hopfield1982neural} wired $N$ neurons to $P$ patterns by the Hebb rule
+\citep{hebb1949organization}, giving \eqref{eq:ising} with
+$J_{ij} = N^{-1}\sum_\mu \xi_i^\mu \xi_j^\mu$, and aligned each neuron with its
+local field. Two lines of algebra show that dynamics descends $H$ at every flip,
+so every initial condition falls into an attractor and retrieval \emph{is} that
+fall. How many memories fit is a phase-transition question: for random patterns
+with $P = \alpha N$, retrieval survives only below $\alpha_c \approx 0.138$
+\citep{amit1985storing}, beyond which they are crushed into a glassy phase.
+Memory is a phase of matter here in the technical sense --- entered and left
+through sharp transitions. The 2024 Nobel Prize in Physics went to Hopfield and
+Hinton \citep{nobel2024physics}, recognising the lineage as physics rather than
+as physics-inspired.
 
 \paragraph{Learning enters.}\label{sec:boltzmann-machines} The Hopfield network
 stores what its designer wires into it; the decisive step was to make the
@@ -169,11 +136,11 @@ symmetry,
   \label{eq:bm-learning}
 \end{equation}
 which stops when model and data correlations agree. This is the
-maximum-entropy principle of Toolbox~\ref{tb:maxent} turned into an algorithm,
+maximum-entropy principle turned into an algorithm,
 and it contains the field's central obstruction in miniature: the positive
 phase is a cheap average over data, while the negative phase is an average over
 the model's Gibbs measure --- a partition-function computation, approachable
-only by sampling (Section~\ref{sec:mcmc}). Restricting the couplings to a
+only by sampling. Restricting the couplings to a
 bipartite visible/hidden graph \citep{smolensky1986information} makes each
 layer conditionally independent given the other and made training practical
 \citep{hinton2002training, hinton2006fast}. The lineage then split: the
@@ -210,12 +177,9 @@ Section~\ref{sec:cascade}, shows RBM training to be an entire \emph{cascade} of
 second-order transitions, one per learned feature. Learning, like memory, is a
 sequence of symmetry breakings.
 
-The order of a transition --- which derivative of the free energy first
-misbehaves --- matters for reading these results, and is set out in
-Appendix~\ref{sec:transition-order}. The cascade above is second-order, which
-is why it is detected through susceptibilities rather than jumps. Both notions
-require the thermodynamic limit: in the finite models of
-Chapters~\ref{ch:gaussian} to~\ref{ch:ring}, a correlation length that grows
+One caveat travels with all of this and is used later. A phase transition is a
+statement about the thermodynamic limit, so in the finite models of
+Chapters~\ref{ch:gaussian} to~\ref{ch:ring} a correlation length that grows
 until it reaches the system size and then stops is a finite-size ceiling, not a
 divergence.
 
@@ -298,6 +262,22 @@ measurable $A \subseteq \mathcal{X}$,
   \;=\; \Prob\big(X_{k+1} \in A \,\big|\, X_k\big) .
   \label{eq:markov-property}
 \end{equation}
+
+\noindent The running example of this thesis is the scalar Gaussian
+autoregression of order one,
+\begin{equation}
+  a_{k+1} \;=\; \alpha\, a_k + \eta_k ,
+  \qquad
+  \eta_k \stackrel{\text{iid}}{\sim} \Nd(0, \ivar),
+  \qquad k = 0, \dots, K-2 ,
+  \label{eq:ar1}
+\end{equation}
+whose transition kernel is $M(a' \mid a) = \Nd(a'; \alpha a, \ivar)$. Taking
+$\ivar = 1 - \alpha^2$ and $a_0 \sim \Nd(0,1)$ makes it stationary with unit
+marginal variance and autocovariance $\gamma(d) = \alpha^{|d|}$, so its
+covariance is Toeplitz for the reason just given. Every chapter from
+Chapter~\ref{ch:gaussian} onwards is about \eqref{eq:ar1}, its non-Gaussian
+variants, or what an estimator can recover of it through noise.
 The conditional law is encoded by a \emph{transition kernel}
 $M(x' \,|\, x)$: a density (or matrix, for discrete $\mathcal{X}$) with
 $\int M(x'|x)\,\dd x' = 1$ for every $x$.
@@ -350,7 +330,7 @@ to expectations under $\pi$ (the ergodic theorem),
   \label{eq:ergodic}
 \end{equation}
 Equation \eqref{eq:ergodic} is the rigorous form of the ergodic postulate
-invoked in Section~\ref{sec:ensembles}, with the physical dynamics
+invoked above, with the physical dynamics
 replaced by an algorithmic one.
 
 \section{The Ornstein--Uhlenbeck process: the corruption channel}
@@ -447,7 +427,20 @@ one line.
 
 One last piece of SDE theory converts everything above into a generative
 method. Suppose data $X_0 \sim p_0$ are corrupted by a forward SDE
-\eqref{eq:generic-sde} up to time $T$, producing marginals $p_t$. Can the
+\begin{equation}
+  \dd X_t \;=\; f(X_t, t)\,\dd t \;+\; g(t)\, \dd W_t
+  \label{eq:generic-sde}
+\end{equation}
+up to time $T$, producing marginals $p_t$ whose evolution is governed by the
+Fokker--Planck equation
+\begin{equation}
+  \frac{\partial p_t}{\partial t}
+  \;=\; -\frac{\partial}{\partial x}\big( f\, p_t \big)
+  \;+\; \frac{g^2}{2}\, \frac{\partial^2 p_t}{\partial x^2} .
+  \label{eq:fokker-planck}
+\end{equation}
+The Ornstein--Uhlenbeck channel \eqref{eq:ou-sde} is the case
+$f = -x$, $g = \sqrt{2}$. Can the
 corruption be undone? Can we find an SDE which, run from $X_T \sim p_T$
 backwards, reproduces the same marginals? The answer
 \citep{anderson1982reverse} is yes, and the reverse drift needs exactly
@@ -527,7 +520,7 @@ only unknown ingredient is the score $\nabla_x \log p_t(x)$ of the noised
 marginals. Generative diffusion is therefore, at bottom, \emph{score
 estimation}: whoever knows $\nabla \log p_t$ for all $t$ can sample from
 $p_0$. Note what this design buys relative to
-Section~\ref{sec:ebm-def}: no energy is ever normalised, no equilibrium
+an energy-based model: no energy is ever normalised, no equilibrium
 is ever awaited. The Markov-chain convergence problem of MCMC is replaced
 by a \emph{fixed-horizon} integration of an SDE whose drift is learned.
 The partition-function problem has not been solved; it has been
@@ -755,7 +748,7 @@ condenses at its own critical time, in order of the strength of the data
 covariance along it, and each condensation is a second-order transition of
 Curie--Weiss type. The mapping onto Curie--Weiss, the two-rate argument that
 produces the ordering, and the confirmation on MNIST, CelebA and human-genome
-data are in Appendix~\ref{sec:cascade-detail}.
+data are in \compendium{}.
 
 \paragraph{What this means for the thesis.} Phase transitions now appear
 on both faces of generative diffusion: in \emph{sampling}, as speciation
