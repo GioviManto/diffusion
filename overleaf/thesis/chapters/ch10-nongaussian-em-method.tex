@@ -88,8 +88,8 @@ claim available here is covariance-stationarity, and it is the one used.
 
 \section{What remains exact}\label{sec:em-exact}
 
-Two facts from Section~\ref{sec:l-grid} carry over unchanged and are worth
-restating as the load-bearing structure of the whole estimator.
+Two facts from Section~\ref{sec:l-grid} carry over unchanged, and everything
+the estimator does rests on them, so they are worth restating here.
 
 \begin{proposition}[The posterior factor graph is still the prior's chain]
 \label{prop:em-unary}
@@ -205,9 +205,11 @@ exact --- up to floating point --- for the chain-shaped \emph{factor model} that
 array defines, and that model is not literally a normalised finite-state
 transition kernel on the truncated domain. The distance between the two is
 precisely the column-mass residual already reported as the quadrature
-diagnostic: at the working configuration the worst interior column departs from
-unit mass by $9.6\times10^{-4}$, and the worst column anywhere, at the domain
-edge where the density is truncated, by $1.9\times10^{-2}$.
+diagnostic: at the working configuration the worst column with
+$|a| \le A/2$ --- far enough inside the domain that its transition density has
+no tail outside the grid, so the residual measures quadrature alone --- departs
+from unit mass by $\gdinterior$, while the worst column anywhere, at the domain
+edge where the density is truncated, departs by $\gdedge$.
 
 The alternative convention --- renormalising each parent-conditioned column
 under the quadrature weights --- would make the array a genuine finite-state
@@ -222,6 +224,10 @@ is the correct one for the model actually fitted. The price is that the fitted
 object is the continuum kernel read through a quadrature rule, which is what the
 column-mass residual measures and what the resolution gate of
 Section~\ref{sec:em-numerical} bounds.
+
+Figure~\ref{fig:em-grid-domain} separates the two error sources the paragraphs
+above keep apart: resolution and truncation are refined one at a time, so that
+neither diagnostic can be mistaken for a certificate of the other.
 
 \begin{figure}[t]\centering
 \includegraphics[width=0.72\linewidth]{fig_grid_domain.pdf}
@@ -242,12 +248,15 @@ an $O(h^2)$ reference. Neither diagnostic alone certifies convergence. Source:
 \begin{remark}[The boundary-mass diagnostic is empirical, not a bound]
 \label{rmk:em-boundary}
 A boundary-mass figure computed from one sampled chain does not bound the
-truncation error for every run, and the gap is large enough to matter: over 256
-independent chains per configuration the single-chain value sits near the
-\emph{median}, while the maximum observed is up to $152\times$ higher (range
-$2.9\times$ to $8369\times$ across configurations). This is why the figures
-above are reported as a maximum and a $90$th percentile over chains rather than
-as one number. The diagnostic is an empirical estimate of typical truncation
+truncation error for every run, and the gap is large enough to matter. Running
+the same recursion on one chain and on $\gdchains$ of them, at the working
+configuration and over all $\gdlevels$ noise levels, the batch maximum exceeds
+the single-chain reading by a median factor of $\gdboundmed$ and by as much as
+$\gdboundhi$; at the mildest level it is only $\gdboundlo$. A single draw
+therefore lands somewhere in the body of a distribution with a very long tail,
+and where it lands is not knowable from the draw. This is why the figures above
+are reported as a maximum and a $90$th percentile over chains rather than as one
+number. The diagnostic is an empirical estimate of typical truncation
 loss, not a certified bound. What it does \emph{not} affect is the separation of truncation from
 quadrature error reported above, which is a pure function of $(A,M)$ and the
 prior and involves no sampled chain at all --- that comparison reproduces
@@ -261,6 +270,12 @@ Chapter~\ref{ch:laplace}: whatever an approximation --- Gaussian closure, grid
 truncation, or an under-converged fit --- does to the posterior mean is
 amplified by $e^{-t}/\Deltat \sim 1/2t$ in the score, so small diffusion times
 remain the regime where any deficiency is most visible.
+
+Figure~\ref{fig:em-diagnostics} collects the optimisation-side checks:
+monotone ascent of the marginal likelihood, recovery of $\alpha$ from
+initialisations far from the truth, and the $n^{-1/2}$ decay of the recovery
+error. The first two are what make the procedure an EM rather than a heuristic;
+the third is what makes it an estimator.
 
 \begin{figure}[t]\centering
 \includegraphics[width=0.9\linewidth]{fig_em_diagnostics.pdf}
@@ -309,11 +324,19 @@ iterations --- the missing-information mechanism of
 the theory places it. The innovation shape is slower still, and on \emph{clean}
 data already: tens of iterations against one for $\alpha$, because the
 mixture label is itself a latent variable even without an observation
-channel. The channel then compounds this. A dedicated sweep measuring exactly
-how many iterations the slowest configuration needs found roughly
-\textbf{2000} --- about $50\times$ a budget of 40 iterations, which several of
-the experiments reported in Chapter~\ref{ch:em-results} used as a fixed
-default before this measurement existed.
+channel. The channel compounds this. A dedicated sweep measured the cost
+directly, recording for each fit the first iteration after which a coordinate
+stays within a fixed relative tolerance of its final value. At
+$\nseq = \convsize$, $C = \convcomps$ and the \convdesign{} noise design, over
+$\convseeds$ seeds run to $\convcap$ iterations, the correlation coefficient
+settles at a median of $\convrhomed$ iterations and the innovation shape at
+$\convshapemed$, with a tail to $\convshapemax$ in the slowest seed --- a paired
+median factor of $\convratio$ between the two coordinates. Measured against
+that, the fixed budget of $\convbudget$ iterations that several of the
+experiments in Chapter~\ref{ch:em-results} used as a default, before this
+measurement existed, is short of the shape coordinate's median by about a factor
+of six, and leaves $\convunsettled$ of the sweep's $\convunsettledof$
+configurations unsettled in it.
 
 \begin{remark}[Fixed budgets compare convergence rates, not estimators]
 \label{rmk:em-fixed-budget}
@@ -339,9 +362,10 @@ generalised M-step and Fisher's identity to turn exact BP conditional
 expectations into a marginal-likelihood gradient. Everything about the
 \emph{posterior inference} step is exact up to the grid discretisation of
 Section~\ref{sec:em-numerical}, which is controlled to far below any effect
-measured. What is not free is optimisation time: the innovation shape is an
-order of magnitude slower to converge than the autoregressive coefficient,
-and by a further order of magnitude once observed only through noise.
+measured. What is not free is optimisation time. Observing the chain only
+through the channel costs the autoregressive coefficient about an order of
+magnitude in iterations, and the innovation shape then settles some three times
+slower again, with a tail several times longer than its own median.
 Chapter~\ref{ch:em-results} reports what this estimator buys --- in data
 efficiency and, separately, in the fidelity of what it generates --- and where,
 along axes of model capacity and model misspecification, it stops buying

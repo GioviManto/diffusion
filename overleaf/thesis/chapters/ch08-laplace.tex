@@ -249,7 +249,8 @@ $A = 8$ the score error sits at the $10^{-15}$ floor down to $t = 0.02$
 and fails only when the likelihood width $\sqrt{2t}$ approaches the grid
 step. The working configuration for all non-Gaussian experiments is
 $M = 401$, $A = 8$, with a reference solution at $M = 801$ and the
-resolution constraint $\sqrt{2t} \gtrsim 3\,\dd x$ checked automatically;
+resolution constraint $\sqrt{2t} \gtrsim 3h$ on the grid spacing
+$h = 2A/(M-1)$ checked automatically;
 grid self-convergence error remains $10^4$ to $10^7$ times smaller than
 every effect measured below. Within this regime we treat grid BP as the
 reference score; outside it no claim is made.
@@ -292,12 +293,12 @@ because the answer turns this from an implementation-specific approximation
 study into a precise question. Write $\Pi_{\mathrm{G}} f$ for the Gaussian
 density matching the mean and variance of $f/\!\int\! f$.
 
-\begin{theorem}[Gaussian closure computes the LMMSE estimator]
+\begin{theorem}[Gaussian closure is the LMMSE estimator]
 \label{thm:l-lmmse}
-Let \emph{moment-projected sum--product} be the forward--backward recursion of
-\eqref{eq:bp-fwd}--\eqref{eq:bp-bwd} that applies $\Pi_{\mathrm{G}}$ to each
-message immediately after every transition integral, multiplying by the site's
-unary likelihood before the next. Take the chain \eqref{eq:l-chain-prior} with
+Let \emph{moment-projected sum--product} be the forward--backward recursion
+of \eqref{eq:bp-fwd}--\eqref{eq:bp-bwd} that applies $\Pi_{\mathrm{G}}$ to each
+message right after every transition integral, multiplying by the site's unary
+likelihood before the next. Take the chain \eqref{eq:l-chain-prior} with
 $\alpha \neq 0$, Gaussian unary likelihoods, $\E[a_0] = 0$, an innovation law
 with mean zero and finite variance $q$, and an initial message that is Gaussian
 or projected by $\Pi_{\mathrm{G}}$. Then its posterior means are exactly those
@@ -406,7 +407,7 @@ an interpretation rather than a measurement.
 
 \section{What can and cannot be concluded}\label{sec:l-open}
 
-Classified in the four kinds of Section~\ref{sec:method}.
+Classified in the vocabulary of Section~\ref{sec:method}.
 Exact, by derivation: the surviving structure of Section~\ref{sec:l-model}, the limits
 \eqref{eq:l-score-limits}, the factorisation \eqref{eq:l-cf}, the
 screened Poisson equation \eqref{eq:l-screened}, the curvature identity

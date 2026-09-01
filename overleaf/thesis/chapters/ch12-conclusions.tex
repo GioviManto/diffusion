@@ -117,7 +117,7 @@ represent (long-range coupling, by a coupling strength of roughly one tenth).
 not saturate near eight components; on this family it does not pay at all.
 Paired against a single Gaussian innovation on identical data, at $\capseeds$
 seeds and two training sizes with fits run to their plateau rather than to a
-fixed iteration count, no capacity in $\{\capcomps\}$ improves held-out evidence
+fixed iteration count, no capacity in $\{$\capcomps$\}$ improves held-out evidence
 or schedule-level score risk. The predeclared equivalence region --- fixed
 before the contrast was computed, precisely so that ``equivalent'' could be
 asserted rather than inferred from a failure to reject --- also refuses the
@@ -163,7 +163,7 @@ experiments.
 linear AR(1) dynamics, extended to a two-dimensional nonlinear state only
 in Chapter~\ref{ch:ring}. (ii) The non-Gaussian results are numerical: grid
 BP is a reference only within its validated resolution regime
-($\sqrt{2t} \gtrsim 3\,\dd x$), and the Laplace closure error is a
+($\sqrt{2t} \gtrsim 3h$ on the grid spacing $h$), and the Laplace closure error is a
 measured curve, not a formula. (iii) The locality laws are proved for
 the Gaussian bulk; their non-Gaussian counterparts are only structurally
 delimited; in particular no low-rank structure is asserted for the Laplace
@@ -187,10 +187,8 @@ this thesis and are not reported here.
 
 \section{Future work}
 
-Mixture messages, in the form of a fully estimated $C$-component innovation
-kernel rather than a fixed two-component closure, are carried out in
-Chapters~\ref{ch:em-method} and~\ref{ch:em-results}. Reverse dynamics
-remains open: Section~\ref{sec:em-generative} integrates the reverse SDE
+Reverse dynamics is the largest thing left open here:
+Section~\ref{sec:em-generative} integrates the reverse SDE
 under the estimated EM/BP score and under two trained neural scores, but on
 fits the convergence analysis shows to be unsettled, so the comparison needs
 redoing with estimators selected on a convergence criterion before it can
@@ -199,7 +197,7 @@ this thesis: with a finite alphabet the BP messages are finite vectors and
 inference is exact with no closure at all, which would give a second
 solvable benchmark alongside the Gaussian one.
 
-What the new chapters measured opens further directions of their own. The
+The learning chapters open further directions of their own. The
 capacity result of Section~\ref{sec:em-capacity} leaves two mechanisms
 entangled, and one experiment would separate them: a finer grid at fixed
 capacity would say how much of the larger mixtures' disadvantage is their fits

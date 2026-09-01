@@ -12,9 +12,10 @@ what is computable.
 
 \section{Markov random fields}\label{sec:mrf}
 
-The Gaussian story above assigned structure to matrices. Graphical
-models assign it to distributions, for arbitrary (not necessarily
-Gaussian) variables.
+Appendix~\ref{app:linalg} assigns structure to matrices, through the zeros of
+a precision. Graphical models assign it to distributions instead, for arbitrary
+and not necessarily Gaussian variables; the two turn out to be the same
+assignment.
 
 \begin{definition}[Markov random field]
 Let $G = (V, \mathcal{E})$ be an undirected graph with one random
@@ -47,8 +48,8 @@ chain an MRF on a line, with pairwise nearest-neighbour energies. For
 \emph{Gaussian} MRFs the correspondence becomes matrix-concrete: the
 energy is the quadratic form $\tfrac12 a^\T J a - h^\T a$, its pairwise
 terms are the entries $J_{ij}$, and the graph of the MRF is exactly the
-sparsity pattern of the precision matrix. The dual reading of zeros of
-Section~\ref{sec:gauss-vectors} and the Hammersley--Clifford theorem are
+sparsity pattern of the precision matrix. The dual reading of zeros in
+Appendix~\ref{sec:gauss-vectors} and the Hammersley--Clifford theorem are
 the same statement, once in linear algebra and once in probability. A
 Gaussian Markov chain therefore has a tridiagonal precision, a fact
 Chapter~\ref{ch:gaussian} derives explicitly and exploits throughout.

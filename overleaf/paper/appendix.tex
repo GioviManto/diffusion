@@ -387,7 +387,7 @@ check first if the domain is ever narrowed.
 synthetic draws. It establishes that errors on representative ordinary draws are below $10^{-3}$.
 It does \emph{not} establish that no reported number moves: that would require re-evaluating the
 actual held-out observations and fitted kernels at a finer resolution --- a different experiment,
-and one not run here. Section~\ref{app:limits} records the residual limitation.
+and one not run here. Appendix~\ref{app:limits} records the residual limitation.
 
 \begin{figure}[h]
 \centering
@@ -514,11 +514,13 @@ is zero in every run reported here.
 Two slownesses, measured separately, because they are independent and easily conflated.
 
 \paragraph{Optimisation: coordinates of the same kernel settle at very different rates.} Running
-EM to $800$ updates at $\nseq=512$, $\ncomp=8$ and recording the whole parameter trace, we measure
-for each coordinate the last update at which it was still further than a fixed relative tolerance
-from its final value. Over sixteen seeds the median is $80$ updates for $\corr$ ($10^{-3}$
-tolerance), $68$ for the innovation variance ($10^{-2}$), and $229$ for the excess kurtosis
-($2\times10^{-2}$), the last ranging up to $638$. The shape is thus roughly three times slower to
+EM to $\convcap$ updates at $\nseq=\convsize$, $\ncomp=\convcomps$ and recording the whole parameter
+trace, we measure for each coordinate the last update at which it was still further than a fixed
+relative tolerance from its final value. Over $\convseeds$ seeds the median is $\convrhomed$ updates
+for $\corr$ ($10^{-3}$ tolerance), $\convivarmed$ for the innovation variance
+($10^{-2}$) and $\convshapemed$ for the excess kurtosis ($2\times10^{-2}$), the
+last ranging up to $\convshapemax$. Paired within a fit, the shape is a
+median factor of $\convratio$ slower to
 settle than the correlation, and monitoring $\corr$ --- the natural thing to plot --- shows a
 converged-looking trace over a kernel that is not. This is why the stopping rule may not be read
 off $\corr$, and why an iteration budget must be justified against the \emph{slowest} coordinate.
@@ -629,7 +631,7 @@ the provenance stamp compares the configuration against itself, so it cannot see
 reads. Two such fields exist today and are listed as defects in
 \texttt{tests/test\_frozen\_config\_is\_read.py}, which fails the build if a third appears.
 Separately, experiments carrying their own local settings --- chain length, noise grid,
-architecture sweeps --- are not described by this file at all, so their outputs additionally record
+architecture sweeps --- are not described by this file at all, so their outputs also record
 a digest of the settings actually resolved at run time.
 
 \paragraph{What Table~\ref{tab:pointwise} covers.} Four qualifications, kept here rather than in
@@ -640,10 +642,11 @@ so the protocol is symmetric and the selection is close to an oracle without bei
 $\nseq=\extendedn$ row uses a raised budget, the caps having been set for
 $\nseq\le\nseqcalib$; rerunning $\nseq=\nseqcalib$ at that budget on the same seeds moves its
 ratio by $\budgetdelta\pm\budgetdeltase$, so the caps are selected without binding.
-$\ndropped$ of $\ncellstotal$ cells are excluded by the resolution gate, because the narrowest
-fitted mixture component is under two grid cells wide; including them changes no ratio by more
-than $\dropshift$. And the network is beaten in all but $2$ of the reported cells, both at the
-smallest sizes --- Appendix~\ref{app:aggregation} resolves where the advantage is largest.
+The resolution gate excludes $\ndropped$ of $\ncellstotal$ cells, because in those the
+narrowest fitted mixture component is under two grid cells wide; including them changes no ratio
+by more than $\dropshift$. The network wins in $\nreversed$ of the $\ncellsused$ reported cells,
+both at the smallest sizes --- Appendix~\ref{app:aggregation} resolves where the advantage is
+largest.
 
 \paragraph{An excluded row, and why the neighbouring one stays.} No $\nseq=8192$ row is reported,
 although one was run. Its parameter file records a source tree with $207$ uncommitted paths, and
@@ -730,9 +733,9 @@ hardware & CPU: single-threaded, \texttt{medium\_cpu} partition, Bocconi HPC \\
 choose is chosen on a validation bundle disjoint from both the training set and the test set, and
 the two arms are given the same privilege. The network selects its parameterisation
 ($\varepsilon$ or $a$) \emph{and} its training length; EM--BP selects its iteration count. Neither
-selection touches the test set. The selected choice coincides with the test-set optimum in $82.2\%$
-of cells for the network and $79.5\%$ for EM--BP, and Table~\ref{tab:pointwise} reports the
-validation-selected numbers, not those optima.
+selection touches the test set. The selected choice coincides with the test-set optimum in
+$\netagree\%$ of cells for the network and $\emagree\%$ for EM--BP, and Table~\ref{tab:pointwise}
+reports the validation-selected numbers, not those optima.
 
 The symmetry matters because the training length is a bias--variance knob for both arms, not a
 convergence detail: selecting one arm's budget while pinning the other's is not a neutral choice.
@@ -810,10 +813,11 @@ discrete-alphabet variant & \texttt{exp\_\allowbreak 10\_\allowbreak discrete\_\
 \end{tabular}
 \end{center}
 
-Every figure in this note is produced by \codefile{paper/figures/make\_figures.py}, which reads
-the outputs above and fails loudly if one is missing; no number in any figure is entered by hand.
-Exact commands, environment and HPC job configuration are in \codefile{REPRODUCIBILITY.md}, and
-the claim-level audit behind this revision is \codefile{REVISION\_AUDIT.md}.
+Every figure in this note is produced by
+\codefile{research/nongaussian-bp/tools/make\_figures.py}, which reads the outputs above and fails
+loudly if one is missing; no number in any figure is entered by hand. Exact commands, environment
+and HPC job configuration are in \codefile{REPRODUCIBILITY.md}, and the claim-level audit behind
+this revision --- what was claimed, what was withdrawn and why --- is the accompanying compendium.
 
 \section{The structured baseline}
 \label{app:structured}
@@ -842,7 +846,7 @@ head won}, at radius $\screenwinnerradius$, width $\screenwinnerwidth$.
 This is a model-selection fact under this search space and protocol, not evidence that long-range
 propagation is intrinsically unnecessary or that radius $\screenwinnerradius$ is optimal in the
 population. It does rule out the cheapest objection: the dilated stack carries
-$\screenconvparams$ parameters against the window head's $\screenwindowparams$ and placed last, so
+\screenconvparams{} parameters against the window head's \screenwindowparams{} and placed last, so
 the long-range arms did not lose for want of capacity. The confirmatory comparison below is
 therefore against the strongest baseline \emph{this screen found}, not the strongest conceivable
 one, and every claim that follows is scoped to that.
@@ -862,8 +866,9 @@ symmetrically on a validation bundle disjoint from test, \emph{within the grids 
 $\structcapem\%$ of EM--BP cells and $\structcapwindow\%$ of window-head cells take the last rung,
 which indicates validation error still falling where the grid ended rather than convergence. The
 values therefore compare the two procedures at stated, validation-selected budgets, not at
-converged optima. Appendix~\ref{app:aggregation} reports the ratio under four aggregations of the
-same cells; all exceed $2\times$ at every size.
+converged optima. Table~\ref{tab:aggregation-structured} reports the ratio under
+$\structaggcount$ aggregations of the same cells; none falls below $\structaggfloor\times$ at any
+size.
 
 \section{Density-level recovery: the Hellinger figures}
 \label{app:hellinger}

@@ -26,10 +26,10 @@ carries most of this thesis, that is not merely lossy --- it is empty.
 \begin{proposition}[One-frame marginals in the stationary Gaussian
 chain]\label{prop:dev-marginal}
 Let the clean chain be stationary Gaussian AR(1) with unit marginal variance,
-corrupted by the variance-preserving channel
-$x = e^{-t} a + \sqrt{1 - e^{-2t}}\, z$, $z \sim \Nd(0,1)$ independent of $a$.
-Then every noisy frame is marginally $\Nd(0,1)$ at every diffusion time, the
-per-frame marginal score is exactly $-x_k$, and the collection of one-frame
+put through the variance-preserving channel
+$x = e^{-t} a + \sqrt{1 - e^{-2t}}\, z$, with $z \sim \Nd(0,1)$ independent of
+$a$. Then every noisy frame is marginally $\Nd(0,1)$ at every diffusion time,
+its per-frame marginal score is exactly $-x_k$, and the collection of one-frame
 marginals carries zero Fisher information about the coupling $\alpha$.
 \end{proposition}
 
@@ -90,6 +90,9 @@ blocks. What the joint view shows is that the structure worth studying is not
 a map between per-frame scores at all, but the coupling pattern of the joint
 score --- a statement about a matrix in the Gaussian case, and about a
 posterior in general. That is the object the rest of this thesis analyses.
+Figure~\ref{fig:toymodel} shows it in the smallest case where it exists: the
+diagonal tilt of the joint score field is the whole of the coupling, and it is
+exactly what a per-frame treatment throws away.
 
 \begin{figure}[t]\centering
 \includegraphics[width=\linewidth]{fig_toymodel_score.pdf}

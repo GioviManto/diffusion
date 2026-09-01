@@ -29,7 +29,7 @@ starting there rather than with Hamilton's equations, because the same
 statement --- \emph{a physical trajectory is a stationary point of a
 functional} --- returns three more times in this thesis: as the free-energy
 principle of \S\ref{sec:free-energy}, as the variational bound that trains a
-diffusion model (Chapter~\ref{ch:diffusion}), and as the maximum-likelihood
+diffusion model (\S\ref{sec:diffusion-idea}), and as the maximum-likelihood
 problem solved by expectation--maximisation in
 Chapter~\ref{ch:em-method}. The objects change; the shape of the argument
 does not.
@@ -415,7 +415,7 @@ thesis as an error amplifier. The OU channel interpolates between the
 data distribution and a standard Gaussian, which is precisely what a
 diffusion model needs.
 
-Two structural remarks, both load-bearing later. First, the OU kernel is
+Two structural remarks, both used repeatedly later. First, the OU kernel is
 Gaussian \emph{in $a$ as well as in $x$}: viewed as a function of the
 clean variable,
 $\Nd(x; a e^{-t}, \Deltat) \propto
@@ -620,7 +620,7 @@ exactly how much coupling the conditioning induces, as a function of $t$.
 \label{sec:statphys-diffusion}
 
 A line of work initiated by Biroli, M\'ezard, and collaborators analyses
-diffusion models with the tools of Chapter~\ref{ch:statmech}, in the
+diffusion models with the tools of \S\S\ref{sec:action}--\ref{sec:statmech-learning}, in the
 regime where the score is \emph{exact}: either computed from a solvable
 $p_0$ or from the empirical measure of $n$ training points. Because this
 is the literature our research extends, we review it in some detail.

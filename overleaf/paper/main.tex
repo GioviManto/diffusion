@@ -48,6 +48,8 @@
 \input{../shared/sections/screening-numbers}
 \input{../shared/sections/grid-convergence-numbers}
 \input{../shared/sections/rate-numbers}
+\input{../shared/sections/structured-aggregation-numbers}
+\input{../shared/sections/convergence-numbers}
 
 \newtheorem{proposition}{Proposition}
 \newtheorem{theorem}{Theorem}
@@ -117,7 +119,7 @@ information about shape than about correlation.
 
 Against an \emph{unstructured} network trained by denoising score matching on identical data, with
 the optimisation budget of both arms selected on a held-out bundle, the structured estimator
-attains between \ratioloword{} and \ratiohiword{} times lower pointwise denoising error, at equal
+attains $\ratiolo$--$\ratiohi\times$ lower pointwise denoising error, at equal
 training-set size, across \nsizesused{} sizes --- a ratio of errors at fixed data, not a reduction
 in the data required to reach a fixed error. A large fraction of that margin disappears once the
 baseline is given locality and weight sharing: against a window head, selected by screening over
@@ -537,9 +539,9 @@ mean for a conditional kernel, are in Appendix~\ref{app:hellinger}.
 
 \noindent
 The practical consequence is that no convergence test can be trusted to select the reported model:
-$\corr$ settles roughly an order of magnitude sooner than the shape, so a $\corr$-trace --- or a
-flat likelihood --- looks textbook-converged over a kernel nowhere near converged in the
-coordinate every non-Gaussian claim depends on. Every reported estimator is therefore selected on
+$\corr$ settles at a median of $\convrhomed$ updates against $\convshapemed$ for the shape, with a
+tail to $\convshapemax$, so a $\corr$-trace --- or a flat likelihood --- looks textbook-converged
+over a kernel nowhere near converged in the coordinate every non-Gaussian claim depends on. Every reported estimator is therefore selected on
 a disjoint validation bundle, at every rung (Appendix~\ref{app:protocol}). The fitted density,
 the settling iterations and the clean-against-channel comparison are Appendix~\ref{app:rates}.
 
@@ -573,7 +575,7 @@ against a weight-shared window head the advantage is $\structratiolo$--$\structr
 increasing rather than falling with $\nseq$: EM--BP is more accurate in every one of the
 $\structcells$ scored cells. The window head was chosen by screening against a dilated
 convolutional stack and a bidirectional message-passing network, both able in principle to
-propagate across the whole chain, and beat neither: on this family, at these sizes, the strongest
+propagate across the whole chain, neither of which beat it: on this family, at these sizes, the strongest
 amortised-inference baseline tested is the simplest one screened. So the scoped statement is:
 \emph{on this family, at these sizes, and with each arm's budget chosen on held-out data, the
 structured estimator attains lower pointwise denoising error at equal training-set size than the
@@ -595,7 +597,7 @@ sites.}
 
 The model assumes exact first-order Markov structure, and under a non-Markov prior the estimator is
 misspecified in a way more data does not repair: a global latent adds a rank-one term a chain
-absorbs, while long-range precision coupling is not low-rank. Nine further scope conditions are in
+absorbs, while long-range precision coupling is not low-rank. Seven further scope conditions are in
 Appendix~\ref{app:limits}, and the outstanding measurement is Appendix~\ref{app:structured}. The
 open question is architectural: which architectures exploit Markovianity, and at what depth
 \citep{mei2024unet,garnierbrun2024transformers}.
