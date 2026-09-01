@@ -36,8 +36,19 @@ sys.path.insert(0, str(ROOT / "experiments"))
 from frozen_config import FROZEN  # noqa: E402
 
 # Restrained academic style: no gradients, no decoration, colourblind-safe.
+#
+# Serif, to match the body text and the figures the other two packages produce.
+# This script's figures used to be the only sans-serif ones in the thesis, which
+# is visible on the page: a chapter can hold a serif figure from gaussian-bp and
+# a sans one from here, three pages apart. Type 42 embeds the fonts as TrueType
+# rather than subsetting to Type 3, which is what the rotating-ring package does
+# and what print wants.
 plt.rcParams.update(
     {
+        "font.family": "serif",
+        "mathtext.fontset": "dejavuserif",
+        "pdf.fonttype": 42,
+        "ps.fonttype": 42,
         "figure.dpi": 140,
         "savefig.dpi": 300,
         "savefig.bbox": "tight",
