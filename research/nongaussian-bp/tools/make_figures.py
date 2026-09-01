@@ -207,7 +207,10 @@ def fig_sample_efficiency() -> None:
         ax.errorbar(sizes, m, yerr=se, capsize=2, **st)
     ax.set_xscale("log", base=2)
     ax.set_yscale("log")
-    ax.set_xlabel(r"training sequences $\nseq$".replace(r"\nseq", "M"))
+    # No symbol on the axis. One figure is shared by two documents that render
+    # \nseq differently -- N in the thesis, M in the paper -- so hardcoding
+    # either one puts the figure at odds with the table beside it in the other.
+    ax.set_xlabel("training sequences")
     ax.set_ylabel("relative score error")
     ax.legend()
     save(fig, "fig_sample_efficiency")

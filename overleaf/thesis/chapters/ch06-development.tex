@@ -20,23 +20,63 @@ and keeping them apart is a permanent discipline of this thesis: the
 of the noising channel, which acts independently on every frame.
 
 It is tempting to treat such a trajectory as $K$ separate samples, computing
-each frame's noisy marginal score independently. For the stationary models of
-this thesis that is not merely lossy --- it is empty. Under the
-variance-preserving channel every noisy frame is marginally $\Nd(0,1)$ at
-every diffusion time, so the per-frame marginal score is exactly $-x_k$:
-independent of $t$, independent of the dynamics, and identical for every
-model considered anywhere in this thesis. A per-frame treatment of a
-stationary sequence model cannot distinguish a fast chain from a slow one, or
-a Gaussian innovation from a Laplace one, because it returns the same
-function in all cases.
+each frame's noisy marginal score independently. In the Gaussian model that
+carries most of this thesis, that is not merely lossy --- it is empty.
+
+\begin{proposition}[One-frame marginals in the stationary Gaussian
+chain]\label{prop:dev-marginal}
+Let the clean chain be stationary Gaussian AR(1) with unit marginal variance,
+corrupted by the variance-preserving channel
+$x = e^{-t} a + \sqrt{1 - e^{-2t}}\, z$, $z \sim \Nd(0,1)$ independent of $a$.
+Then every noisy frame is marginally $\Nd(0,1)$ at every diffusion time, the
+per-frame marginal score is exactly $-x_k$, and the collection of one-frame
+marginals carries zero Fisher information about the coupling $\alpha$.
+\end{proposition}
+
+\noindent This is immediate: variance preservation gives
+$\operatorname{Var}(x) = e^{-2t}\operatorname{Var}(a) + (1 - e^{-2t}) = 1$, and a Gaussian $a$ makes $x$
+Gaussian, so the marginal law is $\Nd(0,1)$ whatever $\alpha$ is and cannot
+depend on it.
+
+\begin{remark}[The same statement is false off the Gaussian
+model]\label{rmk:dev-nongaussian}
+Variance preservation alone gives only $\operatorname{Var}(x) = 1$; it does not give
+Gaussianity, and the distinction matters because the non-Gaussian chains of
+Chapters~\ref{ch:laplace}--\ref{ch:em-results} are the ones the rest of this
+thesis measures. Writing $\varphi$ for characteristic functions,
+\begin{equation}
+  \varphi_{x}(u) \;=\; \varphi_a\!\big(e^{-t}u\big)\,
+  \exp\!\Big[-\tfrac{1 - e^{-2t}}{2}\,u^2\Big],
+  \label{eq:dev-cf}
+\end{equation}
+so if $x$ were exactly $\Nd(0,1)$ at some finite $t$, dividing by the Gaussian
+factor would force
+$\varphi_a(e^{-t}u) = \exp[-\tfrac{1}{2}e^{-2t}u^2]$ --- that is, $a$ Gaussian.
+A genuinely non-Gaussian frame therefore stays non-Gaussian under any finite
+amount of Gaussian corruption, and its one-frame score stays nonlinear;
+Section~\ref{sec:l-K1} computes that score for a Laplace prior and shows it
+approaching $-x$ only as $t \to \infty$.
+\end{remark}
+
+\noindent So the correct general statement is narrower than
+``per-frame is empty'', and it is about \emph{dependence} rather than about
+information as such. One-frame marginals can see the innovation law, and can
+see a parameter that changes the marginals; what no collection of them can
+recover is how consecutive frames are coupled, since coupling is a property of
+the joint law and of no marginal of it. In the Gaussian case those two
+statements collapse into one, because the marginals are $\alpha$-free by
+Proposition~\ref{prop:dev-marginal}; off it they come apart, and
+Chapter~\ref{ch:ring} proves the sharper version for one specific parameter ---
+that the rotation rate of the ring model has exactly zero Fisher information in
+every one-frame marginal, under that model's rotational symmetry.
 
 A sequence is \emph{one} sample from a joint law, and the quantity that
 drives the reverse dynamics is the joint score of the whole noisy trajectory,
 the gradient of $\log P_t(x_0, \dots, x_{K-1})$, whose $k$-th component is a
 conditional expectation over the \emph{full} posterior of the clean frames,
-as in \eqref{eq:tweedie-joint}. All information about temporal structure
-lives in that object and in no marginal of it.
-Chapter~\ref{ch:gaussian} exhibits the contrast in closed form at $K = 2$.
+as in \eqref{eq:tweedie-joint}. That is the object in which the temporal
+structure lives. Chapter~\ref{ch:gaussian} exhibits the contrast in closed form
+at $K = 2$.
 
 This also settles the shape of the structural question. One might hope that
 consecutive frame-blocks of the score are related by a fixed map, a
@@ -60,8 +100,12 @@ $t = 0.15$. Left: the noised joint density $p_t(x_0, x_1)$. Right: the joint
 score field $\nabla \log p_t$ (arrows) over the same density (contours). Both
 panels are computed from the closed-form mixture expressions on a grid. The
 arrows point towards the modes and tilt along the diagonal, and that tilt is
-the entire effect of the coupling between frames --- it is exactly what the
-per-frame score $-x_k$ discards.}
+the entire effect of the coupling between frames --- it is exactly what any
+per-frame treatment discards. Note that this prior is \emph{not} Gaussian, so
+by Remark~\ref{rmk:dev-nongaussian} its noised one-frame marginals are Gaussian
+mixtures with nonlinear scores rather than $\Nd(0,1)$ with score $-x_k$; what
+those marginals cannot see is the coupling, which is the point the figure
+makes.}
 \label{fig:toymodel}
 \end{figure}
 

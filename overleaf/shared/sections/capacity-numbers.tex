@@ -8,14 +8,16 @@
 %% at C=8 across the two sizes -- i.e. the most favourable reading available.
 \newcommand{\capcbestwins}{3}
 \newcommand{\capcbestlo}{2}
-\newcommand{\capmedlo}{$-9.89 \times 10^{-3}$}
-\newcommand{\capmedhi}{$-5.73 \times 10^{-3}$}
+%% Math-mode content WITHOUT delimiters: the prose supplies the $...$, so a
+%% macro carrying its own would nest and fail to compile.
+\newcommand{\capmedlo}{-9.89 \times 10^{-3}}
+\newcommand{\capmedhi}{-5.73 \times 10^{-3}}
 %% The predeclared C=16 vs C=8 equivalence test, at the size where it resolves.
 \newcommand{\capheadsize}{128}
-\newcommand{\capheadlogev}{$-4.4 \times 10^{-4}$}
-\newcommand{\capheadlogevci}{$[-9.2 \times 10^{-4},\, -1.1 \times 10^{-4}]$}
-\newcommand{\capheadrisk}{$+5.0 \times 10^{-3}$}
-\newcommand{\capheadriskci}{$[+9.7 \times 10^{-4},\, +1.1 \times 10^{-2}]$}
+\newcommand{\capheadlogev}{-4.4 \times 10^{-4}}
+\newcommand{\capheadlogevci}{[-9.2 \times 10^{-4},\, -1.1 \times 10^{-4}]}
+\newcommand{\capheadrisk}{+5.0 \times 10^{-3}}
+\newcommand{\capheadriskci}{[+9.7 \times 10^{-4},\, +1.1 \times 10^{-2}]}
 \newcommand{\capheadverdict}{resolved}
 \newcommand{\capothersize}{512}
 \newcommand{\capotherverdict}{unresolved}

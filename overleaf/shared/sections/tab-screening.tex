@@ -5,11 +5,13 @@
 \begin{center}\small
 \captionof{table}{The architecture screen that selected Table~\ref{tab:structured}'s
 baseline. Each candidate architecture was run over its own hyperparameter grid on
-4 development seeds (disjoint from the {\sixteen} confirmatory seeds),
+4 development seeds (disjoint from the confirmatory seeds),
 at $\nseq \in \{32, 2048\}$, with a shared learning-rate grid,
 both output parameterisations, and a shared checkpoint ladder; the reported risk is
 the mean over development seeds on the interior slice used for selection. $\star$
-marks the winner carried into the confirmatory run.}
+marks the winner carried into the confirmatory run. The dilated stack carries an
+order of magnitude more parameters than the winner and finishes last, so the
+outcome is not an artefact of one arm being given more capacity than another.}
 \label{tab:screening}
 \begin{tabular}{lccc}
 \toprule
