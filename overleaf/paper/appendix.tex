@@ -123,17 +123,23 @@ and the likelihood are both Gaussian does that function stay inside a finite-dim
 not, and the integral in \eqref{eq:messages} produces a new shape at every site. An implementation
 must therefore represent a function. We use a truncated uniform grid
 $[-\halfwidth,\halfwidth]$ with $\ngrid$ points, spacing $\gridh$ and composite trapezoidal
-weights, which defines a \emph{finite-state model} for which the recursion is \emph{exact up to
-floating-point arithmetic}.
+weights. That defines a chain-shaped \emph{factor model} for which the recursion is \emph{exact
+up to floating-point arithmetic}. It is not a normalised finite-state Markov chain: the sampled
+transition columns are not renormalised under the quadrature weights, which is deliberate ---
+renormalising would introduce a $\params$-dependent log-normaliser into Fisher's identity and the
+M-step, and because none is applied that term is absent by construction rather than by oversight.
 
-(iii) That finite-state model \emph{approximates} the continuous one, with an error that must be
+(iii) That factor model \emph{approximates} the continuous one, with an error that must be
 measured --- \S\ref{sec:rung0} measures it.
 
-(iv) Monte Carlo enters this note in exactly one place: when a statistic is computed from
-\emph{generated samples}. Every other number here --- posterior means, evidences, information
-matrices --- comes from deterministic quadrature and carries no sampling error at all, only
-discretisation error. Where a quantity is averaged over random draws of a dataset, that is
-replicate spread and is labelled as such.
+(iv) Determinism here is conditional, and the condition matters. Given a dataset, a grid and a
+noise realisation, posterior means, evidences and information matrices are computed by
+deterministic quadrature and carry discretisation error rather than sampling error. But the
+\emph{reported} quantities are not conditional on a dataset: training and held-out sequences are
+drawn at random, network training is stochastic, the information matrices are outer-product
+estimates over $D=512$ sampled trajectories, and every risk and ratio is an average over finitely
+many seeds. Those numbers carry sampling uncertainty, which is why they are reported with paired
+intervals across replicates.
 
 Three levels of exactness are involved and collapsing any two of them overstates the result, so
 each has its own name and none is abbreviated to ``exact''.
@@ -142,9 +148,10 @@ each has its own name and none is abbreviated to ``exact''.
 \item \emph{Tree-exact functional BP.} The posterior factorises on a chain and the sum-product
 integrals are exact as statements about functions on $\Reals$. Nothing numerical has happened yet.
 \item \emph{Exact recursion for the discretised model.} Once grid and quadrature weights are
-fixed, forward--backward is exact --- up to floating point --- \emph{for that finite-state model}.
-It is not exact for the continuous chain.
-\item \emph{Validated grid-quadrature reference.} The finite-state model approximates the
+fixed, forward--backward is exact --- up to floating point --- \emph{for that factor model}. It
+is not exact for the continuous chain, and the factor model is not itself a normalised
+finite-state chain.
+\item \emph{Validated grid-quadrature reference.} The factor model approximates the
 continuous chain, with truncation and quadrature error that is measured rather than assumed
 (\S\ref{sec:rung0}).
 \end{enumerate}

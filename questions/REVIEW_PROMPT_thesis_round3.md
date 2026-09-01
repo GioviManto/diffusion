@@ -39,12 +39,17 @@ iterations" to settle. Nothing ever measured that. It came from a diagnostic
 that ran one fit *out to* 2000 iterations to show its per-edge gain had
 plateaued — a statement about where the gain flattens, not about where the shape
 stops moving — and the two got conflated. The actual sweep says the shape
-settles at a **median of 229 updates with a tail to 638**, against 80 for the
+settles at a **median of 229 updates, largest observed 638**, against 80 for the
 correlation coefficient. Everything downstream survives, because a 40-iteration
 budget is still far short of 229, so the generative-fidelity withdrawal stands.
 But the derived claims did not: "a factor of about fifty" between the two
-coordinates is really 2.8, and "93% of 72 configurations" is 89 of 96. The
-measurement is now a generator (`make_convergence_numbers.py`) and the prose
+coordinates is **2.8** — formed within each fit and then aggregated, which is
+not the quotient of the two medians, 2.9 — and "93% of 72 configurations" is
+**105 of 112**, counted over both run-length shards of the sweep. §8.5 now
+states the population, the tolerance, and what "settled" means: the first update
+after which a coordinate stays within a fixed relative tolerance of its
+end-of-run value, which is trace stability rather than distance to an optimiser.
+The measurement is a generator, `make_convergence_numbers.py`, and the prose
 cites macros. §8.5 and §9.3.
 
 **2. Chapter 9 was printing a table my own audit had withdrawn.** §9.5's

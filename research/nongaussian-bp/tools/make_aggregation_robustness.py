@@ -30,7 +30,12 @@ import csv
 import glob
 import sys
 
+import os
+
 import numpy as np
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from provenance_gate import load_params, require_clean  # noqa: E402
 
 SOURCES = [
     "outputs/frozen/exp_07_certified_seed*/sample_efficiency_val.csv",
@@ -63,6 +68,16 @@ def load():
 
 
 rows = load()
+
+# exp_07 predates hpc/deploy_clean.sh: its records carry the commit, host and
+# resolved configuration but no source-archive digest. The intersection of its
+# recorded dirty list with this experiment's import closure is EMPTY, so the
+# code that ran is reconstructable even though the archive is not hashed --
+# which is what allow_legacy is for, and is not the exp_21 situation. Appendix C
+# names this exception.
+require_clean(load_params(sorted(glob.glob(SOURCES[0].rsplit('/', 1)[0]))),
+              allow_legacy=True)
+
 seeds = sorted({r["seed"] for r in rows}, key=int)
 sizes = sorted({int(r["n_chains"]) for r in rows})
 F = lambda r, k: float(r[k])

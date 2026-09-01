@@ -11,7 +11,12 @@ interval in both directions (it understates it for the ratio and overstates it
 for the error columns).
 """
 import csv, glob, sys
+import os
+
 import numpy as np
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from provenance_gate import code_path_dirty, import_closure, load_params  # noqa: E402
 
 sys.path.insert(0, "experiments")
 from frozen_config import FROZEN  # noqa: E402
@@ -203,6 +208,28 @@ if "em_resolved" in (rows[0] if rows else {}):
 else:
     print("  resolution gate: NOT CERTIFIED -- these outputs predate "
           "em_resolved. Rerun exp_07 part5 to certify.", file=sys.stderr)
+
+# The analysis in the header, made executable.
+#
+# exp_07 predates hpc/deploy_clean.sh, so no archive digest exists and the plain
+# gate refuses it. What makes the retained rows citable anyway is not that fact
+# but a narrower one: the intersection of each run's recorded dirty list with
+# this experiment's import closure is EMPTY. That was checked by hand once and
+# written into the header above, where it could go stale silently the moment a
+# new seed directory was added. It is checked here on every run instead.
+_closure = import_closure("experiments/exp_07_em_vs_score_network.py")
+_dirs = sorted({os.path.dirname(f) for pat in (SOURCE, *[e[0] for e in EXTENDED])
+                for f in glob.glob(pat)})
+_bad = code_path_dirty(load_params(_dirs), _closure)
+if _bad:
+    print("REFUSING: these runs were produced with files uncommitted on the "
+          "code path they execute, so their recorded commit does not "
+          "reconstruct them:", file=sys.stderr)
+    for k, v in sorted(_bad.items()):
+        print(f"    {k}: {', '.join(v)}", file=sys.stderr)
+    sys.exit(1)
+print(f"  provenance: {len(_dirs)} run directories, legacy digest, "
+      f"empty dirty-list intersection with the executed code path")
 
 all_rows = rows
 rows = [r for r in rows if "em_resolved" not in r or int(r["em_resolved"])]

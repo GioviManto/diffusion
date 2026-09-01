@@ -113,8 +113,13 @@ accounts for half the marginal variance) and fails, well before generic
 intuition about misspecification would suggest, on one it structurally cannot
 represent (long-range coupling, by a coupling strength of roughly one tenth).
 
-\paragraph{Capacity, answered in the opposite direction.} Mixture capacity does
-not saturate near eight components; on this family it does not pay at all.
+\paragraph{Capacity, answered in the opposite direction, and only for this
+estimator.} Mixture capacity does not saturate near eight components. Under the
+grid, M-step and iteration cap implemented here it does not pay at all --- and
+that qualification carries the weight, because every cell above
+$C=\capcappedfrom$ stops at the cap and the share of fits the grid cannot
+resolve rises with $C$, so a statistical disadvantage of larger mixtures is not
+separated from an optimisation or a discretisation one.
 Paired against a single Gaussian innovation on identical data, at $\capseeds$
 seeds and two training sizes with fits run to their plateau rather than to a
 fixed iteration count, no capacity in $\{$\capcomps$\}$ improves held-out evidence
@@ -122,12 +127,9 @@ or schedule-level score risk. The predeclared equivalence region --- fixed
 before the contrast was computed, precisely so that ``equivalent'' could be
 asserted rather than inferred from a failure to reject --- also refuses the
 $C=8$ against $C=16$ comparison, resolving against it at
-$\nseq=\capheadsize$ in the direction of $C=16$ being worse. Two things are not
-separated and both disfavour the larger mixtures: every cell at
-$C\geq\capcappedfrom$ stopped at the iteration cap rather than at tolerance, and
-the share of fits whose narrowest component falls below the grid's resolution
-floor climbs with $C$. So the claim is about this estimator on this grid rather
-than about mixture capacity as such. This supersedes an earlier six-seed,
+$\nseq=\capheadsize$ in the direction of $C=16$ being worse. Both unseparated effects disfavour the larger mixtures, so the
+direction of the result is the direction the confounds would produce, and the
+claim stays with the estimator rather than with mixture capacity as such. This supersedes an earlier six-seed,
 fixed-budget design that reported the opposite sign; that reading does not
 reproduce at higher replication and longer budget.
 

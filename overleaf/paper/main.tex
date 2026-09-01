@@ -308,9 +308,11 @@ when everything is Gaussian they reduce to the Kalman filter and RTS smoother
 Two cautions, both expanded in Appendix~\ref{app:exactness}. Sum-product is exact on the tree,
 but a message is a \emph{function} on $\Reals$ --- forced by the state space, not chosen --- so an
 implementation must represent one, and the truncated grid we use makes the recursion exact only
-for a finite-state approximation whose error \S\ref{sec:rung0} measures. And Monte Carlo enters
-this note in exactly one place, when a statistic is computed from generated samples; every other
-number comes from deterministic quadrature and carries discretisation error but no sampling error.
+for the chain-shaped factor model that grid defines, not for a normalised finite-state kernel:
+the sampled columns are not renormalised (Appendix~\ref{app:exactness}), and the distance to the
+continuum recursion is what \S\ref{sec:rung0} measures. And determinism here is conditional --- on
+a dataset and a grid the inference is deterministic, but every reported risk, ratio and
+information estimate is an average over sampled sequences at finitely many seeds.
 
 \paragraph{Cost.} The discretised posterior has $\ngrid^{\nsites}$ joint configurations, so one
 site marginal by direct summation fixes that site and sums over the other $\nsites-1$:
@@ -525,7 +527,7 @@ puts it, in the convergence rate rather than in the attainable accuracy.
 
 The two effects are separable and we separate them, because conflating them produces a false
 conclusion --- an apparent \emph{information} penalty that is really a rate at a fixed iteration
-budget. Both arms recover the truth when run to convergence.
+budget. Run long enough, both arms reach the same fit within the resolution of the comparison.
 \end{remark}
 
 \paragraph{The score is recovered faster than the density that induces it.} Reporting recovery
@@ -598,9 +600,10 @@ sites.}
 The model assumes exact first-order Markov structure, and under a non-Markov prior the estimator is
 misspecified in a way more data does not repair: a global latent adds a rank-one term a chain
 absorbs, while long-range precision coupling is not low-rank. Seven further scope conditions are in
-Appendix~\ref{app:limits}, and the outstanding measurement is Appendix~\ref{app:structured}. The
-open question is architectural: which architectures exploit Markovianity, and at what depth
-\citep{mei2024unet,garnierbrun2024transformers}.
+Appendix~\ref{app:limits}. Left open: whether the pointwise advantage survives into generation
+once both arms are selected on convergence rather than a fixed count; whether mixture capacity
+helps an estimator whose grid resolves its narrowest component; and which architectures exploit
+Markovianity, at what depth \citep{mei2024unet,garnierbrun2024transformers}.
 
 % The closing summary that stood here restated the abstract sentence for
 % sentence -- moment closure is an LMMSE estimator, Fisher's identity gives the

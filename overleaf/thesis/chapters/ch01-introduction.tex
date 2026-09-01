@@ -213,6 +213,10 @@ main line rather than on it.
 
 \section{Contributions}
 
+\noindent The first four concern scores under known dynamics, the next two the
+learning of dynamics that are unknown, and the last is a self-contained
+side result. The order is the thesis's, not the order in which the work matured.
+
 \begin{enumerate}
   \item For the stationary Gaussian AR(1) chain under OU corruption, we
   derive the joint score in closed form, diagonalise it for all
@@ -257,6 +261,31 @@ main line rather than on it.
   the first. We also measure that truncating the inference (windowed message
   passing) is more accurate than truncating the score matrix (banding) at small
   diffusion times (Chapter~\ref{ch:gaussian}).
+
+  \item We drop the assumption, held everywhere above, that the transition law
+  is known, and estimate it from noised sequences alone. Fisher's identity turns
+  one complete forward--backward pass into the exact gradient of the marginal
+  log-likelihood, with no differentiation through the recursion, so both
+  gradient ascent and a generalised M-step are available; the E-step is
+  structurally exact for any innovation law. Two facts about \emph{what it costs
+  to run} follow, and they are measurements rather than folklore: the fitted
+  innovation shape settles at a median of $\convshapemed$ updates against
+  $\convrhomed$ for the correlation coefficient, so a stopping rule read off the
+  correlation trace certifies a kernel that has not converged in the coordinate
+  every non-Gaussian claim depends on (Chapter~\ref{ch:em-method}).
+
+  \item We measure what supplying that structure is worth, against neural
+  denoisers trained by denoising score matching on identical data and given none
+  of it. At equal training-set size the structured estimator attains
+  $\ratiolo$--$\ratiohi\times$ lower pointwise denoising error than an
+  unstructured network across \nsizesused{} sizes; against a weight-shared
+  window head, itself selected by a screen over three architectures on disjoint
+  seeds, the advantage is $\structratiolo$--$\structratiohi\times$. Two
+  boundaries of that advantage are mapped rather than asserted: mixture capacity
+  beyond a single Gaussian innovation buys nothing for this estimator, and a
+  chain-structured estimator absorbs a rank-one violation of the Markov
+  assumption while failing on a long-range one by a coupling strength of roughly
+  one tenth (Chapter~\ref{ch:em-results}).
 
   \item As a separate, self-contained result, we characterise the
   per-node (AMP/TAP) closure on the same model: it returns the exact

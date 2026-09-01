@@ -284,7 +284,9 @@ def _stamp_unconverged(fig) -> None:
 # ---------------------------------------------------------------------------
 
 CAPACITY_SRC = Path("frozen/exp_32_capacity_merged/capacity_equivalence.csv")
-NONMARKOV_SRC = Path("exp_21_frozen")
+NONMARKOV_SRC = (Path("frozen/exp_21_clean")
+                 if (OUT / "frozen" / "exp_21_clean").exists()
+                 else Path("exp_21_frozen"))
 SCREEN_SRC = Path("frozen/exp_31_screen/screening.csv")
 RESOLUTION_FLOOR = 2.0
 SELECTION_REGION = "bulk"

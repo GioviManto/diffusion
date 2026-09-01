@@ -27,11 +27,13 @@ is used to \emph{generate}, by integrating the reverse process; and how far can
 the Markov assumption itself be wrong before the structure stops helping?
 \end{quote}
 
-\noindent Four of the five are answered. The generative-fidelity question is
-not, and the section that addresses it says why the experiment as run cannot
-settle it. The capacity question is answered, but in the opposite direction to
-the one an earlier and much smaller design suggested. The summary at the end of
-the chapter states each of the five at the strength its evidence actually
+\noindent Three are answered outright. The capacity question is answered for
+the estimator as implemented --- and in the opposite direction to the one a
+smaller design suggested --- but not for mixture capacity in the abstract, and
+Section~\ref{sec:em-capacity} says exactly where that line falls. The
+generative-fidelity question is not answered at all, and the section that
+addresses it says why the experiment as run cannot settle it. The summary at the
+end of the chapter states each of the five at the strength its evidence
 supports.
 
 Every comparison below fits the mixture kernel of \eqref{eq:em-mixture-kernel}
@@ -222,8 +224,14 @@ from the cells of Table~\ref{tab:capacity}.}
 \label{fig:em-capacity}
 \end{figure}
 
-\noindent The result is that \textbf{no mixture capacity improves on a single
-Gaussian innovation}, at either training size. The means are dominated by a few
+\noindent The result is that \textbf{under this procedure --- this grid, this
+generalised M-step, this validation rule and this iteration cap --- no mixture
+capacity improves on a single Gaussian innovation} at either training size. The
+qualification is not decoration. Every cell at $C \geq \capcappedfrom$ stops at
+the cap rather than at the tolerance, and the share of fits the grid cannot
+resolve grows with $C$, so the design cannot separate a statistical
+disadvantage of larger mixtures from an optimisation or a discretisation one.
+What it can say, it says at every seed. The means are dominated by a few
 large-magnitude seeds, so the sign count carries the claim: at $C=8$ the mixture
 is ahead on only $\capcbestlo$ to $\capcbestwins$ of $\capseeds$ paired seeds,
 with median paired differences of $\capmedhi$ and $\capmedlo$ per edge. The
@@ -276,11 +284,12 @@ separately tested here.
 controlled]\label{rmk:em-capacity-confound}
 The reason the design above runs to a plateau is that a fixed budget cannot
 distinguish the two. Section~\ref{sec:em-convergence} measures the innovation
-shape as settling at a median of $\convshapemed$ iterations against
-$\convrhomed$ for the correlation coefficient, a paired median factor of
-$\convratio$ and a tail to $\convshapemax$; against a fixed
-$\convbudget$-iteration budget, $\convunsettled$ of the $\convunsettledof$
-configurations in that sweep had not settled in the shape coordinate. Because a larger $C$ has more shape
+shape as settling at a median of $\convshapemed$ updates against
+$\convrhomed$ for the correlation coefficient --- a factor of $\convratio$
+formed within each fit and then aggregated, with a largest observed value of
+$\convshapemax$. Against a fixed $\convbudget$-iteration budget,
+$\convunsettled$ of the $\convunsettledof$ configurations in that sweep had not
+settled in the shape coordinate. Because a larger $C$ has more shape
 parameters to move within the same budget, under-iteration alone produces a
 curve that looks exactly like a capacity effect whether or not capacity is doing
 anything, and a direct check attributes roughly $96\%$ of the apparent capacity
@@ -332,11 +341,20 @@ strength $\gamma$ added on top of the chain. This experiment has its own noise
 schedule and its own training size, so its ratios measure how the advantage
 responds to misspecification and are not on the same scale as
 Table~\ref{tab:pointwise}'s; only the direction and the crossing point are read
-from them. Both arms train at the same budget as the headline protocol, which
-matters because an earlier version of this comparison did not: its baseline saw
-two fifths of the optimisation steps, which inflates every ratio in the one
-direction that would not survive review, and the numbers below come from the
-rerun that fixed it.
+from them. Both arms train at the headline protocol's budget.
+
+One qualification governs everything in this section and is stated before the
+numbers rather than after them. The run behind Table~\ref{tab:nonmarkov} was
+produced with \codefile{src/em.py} uncommitted, so its recorded commit does not
+reconstruct the program that generated it. That is the same defect that
+withdrew the $\nseq = 8192$ row from Table~\ref{tab:pointwise}, and it is not
+the milder legacy case that applies to the runs behind
+Sections~\ref{sec:em-pointwise} and~\ref{sec:em-convergence}
+(Appendix~\ref{app:repro} separates the three). The numbers may well be right,
+and the mechanism they describe is independently supported by the fitted
+coefficients and the Chow--Liu column; but ``may well be right'' is not the
+standard the rest of this thesis is held to, and this section should be read as
+the weakest-certified in it.
 
 \input{../shared/sections/tab-nonmarkov}
 
@@ -482,7 +500,8 @@ is quoted in this thesis.
 
 \section{Summary}
 
-Four of the five questions this chapter opened with are answered, and one is
+Three of the five questions this chapter opened with are answered outright, one
+is answered for the estimator as implemented rather than in general, and one is
 left open.
 
 \paragraph{Pointwise, against an unstructured network.} At equal training-set
@@ -505,9 +524,11 @@ screen against two architectures built to propagate further across the chain,
 which bounds what the baseline is --- the strongest this screen found, not the
 strongest conceivable.
 
-\paragraph{Capacity.} No mixture capacity improves on a single Gaussian
-innovation, at either training size, once fits are run to their plateau rather
-than to a fixed iteration count. The predeclared equivalence test refuses
+\paragraph{Capacity, for this estimator.} Under this grid, this M-step and this
+iteration cap, no mixture capacity improves on a single Gaussian innovation at
+either training size, once fits are run to their plateau rather than to a fixed
+iteration count. Nothing here shows that a mixture cannot help a better-resolved
+or longer-run estimator. The predeclared equivalence test refuses
 ``saturates by eight'' as well: at $\nseq = \capheadsize$ the $C=8 \to C=16$
 step is resolved against the region in the direction of $C=16$ being worse.
 Two things are not isolated --- the iteration cap and the grid's resolution

@@ -305,7 +305,7 @@ once through the OU channel:
 
 \begin{center}
 \begin{minipage}{\linewidth}\centering
-\captionof{table}[What the channel costs in convergence rate]{What the observation channel costs in convergence rate, not in attainable accuracy. Two arms of the same chains, identical initialisation and budget, one seeing clean transition pairs and the other the same chains once through the OU channel (truth: $\alpha = 0.85$, innovation kurtosis $3.0$). Both arms reach the truth; only the rate differs.}
+\captionof{table}[What the channel costs in convergence rate]{What the observation channel costs in convergence rate, not in attainable accuracy. Two arms of the same chains, identical initialisation and budget, one seeing clean transition pairs and the other the same chains once through the OU channel (generating values: $\alpha = 0.85$, innovation kurtosis $3.0$). Both arms approach the same fitted summaries within this experiment's resolution; what the channel changes is the rate. A finite mixture does not contain the generating law exactly, so what is approached is the best fit within the family rather than the law itself.}
 \label{tab:em-convergence}
 \begin{tabular}{@{}rcccc@{}}
 \toprule
@@ -335,13 +335,23 @@ stays within a fixed relative tolerance of its final value. At
 $\nseq = \convsize$, $C = \convcomps$ and the \convdesign{} noise design, over
 $\convseeds$ seeds run to $\convcap$ iterations, the correlation coefficient
 settles at a median of $\convrhomed$ iterations and the innovation shape at
-$\convshapemed$, with a tail to $\convshapemax$ in the slowest seed --- a paired
-median factor of $\convratio$ between the two coordinates. Measured against
-that, the fixed budget of $\convbudget$ iterations that several of the
-experiments in Chapter~\ref{ch:em-results} used as a default, before this
-measurement existed, is short of the shape coordinate's median by about a factor
-of six, and leaves $\convunsettled$ of the sweep's $\convunsettledof$
-configurations unsettled in it.
+$\convshapemed$, the largest observed value being $\convshapemax$. Forming the
+ratio within each fit and then taking the median over fits gives $\convratio$;
+the quotient of the two medians is $\convratioofmedians$, and the paired figure
+is the one reported, because the two coordinates are measured on the same fit.
+Two things about what is being measured. ``Settled'' means the first update
+after which the coordinate stays within a fixed relative tolerance of its value
+at the end of the run --- $10^{-3}$ for $\alpha$, $2\times10^{-2}$ for the
+excess kurtosis --- so it is a statement about the stability of a trace, not
+about distance to an optimiser. And the run has to be long enough for that to
+mean anything: the sweep was run at two lengths, and these medians come from the
+$\convcap$-update shard, the only one in which no configuration settles near its
+own cap. Against those numbers the fixed budget of $\convbudget$ iterations that
+several experiments in Chapter~\ref{ch:em-results} used as a default, before
+this measurement existed, is short of the shape coordinate's median by about a
+factor of six, and leaves $\convunsettled$ of the $\convunsettledof$
+configurations in the sweep --- both shards, since censoring can only shorten a
+settling time and so cannot inflate this count --- unsettled in it.
 
 \begin{remark}[Fixed budgets compare convergence rates, not estimators]
 \label{rmk:em-fixed-budget}
