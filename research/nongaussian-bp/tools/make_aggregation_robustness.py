@@ -205,22 +205,21 @@ $\\nseq={worst}$. The ratio of per-seed averaged errors, which is the summary a
 reader is most likely to have in mind, runs ${rom_lo:.1f}$ to ${rom_hi:.1f}$
 rather than $\\ratiolo$ to $\\ratiohi$.
 
-An earlier version of this appendix attributed that ordering to Jensen's
-inequality. That was wrong and the correction is worth making precisely,
-because the wrong version claimed a theorem where there is only a measurement.
-Jensen gives $\\E[1/Y]\\ge 1/\\E[Y]$, but $\\E[X/Y]\\ge\\E[X]/\\E[Y]$ does
-\\emph{{not}} follow for arbitrary positive correlated $X$ and $Y$ --- the
-dependence between numerator and denominator can push the comparison either
-way. What is true here is empirical: denominator heterogeneity across noise
-levels interacts with that dependence, and in this dataset the mean of
-cellwise ratios comes out largest. It is a property of these cells, not a law,
-which is exactly why the estimand has to be named rather than assumed.
+That ordering is a measurement, not a theorem, and it is worth being precise
+about why no inequality delivers it. Jensen gives $\\E[1/Y]\\ge 1/\\E[Y]$, but
+$\\E[X/Y]\\ge\\E[X]/\\E[Y]$ does \\emph{{not}} follow for arbitrary positive
+correlated $X$ and $Y$ --- the dependence between numerator and denominator
+can push the comparison either way. What holds here is empirical:
+denominator heterogeneity across noise levels interacts with that
+dependence, and in this dataset the mean of cellwise ratios comes out
+largest. It is a property of these cells, which is exactly why the estimand
+has to be named rather than assumed.
 
 Resolving the average over noise levels shows where the aggregation hides
 structure: the ratio is not flat in $t$ but peaks near $t \\approx 0.5$ and
-falls at both ends. The weakest seed-averaged $(\\nseq,t)$ aggregate in the
-grid is ${worst_cell:.1f}$. That is \\emph{{not}} the weakest individual cell,
-and the two were previously conflated: the weakest individual cell is
+falls at both ends. Two different ``weakest'' quantities have to be kept
+apart. The weakest seed-averaged $(\\nseq,t)$ aggregate in the grid is
+${worst_cell:.1f}$; the weakest \\emph{{individual}} cell is
 ${worst_individual:.2f}$, and EM--BP is beaten outright in ${n_reversed}$ of
 the ${n_cells:,}$ cells summarised here.
 The estimator's advantage is largest at moderate noise, where the posterior is

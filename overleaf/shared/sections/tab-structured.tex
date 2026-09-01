@@ -3,10 +3,12 @@
 %% Do not hand-edit the numbers; rerun the generator.
 
 \begin{center}\small
-\captionof{table}{EM--BP against the screened structure-aware baseline
-(a weight-shared window head, radius and parameterisation selected on a
-validation bundle disjoint from test, at the headline protocol throughout).
-Risks are all-site and averaged over the 16 seeds; the ratio is
+\captionof{table}{EM--BP against the screened structure-aware baseline, at the
+headline protocol throughout. The baseline is a weight-shared window head whose
+architecture and hyperparameters were fixed by the screen of
+Table~\ref{tab:screening} on development seeds; only the checkpoint is chosen
+here, on a validation bundle disjoint from test, and EM--BP's iteration count is
+chosen the same way. Risks are all-site and averaged over the 16 seeds; the ratio is
 risk(window)/risk(EM--BP) formed within each seed and then averaged, $\pm$ one
 s.e. \emph{All} scores every site, and is the headline; \emph{centre} is a
 single-site diagnostic. A third region, the predeclared interior slice, is scored

@@ -828,25 +828,42 @@ measurement: it replaces an earlier exploratory run whose provenance did not ver
 protocol differed from the headline table's in four ways (\texttt{outputs/README\_exp12\_scaled.md}
 records the detail; no number from that run is cited here or in the main text).
 
-\paragraph{Which architecture.} Three candidates were screened on development seeds, disjoint
-from the sixteen used below: the weight-shared window head, a dilated convolutional stack, and a
-bidirectional message-passing network, the last two able in principle to propagate across the
-whole chain. \textbf{The window head won}, at radius $2$: neither architecture built to propagate
-further outperformed one that structurally cannot. The confirmatory comparison below is therefore
-against a fixed-radius window head, not against the strongest conceivable amortised-inference
-baseline, and every claim that follows is scoped to that.
+\paragraph{Which architecture, and under what search.} Three candidates were screened on
+$\screendevseeds$ development seeds, disjoint from the $\structseeds$ used below: the
+weight-shared window head, a dilated convolutional stack, and a bidirectional message-passing
+network, the last two able in principle to propagate across the whole chain. Each ran over its own
+hyperparameter grid, with a shared learning-rate grid, both output parameterisations and a common
+checkpoint ladder ($\screenckptlo$ to $\screenckpthi$ steps), $\screenconfigs$ configurations in
+all, selected on mean risk over development seeds on the $\screenregion$ region. \textbf{The window
+head won}, at radius $\screenwinnerradius$, width $\screenwinnerwidth$.
+
+\input{../shared/sections/tab-screening}
+
+This is a model-selection fact under this search space and protocol, not evidence that long-range
+propagation is intrinsically unnecessary or that radius $\screenwinnerradius$ is optimal in the
+population. It does rule out the cheapest objection: the dilated stack carries
+$\screenconvparams$ parameters against the window head's $\screenwindowparams$ and placed last, so
+the long-range arms did not lose for want of capacity. The confirmatory comparison below is
+therefore against the strongest baseline \emph{this screen found}, not the strongest conceivable
+one, and every claim that follows is scoped to that.
 
 \input{../shared/sections/tab-structured}
 
-EM--BP is more accurate in every one of the $\structcells$ scored (seed, size, region) cells. The
-ratio is monotone increasing in $\nseq$ over the range tested, from $\structratiolo\times$ at the
-smallest size to $\structratiohi\times$ at the largest --- the opposite of a purely architectural,
-data-independent gap, and consistent with the estimator's advantage compounding as more data lets
-it use its correctly specified structure more precisely while the window head's receptive field
-stays fixed. Both arms are protected from an under-trained comparison by validation selection
-rather than a fixed budget: $\structcapem\%$ of EM--BP cells and $\structcapwindow\%$ of
-window-head cells hit their respective cap, flagged rather than excluded, since the reported
-checkpoint is whichever the validation bundle preferred.
+EM--BP is more accurate in every one of the $\structcells$ scored cells --- $\structseeds$ seeds
+$\times$ $\structsizes$ sizes $\times$ $\structregions$ regions ($\structregionlist$), of which the
+table shows two. That count is descriptive: regions and sizes share fitted models and data, so the
+inferential unit behind each row is the $\structseeds$ paired seeds. The ratio increases across the
+four sizes tested. That is a description of four measurements and not evidence that the residual is
+non-architectural: a baseline with an irreducible approximation floor $b^2$ gives
+$(b^2 + c_w/\nseq)/(c_e/\nseq)$, linear increasing in $\nseq$ for a wholly architectural reason,
+and the raw risks above are consistent with it --- EM--BP's risk falls about fourfold across the
+range while the window head's falls by less than half that. Both arms select their budget
+symmetrically on a validation bundle disjoint from test, \emph{within the grids on offer}:
+$\structcapem\%$ of EM--BP cells and $\structcapwindow\%$ of window-head cells take the last rung,
+which indicates validation error still falling where the grid ended rather than convergence. The
+values therefore compare the two procedures at stated, validation-selected budgets, not at
+converged optima. Appendix~\ref{app:aggregation} reports the ratio under four aggregations of the
+same cells; all exceed $2\times$ at every size.
 
 \section{Density-level recovery: the Hellinger figures}
 \label{app:hellinger}
@@ -870,3 +887,10 @@ law downweights exactly the tail columns an unweighted vote overweights --- with
 qualitative story.
 
 \input{../shared/sections/tab-aggregation}
+
+The same question applies to the structure-aware ratio, and with more force, since that one is
+quoted as a range. There the noise schedule is already reduced into each cell's risk, so the seed
+is the inferential unit by construction and only the forming and pooling of the ratio remain
+optional.
+
+\input{../shared/sections/tab-aggregation-structured}

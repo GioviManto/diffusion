@@ -45,6 +45,7 @@
 \providecommand{\provenanceappendix}{Appendix~\ref{app:protocol}}
 \input{../shared/sections/efficiency-numbers}
 \input{../shared/sections/structured-numbers}
+\input{../shared/sections/screening-numbers}
 \input{../shared/sections/grid-convergence-numbers}
 \input{../shared/sections/rate-numbers}
 
@@ -118,11 +119,11 @@ Against an \emph{unstructured} network trained by denoising score matching on id
 the optimisation budget of both arms selected on a held-out bundle, the structured estimator
 attains between \ratioloword{} and \ratiohiword{} times lower pointwise denoising error, at equal
 training-set size, across \nsizesused{} sizes --- a ratio of errors at fixed data, not a reduction
-in the data required to reach a fixed error. Most of that margin is architectural: against a
-weight-shared window head, selected by screening over three candidate architectures and measured
-at the same headline protocol, all-site scored, the advantage falls to
-$\structratiolo$--$\structratiohi\times$ and is monotone increasing in the sample size rather than
-falling. The comparison is
+in the data required to reach a fixed error. A large fraction of that margin disappears once the
+baseline is given locality and weight sharing: against a window head, selected by screening over
+three candidate architectures and measured at the same headline protocol, all-site scored, the
+advantage falls to $\structratiolo$--$\structratiohi\times$, increasing across the sizes tested
+rather than falling. The comparison is
 deliberately asymmetric in prior information --- the estimator is handed the Markov factorisation,
 the autoregressive form and a low-dimensional innovation family, the networks none of them --- so
 it measures the worth of that structure on this family, not a general ranking of the two

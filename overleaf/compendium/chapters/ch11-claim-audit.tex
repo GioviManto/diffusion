@@ -77,11 +77,12 @@ The \emph{shape-based} capacity effect is a convergence artefact & withdrawn &
   budget used, and ${\sim}96\%$ of the apparent effect is rate. What is
   withdrawn is the capacity \emph{attribution} for anything resting on fitted
   or generated shape \\
-Held-out evidence saturates near eight components & conditional &
-  \emph{survives} \S\ref{sec:corr-capacity}: it is a separate paired design
-  (six seeds, $\nseq=128$) scored on held-out evidence, which settles early in
-  the optimisation, not on fitted shape. Conditional on that metric --- it is
-  not a claim about the converged \emph{shape} \\
+Held-out evidence saturates near eight components & withdrawn &
+  \emph{reversed} by \texttt{exp\_32} (sixteen paired seeds, two sizes, fits run
+  to plateau, predeclared equivalence region). No capacity improves on $C=1$ at
+  either size, and the $C{=}8$ vs $C{=}16$ step resolves \emph{against} the
+  region at $\nseq=128$ with $C=16$ worse. The six-seed, forty-iteration design
+  that reported the opposite sign does not reproduce \\
 Pointwise and generative fidelity dissociate & withdrawn &
   rests on the same unconverged fits \\
 The channel destroys shape recovery & withdrawn &
@@ -588,13 +589,20 @@ that closes most of it. Screened three architectures on development seeds ---
 the weight-shared window head, a dilated convolutional stack, and a
 bidirectional message-passing network, the last two able in principle to
 propagate across the whole chain --- and \textbf{the window head won}, at
-radius $2$. Confirmed at the headline protocol on the full sixteen frozen
-seeds, all-site scored: EM--BP is more accurate than the window head in every
-one of $192$ scored (seed, size, region) cells, by a factor rising from
-$2.34\times$ at $\nseq=32$ to $6.14\times$ at $\nseq=2048$ --- monotone
-\emph{increasing} with $\nseq$, unlike the unstructured comparison, which is
-consistent with the estimator's structure paying off more precisely as it has
-more data to use it on while the window's receptive field stays fixed. This
+radius $4$, width $64$. Confirmed at the headline protocol on the full sixteen
+frozen seeds, all-site scored: EM--BP is more accurate than the window head in
+every one of $192$ scored cells --- $16$ seeds $\times$ $4$ sizes $\times$ $3$
+regions, not the $128$ a two-column table suggests --- by a factor rising from
+$2.34\times$ at $\nseq=32$ to $6.14\times$ at $\nseq=2048$. \emph{The radius was
+wrong in three documents until 1 September.} It was typed as $2$, read off the
+all-site aggregation rather than the bulk one the selection rule actually uses,
+and stood in the thesis, the paper's appendix and this chapter until
+\texttt{tools/make\_tab\_screening.py} recomputed it from
+\texttt{screening.csv}. It is now a macro. The increase with $\nseq$ is
+recorded as a description of four measurements and no longer offered as evidence
+that the residual is non-architectural: an approximation floor produces the same
+signature, and the raw risks --- EM--BP falling $4.5\times$ across the range
+against the window head's $1.6\times$ --- are consistent with one. This
 replaces the withdrawn \texttt{exp\_12\_scaled} comparison in every document
 and closes the review's largest single open item. The table generator is
 \texttt{tools/make\_tab\_structured.py}, rewritten for this run's schema and
@@ -606,33 +614,46 @@ fails, rather than silently reporting a stale assumption.
 \item \textbf{Rung 4a at a matched convergence budget} (\texttt{629962}), eight seeds split by
       sample size into sixteen shards, at a $3000$-step cap under the per-sequence tolerance. Until
       it lands, the joint-versus-marginal margin above stays out of every document.
-
-\item \textbf{Capacity equivalence at a sufficient budget}
-      (\codefile{experiments/exp\_32\_capacity\_equivalence.py}). The rerun that would settle
-      the withdrawn capacity attribution below, now with a predeclared equivalence region and
-      \texttt{em\_cap} raised from $400$ to $1200$. The raise is itself a measurement rather than
-      a convention: at the old cap every one of the $320$ fits was still censored, and a
-      representative $\ncomp=16$ fit was moving thirty times faster than $\ncomp=8$ over the last
-      hundred iterations --- the same capacity-versus-convergence-rate confound, one level up. Run
-      to $2000$ iterations, the per-edge gain falls to ${\sim}6\times10^{-9}$ by $800$ and then
-      plateaus, so $1200$ captures essentially all the real movement without pretending the strict
-      $10^{-9}$ tolerance is reachable. Jobs \texttt{641515}--\texttt{641520}; lanes~a and~c are
-      complete ($70/70$, $40/40$), lane~b reached $39/50$ before two consecutive six-hour shards
-      both ran out of wall time and a third resume shard (job \texttt{643778}) is in flight ---
-      \texttt{part\_sweep}'s per-cell flush and its own on-disk resume check make a third shard
-      safe to run against the same output directory rather than overwriting the first thirty-nine
-      cells.
-
-      One artefact from this rerun must not be used. A contrast job (\texttt{639099}) fired early
-      because its \texttt{afterany} dependency was satisfied by the \emph{cancellation} of a
-      restructured upstream shard --- \texttt{afterany} fires on any terminal state and cannot
-      distinguish ``the work finished'' from ``something happened to that job id''. It computed
-      the contrast on seeds $0$--$6$ alone, roughly $40\%$ of the design. The file is renamed
-      \texttt{DO\_NOT\_CITE\_premature\_contrasts\_job639099.csv} on the cluster so that a
-      merge script globbing the ordinary name finds nothing; it is kept rather than deleted
-      because its visibly over-wide $\nseq=512$ interval is the demonstration of why the full seed
-      count matters.
 \end{itemize}
+
+\paragraph{Landed: capacity equivalence, and it reverses the claim it was built
+to test.}
+      (\codefile{experiments/exp\_32\_capacity\_equivalence.py}.) Predeclared equivalence region,
+\texttt{em\_cap} raised from $400$ to $1200$. The raise is itself a measurement rather than
+a convention: at the old cap every one of the $320$ fits was still censored, and a
+representative $\ncomp=16$ fit was moving thirty times faster than $\ncomp=8$ over the last
+hundred iterations --- the same capacity-versus-convergence-rate confound, one level up. Run
+to $2000$ iterations, the per-edge gain falls to ${\sim}6\times10^{-9}$ by $800$ and then
+plateaus, so $1200$ captures essentially all the real movement without pretending the strict
+$10^{-9}$ tolerance is reachable. Jobs \texttt{641515}--\texttt{641520} plus the resume shard
+\texttt{643778}; lane~b had reached $39/50$ when two consecutive six-hour shards ran out of
+wall time, and \texttt{part\_sweep}'s per-cell flush and on-disk resume check made a third
+shard safe against the same output directory rather than destructive to the first
+thirty-nine cells. Complete at $160/160$: sixteen seeds, five capacities, two sizes.
+
+The result is not the one the design was hoping to be able to state. Paired against
+$\ncomp=1$ on identical data, \emph{no} capacity improves held-out evidence or
+schedule-level score risk at either size --- $\ncomp=1$ wins on $13/16$ seeds at
+$\nseq=128$ and $14/16$ at $\nseq=512$ --- and the predeclared region refuses the
+$\ncomp{=}8$ versus $\ncomp{=}16$ comparison as well, resolving against it at $\nseq=128$
+with $\ncomp=16$ measurably worse. The six-seed, forty-iteration table it supersedes
+reported the opposite sign and was read as capacity beginning to pay at $\ncomp=4$; that
+does not reproduce. The likely mechanism, offered but not tested, is that the short budget
+was regularising the larger mixtures. Two confounds remain and both disfavour high capacity:
+every cell at $\ncomp\geq4$ stopped at the cap rather than at tolerance, and the share of
+fits whose narrowest component falls under the grid's resolution floor climbs from $0/32$ at
+$\ncomp=1$ to $11/32$ at $\ncomp=16$. Separating them needs a finer grid at fixed capacity
+and a budget ladder at fixed capacity, neither run.
+
+One artefact from this rerun must not be used. A contrast job (\texttt{639099}) fired early
+because its \texttt{afterany} dependency was satisfied by the \emph{cancellation} of a
+restructured upstream shard --- \texttt{afterany} fires on any terminal state and cannot
+distinguish ``the work finished'' from ``something happened to that job id''. It computed
+the contrast on seeds $0$--$6$ alone, roughly $40\%$ of the design. The file is renamed
+\texttt{DO\_NOT\_CITE\_premature\_contrasts\_job639099.csv} on the cluster so that a
+merge script globbing the ordinary name finds nothing; it is kept rather than deleted
+because its visibly over-wide $\nseq=512$ interval is the demonstration of why the full seed
+count matters.
 
 \section{Withdrawn, and not replaced}
 
