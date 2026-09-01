@@ -6,7 +6,22 @@
 %% baseline trained for 8,000 steps against the frozen protocol's 20,000 and
 %% whose ratios are inflated accordingly.
 
-\begin{center}\small
+\begin{center}
+%% minipage, not a bare center: without it LaTeX will break between the
+%% caption and the tabular, and it did -- Table 9.5's caption sat alone at
+%% the foot of one page with its rows at the head of the next.
+\begin{minipage}{\linewidth}\small\centering
+\captionof{table}{Two controlled violations of the Markov assumption, each
+against an exact reference for the contaminated model. The first two rows of
+each block are the baseline's relative score error divided by EM--BP's,
+averaged over the noise schedule, so a value above $1$ means the structured
+estimator wins and a bold value means it loses. The third row is the fitted
+correlation minus the Chow--Liu correlation of the true contaminated law: the
+distance between the chain that was fitted and the best chain there is. The
+fourth is EM--BP's own relative score error at its worst noise level, which
+says how much of a change in the ratio is the estimator degrading rather than
+the baseline improving.}
+\label{tab:nonmarkov}
 \begin{tabular}{@{}lccccc@{}}
 \toprule
 & \multicolumn{5}{c}{global latent, rank-one, strength $\beta$} \\
@@ -15,6 +30,8 @@
 \midrule
 Gaussian, vs CNN & $16.41$ & $14.84$ & $6.68$ & $3.21$ & $2.16$ \\
 Gaussian, vs MLP & $29.34$ & $22.48$ & $11.28$ & $4.00$ & $1.67$ \\
+$\widehat{\corr} - \corr_{\mathrm{CL}}$ & $-0.0025$ & $-0.0008$ & $+0.0008$ & $+0.0051$ & $+0.0144$ \\
+EM--BP error, worst $t$ & $0.019$ & $0.025$ & $0.055$ & $0.134$ & $0.167$ \\
 \midrule
 & \multicolumn{5}{c}{long-range precision coupling, strength $\gamma$} \\
 \cmidrule(lr){2-6}
@@ -22,6 +39,9 @@ Gaussian, vs MLP & $29.34$ & $22.48$ & $11.28$ & $4.00$ & $1.67$ \\
 \midrule
 Gaussian, vs CNN & $16.07$ & $1.24$ & $\mathbf{0.97}$ & $\mathbf{0.88}$ & $\mathbf{0.75}$ \\
 Gaussian, vs MLP & $27.84$ & $1.66$ & $1.19$ & $\mathbf{0.84}$ & $\mathbf{0.70}$ \\
+$\widehat{\corr} - \corr_{\mathrm{CL}}$ & $+0.0018$ & $+0.0376$ & $+0.0557$ & $+0.0806$ & $+0.0976$ \\
+EM--BP error, worst $t$ & $0.016$ & $0.298$ & $0.402$ & $0.490$ & $0.579$ \\
 \bottomrule
 \end{tabular}
+\end{minipage}
 \end{center}

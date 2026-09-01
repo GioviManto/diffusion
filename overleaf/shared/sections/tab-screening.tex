@@ -2,7 +2,11 @@
 %% (4 development seeds, 768 scored rows, provenance-clean).
 %% Do not hand-edit the numbers; rerun the generator.
 
-\begin{center}\small
+\begin{center}
+%% minipage, not a bare center: without it LaTeX will break between the
+%% caption and the tabular, and it did -- Table 9.5's caption sat alone at
+%% the foot of one page with its rows at the head of the next.
+\begin{minipage}{\linewidth}\small\centering
 \captionof{table}{The architecture screen that selected Table~\ref{tab:structured}'s
 baseline. Each candidate architecture was run over its own hyperparameter grid on
 4 development seeds (disjoint from the confirmatory seeds),
@@ -22,4 +26,5 @@ dilated convolutional stack & 8 & 66.4k--264k & $0.205$ \\
 bidirectional message passing & 8 & 9.0k--34.3k & $0.172$ \\
 \bottomrule
 \end{tabular}
+\end{minipage}
 \end{center}

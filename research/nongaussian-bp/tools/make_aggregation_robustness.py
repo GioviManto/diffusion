@@ -175,10 +175,14 @@ of averaging. Table~\\ref{{tab:pointwise}} reports the mean of per-cell
 ratios, aggregated per seed. That is the right inferential unit --- the twelve
 noise levels share a training set and a fitted model --- but being the right
 unit does not make it the only defensible summary, so here is the same data
-under five.
+under four, with a paired interval on the one the table reports.
 
-\\begin{{center}}\\small
-\\captionof{{table}}{{The headline under five estimands. (1) is what
+\\begin{{center}}
+%% minipage, not a bare center: without it LaTeX will break between the
+%% caption and the tabular, and it did -- Table 9.5's caption sat alone at
+%% the foot of one page with its rows at the head of the next.
+\\begin{{minipage}}{{\\linewidth}}\\small\\centering
+\\captionof{{table}}{{The headline under four estimands. (1) is what
 Table~\\ref{{tab:pointwise}} reports. The interval is a paired bootstrap over
 seeds, {BOOT:,} resamples; seeds are resampled rather than cells, because cells
 within a seed share a fitted model.}}
@@ -191,17 +195,18 @@ $\\nseq$ & (1) per-cell & (2) ratio of means & (3) geometric & (4) median
 {chr(10).join(lines)}
 \\bottomrule
 \\end{{tabular}}
+\\end{{minipage}}
 \\end{{center}}
 
 \\noindent Two things follow, and the second is the one worth stating plainly.
 
-The conclusion does not depend on the choice: every estimand at every size
-exceeds ${floor:.1f}$, every bootstrap interval sits well clear of $1$, and no
+The conclusion does not depend on the choice: no estimand at any size falls
+below ${floor:.1f}$, every bootstrap interval sits well clear of $1$, and no
 aggregation produces a reversal anywhere.
 
-But \\textbf{{the estimand we report is systematically the largest of the
-four}}, and by a margin that grows with $\\nseq$ --- up to ${spread:.1f}$ at
-$\\nseq={worst}$. The ratio of per-seed averaged errors, which is the summary a
+But \\textbf{{the estimand we report is the largest of the four at every
+size}}, and the margin widens with $\\nseq$ over most of the range, reaching
+${spread:.1f}$ at $\\nseq={worst}$. The ratio of per-seed averaged errors, which is the summary a
 reader is most likely to have in mind, runs ${rom_lo:.1f}$ to ${rom_hi:.1f}$
 rather than $\\ratiolo$ to $\\ratiohi$.
 

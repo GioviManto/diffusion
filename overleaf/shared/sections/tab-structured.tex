@@ -2,7 +2,11 @@
 %% (16 seeds, 4 sizes, 384 rows, provenance-clean).
 %% Do not hand-edit the numbers; rerun the generator.
 
-\begin{center}\small
+\begin{center}
+%% minipage, not a bare center: without it LaTeX will break between the
+%% caption and the tabular, and it did -- Table 9.5's caption sat alone at
+%% the foot of one page with its rows at the head of the next.
+\begin{minipage}{\linewidth}\small\centering
 \captionof{table}{EM--BP against the screened structure-aware baseline, at the
 headline protocol throughout. The baseline is a weight-shared window head whose
 architecture and hyperparameters were fixed by the screen of
@@ -25,4 +29,5 @@ $\nseq$ & EM--BP & window & all sites & centre site \\
 2048 & $0.0224$ & $0.1267$ & $6.14 \pm 0.45$ & $5.43 \pm 0.39$ \\
 \bottomrule
 \end{tabular}
+\end{minipage}
 \end{center}
