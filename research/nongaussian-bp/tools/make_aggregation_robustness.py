@@ -182,7 +182,7 @@ under four, with a paired interval on the one the table reports.
 %% caption and the tabular, and it did -- Table 9.5's caption sat alone at
 %% the foot of one page with its rows at the head of the next.
 \\begin{{minipage}}{{\\linewidth}}\\small\\centering
-\\captionof{{table}}{{The headline under four estimands. (1) is what
+\\captionof{{table}}[The headline ratio under four estimands]{{The headline under four estimands. (1) is what
 Table~\\ref{{tab:pointwise}} reports. The interval is a paired bootstrap over
 seeds, {BOOT:,} resamples; seeds are resampled rather than cells, because cells
 within a seed share a fitted model.}}

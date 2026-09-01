@@ -369,7 +369,7 @@ tex = f"""%% Included by overleaf/paper/main.tex and overleaf/thesis (Chapter 9)
 %% from exp_07_budget2048_seed*/. Do not hand-edit the numbers; rerun the generator.
 
 \\begin{{table}}[!htbp]
-\\caption{{Relative denoising error against the deterministic grid-BP reference under the true
+\\caption[Relative denoising error against training-set size]{{Relative denoising error against the deterministic grid-BP reference under the true
 kernel, averaged over the noise schedule; {len(seeds)} seeds $\\pm$ one standard error, aggregated
 per seed. Both arms select their optimisation budget on a disjoint validation bundle. EM--BP is
 more accurate in ${th(n_cells - wins)}$ of ${th(n_cells)}$ cells. The ratio column is the mean of

@@ -128,7 +128,7 @@ simultaneously.
 
 \begin{figure}[t]\centering
 \includegraphics[width=\linewidth]{fig_ring_model.pdf}
-\caption{The rotating-ring model, at the parameters used throughout this
+\caption[The rotating-ring model and its trajectories]{The rotating-ring model, at the parameters used throughout this
 chapter ($K = 20$, $\kappa = 2$, $D_r = 0.015$, $D_\theta = 0.005$,
 $\omega = 1$, $h = 2\pi/20$). (a) Polar coordinates and the moving frame
 \eqref{eq:ring-moving-frame}. (b) The potential \eqref{eq:ring-potential} and
@@ -237,7 +237,7 @@ frames.
 
 \begin{figure}[t]\centering
 \includegraphics[width=\linewidth]{fig_ring_gauge.pdf}
-\caption{The rotation and the gauge. (a) $R_\psi$ turns every vector through
+\caption[The rotation as a gauge, before and after]{The rotation and the gauge. (a) $R_\psi$ turns every vector through
 the same angle without changing its length, which is the statement
 $R_\psi^{\T}R_\psi = I_2$. (b) Three surrogate trajectories in the laboratory
 frame ($K = 14$, $\sigma = 0.16$, $\psi = 2\pi/14$; the marked point is
@@ -330,7 +330,7 @@ Figure~\ref{fig:ring-surrogate-response} separates the two terms.
 
 \begin{figure}[t]\centering
 \includegraphics[width=\linewidth]{fig_ring_surrogate_response.pdf}
-\caption{Exact decomposition of the surrogate response
+\caption[Rank-one response of the exact surrogate score]{Exact decomposition of the surrogate response
 \eqref{eq:ring-surrogate-score} at $t = 0.20$, $K = 30$, $\lambda = 0.05$,
 $\sigma = 0.15$, averaged over $250$ noisy trajectories, each panel normalised
 by its own maximum. (a) The chain term $|C_t^{-1}|$ is concentrated near the
@@ -356,7 +356,7 @@ Every identity of this chapter is checked against an independently computed
 reference, in the protocol of Appendix~\ref{app:repro}.
 
 \begin{table}[t]\centering
-\caption{Validation of the rotating-ring computations. The response identity
+\caption[Validation checks for the rotating-ring package]{Validation of the rotating-ring computations. The response identity
 and the analytic surrogate Jacobian are compared with central finite
 differences of the score; the grid check compares two polar resolutions.}
 \label{tab:ring-validation}
@@ -442,10 +442,13 @@ The theorem furnishes an unusually clean experiment. This model carries a
 parameter the marginals can see --- the confining potential
 $V(r) = (r-r_*)^2/2\lambda$ --- and a parameter they provably cannot, so
 running both through the same estimator isolates the effect of the structure
-rather than of the method. Three targets, each in two arms differing only in
-which likelihood scores a trajectory:
+rather than of the method. Table~\ref{tab:ring-targets} sets out three targets,
+each run in two arms differing only in which likelihood scores a trajectory:
 
-\begin{center}\small
+\begin{center}
+\begin{minipage}{\linewidth}\small\centering
+\captionof{table}[Three estimation targets, and what marginals can see]{The three estimation targets of this chapter, and which of them a one-frame marginal can see. Target (a) is the control that makes the contrast readable and is not itself reported; (b) and (c) are what Theorem~\ref{thm:ring-blindness} makes invisible to marginals and the joint law nonetheless recovers.}
+\label{tab:ring-targets}
 \begin{tabular}{@{}llll@{}}
 \toprule
  & target & free parameters & visible to marginals? \\
@@ -455,6 +458,7 @@ which likelihood scores a trajectory:
 (c) & a law over rotations $p(\psi)$ & a distribution & \textbf{no} \\
 \bottomrule
 \end{tabular}
+\end{minipage}
 \end{center}
 
 \noindent Target~(a) defines the contrast rather than supplying a result: it is
@@ -514,9 +518,13 @@ than their own resampling noise in the marginal one. Both controls are in
 Estimating a single angle, the error is $2.1\pm0.7^\circ$ pooled over the whole
 schedule. Recovering the two-species law
 $p^*(\psi)=\tfrac12\delta_{+\omega}+\tfrac12\delta_{-\omega}$ against a truth
-of $\omega = 30^\circ$ and a null of $90^\circ$:
+of $\omega = 30^\circ$ and a null of $90^\circ$, Table~\ref{tab:ring-recovery}
+reports:
 
-\begin{center}\small
+\begin{center}
+\begin{minipage}{\linewidth}\small\centering
+\captionof{table}[Recovery of the two-species rotation law]{Recovery of the two-species rotation law from the joint likelihood, against a truth of $\omega = 30^\circ$ and a null of $90^\circ$. The rotation survives the channel until $t \approx 1$ and has returned to the null by $t = 3$; the blind arm never leaves the null at any noise level.}
+\label{tab:ring-recovery}
 \begin{tabular}{@{}lcccccc@{}}
 \toprule
 $t$ & $0.05$ & $0.32$ & $0.68$ & $0.98$ & $1.43$ & $3.00$ \\
@@ -525,6 +533,7 @@ median $|\hat\omega - \omega|$ & $0.15^\circ$ & $0.24^\circ$ & $0.90^\circ$
 & $2.86^\circ$ & $7.09^\circ$ & $58.8^\circ$ \\
 \bottomrule
 \end{tabular}
+\end{minipage}
 \end{center}
 
 Information about the rotation survives until $t\approx1$ and is gone by
@@ -573,9 +582,12 @@ nonetheless recoverable from the joint. The blind arm of
 initialisation, and over $1{,}824$ cells it does not, to machine precision.
 That is a sharper statement than a comparison of error rates, because the null
 is known exactly rather than estimated.
+Table~\ref{tab:ring-claims} places each result of the chapter in the vocabulary
+of Section~\ref{sec:method}, separating what is proved from what is measured and
+from what is left open.
 
 \begin{table}[t]\centering
-\caption{Status of the results of this chapter.}
+\caption[Status of the rotating-ring results]{Status of the results of this chapter.}
 \label{tab:ring-claims}
 \begin{tabular}{@{}p{0.50\linewidth}p{0.46\linewidth}@{}}
 \toprule

@@ -72,7 +72,7 @@ Chapter~\ref{ch:gaussian}.
 
 \begin{figure}[t]\centering
 \includegraphics[width=0.62\linewidth]{fig_sample_efficiency.pdf}
-\caption{Relative score error against training-set size, mean over
+\caption[Relative score error against training-set size]{Relative score error against training-set size, mean over
 \nseedsused{} replicates with standard errors, for the EM--BP estimator and
 the validation-tuned MLP. The window-head baseline of
 Section~\ref{sec:em-architecture} scores every site rather than the aggregate
@@ -125,7 +125,7 @@ $\screenwinnerwidth$, with the \screenrunnerup{} network next
 
 \begin{figure}[t]\centering
 \includegraphics[width=0.62\linewidth]{fig_screening.pdf}
-\caption{Every configuration of the screen, scored on the \screenregion{}
+\caption[The architecture screen, risk against parameter count]{Every configuration of the screen, scored on the \screenregion{}
 region and averaged over the $\screendevseeds$ development seeds. One marker per
 architecture; the outlined marker is each architecture's best configuration. The
 horizontal axis is what makes the comparison readable: the dilated stack sits an
@@ -211,7 +211,7 @@ than the correlation coefficient does, and shape is what capacity moves.
 
 \begin{figure}[t]\centering
 \includegraphics[width=\linewidth]{fig_capacity.pdf}
-\caption{Left: the paired difference in held-out log-evidence per edge against
+\caption[Mixture capacity against a single Gaussian innovation]{Left: the paired difference in held-out log-evidence per edge against
 $C=1$, with one standard error over the $\capseeds$ seeds. Every interval lies
 below zero at both training sizes, which is the result of this section. Right:
 the share of fits whose narrowest component falls under the grid's resolution
@@ -342,7 +342,7 @@ rerun that fixed it.
 
 \begin{figure}[t]\centering
 \includegraphics[width=\linewidth]{fig_nonmarkov.pdf}
-\caption{The same cells as Table~\ref{tab:nonmarkov}, on a logarithmic vertical
+\caption[Where each Markov violation stops paying]{The same cells as Table~\ref{tab:nonmarkov}, on a logarithmic vertical
 axis with the break-even line drawn. The two mechanisms are not two amounts of
 the same thing: under a rank-one global latent the advantage decays smoothly and
 never reaches the line, even where half the marginal variance is a shared
@@ -430,10 +430,13 @@ would show up.
 
 \paragraph{What it shows.} The efficient information for $\beta$ decays two
 to three orders of magnitude faster with diffusion noise than the
-information for $\alpha$ itself. Reading the loss between the smallest and
-largest diffusion time tested ($t = 0.05$ against $t = 1.6$):
+information for $\alpha$ itself. Table~\ref{tab:em-information} reads the loss
+between the smallest and largest diffusion time tested:
 
 \begin{center}
+\begin{minipage}{\linewidth}\centering
+\captionof{table}[Fisher information lost to the channel, by coordinate]{How much Fisher information about each coordinate the channel destroys, read between the smallest and largest diffusion time tested ($t = 0.05$ against $t = 1.6$). The shape coordinate loses two to three orders of magnitude more than the correlation does, which is a property of the noised likelihood rather than of any optimiser. The reported quantity is the efficient information, so the nuisance coordinates are estimated rather than known.}
+\label{tab:em-information}
 \begin{tabular}{@{}rrrr@{}}
 \toprule
 true $\beta$ & info loss, $\alpha$ & info loss, $\ivar$ & info loss, $\beta$ (shape) \\
@@ -443,6 +446,7 @@ true $\beta$ & info loss, $\alpha$ & info loss, $\ivar$ & info loss, $\beta$ (sh
 3.0 & $56\times$ & $522\times$ & $\mathbf{68{,}460\times}$ \\
 \bottomrule
 \end{tabular}
+\end{minipage}
 \end{center}
 \noindent This is not merely a restatement of the convergence finding: it is
 a property of the noised likelihood itself, independent of any optimiser,

@@ -317,7 +317,7 @@ exponent.
 
 \begin{figure}[t]\centering
 \includegraphics[width=0.78\linewidth]{fig_band_fill.pdf}
-\caption{Band-fill law. Measured $|(\Qt)_{i,i+d}|$ against $t$ (dots) and
+\caption[The band-fill law for the posterior precision]{Band-fill law. Measured $|(\Qt)_{i,i+d}|$ against $t$ (dots) and
 the leading order \eqref{eq:g-bandfill} (solid lines, no fitted
 parameters), for $\alpha = 0.9$, $K = 25$, $d = 1, \dots, 5$. The slopes
 are $d - 1$; agreement at small $t$ is at the percent level for every
@@ -346,7 +346,7 @@ $e^{-2t}$.
 
 \begin{figure}[t]\centering
 \includegraphics[width=0.78\linewidth]{fig_tridiag_loss.pdf}
-\caption{Structure across diffusion time ($\alpha = 0.8$, $K = 40$).
+\caption[Loss and recovery of tridiagonality with diffusion time]{Structure across diffusion time ($\alpha = 0.8$, $K = 40$).
 $\|\Sigt - \Sigz\|_F$ (navy) grows monotonically as the covariance is
 driven to the identity; the off-tridiagonal Frobenius mass of $\Qt$ (red)
 rises from zero, peaks at intermediate $t$, and decays to zero: the band
@@ -689,7 +689,7 @@ second from the first is left open.
 
 \begin{figure}[t]\centering
 \includegraphics[width=\linewidth]{fig_local_vs_full.pdf}
-\caption{Locality of the joint score ($\alpha = 0.8$, $K = 121$,
+\caption[Geometric decay of the windowed estimator's error]{Locality of the joint score ($\alpha = 0.8$, $K = 121$,
 deterministic RMS over the data law). Left: exact truncation error of the
 radius-$r$ local estimator (dots) at three diffusion times; the dashed
 lines have the predicted slopes $q(\alpha,t)^r$ from
@@ -707,9 +707,12 @@ $\widehat S = -Q_t^{(b)} x$ with entries beyond $|i-j| \leq b$ zeroed.
 \emph{Truncate the algorithm}: let messages travel at most $r$ hops, i.e.\
 run exact inference on the window $x_{k-r}, \dots, x_{k+r}$ (the local
 estimator above). Both are linear in $x$, so their RMS errors are again
-deterministic. At equal locality budget ($b = r = 1$, $K = 40$,
-$\alpha = 0.8$):
+deterministic. Table~\ref{tab:g-truncation} compares them at equal locality
+budget ($b = r = 1$, $K = 40$, $\alpha = 0.8$):
 \begin{center}
+\begin{minipage}{\linewidth}\centering
+\captionof{table}[Truncating the answer against truncating the algorithm]{Truncating the answer against truncating the algorithm, at equal locality budget ($b = r = 1$, $K = 40$, $\alpha = 0.8$). Both estimators are linear in $x$, so both errors are deterministic rather than sampled. The cost of locality peaks at intermediate diffusion times and the ordering reverses nowhere.}
+\label{tab:g-truncation}
 \begin{tabular}{@{}lcccc@{}}
 \toprule
 relative RMS score error & $t = 0.05$ & $t = 0.3$ & $t = 1$ & $t = 3$ \\
@@ -718,6 +721,7 @@ banded matrix ($b = 1$)      & $0.210$ & $0.302$ & $0.135$ & $0.0035$ \\
 truncated inference ($r = 1$) & $0.123$ & $0.235$ & $0.130$ & $0.0035$ \\
 \bottomrule
 \end{tabular}
+\end{minipage}
 \end{center}
 Two observations. The cost of locality is non-monotone in $t$ and peaks at
 intermediate times, consistent with Section~\ref{sec:g-tridiag-loss}. And

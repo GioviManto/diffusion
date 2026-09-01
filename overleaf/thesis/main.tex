@@ -45,6 +45,13 @@ To my family.
 \setcounter{page}{5}
 \tableofcontents
 \clearpage
+% Both lists earn their place at this length: the results chapters are read out
+% of order, and a reader chasing one number should not have to find the section
+% that happens to contain it.
+\listoffigures
+\clearpage
+\listoftables
+\clearpage
 % ensure the thesis body starts on an odd (right) page
 \ifodd\value{page}\else\null\thispagestyle{empty}\clearpage\fi
 

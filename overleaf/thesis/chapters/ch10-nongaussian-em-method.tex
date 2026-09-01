@@ -231,7 +231,7 @@ neither diagnostic can be mistaken for a certificate of the other.
 
 \begin{figure}[t]\centering
 \includegraphics[width=0.72\linewidth]{fig_grid_domain.pdf}
-\caption{Grid and domain control on a Laplace chain ($\alpha=0.85$, $n=32$
+\caption[Grid and domain control, separated]{Grid and domain control on a Laplace chain ($\alpha=0.85$, $n=32$
 sites), four panels. (a) Relative score error against a high-resolution
 reference as grid resolution $M$ grows at fixed half-width $A=8$; (b) the same
 as $A$ grows at fixed $M=401$ --- both saturate at the floating-point floor
@@ -279,7 +279,7 @@ the third is what makes it an estimator.
 
 \begin{figure}[t]\centering
 \includegraphics[width=0.9\linewidth]{fig_em_diagnostics.pdf}
-\caption{Optimisation diagnostics for the EM procedure of
+\caption[Optimisation diagnostics for the EM procedure]{Optimisation diagnostics for the EM procedure of
 Section~\ref{sec:em-algorithm}. Left: marginal log-likelihood by iteration
 from four initialisations of $\alpha$; the largest decrease across
 iterations is zero in every run. Centre: the estimated $\alpha$ over the
@@ -299,10 +299,14 @@ measurement, and it is the one that most directly qualifies the results of
 Chapter~\ref{ch:em-results}: how many EM iterations the algorithm of
 Section~\ref{sec:em-algorithm} actually needs.
 
-Two arms of the same chains were fit under identical initialisation and
-budget, one seeing clean data and the other once through the OU channel:
+Table~\ref{tab:em-convergence} fits two arms of the same chains under identical
+initialisation and budget, one seeing clean data and the other the same chains
+once through the OU channel:
 
 \begin{center}
+\begin{minipage}{\linewidth}\centering
+\captionof{table}[What the channel costs in convergence rate]{What the observation channel costs in convergence rate, not in attainable accuracy. Two arms of the same chains, identical initialisation and budget, one seeing clean transition pairs and the other the same chains once through the OU channel (truth: $\alpha = 0.85$, innovation kurtosis $3.0$). Both arms reach the truth; only the rate differs.}
+\label{tab:em-convergence}
 \begin{tabular}{@{}rcccc@{}}
 \toprule
 iteration & \multicolumn{2}{c}{clean} & \multicolumn{2}{c}{through the channel} \\
@@ -314,6 +318,7 @@ iteration & \multicolumn{2}{c}{clean} & \multicolumn{2}{c}{through the channel} 
 600 & 0.8475 & 3.132 & 0.8466 & 3.096 \\
 \bottomrule
 \end{tabular}
+\end{minipage}
 \end{center}
 \noindent(truth: $\alpha=0.85$, innovation kurtosis $3.0$). Both arms reach
 the truth; what differs is the \emph{rate}. On clean data $\alpha$ is
