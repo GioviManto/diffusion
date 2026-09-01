@@ -39,8 +39,7 @@ matrix posterior (means, variances, scores); bulk variance, covariance
 decay $q^d$, and the recombination identity; AMP mean and score
 closure-independence; the AMP variance formula, existence boundary,
 breakdown time, and weak-coupling law; the locality slopes; the band-fill
-coefficients (with the factorial variant explicitly rejected); spectral
-preservation and the large-$t$ return.
+coefficients; spectral preservation and the large-$t$ return.
 The audit driver of \texttt{research/unified-note} runs $55$ checks on
 the consolidated note, including the Laplace $K = 1$ quadrature checks
 and the one-step boundary-message identity.
@@ -119,9 +118,15 @@ aggregation figure in this thesis is typed. Each is defined once in
 \texttt{overleaf/shared/sections/} by a generator
 (\texttt{tools/make\_tab\_efficiency.py},
 \texttt{tools/make\_tab\_structured.py},
+\texttt{tools/make\_tab\_screening.py},
+\texttt{tools/make\_tab\_capacity.py},
 \texttt{tools/make\_aggregation\_robustness.py},
+\texttt{tools/make\_aggregation\_structured.py},
 \texttt{tools/make\_figures.py}) reading the frozen outputs, and the prose
-cites the macro. The figures and the tables therefore share a size grid and
+cites the macro. The rule earns its keep: the screening winner's radius was
+the one number in Section~\ref{sec:em-architecture} still typed by hand, and it
+was wrong in three documents until \texttt{make\_tab\_screening.py} recomputed
+it from the artifact. The figures and the tables therefore share a size grid and
 an aggregation rule by construction rather than by inspection.
 
 \paragraph{What Table~\ref{tab:pointwise} covers.} Four qualifications, kept
@@ -140,6 +145,45 @@ component is under two grid cells wide; including them changes no ratio by
 more than $\dropshift$. And the network is beaten in all but $2$ of the
 reported cells, both at the smallest sizes ---
 Appendix~\ref{app:aggregation} resolves where the advantage is largest.
+
+\paragraph{What Table~\ref{tab:structured} covers.} The confirmatory run scores
+three regions per cell --- $\structregionlist$ --- of which the table displays
+two; the third is the predeclared interior slice, and it is the one the
+architecture screen selects on. That is why the $\structcells$ scored cells are
+$\structseeds \times \structsizes \times \structregions$ and not the
+$\structseeds \times \structsizes \times 2$ a two-column table suggests. The
+count is a descriptive diagnostic and not a replication count: regions are a
+scoring choice applied after fitting, and sizes share nothing but the seed, so
+the inferential unit behind each displayed row is the $\structseeds$ paired
+seeds. Both arms are checkpointed and selected on a validation bundle disjoint
+from the test bundle, and neither bundle is shared with training.
+
+\paragraph{The architecture screen.} Table~\ref{tab:screening} reports it in
+full, from \texttt{outputs/frozen/exp\_31\_screen/screening.csv} at commit
+\texttt{569a67c}, which is the artifact the confirmatory run names in its own
+recorded configuration (\texttt{winners=auto:} that path) rather than a
+reconstruction. $\screenconfigs$ configurations over $\screendevseeds$
+development seeds, at two training sizes, with learning rates
+$\screenlrs$, both output parameterisations, and a checkpoint ladder from
+$\screenckptlo$ to $\screenckpthi$ steps shared across all three
+architectures. Selection is on mean risk over the development seeds, scored on
+the $\screenregion$ region; the development seeds are numbered from $10000$ and
+share no seed with the confirmatory set, so the reported interval is not a
+selection artefact. The winner is the window head at radius
+$\screenwinnerradius$, width $\screenwinnerwidth$, learning rate
+$\screenwinnerlr$, $\screenwinnermode$ parameterisation. Parameter counts
+across the grids are $\screenwindowparams$ (window), $\screenbimpparams$
+(message passing) and $\screenconvparams$ (dilated convolution): the arm with
+the most capacity placed last, which is the relevant check on whether the
+comparison was tuned evenly.
+
+\paragraph{The transition array's normalisation.} Stated in
+Section~\ref{sec:em-numerical} and repeated here because it determines which
+probabilistic object the M-step optimises: columns are \emph{not} renormalised
+under the quadrature weights, so the fitted object is the continuum kernel read
+through a quadrature rule and the surrogate carries no $\theta$-dependent
+log-normaliser. The column-mass residual is the measured distance to a
+normalised finite-state kernel.
 
 \paragraph{Excluded inputs.} $\nseq=8192$ is excluded from both
 Table~\ref{tab:pointwise} and Figure~\ref{fig:em-sample-eff}: the

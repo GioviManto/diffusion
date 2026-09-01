@@ -195,6 +195,34 @@ with an independently coded brute-force enumeration --- sharing no code with
 the BP recursion --- to $1.6\times10^{-14}$ on posterior means and
 $1.8\times10^{-15}$ on the log-evidence.
 
+\paragraph{Which finite-grid model is being optimised.} ``Exact for the
+discretised chain'' needs one more specification than it has been given so far,
+because there are two conventions available and they lead to different
+objectives. The transition array used here is the continuum density
+$K_\theta(a' \mid a)$ evaluated at the grid points and combined with the
+trapezoidal weights, with \emph{no} per-column renormalisation. BP is therefore
+exact --- up to floating point --- for the chain-shaped \emph{factor model} that
+array defines, and that model is not literally a normalised finite-state
+transition kernel on the truncated domain. The distance between the two is
+precisely the column-mass residual already reported as the quadrature
+diagnostic: at the working configuration the worst interior column departs from
+unit mass by $9.6\times10^{-4}$, and the worst column anywhere, at the domain
+edge where the density is truncated, by $1.9\times10^{-2}$.
+
+The alternative convention --- renormalising each parent-conditioned column
+under the quadrature weights --- would make the array a genuine finite-state
+kernel, but its normaliser would depend on $\theta$, most strongly near the
+boundary, and that dependence would have to be carried: the derivative of
+$\log Z_\theta$ would enter both Fisher's identity and the M-step, and the
+surrogate could no longer be written as
+$Q(\theta \mid \theta^{(k)}) = \langle \Xi(\theta^{(k)}), \log K_\theta\rangle$
+with $K_\theta$ the raw density. Because no renormalisation is applied, that
+term is absent by construction rather than by oversight, and the surrogate above
+is the correct one for the model actually fitted. The price is that the fitted
+object is the continuum kernel read through a quadrature rule, which is what the
+column-mass residual measures and what the resolution gate of
+Section~\ref{sec:em-numerical} bounds.
+
 \begin{figure}[t]\centering
 \includegraphics[width=0.72\linewidth]{fig_grid_domain.pdf}
 \caption{Grid and domain control on a Laplace chain ($\alpha=0.85$, $n=32$
@@ -213,14 +241,14 @@ an $O(h^2)$ reference. Neither diagnostic alone certifies convergence. Source:
 
 \begin{remark}[The boundary-mass diagnostic is empirical, not a bound]
 \label{rmk:em-boundary}
-The worst-boundary-mass figures above were originally computed from a single
-sampled chain and reported as if they bounded the truncation error for every
-run. They do not: reseeding the same diagnostic over 256 independent chains
-per configuration shows the single-chain value sits near the \emph{median}
-over chains, while the maximum observed is up to $152\times$ higher (range
-$2.9\times$ to $8369\times$ across configurations). The diagnostic should be
-read as an empirical estimate of typical truncation loss, not a certified
-bound. What it does \emph{not} affect is the separation of truncation from
+A boundary-mass figure computed from one sampled chain does not bound the
+truncation error for every run, and the gap is large enough to matter: over 256
+independent chains per configuration the single-chain value sits near the
+\emph{median}, while the maximum observed is up to $152\times$ higher (range
+$2.9\times$ to $8369\times$ across configurations). This is why the figures
+above are reported as a maximum and a $90$th percentile over chains rather than
+as one number. The diagnostic is an empirical estimate of typical truncation
+loss, not a certified bound. What it does \emph{not} affect is the separation of truncation from
 quadrature error reported above, which is a pure function of $(A,M)$ and the
 prior and involves no sampled chain at all --- that comparison reproduces
 to $0.000$ relative difference under reseeding and is exactly the result

@@ -82,31 +82,30 @@ bias--variance knob for both and selecting one while pinning the other is not a
 neutral protocol. The numbers are generated from the frozen outputs by
 \texttt{tools/make\_tab\_efficiency.py} rather than transcribed.
 
-What that comparison does \emph{not} establish bears repeating here, because
-the figure is quotable and the caveat is not. The two arms are asymmetric in
-supplied information by construction: the estimator receives the Markov
-factorisation, the autoregressive form and homogeneity, and the networks
-receive none of them. The measurement is of what a correct structural
-assumption is worth on a family where it holds exactly. It is not a ranking of
-learning algorithms.
+What that comparison does \emph{not} establish has to be stated with it. The two
+arms are asymmetric in supplied information by construction: the estimator
+receives the Markov factorisation, the autoregressive form and homogeneity, and
+the networks receive none of them. The measurement is of what a correct
+structural assumption is worth on a family where it holds exactly. It is not a
+ranking of learning algorithms.
 
-In particular the comparison is against an \emph{unstructured} network, and
-most of the margin turns out to be attributable to that choice rather than to
-estimation. A weight-shared window baseline --- the same object as a one-layer
-convolution --- closes the greater part of the gap, which means the headline
-figure should be read as an upper bound on the value of the structural
-assumption and not as its size: against a network with no locality prior the
-advantage is $\ratiolo$--$\ratiohi\times$ (RQ6, above), and it falls to
-$\structratiolo$--$\structratiohi\times$ once the baseline shares weights
-across sites. That second figure is now measured at the headline
-protocol, every site scored, both arms selected on a disjoint validation
-bundle and the whole comparison deployed through the provenance gate
-(Section~\ref{sec:em-architecture}) --- and the weight-sharing baseline was
-chosen by screening against two architectures built to propagate further
-across the chain, a dilated stack and a bidirectional message-passing
-network, without losing to either. The strongest amortised-inference
-baseline this thesis tested is, on this family and at these sizes, the
-simplest one screened.
+In particular the comparison is against an \emph{unstructured} network, and a
+large fraction of the margin disappears once locality and weight sharing are
+supplied to the baseline. That fraction should not be read as a decomposition
+into an architecture term and an estimation term: architecture, capacity,
+parameter sharing, optimisation and implicit regularisation change together
+when the baseline is swapped, and no design here separates them. What can be
+said is the pair of measurements. Against a network with no locality prior the
+advantage is $\ratiolo$--$\ratiohi\times$ (RQ6, above); against one that shares
+weights across sites it is $\structratiolo$--$\structratiohi\times$, measured at
+the headline protocol with every site scored and both arms selected on a
+disjoint validation bundle (Section~\ref{sec:em-architecture}). The headline
+figure is therefore an upper bound on the value of the structural assumption
+rather than its size. The weight-sharing baseline was itself the winner of a
+screen against a dilated stack and a bidirectional message-passing network,
+both able in principle to propagate further across the chain; that makes it the
+strongest baseline this screen found, on this family and at these sizes, which
+is a weaker and more useful statement than the strongest conceivable one.
 
 The chain-Markov assumption itself tolerates a violation it can absorb into
 its own fitted parameters (a shared global latent, up to the point where it
@@ -114,32 +113,49 @@ accounts for half the marginal variance) and fails, well before generic
 intuition about misspecification would suggest, on one it structurally cannot
 represent (long-range coupling, by a coupling strength of roughly one tenth).
 
-\paragraph{Two questions this thesis leaves open rather than answers.}
-Whether mixture capacity saturates near eight components, and whether
+\paragraph{Capacity, answered in the opposite direction.} Mixture capacity does
+not saturate near eight components; on this family it does not pay at all.
+Paired against a single Gaussian innovation on identical data, at $\capseeds$
+seeds and two training sizes with fits run to their plateau rather than to a
+fixed iteration count, no capacity in $\{\capcomps\}$ improves held-out evidence
+or schedule-level score risk. The predeclared equivalence region --- fixed
+before the contrast was computed, precisely so that ``equivalent'' could be
+asserted rather than inferred from a failure to reject --- also refuses the
+$C=8$ against $C=16$ comparison, resolving against it at
+$\nseq=\capheadsize$ in the direction of $C=16$ being worse. Two things are not
+separated and both disfavour the larger mixtures: every cell at
+$C\geq\capcappedfrom$ stopped at the iteration cap rather than at tolerance, and
+the share of fits whose narrowest component falls below the grid's resolution
+floor climbs with $C$. So the claim is about this estimator on this grid rather
+than about mixture capacity as such. This supersedes an earlier six-seed,
+fixed-budget design that reported the opposite sign; that reading does not
+reproduce at higher replication and longer budget.
+
+\paragraph{One question this thesis leaves open rather than answers.} Whether
 pointwise accuracy and generative fidelity can move in opposite directions
-within one estimator, are both unresolved here, and for the same reason: the
-experiments that address them share a fixed iteration budget under which most
-shape coordinates had not settled, and the shape is what both questions turn
-on. On capacity there is a second, independent limitation, worth separating
-because it would apply even to a fully converged rerun --- failing to resolve
-a difference between $C=8$ and $C=16$ at six seeds is not evidence that none
-exists, and no equivalence region was predeclared against which ``none''
-could be judged. A budget-limited comparison answers ``how do these behave
-after this much optimisation'', which is not the question either was asked;
-that distinction is itself one of the findings under RQ5, and the
-convergence measurement that establishes it
-(Section~\ref{sec:em-convergence}) is what the corrected reruns are designed
-around.
+within one estimator is unresolved here. The comparison that addresses it uses a
+fixed iteration budget under which most shape coordinates had not settled, and
+the shape is what the generative metric scores, so it compares converged
+estimators against unconverged ones on the one coordinate that had not
+converged. A budget-limited comparison answers ``how do these behave after this
+much optimisation'', which is not the question it was asked; that distinction is
+itself one of the findings under RQ5, and the convergence measurement that
+establishes it (Section~\ref{sec:em-convergence}) is what a corrected rerun
+would be designed around --- as the capacity experiment above already is.
 
 \section{What the model suggests but does not establish}
 
 Within the Gaussian benchmark, local score computations are near-optimal
-away from intermediate diffusion times, the required receptive field
-scales as $\xi \log(1/\varepsilon)$ with $\xi = 1/\log(1/q)$, and a
-local algorithm is preferable to a banded linear readout. These are
-properties of exact inference in one controlled model. Whether trained
-score networks on real sequence data inherit them is untested here and
-would require learning experiments.
+away from intermediate diffusion times, and a local algorithm is preferable to
+a banded linear readout. The receptive-field scaling
+$r \gtrsim \xi \log(1/\varepsilon)$ with $\xi = 1/\log(1/q)$ follows from the
+\emph{measured} geometric decay of the windowed estimator's error over
+$r = 2,\dots,13$, not from the exact influence-coefficient result, which does
+not by itself cover the boundary conditions windowing introduces; it is an
+empirical scaling over the tested range rather than a theorem. Those are
+properties of one controlled model. Whether trained score networks on real
+sequence data inherit them is untested here and would require learning
+experiments.
 
 \section{Limitations}
 
@@ -152,12 +168,16 @@ measured curve, not a formula. (iii) The locality laws are proved for
 the Gaussian bulk; their non-Gaussian counterparts are only structurally
 delimited; in particular no low-rank structure is asserted for the Laplace
 $K = 2$ posterior Hessian, which holds only in a narrow regime.
-(v) The EM-learning results of Chapters~\ref{ch:em-method}
-and~\ref{ch:em-results} use a fixed, generous but ultimately insufficient
-iteration budget for several of the reported sweeps; any conclusion in
-those chapters resting on fitted or generated \emph{shape} at that budget
-is flagged explicitly as confounded with convergence rate rather than
-resolved. (vi) The misspecification results of
+(iv) The learning results of Chapters~\ref{ch:em-method}
+and~\ref{ch:em-results} are statistical rather than exact: they are estimates
+over a finite number of seeds, reported with paired uncertainty, and several are
+resolved only at one of the two training sizes tested.
+(v) The reverse-dynamics comparison of Section~\ref{sec:em-generative} uses a
+fixed iteration budget insufficient for the fitted \emph{shape} to settle, so
+its reading is withdrawn rather than reported; the capacity experiment that
+replaces the corresponding fixed-budget design still stops at an iteration cap
+rather than at tolerance for every cell above $C=\capcappedfrom$.
+(vi) The misspecification results of
 Section~\ref{sec:em-nonmarkov} probe exactly two violations of the Markov
 assumption; they establish that the two are not interchangeable in effect,
 not a general theory of how much non-Markov structure a chain estimator
@@ -179,12 +199,16 @@ this thesis: with a finite alphabet the BP messages are finite vectors and
 inference is exact with no closure at all, which would give a second
 solvable benchmark alongside the Gaussian one.
 
-What the new chapters measured opens further directions of their own.
-Re-running the capacity sweep of Section~\ref{sec:em-capacity} to a
-convergence criterion rather than a fixed iteration count, now that
-Section~\ref{sec:em-convergence} has measured what that criterion should be,
-would settle the one result in this thesis that is explicitly flagged as
-confounded. The misspecification study of Section~\ref{sec:em-nonmarkov}
+What the new chapters measured opens further directions of their own. The
+capacity result of Section~\ref{sec:em-capacity} leaves two mechanisms
+entangled, and one experiment would separate them: a finer grid at fixed
+capacity would say how much of the larger mixtures' disadvantage is their fits
+falling below the grid's resolution rather than their overfitting the data,
+since only the second should survive a mesh refinement. A budget ladder at fixed
+capacity would do the same for the iteration cap, and would test directly the
+reading offered there --- that a short budget was regularising the larger
+mixtures, which is why the earlier fixed-budget design reported the opposite
+sign. The misspecification study of Section~\ref{sec:em-nonmarkov}
 probes two violations at a time; a paired design across violation strengths,
 and further violation types beyond a global latent and long-range coupling,
 would generalise the finding that the two mechanisms are not

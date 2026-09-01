@@ -176,12 +176,15 @@ The correspondence is not confined to convolutional architectures.
 \citet{garnierbrun2024transformers} train transformers on data generated
 by a hierarchical model in which the exact posterior is again computable
 by belief propagation, and find that the trained attention maps come to
-reproduce the message-passing schedule --- the network discovers the
-inference algorithm rather than approximating the function some other
-way. Read together with \citet{mei2024unets}, the claim is
-architecture-independent: what a denoiser must implement is determined by
-the graphical structure of the data, and the natural depth is set by that
-structure. This is precisely why the chain matters here. A chain is a
+reproduce the message-passing schedule. Read together with
+\citet{mei2024unets}, this is \emph{cross-architecture evidence} for a
+particular reading: that graphical inference is a useful description of what a
+trained denoiser ends up computing, and that the depth it needs is set by the
+structure of the data rather than by the architecture chosen. It is evidence
+across two architecture families and two model families, not a theorem about
+every denoiser --- a network can approximate the same posterior map without
+reproducing the algorithm internally, and neither result rules that out. This is
+precisely why the chain matters here. A chain is a
 degenerate tree, of depth equal to its length and width two, so the depth
 these results would predict is not the logarithmic depth of a balanced
 hierarchy but a depth linear in the correlation length --- a sharply
@@ -193,7 +196,8 @@ hypothesis but a computable quantity. For the Gaussian chain, the exact
 score at frame $k$ depends on the observation at frame $k \pm d$ with a
 weight that decays geometrically in $d$, at a rate $q(\alpha, t)$
 computed in closed form in Chapter~\ref{ch:gaussian}; the error of the
-best radius-$r$ local approximation decays as $q^r$, and the comparison
+radius-$r$ windowed estimator is \emph{measured} to decay at that same rate
+over the tested range, which is a separate and weaker statement, and the comparison
 between truncating the inference and truncating the score matrix
 quantifies, in one solvable case, how a local computation should be
 organised. These results describe the function a network would have to
