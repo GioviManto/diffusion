@@ -152,11 +152,12 @@ away from intermediate diffusion times, and a local algorithm is preferable to
 a banded linear readout. The receptive-field scaling
 $r \gtrsim \xi \log(1/\varepsilon)$ with $\xi = 1/\log(1/q)$ follows from the
 \emph{measured} geometric decay of the error of radius-$r$ windowed
-\emph{inference} --- exact BP run on a window of the chain, not the windowed
-network baseline of Section~\ref{sec:em-architecture} --- over
-$r = 2,\dots,13$, not from the exact influence-coefficient result, which does
-not by itself cover the boundary conditions windowing introduces; it is an
-empirical scaling over the tested range rather than a theorem. Those are
+\emph{inference} over $r = 2,\dots,13$ --- exact BP run on a window of the
+chain, not the windowed network baseline of
+Section~\ref{sec:em-architecture}. It does not follow from the exact
+influence-coefficient result, which by itself does not cover the boundary
+conditions windowing introduces. It is an empirical scaling over the tested
+range, not a theorem. Those are
 properties of one controlled model. Whether trained score networks on real
 sequence data inherit them is untested here and would require learning
 experiments.

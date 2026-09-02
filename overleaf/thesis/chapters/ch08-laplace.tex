@@ -236,7 +236,7 @@ both are diagonal at once.
 \section{A validated numerical reference: grid BP}\label{sec:l-grid}
 
 Since functional messages admit no closed form, the exact recursion is
-approximated numerically: messages are represented by their values on $M$
+approximated numerically: messages are represented by their values on $\ngrid$
 equispaced points in $[-A, A]$ and the update integrals are carried out
 by trapezoidal quadrature, each update touching every pair of grid
 points. This
@@ -244,27 +244,26 @@ points. This
 recursion, and it can serve as a reference only inside a validated
 regime, which we establish on the exactly solvable Gaussian chain. There
 the trapezoid rule on analytic, rapidly decaying integrands converges
-spectrally, so failure is abrupt rather than gradual: at $M = 101$,
+spectrally, so failure is abrupt rather than gradual: at $\ngrid = 101$,
 $A = 8$ the score error sits at the $10^{-15}$ floor down to $t = 0.02$
 and fails only when the likelihood width $\sqrt{2t}$ approaches the grid
 step. The working configuration for all non-Gaussian experiments is
-$M = 401$, $A = 8$, with a reference solution at $M = 801$ and the
+$\ngrid = 401$, $A = 8$, with a reference solution at $\ngrid = 801$ and the
 resolution constraint $\sqrt{2t} \gtrsim 3h$ on the grid spacing
-$h = 2A/(M-1)$ checked automatically;
+$h = 2A/(\ngrid-1)$ checked automatically;
 grid self-convergence error remains $10^4$ to $10^7$ times smaller than
 every effect measured below. Within this regime we treat grid BP as the
 reference score; outside it no claim is made.
 
 \begin{remark}[Symbols that are easy to swap]
-Throughout this thesis $M$ is the number of \emph{grid points} representing a
-message and $\nseq$ is the number of training \emph{sequences}; they are
-independent, and every configuration states both. The companion paper uses
-$M$ for the sequence count and a separate symbol for the grid, so a figure
-quoting ``$M=401$'' here and ``$M=4096$'' there refers to different objects.
-Two more pairs, for the same reason. The chain length is $K$ and its internal
-index is $u$, never $t$, which is reserved for diffusion time throughout. And
-$q$ always means the geometric decay rate $q(\alpha,t)$ of
-Section~\ref{sec:g-bulk}; the innovation variance is $\ivar$, never $q$.
+Three pairs are worth fixing before the numerical sections use them. The grid
+resolution is $\ngrid$ and the number of training \emph{sequences} is $\nseq$;
+they are independent, and every configuration states both. The chain length is
+$K$ and its internal index is $u$, never $t$, which is reserved for diffusion
+time throughout. And $q$ always means the geometric decay rate $q(\alpha,t)$
+of Section~\ref{sec:g-bulk}; the innovation variance is $\ivar$, never $q$.
+The companion paper writes the sequence count $M$ where this thesis writes
+$\nseq$; the grid symbol is the same in both.
 \end{remark}
 
 All score errors are amplified posterior-mean errors: for any two solvers
@@ -344,7 +343,7 @@ Table~\ref{tab:l-closure} reports the median relative score error of the
 Gaussian closure on the Laplace chain:
 \begin{center}
 \begin{minipage}{\linewidth}\centering
-\captionof{table}[Gaussian-message error on the Laplace chain]{The Gaussian-message approximation against validated grid BP on the Laplace chain ($\alpha = 0.85$, $K = 32$, $60$ trials per $t$, reference $M = 801$). By Theorem~\ref{thm:l-lmmse} the first row is the price of discarding everything beyond second moments, not the error of one particular implementation. The second row is the share of trials exceeding $10\%$ relative error, which reaches zero an order of magnitude in $t$ before the median does.}
+\captionof{table}[Gaussian-message error on the Laplace chain]{The Gaussian-message approximation against validated grid BP on the Laplace chain ($\alpha = 0.85$, $K = 32$, $60$ trials per $t$, reference $\ngrid = 801$). By Theorem~\ref{thm:l-lmmse} the first row is the price of discarding everything beyond second moments, not the error of one particular implementation. The second row is the share of trials exceeding $10\%$ relative error, which reaches zero an order of magnitude in $t$ before the median does.}
 \label{tab:l-closure}
 \begin{tabular}{@{}lccccc@{}}
 \toprule

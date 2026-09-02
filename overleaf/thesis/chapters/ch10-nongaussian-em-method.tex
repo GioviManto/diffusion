@@ -49,7 +49,10 @@ a member of a \emph{parametric family} rather than a fixed law. Forward noising 
 Ornstein--Uhlenbeck channel of Section~\ref{sec:ou},
 $x = e^{-t} a + \sqrt{\Deltat}\,\xi$, unchanged from every earlier chapter.
 
-The estimated family is a $C$-component Gaussian mixture on the innovation,
+The estimated family is a $C$-component Gaussian mixture on the innovation.
+It is the transition kernel written $M(a' \mid a)$ in
+Chapters~\ref{ch:background} and~\ref{ch:laplace}, carrying its parameters
+explicitly because they are now what is being estimated:
 \begin{equation}
   K_\theta(a' \mid a) = \sum_{c=1}^{C} \pi_c \,
     \Nd\!\big(a' - \alpha a;\ \nu_c,\ s_c^2\big),
@@ -173,7 +176,7 @@ actually returned.
 \section{The numerical representation: grid BP, again}\label{sec:em-numerical}
 
 Messages remain functions on $\R$, so they are represented exactly as in
-Section~\ref{sec:l-grid}: values on $M$ equispaced points in $[-A,A]$, updates
+Section~\ref{sec:l-grid}: values on $\ngrid$ equispaced points in $[-A,A]$, updates
 by trapezoidal quadrature. Two error sources are tracked separately here as
 well. Truncation error --- the probability mass the finite domain $[-A,A]$
 misses --- is diagnosed by the maximum boundary mass over the sites of a chain.
@@ -181,14 +184,14 @@ That is a statistic of a sampled trajectory rather than a bound, so it is
 recorded over $256$ chains per configuration: the worst chain falls from
 $2.3\times10^{-3}$ at $A=4$ to $1.2\times10^{-6}$ at $A=8$, the $90$th
 percentile from $2.7\times10^{-4}$ to $1.5\times10^{-8}$, and neither depends on
-the grid resolution $M$. The gap between the two rows matters, because a figure
+the grid resolution $\ngrid$. The gap between the two rows matters, because a figure
 read off a single trajectory sits near the median and so understates the tail by
 two orders of magnitude. Quadrature error, from the
-finite spacing $h=2A/(M-1)$ --- the grid holds $M$ points including both
+finite spacing $h=2A/(\ngrid-1)$ --- the grid holds $\ngrid$ points including both
 endpoints --- on an otherwise exact interior update, falls as
 $O(h^2)$: a factor of four per halving of $h$, matching the trapezoidal
 rate on a smooth integrand. At the working configuration used for every
-experiment in this and the next chapter, $M=401$, $A=8$, both sources sit far
+experiment in this and the next chapter, $\ngrid=401$, $A=8$, both sources sit far
 below any effect subsequently measured: the discretised recursion reproduces
 the closed-form Gaussian posterior mean to $9.2\times10^{-15}$, and agrees
 with an independently coded brute-force enumeration --- sharing no code with
@@ -205,15 +208,15 @@ exact --- up to floating point --- for the chain-shaped \emph{factor model} that
 array defines, and that model is not literally a normalised finite-state
 transition kernel on the truncated domain. The distance between the two is
 precisely the column-mass residual already reported as the quadrature
-diagnostic: at the working configuration the worst column with
-$|a| \le A/2$ --- far enough inside the domain that its transition density has
-no tail outside the grid, so the residual measures quadrature alone --- departs
-from unit mass by $\gdinterior$, while the worst column anywhere, at the domain
-edge where the density is truncated, departs by $\gdedge$.
+diagnostic. At the working configuration, the worst column with $|a| \le A/2$
+departs from unit mass by $\gdinterior$; such a column sits far enough inside
+the domain that its transition density has no tail outside the grid, so its
+residual measures quadrature alone. The worst column anywhere departs by
+$\gdedge$, at the domain edge where the density is truncated.
 
 The alternative convention --- renormalising each parent-conditioned column
 under the quadrature weights --- would make the array a genuine finite-state
-kernel, but its normaliser would depend on $\theta$, most strongly near the
+kernel. Its normaliser would then depend on $\theta$, most strongly near the
 boundary, and that dependence would have to be carried: the derivative of
 $\log Z_\theta$ would enter both Fisher's identity and the M-step, and the
 surrogate could no longer be written as
@@ -233,8 +236,8 @@ neither diagnostic can be mistaken for a certificate of the other.
 \includegraphics[width=0.72\linewidth]{fig_grid_domain.pdf}
 \caption[Grid and domain control, separated]{Grid and domain control on a Laplace chain ($\alpha=0.85$, $n=32$
 sites), four panels. (a) Relative score error against a high-resolution
-reference as grid resolution $M$ grows at fixed half-width $A=8$; (b) the same
-as $A$ grows at fixed $M=401$ --- both saturate at the floating-point floor
+reference as grid resolution $\ngrid$ grows at fixed half-width $A=8$; (b) the same
+as $A$ grows at fixed $\ngrid=401$ --- both saturate at the floating-point floor
 well inside the working configuration. (c) Forward-message boundary mass
 against $A$, the truncation diagnostic, drawn as \emph{both} the maximum and
 the $90$th percentile over $256$ chains, which differ by roughly two orders of
@@ -258,7 +261,7 @@ and where it lands is not knowable from the draw. This is why the figures above
 are reported as a maximum and a $90$th percentile over chains rather than as one
 number. The diagnostic is an empirical estimate of typical truncation
 loss, not a certified bound. What it does \emph{not} affect is the separation of truncation from
-quadrature error reported above, which is a pure function of $(A,M)$ and the
+quadrature error reported above, which is a pure function of $(A,\ngrid)$ and the
 prior and involves no sampled chain at all --- that comparison reproduces
 to $0.000$ relative difference under reseeding and is exactly the result
 Section~\ref{sec:l-grid} already relies on.

@@ -115,6 +115,13 @@
 % decay rate q(\alpha,t) of Chapter 5. One macro, so the two cannot drift apart
 % again and so the collision with q stays fixed.
 \newcommand{\ivar}{\sigma_\eta^2}
+% Grid resolution. Chapters 6 and 8 wrote this as a bare M, which collided
+% twice: with the Markov transition kernel M of Chapter 2 (used again in
+% Chapter 6's one-step proposition) and with the shared figures, whose axes
+% are labelled N_g because the paper writes M for the training-set size.
+% shared/notation.tex already renders it this way, so this alias makes the
+% figures agree with the prose in both documents.
+\providecommand{\ngrid}{N_{\mathrm{g}}}
 % Where THIS document keeps its provenance discussion. Shared generated
 % sections cite it through this macro instead of a literal label, because the
 % paper and the thesis file that material under different appendix names and a

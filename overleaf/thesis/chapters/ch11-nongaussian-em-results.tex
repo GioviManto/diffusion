@@ -175,12 +175,12 @@ displayed row is the $\structseeds$ paired seeds.
 The ratio increases across the four sizes tested, from
 $\structratiolo\times$ to $\structratiohi\times$. That is a description of four
 measurements and nothing more is claimed from it. In particular it is not
-evidence that the residual is non-architectural: an architecture with an
+evidence that the residual is non-architectural. An architecture with an
 irreducible approximation floor $b^2$ would give
 $R_{\text{window}}/R_{\text{EM}} = (b^2 + c_w/N)/(c_e/N)$, which grows linearly
-in $N$ for an entirely architectural reason, and the raw risks in
-Table~\ref{tab:structured} are consistent with exactly that --- EM--BP's risk
-falls by a factor of about four and a half across the range while the window
+in $N$ for an entirely architectural reason. The raw risks in
+Table~\ref{tab:structured} are consistent with exactly that: EM--BP's risk
+falls by a factor of about four and a half across the range, while the window
 head's falls by less than two. Different statistical rates or different
 optimisation limits would produce the same signature. The direction is
 measured; the mechanism is not.
@@ -256,12 +256,12 @@ about this estimator on this grid rather than about mixture capacity as such.
 First, every cell at $C \geq \capcappedfrom$ stopped at the
 $\capiterlimit$-iteration cap rather than at the convergence tolerance
 ($\capcappedcells$ of $\capcappedtotal$). The cap was placed at the measured
-practical plateau --- a representative $C=16$ fit taken to $2000$ iterations has
+practical plateau. A representative $C=16$ fit taken to $2000$ iterations has
 per-edge gain $6.9\times10^{-8}$ at $400$, about $6\times10^{-9}$ by $800$, and
-then does not move ($6.08\times10^{-9}$ at $1200$, $6.09\times10^{-9}$ at
-$2000$), never reaching the strict tolerance at any practical count --- so the
-residual asymmetry is small, but it is not zero, and higher capacities are the
-ones it disfavours. Second, the share of fits whose narrowest component falls
+then does not move: $6.08\times10^{-9}$ at $1200$ against
+$6.09\times10^{-9}$ at $2000$, never reaching the strict tolerance at any
+practical count. The residual asymmetry is therefore small, but it is not zero,
+and it disfavours the higher capacities. Second, the share of fits whose narrowest component falls
 below the grid's resolution floor of $\capsminfloor$ spacings climbs with
 capacity, from $\capunresolvedone/\capunresolvedtotal$ at $C=1$ to
 $\capunresolvedhi/\capunresolvedtotal$ at $C=16$. Part of what the larger

@@ -312,12 +312,12 @@ established in three ways, and the difference is not cosmetic. Most are proved b
 algebra (with the longer passages isolated in numbered \emph{toolboxes}).
 Others are verified by deterministic numerical checks against a reference
 computed by an independent method, in the spirit of the exactly solvable
-programme of \citet{biroli2023generative}; where an approximation is introduced
-(the Gaussian closure of BP messages, local truncations), its error is
-\emph{measured} against a reference computed by matrix algebra, or by dense
-grid quadrature validated on the solvable case --- the latter being a
-numerically validated reference rather than an exact one, and used only inside
-the resolution regime where that validation holds. The learning chapters
+programme of \citet{biroli2023generative}. Where an approximation is introduced
+--- the Gaussian closure of BP messages, local truncations --- its error is
+\emph{measured} against a reference computed either by matrix algebra or by
+dense grid quadrature validated on the solvable case. The latter is a
+numerically validated reference, not an exact one, and is used only inside the
+resolution regime where that validation holds. The learning chapters
 (\ref{ch:em-method} and~\ref{ch:em-results}) are neither: they are stochastic
 estimation experiments, reported with paired uncertainty over seeds, and their
 conclusions are statistical rather than certain. All numbers in the thesis are
@@ -376,14 +376,14 @@ factorisation, the autoregressive form, homogeneity across sites, and an
 innovation family flexible enough to represent the truth closely; nothing
 here speaks to a setting where those do not hold. The last of these is a
 representation rather than an exact containment: a $C$-component Gaussian
-mixture does not contain a Laplace density for any finite $C$, so what
-maximum likelihood approaches is the best approximation within the fitted
-family, and the recovery statements of Chapter~\ref{ch:em-results} are
-about specific summaries --- $\alpha$, the innovation variance, its excess
-kurtosis --- rather than about the transition density as a whole. The comparison in RQ6 is therefore a measurement
-of what a correct structural assumption buys on one family, and not
-evidence that likelihood learning through belief propagation is a better
-learning algorithm than score matching --- a distinction the thesis
+mixture does not contain a Laplace density for any finite $C$. What maximum
+likelihood approaches is therefore the best approximation within the fitted
+family, and the recovery statements of Chapter~\ref{ch:em-results} concern
+specific summaries --- $\alpha$, the innovation variance, its excess
+kurtosis --- rather than the transition density as a whole. The comparison in
+RQ6 is thus a measurement of what a correct structural assumption buys on one
+family. It is not evidence that likelihood learning through belief propagation
+is a better learning algorithm than score matching --- a distinction the thesis
 maintains wherever the numbers appear. Any implication for trained score
 networks in practice remains a hypothesis suggested by a controlled
 model, not an established property of practical systems.

@@ -97,6 +97,14 @@ def em_stat(family, mech, strength, column, reduce=np.mean):
         rows = [r for r in csv.DictReader(open(files[0])) if r["arm"] == "em_bp"]
         if not rows:
             return None
+        # Not every family records every diagnostic. The Laplace arm has no
+        # Chow--Liu reference -- there is no closed form for the best chain
+        # approximation to a contaminated Laplace law -- so the column is
+        # absent rather than empty, and the row is simply not drawn for it.
+        # Returning None here, rather than raising, is what keeps a missing
+        # DIAGNOSTIC from being confused with a missing CELL.
+        if column not in rows[0]:
+            return None
         return float(reduce([float(r[column]) for r in rows]))
     return None
 
@@ -127,6 +135,58 @@ try:
                             import_closure(ENTRY))
 except SystemExit:
     DIRTY = {"(no params files)": ["provenance record absent"]}
+# The Laplace and Gaussian arms were deployed separately and therefore carry
+# different commits. The provenance gate's standing objection to mixed commits
+# is that "two programs' results [get] averaged into one cell", so the two
+# things that have to be true are checked here rather than assumed:
+#
+#   (1) no single CELL mixes commits -- each output directory is one deployment;
+#   (2) across the commits present, every file in the experiment's import
+#       closure is byte-identical, so "different commit" does not mean
+#       "different program".
+#
+# If either fails the table is refused. A mixed-commit table that passes both
+# is exactly as trustworthy as a single-commit one, and saying so beats either
+# hiding the mixture or redoing work that would produce identical bytes.
+def _commits_by_cell():
+    by = {}
+    for path, d in load_params(sorted(glob.glob(f"{SOURCE}/*"))):
+        by.setdefault(path.parent.name, set()).add(str(d.get("git_commit", "")))
+    return by
+
+
+COMMITS = set()
+_mixed_cells = []
+for _cell, _cs in sorted(_commits_by_cell().items()):
+    COMMITS |= _cs
+    if len(_cs) > 1:
+        _mixed_cells.append(f"{_cell}: {', '.join(sorted(c[:7] for c in _cs))}")
+if _mixed_cells:
+    sys.exit("REFUSING: these cells pool more than one commit:\n  "
+             + "\n  ".join(_mixed_cells))
+
+if len(COMMITS) > 1:
+    import subprocess
+    _repo = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
+    _rel = "research/nongaussian-bp"
+    _blobs, _differ = {}, []
+    for _f in sorted(import_closure(ENTRY)):
+        _seen = set()
+        for _c in sorted(COMMITS):
+            _r = subprocess.run(["git", "-C", _repo, "rev-parse", f"{_c}:{_rel}/{_f}"],
+                                capture_output=True, text=True)
+            _seen.add(_r.stdout.strip() if _r.returncode == 0 else f"ABSENT@{_c[:7]}")
+        if len(_seen) > 1:
+            _differ.append(_f)
+    if _differ:
+        sys.exit("REFUSING: the source spans commits "
+                 + ", ".join(sorted(c[:7] for c in COMMITS))
+                 + " and these executed files differ between them:\n  "
+                 + "\n  ".join(_differ)
+                 + "\nThese are different programs; do not pool them.")
+    print(f"  {len(COMMITS)} commits, identical across all "
+          f"{len(import_closure(ENTRY))} files of the executed closure")
+
 UNCERTIFIED = bool(DIRTY)
 if UNCERTIFIED:
     offenders = sorted({f for v in DIRTY.values() for f in v})
@@ -166,17 +226,22 @@ for i, (mech, header, strengths) in enumerate(MECHANISMS):
                     cells.append(f"${v:.2f}$")
             lines.append(f"{PRETTY.get(family, family.capitalize())}, vs "
                          f"{arm.upper()} & " + " & ".join(cells) + " \\\\")
+    # The two diagnostic rows are independent. They used to share a `continue`,
+    # so a family with no Chow--Liu column lost its ERROR row as well -- which
+    # would have silently dropped the one row that says whether a moving ratio
+    # is the estimator degrading or the baseline improving.
     for family in families:
+        tag = f"{PRETTY.get(family, family.capitalize())}: " if len(families) > 1 else ""
         dev = [em_stat(family, mech, s, "rho_minus_chow_liu") for s in strengths]
-        if all(v is None for v in dev):
-            continue
-        lines.append("$\\widehat{\\corr} - \\corr_{\\mathrm{CL}}$ & "
-                     + " & ".join("--" if v is None else f"${v:+.4f}$" for v in dev)
-                     + " \\\\")
+        if not all(v is None for v in dev):
+            lines.append(tag + "$\\widehat{\\corr} - \\corr_{\\mathrm{CL}}$ & "
+                         + " & ".join("--" if v is None else f"${v:+.4f}$" for v in dev)
+                         + " \\\\")
         err = [em_stat(family, mech, s, "score_rel_l2", max) for s in strengths]
-        lines.append("EM--BP error, worst $t$ & "
-                     + " & ".join("--" if v is None else f"${v:.3f}$" for v in err)
-                     + " \\\\")
+        if not all(v is None for v in err):
+            lines.append(tag + "EM--BP error, worst $t$ & "
+                         + " & ".join("--" if v is None else f"${v:.3f}$" for v in err)
+                         + " \\\\")
 
 if missing:
     print(f"  {len(missing)} cell(s) absent, emitted as '--': "
@@ -191,6 +256,7 @@ caveat = ("\\textbf{Provenance: not certified.} The run behind this table was "
           "same protocol is what should stand here. "
           ) if UNCERTIFIED else ""
 tex = f"""%% GENERATED by tools/make_tab_nonmarkov.py from {SOURCE}/ -- do not hand-edit.
+%% commit(s): {", ".join(sorted(c[:7] for c in COMMITS))} -- verified byte-identical over the executed import closure.
 %%
 %% Supersedes the hand-typed table, whose numbers could not be reproduced from
 %% any committed output by any aggregation. Source is the frozen-budget rerun

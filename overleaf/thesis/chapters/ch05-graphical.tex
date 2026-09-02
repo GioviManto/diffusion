@@ -196,10 +196,10 @@ small enough that the locality of the score is not an architectural
 hypothesis but a computable quantity. For the Gaussian chain, the exact
 score at frame $k$ depends on the observation at frame $k \pm d$ with a
 weight that decays geometrically in $d$, at a rate $q(\alpha, t)$
-computed in closed form in Chapter~\ref{ch:gaussian}; the error of the
+computed in closed form in Chapter~\ref{ch:gaussian}. The error of the
 radius-$r$ windowed estimator is \emph{measured} to decay at that same rate
-over the tested range, which is a separate and weaker statement, and the comparison
-between truncating the inference and truncating the score matrix
+over the tested range --- a separate and weaker statement. Comparing
+truncation of the inference against truncation of the score matrix then
 quantifies, in one solvable case, how a local computation should be
 organised. These results describe the function a network would have to
 learn rather than the dynamics of learning it; the trained baselines of

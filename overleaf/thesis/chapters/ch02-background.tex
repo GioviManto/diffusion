@@ -24,13 +24,12 @@ this thesis.
 \section{The principle of stationary action}\label{sec:action}
 
 Mechanics can be built from a single variational statement, and it is worth
-starting there rather than with Hamilton's equations, because the same
-statement --- \emph{a physical trajectory is a stationary point of a
-functional} --- returns three more times in this thesis: as the free-energy
-free-energy principle of thermodynamics, as the variational bound that trains a
-diffusion model (\S\ref{sec:diffusion-idea}), and as the maximum-likelihood
-problem solved by expectation--maximisation in
-Chapter~\ref{ch:em-method}. The objects change; the shape of the argument
+starting there rather than with Hamilton's equations. The same statement ---
+\emph{a physical trajectory is a stationary point of a functional} --- returns
+three more times in this thesis: as the free-energy principle of
+thermodynamics, as the variational bound that trains a diffusion model
+(\S\ref{sec:diffusion-idea}), and as the maximum-likelihood problem solved by
+expectation--maximisation in Chapter~\ref{ch:em-method}. The objects change; the shape of the argument
 does not.
 
 Let a system be described by generalised coordinates $q(t)$, let the
@@ -532,8 +531,8 @@ already been differentiated away.
 
 The appeal to non-equilibrium thermodynamics in \citet{sohl2015deep} is
 structural rather than decorative. Their forward process is a chain of small
-perturbations converting a structured distribution into a simple one, that is
-an annealing schedule, and the objective they derive is a variational bound of
+perturbations converting a structured distribution into a simple one --- an
+annealing schedule. The objective they derive is then a variational bound of
 the same algebraic form as the work identities of non-equilibrium statistical
 mechanics: the log-likelihood is bounded by an average of log-ratios along the
 forward path, exactly as free-energy differences are bounded in Jarzynski-type
@@ -741,12 +740,11 @@ study is the restricted Boltzmann machine of
 Section~\ref{sec:boltzmann-machines}, the minimal trainable EBM, with
 energy $E(v, h) = -v^\T W h - b^\T v - c^\T h$ and the moment-matching
 gradient \eqref{eq:bm-learning}. The central idea is to track training as a
-sequence of symmetry breakings in the student's singular modes, and the result
-is that an RBM learning a Hopfield teacher with two correlated patterns
-undergoes not one transition but a \emph{cascade}: each singular direction
-condenses at its own critical time, in order of the strength of the data
-covariance along it, and each condensation is a second-order transition of
-Curie--Weiss type. The mapping onto Curie--Weiss, the two-rate argument that
+sequence of symmetry breakings in the student's singular modes. An RBM
+learning a Hopfield teacher with two correlated patterns then undergoes not one
+transition but a \emph{cascade}: each singular direction condenses at its own
+critical time, in order of the strength of the data covariance along it, and
+each condensation is a second-order transition of Curie--Weiss type. The mapping onto Curie--Weiss, the two-rate argument that
 produces the ordering, and the confirmation on MNIST, CelebA and human-genome
 data are in \compendium{}.
 

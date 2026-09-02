@@ -140,7 +140,7 @@ def fig_closure() -> None:
         ax.loglog(*zip(*pts), marker="o", label=name.replace("_", " "))
     ax.set_xlabel("diffusion time $t$")
     ax.set_ylabel("relative score error")
-    ax.set_title(r"Gaussian baseline, $\rho=0.85$")
+    ax.set_title("Gaussian baseline, autoregressive coefficient $0.85$")
     ax.legend()
     save(fig, "fig_closure_families")
 
@@ -708,7 +708,14 @@ def fig_cost() -> None:
     st["label"] = "network (fixed step budget)"
     ax[1].loglog(n, [a + b_ for a, b_ in zip(_f(tr, "net_eps_seconds"),
                                              _f(tr, "net_x0_seconds"))], **st)
-    ax[1].set_xlabel(r"training sequences $M$")
+    # No symbol on this axis. The figure is shared, and the two documents give
+    # the training-set size different letters -- the paper writes M, the thesis
+    # writes N, because the thesis needs M for grid points (Remark "Symbols
+    # that are easy to swap"). A baked-in "$M$" is therefore correct in one
+    # document and a direct contradiction in the other. The companion axis in
+    # fig_sample_efficiency already spells the word out, so this also makes the
+    # two training-size axes agree.
+    ax[1].set_xlabel("training sequences")
     ax[1].set_ylabel("training wall-clock, s")
     ax[1].set_title("training cost")
     ax[1].legend()
@@ -734,26 +741,26 @@ def fig_em_diagnostics() -> None:
             continue
         pts.sort()
         it, ll, rh = zip(*pts)
-        ax[0].plot(it, ll, lw=1.0, label=rf"$\rho^{{(0)}}={rho0}$")
+        ax[0].plot(it, ll, lw=1.0, label=rf"init.\\ ${rho0}$")
         ax[1].plot(it, rh, lw=1.0)
     ax[0].set_xlabel("EM iteration")
     ax[0].set_ylabel("marginal log-likelihood")
     ax[0].set_title(r"objective, $C=4$")
     ax[0].legend()
-    ax[1].axhline(0.85, color="#222222", ls="--", lw=1.0, label=r"true $\rho$")
+    ax[1].axhline(0.85, color="#222222", ls="--", lw=1.0, label="true value")
     ax[1].set_xlabel("EM iteration")
-    ax[1].set_ylabel(r"$\widehat{\rho}$")
+    ax[1].set_ylabel("estimate")
     ax[1].set_title("autoregressive coefficient")
     ax[1].legend()
 
     n = _f(rate, "n_chains")
     ax[2].loglog(n, _f(rate, "mixture_rho_rmse"), marker="s", color="#0072B2",
-                 label=r"$\widehat{\rho}$ RMSE")
+                 label="autoregressive coefficient")
     ax[2].loglog(n, _f(rate, "mixture_var_rmse"), marker="o", color="#D55E00",
-                 label=r"$\widehat{q}$ RMSE")
+                 label="innovation variance")
     ref = [_f(rate, "mixture_rho_rmse")[0] * (n[0] / v) ** 0.5 for v in n]
-    ax[2].loglog(n, ref, ls=":", color="#222222", label=r"$M^{-1/2}$")
-    ax[2].set_xlabel(r"training sequences $M$")
+    ax[2].loglog(n, ref, ls=":", color="#222222", label="slope $-1/2$")
+    ax[2].set_xlabel("training sequences")
     ax[2].set_ylabel("RMSE")
     ax[2].set_title("parameter recovery")
     ax[2].legend()
