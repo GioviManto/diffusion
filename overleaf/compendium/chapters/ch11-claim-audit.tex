@@ -1014,3 +1014,52 @@ right; where a bug's signature is known, assert it. \codefile{tests/test\_ring.p
 the profile likelihood peaks at the truth \emph{and} that it becomes monotone when the normaliser
 is removed, so deleting the term cannot make the suite greener. Most of the entries above would
 have been caught a good deal sooner by a test of that shape.
+
+\section{Provenance history displaced from the reproducibility appendix}
+\label{sec:provenance-history}
+
+The thesis's Appendix~C states the three certification routes and the current
+status of each experiment. What it no longer carries, because it is development
+record rather than protocol, is why each route exists. That is here.
+
+\paragraph{Why \texttt{exp\_21} needed a rerun.} The tree it originally ran
+from, \texttt{outputs/exp\_21\_frozen}, had \texttt{src/em.py} uncommitted in
+all ten cells. The dirt was on the executed code path, so the recorded commit
+did not reconstruct the program that produced the numbers --- the same defect as
+\texttt{exp\_12\_scaled} and the withdrawn $\nseq = 8192$ efficiency row.
+\texttt{make\_tab\_nonmarkov.py} declared it in the table's own caption rather
+than emitting something a reader could not distinguish from the certified
+tables, and the section was to be read against a rerun until that rerun landed.
+
+What the rerun then settled is worth recording, because it was not knowable
+beforehand: the Gaussian arm reproduced the run it replaced on every quoted
+number to the precision printed. The uncommitted file had never been on this
+experiment's path in any way that mattered. The gate refused a run that was, in
+the event, correct --- which is the behaviour a provenance gate should have,
+since the alternative is a gate that passes whenever the dirt happens to be
+harmless and therefore certifies nothing.
+
+\paragraph{Why the mixed-commit check exists.} The rerun was deployed in two
+git-archive batches, Laplace and Gaussian, so it spans two commits. A cell
+pooling two commits would be uninterpretable, and two commits differing anywhere
+on the import closure would make the arms incomparable. The generator therefore
+refuses unless no single cell pools commits and all sixteen closure files are
+byte-identical across them. Neither condition was checked by hand; both run on
+every regeneration.
+
+\paragraph{Why the last hand-typed number was removed.} The screening winner's
+radius was the final quantity in the architecture section still typed rather
+than generated, and it was wrong in three documents at once --- thesis, paper
+and this compendium all said radius~2, while the selection rule the code
+implements picks radius~4. \texttt{make\_tab\_screening} now recomputes it from
+the artifact. A number that appears in three places and is maintained in none of
+them is the failure mode the generated-macro rule exists to prevent.
+
+\paragraph{Why the $\nseq = 8192$ exclusion is enforced in code.} The thesis's
+Appendix~C states which row is withdrawn and why. What belongs here is that the
+check is not a one-off: \texttt{make\_tab\_efficiency.py} recomputes the
+intersection of each run's dirty list with its own import closure on every run
+and refuses if it is ever non-empty. The figure beside the table reads the same
+size grid from the same source, so the two cannot come to disagree about which
+sizes are reportable --- which they once did, the table stopping at $4096$ while
+the curve beside it ran to $8192$.

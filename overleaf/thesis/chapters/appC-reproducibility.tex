@@ -98,18 +98,18 @@ package, whose closed-form panels are recomputed at build time and whose
 measured panels read that package's curated CSVs; they are carried here under
 the \texttt{fig\_ring\_*} names rather than that script's numbered ones.
 
-One caveat belongs with this. The restyling step that turned the older packages'
-outputs into the uniform vector PDFs used here lived in a script under the old
-\texttt{thesis/} tree and was lost when that tree was removed during the
-restructuring of 18 August 2026; it had never been committed. The computations
-behind every panel remain in the packages named above and are re-runnable, so
-what was lost is a styling pass rather than a result. Nothing in this thesis'
-quantitative claims depends on it either way: every number is generated, and no
-number is read off a figure.
+One caveat belongs with this. The restyling step that turned the older
+packages' outputs into the uniform vector PDFs used here was never committed and
+no longer exists, so those figures cannot be regenerated in their present style;
+this is why they, alone among the figures here, still carry Type~3 fonts. The
+computations behind every panel remain in the packages named above and are
+re-runnable, so what was lost is a styling pass rather than a result, and no
+quantitative claim depends on it: every number is generated, and none is read
+off a figure.
 
 \begin{center}
 \begin{minipage}{\linewidth}\small\centering
-\captionof{table}[Figure-to-code map]{Every figure in this thesis, the file it is committed as, and the package whose code computes the numbers in it. The one exception is noted below the table.}
+\captionof{table}[Figure-to-code map]{Every figure in this thesis, the file it is committed as, and the package whose code computes the numbers in it. The styling caveat above applies to the figures from the older packages; the two schematics are drawn in \TeX{} and compute nothing.}
 \label{tab:figure-map}
 \begin{tabular}{@{}lll@{}}
 \toprule
@@ -163,10 +163,10 @@ uncommitted work on the code path that produced the numbers. That distinction
 does the work below, because the two are not equally serious.
 
 \paragraph{How each run is certified.} Not every experiment here was run after
-\texttt{deploy\_clean.sh} existed. Three routes to certification appear, and
-they are set out rather than described by their strictest case. Nothing cited
-in this thesis is uncertified; the one result that was is now a rerun, and the
-paragraph on it records what changed.
+\texttt{deploy\_clean.sh} existed, so three routes to certification appear.
+Nothing cited in this thesis is uncertified. The development record behind each
+route --- which deployments failed, and why each check was added --- is in
+\compendium{}.
 
 \emph{Certified.} \texttt{exp\_31}, the architecture screen and the
 confirmatory comparison, and \texttt{exp\_32}, capacity, were deployed by the
@@ -190,28 +190,16 @@ experiment, the frozen configuration and \texttt{src/em.py} --- is withdrawn
 and appears nowhere in this thesis.
 
 \emph{Certified after rerun.} \texttt{exp\_21}, behind
-Table~\ref{tab:nonmarkov} and Figure~\ref{fig:em-nonmarkov}, was the one
-result in this thesis that could not be certified. The tree it originally ran
-from, \texttt{outputs/exp\_21\_frozen}, had \texttt{src/em.py} uncommitted in
-all ten cells --- the same defect as \texttt{exp\_12\_scaled} and the
-withdrawn $\nseq = 8192$ row, with the dirt on the executed code path, so the
-recorded commit did not reconstruct the program.
-\texttt{make\_tab\_nonmarkov.py} stated that in the table's own caption rather
-than emitting something indistinguishable from the certified tables, and the
-section was to be read against a rerun.
-
-That rerun is what the section now reports:
-\texttt{outputs/frozen/exp\_21\_clean}, fifteen cells from two git-archive
-deployments, every one with an empty dirty list. Two things are worth recording
-about it. First, the Gaussian arm reproduces the run it replaces on every
-number this thesis quotes from it, to the precision printed --- which is the
-evidence, unavailable before, that the uncommitted file was not on this
-experiment's path in any way that mattered. Second, the rerun spans two
-commits, because the Laplace and Gaussian arms were deployed separately, so the
-generator refuses unless no single cell pools commits \emph{and} every file in
-the experiment's sixteen-file import closure is byte-identical between them.
-Both hold here, and the check runs on every regeneration rather than once by
-hand.
+Table~\ref{tab:nonmarkov} and Figure~\ref{fig:em-nonmarkov}, is reported from
+\texttt{outputs/frozen/exp\_21\_clean}: fifteen cells from two git-archive
+deployments, every one with an empty dirty list. It replaces an earlier run
+whose recorded commit did not reconstruct the program, and the Gaussian arm
+reproduces that run on every number quoted here, to the precision printed.
+Because the Laplace and Gaussian arms were deployed separately, the rerun spans
+two commits, so \texttt{make\_tab\_nonmarkov.py} refuses unless no single cell
+pools commits \emph{and} every file in the experiment's sixteen-file import
+closure is byte-identical between them. Both hold, and the check runs on every
+regeneration.
 
 \paragraph{Generated numbers.} No efficiency, structured-baseline or
 aggregation number in this thesis is typed. Each is defined once as a macro in
@@ -229,14 +217,9 @@ directly:
 \end{tabular}
 \end{center}
 
-\noindent The
-prose then cites the macro rather than the value. The rule has a measurable
-effect: the
-screening winner's radius was the last number in
-Section~\ref{sec:em-architecture} still typed by hand, and it was wrong in three
-documents until \texttt{make\_tab\_screening} recomputed it from the artifact.
-Tables and figures therefore share a size grid and an aggregation rule by
-construction rather than by inspection.
+\noindent The prose then cites the macro rather than the value, so tables,
+figures and text share a size grid and an aggregation rule by construction
+rather than by inspection.
 
 \paragraph{What Table~\ref{tab:pointwise} covers.} Four qualifications, kept
 here rather than in the caption, which had grown into a methods subsection
