@@ -82,3 +82,6 @@ archive/
 
 # External advisor review, kept local: not our writing and not for distribution.
 research/Review-GPT.md
+
+# --- Overleaf upload bundles (build products of make_upload_bundle.sh) ---
+overleaf/upload/

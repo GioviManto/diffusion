@@ -26,15 +26,12 @@ fail=0
 # nothing looks wrong until you scroll to the references and find them
 # missing.
 #
-# So each document folder gets its own copy, refreshed here, and the roots say
-# \bibliography{references} -- a bare name in bibtex's own working directory,
-# which needs no path resolution and cannot hit that restriction.
-# shared/references.bib stays the single source of truth; these are build
-# products that happen to be committed, because the Overleaf upload is a zip
-# of this folder and has to carry them.
-for d in workshop paper compendium thesis; do
-    cp -f shared/references.bib "$d/references.bib"
-done
+# The fix is not to copy the .bib into each folder -- that was tried, and the
+# roots kept saying \bibliography{../shared/references}, so the copies sat
+# there unread while the hazard remained. It is make_upload_bundle.sh, which
+# flattens each document into a directory with no parent reference of any kind
+# and then proves it by compiling it there. shared/references.bib stays the
+# single source of truth for this local build.
 
 for spec in "${DOCS[@]}"; do
     d="${spec%%:*}"; limit="${spec#*:}"

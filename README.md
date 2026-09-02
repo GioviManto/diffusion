@@ -16,8 +16,21 @@ unavailable almost everywhere else.
 ## Start here
 
 ```bash
-cd overleaf && ./build.sh      # all four documents
+cd overleaf && ./build.sh                 # build all four documents
+cd overleaf && ./make_upload_bundle.sh    # Overleaf-ready zips in overleaf/upload/
 ```
+
+`build.sh` compiles in place and checks each document for undefined references,
+undefined citations and the paper's nine-page body limit.
+
+`make_upload_bundle.sh` produces one self-contained folder and zip per document
+under `overleaf/upload/`. Upload `upload/thesis.zip` to Overleaf via **New
+Project -> Upload Project**; `main.tex` is the main document. The flattening is
+not cosmetic: the working tree keeps one copy of the figures, notation and
+generated numbers in `shared/` and reaches them with `../shared/`, and Overleaf's
+bibtex will not read through `..` -- it finds no `.bib`, silently drops every
+citation, and still compiles. Each bundle is verified by being compiled inside
+its own directory before the zip is written.
 
 | Folder | What it holds |
 |---|---|
