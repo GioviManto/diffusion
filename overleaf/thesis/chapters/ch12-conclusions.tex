@@ -99,12 +99,12 @@ advantage is $\ratiolo$--$\ratiohi\times$ (RQ6, above); against one that shares
 weights across sites it is $\structratiolo$--$\structratiohi\times$, measured at
 the headline protocol with every site scored and both arms selected on a
 disjoint validation bundle (Section~\ref{sec:em-architecture}). The headline
-figure is therefore an upper bound on the value of the structural assumption
-rather than its size. The weight-sharing baseline was itself the winner of a
-screen against a dilated stack and a bidirectional message-passing network,
-both able in principle to propagate further across the chain; that makes it the
-strongest baseline this screen found, on this family and at these sizes, which
-is a weaker and more useful statement than the strongest conceivable one.
+figure is therefore the larger of two observed comparisons, taken against the
+less structured baseline; it is not a formal upper bound on a uniquely defined
+causal quantity. The weight-sharing baseline was itself the winner of a screen
+against a dilated stack and a bidirectional message-passing network, both able
+in principle to propagate further across the chain, so it is the
+best-performing candidate that screen found on this family and at these sizes.
 
 The chain-Markov assumption itself tolerates a violation it can absorb into
 its own fitted parameters (a shared global latent, up to the point where it
@@ -128,16 +128,14 @@ asserted rather than inferred from a failure to reject --- also refuses the
 $C=8$ against $C=16$ comparison, resolving against it at
 $\nseq=\capheadsize$ in the direction of $C=16$ being worse. Both unseparated effects disfavour the larger mixtures, so the
 direction of the result is the direction the confounds would produce, and the
-claim stays with the estimator rather than with mixture capacity as such. This supersedes an earlier six-seed,
-fixed-budget design that reported the opposite sign; that reading does not
-reproduce at higher replication and longer budget.
+claim stays with the estimator rather than with mixture capacity as such.
 
 \paragraph{One question this thesis leaves open rather than answers.} Whether
 pointwise accuracy and generative fidelity can move in opposite directions
 within one estimator is unresolved here. The comparison that addresses it uses a
 fixed iteration budget under which most shape coordinates had not settled, and
-the shape is what the generative metric scores, so it compares converged
-estimators against unconverged ones on the one coordinate that had not
+the shape is what the generative metric scores, so it compares procedures whose fitted shape
+coordinates are unequally settled on the one coordinate that had not
 converged. A budget-limited comparison answers ``how do these behave after this
 much optimisation'', which is not the question it was asked; that distinction is
 itself one of the findings under RQ5, and the convergence measurement that

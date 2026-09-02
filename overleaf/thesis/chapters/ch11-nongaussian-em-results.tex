@@ -223,15 +223,17 @@ below zero at both training sizes, which is the result of this section. Right:
 the share of fits whose narrowest component falls under the grid's resolution
 floor of $\capsminfloor$ spacings, which climbs monotonically with $C$ --- the
 second caveat of Remark~\ref{rmk:em-capacity-caveats}, and the reason the left
-panel is a statement about this estimator on this grid. Both panels are drawn
-from the cells of Table~\ref{tab:capacity}.}
+panel is a statement about this estimator on this grid. Every cell at
+$C \geq \capcappedfrom$ reached the $\capiterlimit$-iteration cap rather than
+the convergence tolerance. Both panels are drawn from the cells of
+Table~\ref{tab:capacity}.}
 \label{fig:em-capacity}
 \end{figure}
 
 \noindent The result is that \textbf{under this procedure --- this grid, this
 generalised M-step, this validation rule and this iteration cap --- no mixture
 capacity improves on a single Gaussian innovation} at either training size. The
-qualification is not decoration. Every cell at $C \geq \capcappedfrom$ stops at
+qualification is quantitative. Every cell at $C \geq \capcappedfrom$ stops at
 the cap rather than at the tolerance, and the share of fits the grid cannot
 resolve grows with $C$, so the design cannot separate a statistical
 disadvantage of larger mixtures from an optimisation or a discretisation one.

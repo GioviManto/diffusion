@@ -466,7 +466,7 @@ def fig_capacity() -> None:
     ax[0].set_xticklabels([str(c) for c in others])
     ax[0].set_xlabel(r"mixture components $C$")
     ax[0].set_ylabel("held-out log-evidence per edge,\npaired difference from $C=1$")
-    ax[0].set_title("no capacity clears zero")
+    ax[0].set_title("held-out evidence relative to $C=1$")
     ax[0].legend()
 
     share = [100.0 * sum(1 for r in rows if int(r["n_components"]) == c
@@ -479,7 +479,7 @@ def fig_capacity() -> None:
     ax[1].set_xticklabels([str(c) for c in comps])
     ax[1].set_xlabel(r"mixture components $C$")
     ax[1].set_ylabel("cells below the grid's resolution floor (%)")
-    ax[1].set_title("and the fits get harder to resolve")
+    ax[1].set_title("convergence diagnostics by capacity")
     save(fig, "fig_capacity")
 
 
@@ -523,8 +523,8 @@ def fig_nonmarkov() -> None:
         ax[k].axhline(1.0, color="#222222", ls="--", lw=1.0)
         ax[k].set_yscale("log")
         ax[k].set_xlabel(xlabel)
-        ax[k].set_title(("absorbed into the fitted chain",
-                         "not representable by a chain")[k])
+        ax[k].set_title(("rank-one global latent",
+                         "long-range precision coupling")[k])
     ax[0].set_ylabel("baseline error / EM\u2013BP error")
     ax[0].legend()
     save(fig, "fig_nonmarkov")
@@ -552,7 +552,7 @@ def fig_screening() -> None:
     ax.set_xscale("log")
     ax.set_xlabel("trainable parameters")
     ax.set_ylabel(f"mean risk on the {SELECTION_REGION} region")
-    ax.set_title("the screen's winner is also its smallest arm")
+    ax.set_title("validation risk against parameter count")
     ax.legend(loc="upper left")
     save(fig, "fig_screening")
 
@@ -850,7 +850,7 @@ def fig_innovation_density() -> None:
         ax[j].set_yscale("log")
         ax[j].set_ylim(1e-4, 3)
         ax[j].set_xlabel(r"innovation $\varepsilon$")
-        ax[j].set_title(rf"$M={bud}$")
+        ax[j].set_title(rf"{bud} EM updates")
     ax[0].set_ylabel("density")
     ax[0].legend()
     save(fig, "fig_innovation_density")
