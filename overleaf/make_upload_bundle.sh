@@ -103,6 +103,18 @@ for d in "${DOCS[@]}"; do
     printf '  %-12s %-24s %5s pp  %s\n' "$d" "$OUT/$d.zip" "$pages" "$(du -sh "$b" | cut -f1 | tr -d ' ')"
 done
 
+# One archive carrying all four, as sibling self-contained folders. This is the
+# answer to "can I just upload the whole thing": not overleaf/ as it stands,
+# because of the ../shared/ bibliography, but this, which is the same four
+# bundles already proven to compile standing alone. Overleaf's main-document
+# selector then switches between them. The figures are duplicated four times,
+# which costs a few megabytes and buys independence from how Overleaf resolves
+# a relative path.
+( cd "$OUT" && zip -qr all.zip thesis paper workshop compendium )
+
 echo
-echo "Upload upload/<doc>.zip to Overleaf (New Project -> Upload Project),"
-echo "or drag the upload/<doc>/ folder in. main.tex is the main document."
+echo "  all four        $OUT/all.zip            $(du -sh "$OUT/all.zip" | cut -f1 | tr -d ' ')"
+echo
+echo "Overleaf: New Project -> Upload Project."
+echo "  one document   -> upload/<doc>.zip,  main.tex is already the main file"
+echo "  all four       -> upload/all.zip,    then Menu -> Main document to switch"

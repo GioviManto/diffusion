@@ -324,4 +324,7 @@ The sweeps of Chapters~\ref{ch:em-method} and~\ref{ch:em-results} run under
 SLURM from the batch scripts in \texttt{hpc/}, one per experiment. The
 document compiles with a single run of \texttt{tectonic main.tex}.
 
-\fussy
+% Undo the appendix's loosened line breaking, which would otherwise leak
+% into the appendices that follow. This was \fussy, the partner of a
+% \sloppy that no longer exists.
+\setlength{\emergencystretch}{0pt}
