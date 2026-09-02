@@ -269,8 +269,8 @@ meaningful and also what bounds it.
 Chapter~\ref{ch:ring} is a self-contained case study rather than a
 seventh question. It asks what joint observations can identify that no
 single-frame marginal can, on a rotating-ring model whose state space and
-estimand both differ from the chain's, and it is placed alongside the
-main line rather than on it.
+estimand both differ from the chain's, and it is placed after the main line
+rather than inside it.
 
 \section{Contributions}
 
@@ -479,17 +479,20 @@ belief propagation identified with the Kalman smoother.
 Chapter~\ref{ch:laplace} leaves Gaussianity in the most controlled way
 possible, Laplace innovations, and measures what the Gaussian message
 family costs when the data are no longer Gaussian (RQ3).
-Chapter~\ref{ch:ring} extends the state at each site from a scalar to a
-point on a rotating ring, a nonlinear dynamic object, and shows that a
-Cartesian surrogate is exactly solvable while the model as drawn is
-solvable numerically to a measured accuracy, both admitting the same
-structural description of the joint score.
 Chapters~\ref{ch:em-method}--\ref{ch:em-results} leave the innovation law
 itself unknown: an EM procedure built on the exact chain inference of
 Chapter~\ref{ch:gaussian} estimates it from noised data alone, and the
 structured estimator is compared against trained neural denoisers ---
 unstructured and structure-aware --- along axes of model capacity and of
-misspecification of the Markov assumption itself.
+misspecification of the Markov assumption itself. That closes the main line:
+one continuous argument from the Gaussian chain, through a controlled
+non-Gaussian departure, to a learned transition and its measured value.
+Chapter~\ref{ch:ring} then extends the state at each site from a scalar to a
+point on a rotating ring, a nonlinear dynamic object, and shows that a
+Cartesian surrogate is exactly solvable while the model as drawn is solvable
+numerically to a measured accuracy, both admitting the same structural
+description of the joint score. It is placed after the main results because it
+is an independent extension and nothing in them depends on it.
 Chapter~\ref{ch:conclusions} states findings per research question,
 limitations, and the questions that follow. The appendices contain proofs,
 numerical checks, aggregation analyses and reproducibility material that
