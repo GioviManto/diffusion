@@ -9,7 +9,7 @@ end-state should be easy to sample from, and --- crucially --- the distribution 
 intermediate time should be something we can reason about.
 
 The Ornstein--Uhlenbeck (OU) process satisfies all three. In the variance-preserving
-convention used throughout \citep{song2021}, it is the stochastic differential equation
+convention used throughout \citep{song2021scorebased}, it is the stochastic differential equation
 \begin{equation}
 \label{eq:ou}
 \frac{\mathrm{d}x}{\mathrm{d}t} \;=\; -x + \sqrt{2}\,\gwn(t),
@@ -161,8 +161,8 @@ forward-noised reference of \S\ref{sec:tmin} fixed it.
 \section*{Sources}
 \addcontentsline{toc}{section}{Sources}
 The variance-preserving forward process and the SDE formulation of diffusion generative models
-are from \citet{song2021}; the discrete-time antecedents are \citet{sohl2015} and
-\citet{ho2020}. The time-reversal theorem that supplies the reverse drift is
-\citet{anderson1982}, with the general treatment in \citet{haussmann1986}. The Fokker--Planck
+are from \citet{song2021scorebased}; the discrete-time antecedents are \citet{sohl2015deep} and
+\citet{ho2020denoising}. The time-reversal theorem that supplies the reverse drift is
+\citet{anderson1982reverse}, with the general treatment in \citet{haussmann1986}. The Fokker--Planck
 machinery underlying both is standard \citep{risken1989}. Choices of $\tmin$, $\tmax$ and the
-time discretisation are discussed empirically by \citet{karras2022}.
+time discretisation are discussed empirically by \citet{karras2022elucidating}.

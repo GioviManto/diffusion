@@ -62,7 +62,7 @@ Initialisation $x(\tau{=}0)\sim\normal{0}{I}$; termination at $\tau = \tmax-\tmi
 \end{center}
 
 The reverse drift follows from the time-reversal theorem for diffusions
-\citep{anderson1982,haussmann1986}: for a forward SDE $\mathrm{d}x = f\,\mathrm{d}t +
+\citep{anderson1982reverse,haussmann1986}: for a forward SDE $\mathrm{d}x = f\,\mathrm{d}t +
 g\,\mathrm{d}W$ the time-reversed process has drift $f - g^2\nabla\log p_t$ and the same
 diffusion coefficient. With $f=-x$ and $g=\sqrt{2}$ the backward-in-$t$ drift is
 $-x - 2\score$, and rewriting in $\tau$ flips the sign to give the box above. Because unit-variance
@@ -88,7 +88,7 @@ Dominated convergence then licenses
 \]
 Dividing by $\Pt(x)$ and recognising $\Pz(a)g_{\Dt}(x-e^{-t}a)/\Pt(x) = P(a\mid x,t)$ gives
 \eqref{eq:score}. Nothing is approximated. In the empirical-Bayes literature this is Tweedie's
-formula \citep{robbins1956,miyasawa1961,efron2011}.
+formula \citep{robbins1956empirical,miyasawa1961empirical,efron2011tweedie}.
 
 \paragraph{Risk decomposition.} For any $u$ that is a function of $x$ alone,
 \begin{equation}
@@ -487,7 +487,7 @@ sense of Appendix~\ref{app:exactness}(ii). Implementation \coderef{src/em.py}{e\
       $\Xis$ held fixed. We alternate the $(\pi,\nu,s^2)$ block and the $\corr$ block, both
       closed form, for at most \textbf{sixteen} inner sweeps, stopping early when the per-edge
       gain in $\Qfun$ drops below $10^{-8}$. This increases $\Qfun$
-      without maximising it: \textbf{generalised EM / ECM} \citep{meng1993}, not exact EM.
+      without maximising it: \textbf{generalised EM / ECM} \citep{meng1993maximum}, not exact EM.
       Sixteen is chosen by measurement: at four sweeps the fitted innovation excess kurtosis
       is $28\%$ below its value at sixteen whenever the outer loop is also cut short, while
       $\corr$ moves in the fourth decimal --- the same shape-versus-correlation rate asymmetry
@@ -502,7 +502,7 @@ sense of Appendix~\ref{app:exactness}(ii). Implementation \coderef{src/em.py}{e\
 \end{itemize}
 
 \paragraph{Guarantees, initialisation, stopping.} Generalised EM guarantees monotone ascent of
-$\Lik$ \citep{dempster1977,wu1983}; convergence is to a stationary point, not necessarily a global
+$\Lik$ \citep{dempster1977maximum,wu1983}; convergence is to a stationary point, not necessarily a global
 maximum. Mixture components are initialised spread over $[-\sqrt{\Var}, \sqrt{\Var}]$ with random
 scales; $\corr$ is initialised away from its truth in every experiment --- at $0.3$ in most, and
 over $\{0,\,0.3,\,0.6,\,-0.4\}$ in the initialisation sweep of \codefile{exp\_18}. The truth is

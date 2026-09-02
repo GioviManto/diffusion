@@ -11,7 +11,7 @@ observed sequences; $\ngrid$ is the number of quadrature points; $\kernel$ is al
 transition kernel, $\innov$ the innovation density, $\corr$ the autoregressive coefficient and
 $\ivar$ its variance. Vectors are bold lowercase, matrices bold uppercase. The forward process is
 $\vx(t)=e^{-t}\va+\sqrt{\Dt}\,\vz$ with $\Dt=1-e^{-2t}$; the reverse SDE and its sign conventions
-follow \citet{anderson1982,haussmann1986} and are stated in full in the companion paper.
+follow \citet{anderson1982reverse,haussmann1986} and are stated in full in the companion paper.
 
 \section{The score--posterior identity}
 \label{app:identity}
@@ -21,7 +21,7 @@ $\nabla_{\vx} g_{\Dt}(\vx-e^{-t}\va)=-\tfrac{\vx-e^{-t}\va}{\Dt}g_{\Dt}(\vx-e^{-
 integrand dominated uniformly whenever $\Pz$ has a finite first moment. Dominated convergence then
 licenses differentiation under the integral; dividing by $\Pt(\vx)$ and recognising the posterior
 density gives \eqref{eq:score}. This is Tweedie's formula
-\citep{robbins1956,miyasawa1961,efron2011}. Since $\pmean{\va}$ minimises the conditional squared
+\citep{robbins1956empirical,miyasawa1961empirical,efron2011tweedie}. Since $\pmean{\va}$ minimises the conditional squared
 risk, every error below is reported \emph{against} it rather than as raw risk: the Bayes floor is
 common to all estimators, and subtracting it is what makes the comparison informative.
 

@@ -136,7 +136,7 @@ approaches.
 \label{sec:intro}
 
 Generative diffusion produces data $\va\in\Reals^{\nsites}$ from a distribution $\Pz$ known only
-through samples, by noising and then reversing \citep{sohl2015,ho2020,song2021}. Reversal is
+through samples, by noising and then reversing \citep{sohl2015deep,ho2020denoising,song2021scorebased}. Reversal is
 driven by the score $\score(\vx,t)=\nabla_{\vx}\log\Pt(\vx)$, which is learned by regression
 against the posterior mean of the clean signal.
 
@@ -146,7 +146,7 @@ unrestricted function class the global minimiser of the denoising objective is t
 \emph{that}. A model attaining it exactly, integrated to zero noise, would have a reverse process
 whose fixed points are the training samples and would generate nothing else. Diffusion models
 nonetheless generate new data, and when they memorise rather than generalise is an active question
-\citep{biroli2023,biroli2024dynamical}.
+\citep{biroli2023generative,biroli2024dynamical}.
 
 Measuring it is the difficulty: deciding what a network has learned means comparing it against the
 score it \emph{should} have learned, and for realistic data that object is unavailable, so a large
@@ -215,13 +215,13 @@ transition is withheld; each adds exactly one difficulty to the one below it.
 \section{Related work}
 \label{sec:related}
 
-\paragraph{Diffusion and score matching.} The construction is due to \citet{sohl2015}, developed
-by \citet{ho2020} and given its continuous-time form by \citet{song2021}; training targets the
-score by denoising score matching \citep{hyvarinen2005,vincent2011}, and that the regression
-target is a posterior mean is Tweedie's formula \citep{robbins1956,miyasawa1961,efron2011}.
+\paragraph{Diffusion and score matching.} The construction is due to \citet{sohl2015deep}, developed
+by \citet{ho2020denoising} and given its continuous-time form by \citet{song2021scorebased}; training targets the
+score by denoising score matching \citep{hyvarinen2005estimation,vincent2011connection}, and that the regression
+target is a posterior mean is Tweedie's formula \citep{robbins1956empirical,miyasawa1961empirical,efron2011tweedie}.
 
 \paragraph{Statistical mechanics, and the memorisation question.} The high-dimensional behaviour of
-these models is analysed as a phase-transition problem \citep{biroli2023,biroli2024dynamical,
+these models is analysed as a phase-transition problem \citep{biroli2023generative,biroli2024dynamical,
 achilli2026speciation}. The puzzle above is attacked within it through training dynamics, where the
 time to memorise grows with sample size while the time to generalise does not
 \citep{bonnaire2025memorize,favero2025bigger}; through the learned representation, geometry-adaptive
@@ -237,7 +237,7 @@ generative models supply tractable non-Gaussian families with a phase structure
 \citep{sclocchi2025phase}, and the same construction can be run backwards to read latent structure
 off real data \citep{sclocchi2025probing} or to date the emergence of compositional generalisation
 during training \citep{favero2025compositional}. Two results bear directly on what we leave open:
-\citet{mei2024unet}
+\citet{mei2024unets}
 reads U-Nets on such models as implementing belief propagation, and
 \citet{garnierbrun2024transformers} shows transformers learning the corresponding inference on
 hierarchically filtered data. Both concern \emph{tree}-structured data, where the natural depth is
@@ -245,10 +245,10 @@ the tree's. A chain is a degenerate tree --- depth equal to its length, width tw
 architectural implication differs, which is what \S\ref{sec:networks} sets up rather than settles.
 
 \paragraph{Graphical models and inference.} Sum-product and its exactness on trees are standard
-\citep{pearl1988,kschischang2001,mezard2009,wainwright2008}; on a chain the recursions are
-forward--backward \citep{baum1970,rabiner1989}, reducing to Kalman and RTS in the Gaussian case
-\citep{kalman1960,rauch1965}. The estimation machinery is EM \citep{dempster1977}, its
-conditional-maximisation variants \citep{wu1983,meng1993}, and Fisher's identity
+\citep{pearl1988,kschischang2001factor,mezard2009information,wainwright2008}; on a chain the recursions are
+forward--backward \citep{baum1970,rabiner1989tutorial}, reducing to Kalman and RTS in the Gaussian case
+\citep{kalman1960new,rauch1965maximum}. The estimation machinery is EM \citep{dempster1977maximum}, its
+conditional-maximisation variants \citep{wu1983,meng1993maximum}, and Fisher's identity
 \citep{fisher1925,louis1982,cappe2005}.
 
 \paragraph{What is not new here.} The numerics are classical too: messages on a grid, integrated by
@@ -287,7 +287,7 @@ the posterior factor graph is the prior's chain (drawn in Appendix~\ref{app:bp})
 
 A \emph{tree} is a connected acyclic graph --- there is exactly one path between any two nodes. A
 chain is the simplest tree, the one whose nodes have degree at most two. On a tree, sum-product
-returns the exact marginals \citep{pearl1988,kschischang2001,mezard2009}: with
+returns the exact marginals \citep{pearl1988,kschischang2001factor,mezard2009information}: with
 \begin{align}
 \label{eq:messages}
 \lmsg_{i}(a_i) &\propto \int \mathrm{d}a_{i-1}\;
@@ -300,9 +300,9 @@ $P(a_i\mid \vx,t) \propto \lmsg_i(a_i)\like(x_i\mid a_i)\rmsg_i(a_i)$ and the pa
 edge $(i-1,i)$ is $\propto \lmsg_{i-1}\like(x_{i-1}\mid a_{i-1})\kernel(a_i\mid
 a_{i-1})\like(x_i\mid a_i)\rmsg_i$. The local likelihood is absorbed \emph{before} propagation, so
 $\like(x_i\mid a_i)$ appears exactly once in each marginal. These are the forward--backward
-recursions of hidden Markov models \citep{baum1970,rabiner1989} written for a continuous state;
+recursions of hidden Markov models \citep{baum1970,rabiner1989tutorial} written for a continuous state;
 when everything is Gaussian they reduce to the Kalman filter and RTS smoother
-\citep{kalman1960,rauch1965}.
+\citep{kalman1960new,rauch1965maximum}.
 
 
 Two cautions, both expanded in Appendix~\ref{app:exactness}. Sum-product is exact on the tree,
@@ -447,7 +447,7 @@ Appendix~\ref{app:learning}.
 
 Both routes are implemented and neither dominates. On this smooth kernel gradient ascent reaches
 EM's optimum to $1.6\times10^{-9}$ nats, but it needs a tuned step size and larger steps diverge;
-EM needs no step size and its ascent is monotone by construction \citep{dempster1977,wu1983}.
+EM needs no step size and its ascent is monotone by construction \citep{dempster1977maximum,wu1983}.
 That is the whole content of the comparison, and it is why every rung above uses EM. The one place
 gradient ascent wins is a kernel whose $\Qfun$-maximiser is a lattice artefact of the
 discretisation, which is a statement about the grid rather than about the algorithms
@@ -489,7 +489,7 @@ not enough: the complete-data problem is itself a mixture fit, carrying the comp
 second latent variable, so the maximisation step has no closed form. We alternate the
 $(\pi,\nu,s^2)$ and $\corr$ blocks, each closed form given the other, for up to sixteen inner
 sweeps or until the per-edge gain in $\Qfun$ falls below $10^{-8}$. The algorithm is therefore \textbf{generalised EM} of ECM type
-\citep{dempster1977,meng1993}: every step increases $\Qfun$ without maximising it, which preserves
+\citep{dempster1977maximum,meng1993maximum}: every step increases $\Qfun$ without maximising it, which preserves
 monotone ascent \citep{wu1983} but not the exact-maximiser property. We do not call it exact EM.
 
 \paragraph{Misspecification.} When the truth is Laplace and the family is the mixture
@@ -522,7 +522,7 @@ does not depend on $\params$ at all --- while the innovation shape still takes t
 That slowness belongs to the mixture's inner latent label, the extra difficulty introduced above. It is not caused by the channel.
 
 Through the channel both coordinates slow down further, and \emph{that} is the channel's doing:
-it is the missing-information mechanism of \citet{dempster1977} appearing exactly where the theory
+it is the missing-information mechanism of \citet{dempster1977maximum} appearing exactly where the theory
 puts it, in the convergence rate rather than in the attainable accuracy.
 
 The two effects are separable and we separate them, because conflating them produces a false
@@ -603,7 +603,7 @@ absorbs, while long-range precision coupling is not low-rank. Seven further scop
 Appendix~\ref{app:limits}. Left open: whether the pointwise advantage survives into generation
 once both arms are selected on convergence rather than a fixed count; whether mixture capacity
 helps an estimator whose grid resolves its narrowest component; and which architectures exploit
-Markovianity, at what depth \citep{mei2024unet,garnierbrun2024transformers}.
+Markovianity, at what depth \citep{mei2024unets,garnierbrun2024transformers}.
 
 % The closing summary that stood here restated the abstract sentence for
 % sentence -- moment closure is an LMMSE estimator, Fisher's identity gives the
