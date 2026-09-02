@@ -445,21 +445,35 @@ def fig_nonmarkov() -> None:
     panels = (("beta", r"global latent, rank-one strength $\beta$"),
               ("gamma", r"long-range coupling strength $\gamma$"))
     fig, ax = plt.subplots(1, 2, figsize=(7.0, 2.7), sharey=True)
+    # Both innovation laws, so the figure shows the same cells the table does.
+    # The Laplace arm exists for the rank-one mechanism only -- there is no
+    # closed-form reference for a long-range-coupled Laplace chain -- so it
+    # appears in the left panel and is simply absent from the right, rather
+    # than being drawn as a gap.
     for k, (mech, xlabel) in enumerate(panels):
-        cells = {}
-        for d in sorted(_glob.glob(str(OUT / NONMARKOV_SRC / f"gauss_{mech}*"))):
-            m = _re.search(rf"{mech}([0-9.]+)$", d)
-            f = Path(d) / "nonmarkov_gauss.csv"
-            if not m or not f.exists():
+        for family, dash in (("gauss", "-"), ("laplace", "--")):
+            cells = {}
+            for d in sorted(_glob.glob(str(OUT / NONMARKOV_SRC / f"{family}_{mech}*"))):
+                m = _re.search(rf"{mech}([0-9.]+)$", d)
+                f = Path(d) / f"nonmarkov_{family}.csv"
+                if not m or not f.exists():
+                    continue
+                cells[float(m.group(1))] = list(csv.DictReader(f.open()))
+            if not cells:
+                if family == "gauss":
+                    raise FileNotFoundError(
+                        f"missing committed output: {OUT / NONMARKOV_SRC}")
                 continue
-            cells[float(m.group(1))] = list(csv.DictReader(f.open()))
-        if not cells:
-            raise FileNotFoundError(f"missing committed output: {OUT / NONMARKOV_SRC}")
-        xs = sorted(cells)
-        for arm in ("cnn", "mlp"):
-            ys = [float(np.mean([float(r["ratio_to_em"]) for r in cells[x]
-                                 if r["arm"] == arm])) for x in xs]
-            ax[k].plot(xs, ys, **STYLE[arm])
+            xs = sorted(cells)
+            for arm in ("cnn", "mlp"):
+                ys = [float(np.mean([float(r["ratio_to_em"]) for r in cells[x]
+                                     if r["arm"] == arm])) for x in xs]
+                st = dict(STYLE[arm], ls=dash)
+                st["label"] = (st["label"] + ", Laplace") if family == "laplace" \
+                    else (st["label"] + ", Gaussian")
+                if family == "laplace":
+                    st["markerfacecolor"] = "white"
+                ax[k].plot(xs, ys, **st)
         ax[k].axhline(1.0, color="#222222", ls="--", lw=1.0)
         ax[k].set_yscale("log")
         ax[k].set_xlabel(xlabel)

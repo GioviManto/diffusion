@@ -339,30 +339,39 @@ responds to misspecification and are not on the same scale as
 Table~\ref{tab:pointwise}'s; only the direction and the crossing point are read
 from them. Both arms train at the headline protocol's budget.
 
-One qualification governs everything in this section and is stated before the
-numbers rather than after them. The run behind Table~\ref{tab:nonmarkov} was
-produced with \codefile{src/em.py} uncommitted, so its recorded commit does not
-reconstruct the program that generated it. That is the same defect that
-withdrew the $\nseq = 8192$ row from Table~\ref{tab:pointwise}, and it is not
-the milder legacy case that applies to the runs behind
-Sections~\ref{sec:em-pointwise} and~\ref{sec:em-convergence}
-(Appendix~\ref{app:repro} separates the three). The numbers may well be right,
-and the mechanism they describe is independently supported by the fitted
-coefficients and the Chow--Liu column; but ``may well be right'' is not the
-standard the rest of this thesis is held to, and this section should be read as
-the weakest-certified in it.
+The measurement is reported for two innovation laws. The Gaussian arm carries
+both mechanisms, since its contaminated model has an exact reference in closed
+form; the Laplace arm carries the rank-one mechanism, where the same
+contamination can be applied to a non-Gaussian chain and the reference computed
+on the grid. Reading them together separates what is a property of the chain
+structure from what is a property of Gaussianity. On the rank-one mechanism the
+two agree in shape --- the same ordering, the same smooth decay, no crossing
+--- and differ at the margin. At $\beta = \nmbetamax$ the Gaussian arm is still
+ahead at every noise level against both baselines, worst ratio
+$\nmbetaminratio$; the Laplace arm is still ahead against the convolutional
+baseline, worst ratio $\nmlapbetaminratiocnn$, but reaches the break-even line
+against the fully connected one at the largest diffusion time, at
+$\nmlapbetaminratio$. The mechanism carries across the innovation law; the
+size of the margin it leaves does not quite.
 
 \input{../shared/sections/tab-nonmarkov}
 
 \begin{figure}[t]\centering
 \includegraphics[width=\linewidth]{fig_nonmarkov.pdf}
 \caption[Where each Markov violation stops paying]{The same cells as Table~\ref{tab:nonmarkov}, on a logarithmic vertical
-axis with the break-even line drawn. The two mechanisms are not two amounts of
+axis with the break-even line drawn; solid is the Gaussian innovation, dashed
+with open markers the Laplace one. The two mechanisms are not two amounts of
 the same thing: under a rank-one global latent the advantage decays smoothly and
-never reaches the line, even where half the marginal variance is a shared
+does not reach the line, even where half the marginal variance is a shared
 constant; under long-range coupling it crosses within the first tested strength
-and stays below. Both curves fall because the estimator degrades, not because
-the baselines improve --- the last row of each block in
+and stays below. The Laplace curves track the Gaussian ones across the whole
+rank-one sweep, which is what says the mechanism belongs to the chain structure
+rather than to Gaussianity; the long-range panel is Gaussian only, since the
+contaminated Laplace model has no closed-form reference. Every curve is a mean
+over the noise schedule, so it shows the direction rather than the worst case
+--- the tie reported in the text at $\beta = \nmbetamax$ is at one noise level
+and is not visible here. All fall because the estimator degrades, not because
+the baselines improve: the last row of each block in
 Table~\ref{tab:nonmarkov} carries EM--BP's own error.}
 \label{fig:em-nonmarkov}
 \end{figure}
@@ -392,10 +401,10 @@ Two rows of the table separate the mechanism from the outcome. The estimator's
 own error is what moves in both blocks --- the baselines barely change --- so
 neither column is a story about the networks improving. What distinguishes the
 two violations is the last row of each block: under rank-one contamination the
-fitted chain stays within $0.015$ of the Chow--Liu correlation, the best
+fitted chain stays within $\nmcldevbeta$ of the Chow--Liu correlation, the best
 first-order approximation of the contaminated truth, so it is still fitting the
-right chain; under long-range coupling that gap grows by nearly an order of
-magnitude, which is what it looks like when the family can no longer represent
+right chain; under long-range coupling that gap is $\nmcldevfactor$ times
+larger, which is what it looks like when the family can no longer represent
 what generated the data. The uncontaminated controls of the two blocks are the
 same configuration reached from two directions, and they agree to within $2\%$
 ($\nmcontrolbeta$ and $\nmcontrolgamma$), which is what makes the rest of the

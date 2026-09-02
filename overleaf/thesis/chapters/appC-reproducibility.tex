@@ -122,7 +122,7 @@ Figure & File & Numbers computed by \\
 \ref{fig:em-sample-eff} & \texttt{fig\_sample\_efficiency.pdf} & \texttt{nongaussian-bp} exp.~07, frozen \\
 \ref{fig:em-screening} & \texttt{fig\_screening.pdf} & \texttt{nongaussian-bp} exp.~31 screen, frozen \\
 \ref{fig:em-capacity} & \texttt{fig\_capacity.pdf} & \texttt{nongaussian-bp} exp.~32, frozen \\
-\ref{fig:em-nonmarkov} & \texttt{fig\_nonmarkov.pdf} & \texttt{nongaussian-bp} exp.~21, frozen budget \\
+\ref{fig:em-nonmarkov} & \texttt{fig\_nonmarkov.pdf} & \texttt{nongaussian-bp} exp.~21, clean rerun \\
 \ref{fig:bp-bulkvar} & \texttt{fig\_bulk\_variance.pdf} & \texttt{gaussian-bp}, closed forms \\
 \ref{fig:bp-vs-amp} & \texttt{fig\_bp\_vs\_amp.pdf} & \texttt{gaussian-bp}, closed forms and iteration \\
 \ref{fig:ring-model} & \texttt{fig\_ring\_model.pdf} & ring package, closed forms and simulation \\
@@ -155,9 +155,11 @@ module, so that uncommitted work elsewhere in the tree is distinguished from
 uncommitted work on the code path that produced the numbers. That distinction
 does the work below, because the two are not equally serious.
 
-\paragraph{Which runs are certified, and which are not.} Not every experiment
-here was run after \texttt{deploy\_clean.sh} existed. Three levels appear, and
-they are set out rather than described by their strictest case.
+\paragraph{How each run is certified.} Not every experiment here was run after
+\texttt{deploy\_clean.sh} existed. Three routes to certification appear, and
+they are set out rather than described by their strictest case. Nothing cited
+in this thesis is uncertified; the one result that was is now a rerun, and the
+paragraph on it records what changed.
 
 \emph{Certified.} \texttt{exp\_31}, the architecture screen and the
 confirmatory comparison, and \texttt{exp\_32}, capacity, were deployed by the
@@ -180,15 +182,29 @@ once by hand. The one \texttt{exp\_07} row where the intersection was
 experiment, the frozen configuration and \texttt{src/em.py} --- is withdrawn
 and appears nowhere in this thesis.
 
-\emph{Not certified.} \texttt{outputs/exp\_21\_frozen}, behind
-Table~\ref{tab:nonmarkov} and Figure~\ref{fig:em-nonmarkov}, ran with
-\texttt{src/em.py} uncommitted in all ten cells. That is the same defect as
-\texttt{exp\_12\_scaled} and as the withdrawn $\nseq = 8192$ row: the dirt
-sits on the executed code path, so the recorded commit does not reconstruct the
-program. \texttt{make\_tab\_nonmarkov.py} says so in that table's own caption
-rather than emitting something indistinguishable from the certified tables. A
-clean-deployment rerun of the identical protocol is what should stand there, and
-Section~\ref{sec:em-nonmarkov} is to be read against that.
+\emph{Certified after rerun.} \texttt{exp\_21}, behind
+Table~\ref{tab:nonmarkov} and Figure~\ref{fig:em-nonmarkov}, was the one
+result in this thesis that could not be certified. The tree it originally ran
+from, \texttt{outputs/exp\_21\_frozen}, had \texttt{src/em.py} uncommitted in
+all ten cells --- the same defect as \texttt{exp\_12\_scaled} and the
+withdrawn $\nseq = 8192$ row, with the dirt on the executed code path, so the
+recorded commit did not reconstruct the program.
+\texttt{make\_tab\_nonmarkov.py} stated that in the table's own caption rather
+than emitting something indistinguishable from the certified tables, and the
+section was to be read against a rerun.
+
+That rerun is what the section now reports:
+\texttt{outputs/frozen/exp\_21\_clean}, fifteen cells from two git-archive
+deployments, every one with an empty dirty list. Two things are worth recording
+about it. First, the Gaussian arm reproduces the run it replaces on every
+number this thesis quotes from it, to the precision printed --- which is the
+evidence, unavailable before, that the uncommitted file was not on this
+experiment's path in any way that mattered. Second, the rerun spans two
+commits, because the Laplace and Gaussian arms were deployed separately, so the
+generator refuses unless no single cell pools commits \emph{and} every file in
+the experiment's sixteen-file import closure is byte-identical between them.
+Both hold here, and the check runs on every regeneration rather than once by
+hand.
 
 \paragraph{Generated numbers.} No efficiency, structured-baseline or
 aggregation number in this thesis is typed. Each is defined once as a macro in
