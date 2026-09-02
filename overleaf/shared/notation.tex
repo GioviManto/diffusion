@@ -106,5 +106,11 @@
 \providecommand{\needsdata}[1]{{\bfseries\color{red}[PENDING: #1]}}
 
 % --- Repository pointers (shared by the note and the compendium) ------------
-\providecommand{\coderef}[2]{\texttt{\small #1}\,$\rightarrow$\,\texttt{\small #2}}
+% The arrow is drawn only when there IS a second component to point at.
+% Four call sites pass an empty second argument to mean "the whole file", and
+% those were rendering as "path/to/file.py -> produces the numbers above",
+% a dangling arrow running into the prose.
+\providecommand{\codepath}[1]{\texttt{\small #1}}
+\providecommand{\coderef}[2]{%
+  \codepath{#1}\ifx\relax#2\relax\else\,$\rightarrow$\,\texttt{\small #2}\fi}
 \providecommand{\codefile}[1]{\texttt{\small #1}}

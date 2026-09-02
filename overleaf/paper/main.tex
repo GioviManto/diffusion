@@ -307,9 +307,9 @@ when everything is Gaussian they reduce to the Kalman filter and RTS smoother
 
 Two cautions, both expanded in Appendix~\ref{app:exactness}. Sum-product is exact on the tree,
 but a message is a \emph{function} on $\Reals$ --- forced by the state space, not chosen --- so an
-implementation must represent one, and the truncated grid we use makes the recursion exact only
+implementation must represent one. The truncated grid we use makes the recursion exact only
 for the chain-shaped factor model that grid defines, not for a normalised finite-state kernel:
-the sampled columns are not renormalised (Appendix~\ref{app:exactness}), and the distance to the
+the sampled columns are not renormalised (Appendix~\ref{app:exactness}). The distance to the
 continuum recursion is what \S\ref{sec:rung0} measures. And determinism here is conditional --- on
 a dataset and a grid the inference is deterministic, but every reported risk, ratio and
 information estimate is an average over sampled sequences at finitely many seeds.

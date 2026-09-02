@@ -133,11 +133,12 @@ $\Qfun$ is a lattice artefact of the discretisation.
 \end{pitfall}
 
 \begin{codebox}
-\coderef{src/em.py}{q\_gradient} implements \eqref{eq:fisher-chapter};
-\coderef{experiments/exp\_08\_gradient\_vs\_exact\_mstep.py}{\texttt{exp\_08}} is the
-comparison. The identity
-is checked against a central finite difference of the exact evidence in
-\codefile{tests/test\_em\_bp.py}, agreeing to a relative $1.5\times10^{-9}$.
+\coderef{src/em.py}{q\_gradient} implements \eqref{eq:fisher-chapter}, and
+the comparison is
+\codepath{experiments/exp\_08\_gradient\_vs\_exact\_mstep.py}.
+The identity is checked against a central finite difference of the exact
+evidence in \codefile{tests/test\_em\_bp.py}, agreeing to a relative
+$1.5\times10^{-9}$.
 \end{codebox}
 
 \section{The kernel families}
