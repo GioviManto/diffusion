@@ -68,17 +68,16 @@ per cell and at three quantiles, taking in each case the worst value over the tw
 schedule:
 
 \begin{center}
-\small
-\begin{tabular}{lcccc}
+\footnotesize
+\setlength{\tabcolsep}{4pt}
+\begin{tabular}{@{}lccc@{}}
 \toprule
-$\halfwidth$ & $4$ & $6$ & $8$ & $10$ \\
+$\halfwidth$ & worst chain & $90$th pct. & median \\
 \midrule
-worst chain & $2.3\times10^{-3}$ & $1.6\times10^{-4}$ & $1.2\times10^{-6}$
-            & $3.3\times10^{-8}$ \\
-$90$th percentile & $2.7\times10^{-4}$ & $2.5\times10^{-6}$ & $1.5\times10^{-8}$
-                  & $7.8\times10^{-11}$ \\
-median & $3.8\times10^{-5}$ & $3.8\times10^{-7}$ & $3.0\times10^{-9}$
-       & $1.8\times10^{-11}$ \\
+$4$  & $2.3\times10^{-3}$ & $2.7\times10^{-4}$  & $3.8\times10^{-5}$ \\
+$6$  & $1.6\times10^{-4}$ & $2.5\times10^{-6}$  & $3.8\times10^{-7}$ \\
+$8$  & $1.2\times10^{-6}$ & $1.5\times10^{-8}$  & $3.0\times10^{-9}$ \\
+$10$ & $3.3\times10^{-8}$ & $7.8\times10^{-11}$ & $1.8\times10^{-11}$ \\
 \bottomrule
 \end{tabular}
 \end{center}
