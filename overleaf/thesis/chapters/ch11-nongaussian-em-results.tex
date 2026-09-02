@@ -61,14 +61,16 @@ gives the other three, with a paired interval on the one quoted here. These figu
 \codefile{tools/make\_tab\_efficiency.py} from the frozen outputs rather than
 transcribed, so the table, the figure and this sentence cannot drift apart.
 
-That comparison is against a network with no locality prior, and most of the
-margin is attributable to that rather than to the estimator: against a
-locality-respecting weight-shared baseline it narrows to
-$\structratiolo$--$\structratiohi\times$, measured at the same headline
-protocol and reported with its own scoping in
-Section~\ref{sec:em-architecture}. The direction is consistent with the
-locality results of Chapter~\ref{ch:ring} and the receptive-field argument of
-Chapter~\ref{ch:gaussian}.
+That first comparison is against a network with neither a locality prior nor
+weight sharing. When those two biases are supplied through the window-head
+baseline, the observed ratio narrows to
+$\structratiolo$--$\structratiohi\times$, measured at the same headline protocol
+and reported with its own scoping in Section~\ref{sec:em-architecture}. This
+change does not identify a causal decomposition: architecture, parameter
+sharing, capacity and optimisation change together across the two baselines. It
+shows that the generic-MLP comparison overstates what can be attributed
+specifically to the supplied Markov model. The relevant locality result is the
+influence decay of Chapter~\ref{ch:gaussian}.
 
 \input{../shared/sections/tab-efficiency}
 
@@ -132,8 +134,8 @@ region and averaged over the $\screendevseeds$ development seeds. One marker per
 architecture; the outlined marker is each architecture's best configuration. The
 horizontal axis is what makes the comparison readable: the dilated stack sits an
 order of magnitude to the right and does not reach the window head's risk
-anywhere, so the long-range arms did not lose for want of capacity. Drawn from
-the same artifact as Table~\ref{tab:screening}.}
+anywhere in the screen. Drawn from the same artifact as
+Table~\ref{tab:screening}.}
 \label{fig:em-screening}
 \end{figure}
 
@@ -148,15 +150,17 @@ this training protocol and these development seeds, the simplest candidate
 scored best. It is not evidence that long-range propagation is intrinsically
 useless here, that radius $\screenwinnerradius$ is the population-optimal
 receptive field, or that a dilated or message-passing architecture could not
-overtake it under different tuning. The one thing it does rule out is the
-cheapest objection to the screen --- that the long-range arms lost because they
-were starved. They were not: the dilated stack carries \screenconvparams{}
-parameters against the window head's \screenwindowparams{}, an order of
-magnitude more, and finished last of the three. \textbf{The confirmatory
-comparison below is therefore EM--BP against a fixed-radius window head, the
-strongest baseline \emph{this screen found}, not the strongest conceivable
-amortised-inference baseline}, and that scoping is carried in every claim that
-follows.
+overtake it under different tuning. It does establish that the long-range
+arms were not offered a smaller budget: the dilated stack carries
+\screenconvparams{} parameters against the window head's
+\screenwindowparams{}, an order of magnitude more, and finished last of the
+three. A larger parameter count is not by itself proof of adequate optimisation
+or of a correct inductive bias, so this bounds one explanation rather than
+eliminating the class. Under the stated development screen the radius-
+\screenwinnerradius{} window head achieved the lowest validation risk, and the
+confirmatory experiment below therefore compares EM--BP with the
+best-performing candidate in that screen. That scoping is carried in every
+claim that follows.
 
 \input{../shared/sections/tab-structured}
 
@@ -247,8 +251,10 @@ region and in the direction of $C=16$ being \emph{worse}: evidence
 $\capheadlogev$ with interval $\capheadlogevci$, risk $\capheadrisk$ with
 interval $\capheadriskci$, both lying wholly outside it. At
 $\nseq = \capothersize$ it is \capotherverdict. So neither ``capacity saturates
-by eight'' nor ``capacity keeps paying past eight'' is supported: past the
-capacity the data supports, extra components cost.
+by eight'' nor ``capacity keeps paying past eight'' is supported. What is
+measured is narrower: at $\nseq = \capheadsize$, the observed $C=8 \to C=16$
+contrast is resolved outside the predeclared equivalence region, in the
+direction of worse held-out evidence and worse score risk for $C=16$.
 
 \begin{remark}[Two things this does not isolate]\label{rmk:em-capacity-caveats}
 Both point the same way, and both are reasons to read the table as a statement
@@ -297,12 +303,13 @@ here as evidence about an under-converged operating point rather than about the
 converged estimator.
 \end{remark}
 
-Runtime is close to flat across the capacity range, $13.5\to14.3$ seconds per
-iteration from $C=2$ to $C=16$ while the number of free parameters grows
-$6\to48$, confirming that the E-step's $O(nM^2)$ cost dominates and only the
-M-step scales with $C$. Capacity is therefore nearly free to compute, which is
-what makes the result above a statement about statistics rather than about
-budget.
+Per-iteration runtime changes little over the tested capacity range,
+$13.5\to14.3$ seconds from $C=2$ to $C=16$ while the number of free parameters
+grows $6\to48$, because the E-step's $O(\nsites\,\ngrid^2)$ cost dominates the
+component-dependent M-step. This shows that increasing $C$ adds little cost to
+one iteration. It does not remove the confounds above: the higher-capacity fits
+are precisely the ones for which the iteration-cap and grid-resolution
+diagnostics become less favourable.
 
 \section{Pointwise accuracy and generative fidelity}
 \label{sec:em-generative}
@@ -314,8 +321,9 @@ iterations, while Section~\ref{sec:em-convergence} measures the fitted
 innovation shape --- which is precisely what the generative metric scores --- as
 settling at a median of $\convshapemed$ iterations, and as still moving at
 $\convbudget$ in $\convunsettledpct\%$ of the configurations swept. The
-comparison therefore scores converged estimators against unconverged ones on the
-one coordinate that had not converged, and a dissociation between pointwise and
+comparison therefore evaluates procedures whose fitted shape coordinates are
+unequally settled under the available budgets, on the one coordinate that
+carries the generative metric, and a dissociation between pointwise and
 generative quality cannot be separated from that asymmetry.
 
 The dissociation may well be real, and the design cannot distinguish it from
@@ -351,8 +359,9 @@ ahead at every noise level against both baselines, worst ratio
 $\nmbetaminratio$; the Laplace arm is still ahead against the convolutional
 baseline, worst ratio $\nmlapbetaminratiocnn$, but reaches the break-even line
 against the fully connected one at the largest diffusion time, at
-$\nmlapbetaminratio$. The mechanism carries across the innovation law; the
-size of the margin it leaves does not quite.
+$\nmlapbetaminratio$. The ordering carries across both innovation laws tested;
+the size of the margin it leaves does not quite. Whether it carries beyond these
+two families is not established here.
 
 \input{../shared/sections/tab-nonmarkov}
 
@@ -365,9 +374,10 @@ the same thing: under a rank-one global latent the advantage decays smoothly and
 does not reach the line, even where half the marginal variance is a shared
 constant; under long-range coupling it crosses within the first tested strength
 and stays below. The Laplace curves track the Gaussian ones across the whole
-rank-one sweep, which is what says the mechanism belongs to the chain structure
-rather than to Gaussianity; the long-range panel is Gaussian only, since the
-contaminated Laplace model has no closed-form reference. Every curve is a mean
+rank-one sweep, which shows that the rank-one result is not confined to the
+Gaussian experiment; its generality beyond these two innovation families
+remains open. The long-range panel is Gaussian only, since the contaminated
+Laplace model has no closed-form reference. Every curve is a mean
 over the noise schedule, so it shows the direction rather than the worst case
 --- the tie reported in the text at $\beta = \nmbetamax$ is at one noise level
 and is not visible here. All fall because the estimator degrades, not because
@@ -382,9 +392,9 @@ every site makes the score residual \emph{exactly} rank one, by a Woodbury
 identity, and over the range tested a chain-structured estimator accommodates
 that correction within its own fitted coefficients: the fitted correlation
 climbs from $\nmrhoclean$ on the clean chain to $\nmrhobetamax$ at
-$\beta = \nmbetamax$, absorbing into the chain a dependence the chain did not
-generate. This is partial accommodation over a measured range, not an exact
-representation --- a first-order Markov family does not contain the contaminated
+$\beta = \nmbetamax$: the fitted chain partially accommodates the rank-one
+perturbation by changing its effective lag-one correlation. This is partial
+accommodation over a measured range, not an exact representation --- a first-order Markov family does not contain the contaminated
 law --- but the residual it cannot represent stays small enough that the
 advantage never inverts: at $\beta = \nmbetamax$, where half the marginal
 variance is a shared global constant, the ratio at its worst noise level is
@@ -402,8 +412,10 @@ own error is what moves in both blocks --- the baselines barely change --- so
 neither column is a story about the networks improving. What distinguishes the
 two violations is the last row of each block: under rank-one contamination the
 fitted chain stays within $\nmcldevbeta$ of the Chow--Liu correlation, the best
-first-order approximation of the contaminated truth, so it is still fitting the
-right chain; under long-range coupling that gap is $\nmcldevfactor$ times
+first-order approximation of the contaminated truth, so its fitted lag-one
+correlation remains close to the corresponding first-order projection --- one
+scalar agreeing, not the whole fitted law certified; under long-range coupling
+that gap is $\nmcldevfactor$ times
 larger, which is what it looks like when the family can no longer represent
 what generated the data. The uncontaminated controls of the two blocks are the
 same configuration reached from two directions, and they agree to within $2\%$
@@ -556,8 +568,8 @@ fails, well before generic intuition about misspecification would suggest, on a
 long-range coupling it structurally cannot represent.
 
 \paragraph{Generation: open.} Whether the pointwise advantage transfers to
-generation is not resolved here. The comparison available scores converged
-estimators against unconverged ones on the single coordinate that had not
-converged, so Section~\ref{sec:em-generative} withdraws the reading rather than
+generation is not resolved here. The comparison available evaluates procedures
+whose fitted shape coordinates are unequally settled on the single coordinate
+that carries the metric, so Section~\ref{sec:em-generative} withdraws the reading rather than
 reversing it. The correction is the one applied to capacity above: select on a
 convergence criterion, then compare.
