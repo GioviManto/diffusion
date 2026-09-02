@@ -110,8 +110,9 @@ convert. Earlier work here reported score error alone.
 machine precision for any pair of denoisers --- a large residual means an implementation bug,
 not a modelling difference. \coderef{src/sample\_metrics.py}{pointwise\_ladder} emits
 \texttt{score\_reweighting} next to every error it reports.
-Verified in \coderef{tests/test\_sample\_metrics.py}{test\_score\_reweighting\_matches\_the\_tweedie\_factor}
-and \texttt{test\_reweighting\_spans\_the\_claimed\_range\_across\_the\_schedule}.
+Verified in \codepath{tests/test\_sample\_metrics.py}, by
+\texttt{test\_score\_reweighting\_matches\_the\_tweedie\_factor} and
+\texttt{test\_reweighting\_spans\_the\_claimed\_range\_across\_the\_schedule}.
 \end{codebox}
 \end{pitfall}
 

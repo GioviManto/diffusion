@@ -20,8 +20,8 @@ One line per claim. \textbf{Settled} means it can be cited without qualification
 with it; \textbf{censored} means the run hit a budget rather than a conclusion;
 \textbf{withdrawn} means it was claimed and is not any more.
 
-\begin{center}\small
-\begin{tabular}{@{}p{0.30\textwidth}p{0.13\textwidth}p{0.47\textwidth}@{}}
+{\small
+\begin{longtable}{@{}p{0.30\textwidth}p{0.13\textwidth}p{0.47\textwidth}@{}}
 \toprule
 claim & status & where it stands \\
 \midrule
@@ -88,8 +88,8 @@ Pointwise and generative fidelity dissociate & withdrawn &
 The channel destroys shape recovery & withdrawn &
   a rate at a fixed iteration count, mistaken for an information penalty \\
 \bottomrule
-\end{tabular}
-\end{center}
+\end{longtable}
+}
 
 
 This chapter is the experimental record. It replaces an earlier version that reported results
@@ -931,8 +931,10 @@ neither was visible as an anomaly, and both produced plausible numbers.
 \subsection{A sign error in a gradient that a fixed point could not see}
 \label{sec:corr-gradient}
 
-\paragraph{What was wrong.} \coderef{src/kernels.py}{MixtureInnovationKernel.grad\_log\_transition\_matrix}
-carried a sign error in the $\corr$ derivative.
+\paragraph{What was wrong.} In \codepath{src/kernels.py}, the method
+\texttt{\small MixtureInnovationKernel.\allowbreak
+grad\_\allowbreak log\_\allowbreak transition\_\allowbreak matrix} carried a
+sign error in the $\corr$ derivative.
 
 \paragraph{Why it mattered more than it looks.} A fixed-point residual near zero is evidence of a
 stationary point only if the derivative defining it is right. Every convergence diagnostic

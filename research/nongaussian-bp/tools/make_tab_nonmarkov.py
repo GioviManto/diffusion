@@ -293,6 +293,21 @@ the baseline improving.}}
 # from the superseded run: "never falls below 2.08" at beta=1 is 1.44 here, and
 # the Chow--Liu column differed in every cell.
 fam = "gauss"
+
+
+def _cldev(mech):
+    """Largest |fitted correlation - Chow--Liu correlation| over the mechanism's
+    strengths. This is the distance between the chain that was fitted and the
+    best chain available, so it separates "fitting the wrong chain" from
+    "fitting the right chain badly"."""
+    vals = [em_stat(fam, mech, s, "rho_minus_chow_liu")
+            for _, m, ss in MECHANISMS if m == mech for s in ss]
+    vals = [abs(v) for v in vals if v is not None]
+    if not vals:
+        sys.exit(f"REFUSING: no Chow--Liu column for {fam}/{mech}")
+    return max(vals)
+
+
 crossover = next((s for s in MECHANISMS[1][2]
                   if (ratio(fam, "gamma", s, "cnn") or 9e9) < 1.0), None)
 last_holding = max((s for s in MECHANISMS[1][2]
@@ -316,6 +331,13 @@ macros = "\n".join([
     # readable, and their disagreement is what invalidated the previous one.
     f"\\newcommand{{\\nmcontrolbeta}}{{{ratio(fam, 'beta', 0.0, 'cnn'):.2f}}}",
     f"\\newcommand{{\\nmcontrolgamma}}{{{ratio(fam, 'gamma', 0.0, 'cnn'):.2f}}}",
+    # How far the fitted chain sits from the BEST chain (Chow--Liu) under each
+    # mechanism, and the factor between them. Section 9.5 typed "within 0.015"
+    # and "nearly an order of magnitude" by hand; both are read off the same
+    # table row, so both belong here where they cannot drift from it.
+    f"\\newcommand{{\\nmcldevbeta}}{{{_cldev('beta'):.3f}}}",
+    f"\\newcommand{{\\nmcldevgamma}}{{{_cldev('gamma'):.3f}}}",
+    f"\\newcommand{{\\nmcldevfactor}}{{{_cldev('gamma') / _cldev('beta'):.0f}}}",
     "",
 ])
 mdest = "../../overleaf/shared/sections/nonmarkov-numbers.tex"

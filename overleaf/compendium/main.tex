@@ -7,6 +7,9 @@
 \usepackage{empheq}
 \usepackage[numbers,sort&compress]{natbib}
 \usepackage{booktabs}
+% The claim-audit table is taller than a page and was overflowing its \vbox
+% by 138pt; longtable lets it break instead.
+\usepackage{longtable}
 \usepackage{capt-of}   % \captionof, used by the shared generated tables
 
 \usepackage{graphicx}
