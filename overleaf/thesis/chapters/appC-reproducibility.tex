@@ -5,7 +5,11 @@
 % breaking early, and five paragraphs here did exactly that. Raising the
 % tolerance for the appendix trades a little inter-word stretch for text that
 % stays inside the text block.
-\sloppy
+% Path-heavy tables and URLs need looser lines than the body, but \sloppy
+% over a whole appendix buys that with visibly loose interword spacing on
+% ordinary prose. \emergencystretch is only drawn on when a paragraph would
+% otherwise overfull, so normal paragraphs set normally.
+\setlength{\emergencystretch}{2em}
 
 \section{Repository layout}
 
