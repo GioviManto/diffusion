@@ -38,19 +38,36 @@ for d in "${DOCS[@]}"; do
     for ext in sty cls bst clo; do
         cp "$d"/*."$ext" "$b"/ 2>/dev/null || true
     done
-    [ -d "$d/chapters" ] && cp -R "$d/chapters" "$b"/
+    if [ -d "$d/chapters" ]; then
+        cp -R "$d/chapters" "$b"/
+        rm -rf "$b/chapters/_superseded"       # archived drafts, not part of the document
+    fi
 
-    # everything it reaches through ../shared/, brought alongside
-    cp -R shared/figures "$b"/figures
-    cp -R shared/sections "$b"/sections
-    cp    shared/notation.tex   "$b"/notation.tex
-    cp    shared/references.bib "$b"/references.bib
+    # Only what this document actually references. Copying all of shared/ was
+    # padding the uploads badly -- the workshop note reaches one figure and
+    # shipped twenty, plus twenty .png copies of them that no \includegraphics
+    # ever names, plus every generated section belonging to the other three
+    # documents. Overleaf caps a project at 180 files, so the padding was not
+    # free.
+    mkdir -p "$b/figures" "$b/sections"
+    python3 - "$b" shared <<'PY'
+import re, shutil, sys, pathlib
+bundle, shared = pathlib.Path(sys.argv[1]), pathlib.Path(sys.argv[2])
+text = "\n".join(p.read_text() for p in bundle.rglob("*.tex"))
+for name in set(re.findall(r"includegraphics\[[^\]]*\]\{([^}]+)\}", text)):
+    src = shared / "figures" / pathlib.Path(name).name
+    if src.exists():
+        shutil.copy2(src, bundle / "figures" / src.name)
+for name in set(re.findall(r"\\input\{\.\./shared/sections/([^}]+)\}", text)):
+    src = (shared / "sections" / name).with_suffix(".tex")
+    if src.exists():
+        shutil.copy2(src, bundle / "sections" / src.name)
+PY
+    cp shared/notation.tex   "$b"/notation.tex
+    cp shared/references.bib "$b"/references.bib
 
-    # exploratory/ is not referenced by any document; it only bloats the upload
-    rm -rf "$b/figures/exploratory"
-
-    # the per-folder bib copy the repo carries for the old scheme, if present
-    rm -f "$b/references.bib.orig"
+    # READMEs describe the repository layout, which the bundle does not have
+    find "$b" -name 'README.md' -delete
 
     # rewrite every parent-directory reference. Order matters: the longest
     # prefixes first, so ../shared/figures/ is not half-rewritten by the
@@ -63,12 +80,19 @@ for d in "${DOCS[@]}"; do
         s{\.\./shared/}{}g;
     '
 
-    # Nothing may still point outside the bundle. The lookbehind matters:
-    # the paper's appendix typesets elided paths like exp_01_.../grid.csv, and
-    # a plain ../ search reports every one of them as a parent reference.
-    if grep -rnP '(?<!\.)\.\./' "$b" --include='*.tex' >/dev/null 2>&1; then
+    # Nothing may still point outside the bundle.
+    #
+    # The lookbehind matters: the paper's appendix typesets elided paths like
+    # exp_01_.../grid.csv, and a plain ../ search reports every one of them.
+    # This is perl and not `grep -P` because it has to run under whichever grep
+    # the script's shell resolves -- BSD grep has no -P, so the check errored
+    # out, the `if` read false, and the guard silently passed everything for as
+    # long as it existed. A guard that cannot fail is not a guard.
+    stray=$(find "$b" -name '*.tex' -print0 \
+            | xargs -0 perl -ne 'print "$ARGV:$.: $_" if m{(?<!\.)\.\./}')
+    if [ -n "$stray" ]; then
         echo "  $d: REFUSING -- a parent-directory reference survived:" >&2
-        grep -rnP '(?<!\.)\.\./' "$b" --include='*.tex' | sed 's/^/      /' >&2
+        sed 's/^/      /' >&2 <<<"$stray"
         exit 1
     fi
 
@@ -103,18 +127,11 @@ for d in "${DOCS[@]}"; do
     printf '  %-12s %-24s %5s pp  %s\n' "$d" "$OUT/$d.zip" "$pages" "$(du -sh "$b" | cut -f1 | tr -d ' ')"
 done
 
-# One archive carrying all four, as sibling self-contained folders. This is the
-# answer to "can I just upload the whole thing": not overleaf/ as it stands,
-# because of the ../shared/ bibliography, but this, which is the same four
-# bundles already proven to compile standing alone. Overleaf's main-document
-# selector then switches between them. The figures are duplicated four times,
-# which costs a few megabytes and buys independence from how Overleaf resolves
-# a relative path.
-( cd "$OUT" && zip -qr all.zip thesis paper workshop compendium )
+# Deliberately no combined archive. One Overleaf project per document is what
+# gets shared and commented on separately, and a fifth zip containing copies of
+# the other four is exactly the kind of near-duplicate that gets uploaded by
+# mistake. Each document is its own project.
 
 echo
-echo "  all four        $OUT/all.zip            $(du -sh "$OUT/all.zip" | cut -f1 | tr -d ' ')"
-echo
-echo "Overleaf: New Project -> Upload Project."
-echo "  one document   -> upload/<doc>.zip,  main.tex is already the main file"
-echo "  all four       -> upload/all.zip,    then Menu -> Main document to switch"
+echo "Overleaf: New Project -> Upload Project -> upload/<doc>.zip"
+echo "main.tex is already the main document in each; nothing to configure."
