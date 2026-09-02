@@ -110,20 +110,20 @@ $\Nd(1, D_r/\kappa)$.
 \subsection{One trajectory is one data point}
 
 The trajectory is sampled at internal times $u_k = k h$ for
-$k = 0, \dots, K-1$, and the complete datum is the stacked vector
+$k = 0, \dots, L-1$, and the complete datum is the stacked vector
 \begin{equation}
-  a = (a_0, a_1, \dots, a_{K-1}) \in \R^{2K} .
+  a = (a_0, a_1, \dots, a_{L-1}) \in \R^{2L} .
   \label{eq:ring-datum}
 \end{equation}
-The $K$ frames are correlated coordinates of one data point, not $K$ samples.
+The $L$ frames are correlated coordinates of one data point, not $L$ samples.
 Relative to Chapter~\ref{ch:gaussian} the only change of setting is that each
-frame is now two-dimensional, so the score has $K$ blocks of size two rather
-than $K$ scalar components; the forward channel is unchanged,
+frame is now two-dimensional, so the score has $L$ blocks of size two rather
+than $L$ scalar components; the forward channel is unchanged,
 \begin{equation}
-  x = e^{-t} a + \sqrt{\Deltat}\, \xi , \qquad \xi \sim \Nd(0, I_{2K}) ,
+  x = e^{-t} a + \sqrt{\Deltat}\, \xi , \qquad \xi \sim \Nd(0, I_{2L}) ,
   \label{eq:ring-channel}
 \end{equation}
-which is the channel of Section~\ref{sec:ou} acting on all $2K$ coordinates at
+which is the channel of Section~\ref{sec:ou} acting on all $2L$ coordinates at
 once. Figure~\ref{fig:ring-model} shows the model and the two clocks: internal
 time orders the frames along the path, diffusion time corrupts them
 simultaneously.
@@ -131,7 +131,7 @@ simultaneously.
 \begin{figure}[t]\centering
 \includegraphics[width=\linewidth]{fig_ring_model.pdf}
 \caption[The rotating-ring model and its trajectories]{The rotating-ring model, at the parameters used throughout this
-chapter ($K = 20$, $\kappa = 2$, $D_r = 0.015$, $D_\theta = 0.005$,
+chapter ($L = 20$, $\kappa = 2$, $D_r = 0.015$, $D_\theta = 0.005$,
 $\omega = 1$, $h = 2\pi/20$). (a) Polar coordinates and the moving frame
 \eqref{eq:ring-moving-frame}. (b) The potential \eqref{eq:ring-potential} and
 the force \eqref{eq:ring-force} it generates; the force changes sign at
@@ -207,7 +207,7 @@ innovation in \eqref{eq:ring-sur-dynamics} and the channel
 \begin{lemma}[Gauge reduction]\label{lem:ring-gauge}
 Define the de-rotated frame $y_k = R_{-k\psi} z_k$ and stack the per-frame
 rotations into
-$U_\psi = \mathrm{diag}(I_2, R_{-\psi}, \dots, R_{-(K-1)\psi})$. Then
+$U_\psi = \mathrm{diag}(I_2, R_{-\psi}, \dots, R_{-(L-1)\psi})$. Then
 \begin{equation}
   y_{k+1} = y_k + \sigma \widetilde\eta_{k+1} ,
   \qquad \widetilde\eta_{k+1} \stackrel{\text{iid}}{\sim} \Nd(0, I_2) ,
@@ -242,7 +242,7 @@ frames.
 \caption[The rotation as a gauge, before and after]{The rotation and the gauge. (a) $R_\psi$ turns every vector through
 the same angle without changing its length, which is the statement
 $R_\psi^{\T}R_\psi = I_2$. (b) Three surrogate trajectories in the laboratory
-frame ($K = 14$, $\sigma = 0.16$, $\psi = 2\pi/14$; the marked point is
+frame ($L = 14$, $\sigma = 0.16$, $\psi = 2\pi/14$; the marked point is
 $k = 0$), coherently circulating. (c) The same trajectories after $U_\psi$: a
 random walk anchored on the ring. Because $U_\psi$ is orthogonal the reduction
 is exact at every diffusion time; the numerical round trip agrees to machine
@@ -271,7 +271,7 @@ $\E[y_i \,|\, A = \alpha] = \alpha$ and
 since $\E[\widetilde\eta_r \widetilde\eta_s^{\T}] = \delta_{rs} I_2$ leaves only
 the $\min(i,j)$ indices common to both sums. Compactly,
 $y \,|\, A = \alpha \sim \Nd(\mathbf{1} \otimes \alpha,\ G \otimes I_2)$
-with $G_{ij} = \sigma^2\min(i,j)$, where $\mathbf 1 \in \R^K$ is the
+with $G_{ij} = \sigma^2\min(i,j)$, where $\mathbf 1 \in \R^L$ is the
 all-ones vector. The two Kronecker products separate the temporal index from
 the spatial one: $\mathbf 1 \otimes \alpha$ repeats the same two-dimensional
 anchor in every frame, and
@@ -279,12 +279,12 @@ $(G \otimes I_2)_{(i,\alpha'),(j,\beta')}
 = G_{ij}\,\delta_{\alpha'\beta'}$, so $G$ carries all the temporal
 correlation while $I_2$ states that the two spatial coordinates are
 uncorrelated and share the same temporal covariance. Applying the channel and
-using $I_{2K} = I_K \otimes I_2$ to combine the covariances,
+using $I_{2L} = I_L \otimes I_2$ to combine the covariances,
 \begin{equation}
   x \,|\, A = \alpha
   \ \sim\ \Nd\big(e^{-t}\,\mathbf 1 \otimes \alpha,\ C_t \otimes I_2\big),
   \qquad
-  C_t = e^{-2t}G + \Deltat\, I_K ,
+  C_t = e^{-2t}G + \Deltat\, I_L ,
   \label{eq:ring-Ct}
 \end{equation}
 in which $C_t$ does not depend on $\alpha$: the noised law is a two-parameter
@@ -313,7 +313,7 @@ and the score and response blocks are
 Appendix~\ref{app:ring}.
 \end{proof}
 
-The $2K$-dimensional integral over clean trajectories has collapsed to a
+The $2L$-dimensional integral over clean trajectories has collapsed to a
 two-dimensional posterior over the shared anchor, which is the whole
 simplification and a direct consequence of \eqref{eq:ring-unrolled}. Its two
 moments are cheap: the prior and the $\norm{\alpha}^2$ term are rotationally
@@ -611,7 +611,7 @@ Paired sample-level controls: one-frame law invariant to $\psi$ below the
 Recovery of the confining potential $(\lambda, r_*)$
   & not reported here (defines the control, see
     \S\ref{sec:ring-estimation}) \\
-Behaviour in $K$, and inference of the phase rather than its use
+Behaviour in $L$, and inference of the phase rather than its use
   & open \\
 \bottomrule
 \end{tabular}
@@ -622,7 +622,7 @@ Behaviour in $K$, and inference of the phase rather than its use
 \begin{enumerate}
   \item \textbf{One parameter set for the geometry.} The ring width, walk noise
   and trajectory length are held at a single baseline. Only the noise level and
-  the data budget are swept, and nothing is claimed about scaling in $K$.
+  the data budget are swept, and nothing is claimed about scaling in $L$.
   \item \textbf{Radius positivity.} The radial process is formally supported on
   all of $\R$. At the baseline the probability of a negative radius is
   negligible, but a strict model would reflect at the origin or use a positive
@@ -643,7 +643,7 @@ Behaviour in $K$, and inference of the phase rather than its use
   chapter depends on it.
 \end{enumerate}
 
-The immediate extensions are to vary $K$ systematically, to infer the angular
+The immediate extensions are to vary $L$ systematically, to infer the angular
 
 phase rather than use an oracle basis, to add an unknown rotation class, and to
 test whether a time-dependent local architecture with receptive field

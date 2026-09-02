@@ -82,7 +82,7 @@ For a Gaussian posterior, the fixed-point condition for the means is the
 same linear system $J m = h$ under mean field, BP, and AMP. All three
 schemes hence return the exact posterior mean and, via the
 score--posterior identity, the same exact joint score, for every
-$(K, \alpha, t)$, regardless of whether their variance closures are
+$(L, \alpha, t)$, regardless of whether their variance closures are
 accurate or even solvable.
 \end{theorem}
 
@@ -178,7 +178,7 @@ and slightly overestimates the variance, as predicted by
 
 \begin{figure}[t]\centering
 \includegraphics[width=\linewidth]{fig_bp_vs_amp.pdf}
-\caption[BP against AMP: mean, variance, and the existence boundary]{BP against AMP on a finite chain ($K = 9$, $\alpha = 0.8$).
+\caption[BP against AMP: mean, variance, and the existence boundary]{BP against AMP on a finite chain ($L = 9$, $\alpha = 0.8$).
 Left: the AMP mean error (about $10^{-12}$, flat in $t$:
 Theorem~\ref{thm:bp-same-score}) against the AMP variance error, which
 grows with $t$ up to the breakdown time $t_c$ (dotted line). Right: the
@@ -191,7 +191,7 @@ $180$ points of this plane.}
 \label{fig:bp-vs-amp}
 \end{figure}
 
-Numerically, on a $K = 12$ chain at $\alpha = 0.8$: the AMP score error
+Numerically, on an $L = 12$ chain at $\alpha = 0.8$: the AMP score error
 stays at $10^{-13}$--$10^{-12}$ for every $t$, while the variance error
 is $1.3 \times 10^{-4}$ at $t = 0.05$, $3.5 \times 10^{-2}$ at $t = 0.2$,
 and past $t \approx 0.23$ the variance update has no positive fixed point

@@ -16,6 +16,64 @@ log-density of progressively noised data,
   \score(x, t) \;=\; \nabla_x \log p_t(x),
   \label{eq:intro-score}
 \end{equation}
+\begin{figure}[t]\centering
+\begin{tikzpicture}[
+  latent/.style={circle, draw, minimum size=6.4mm, inner sep=0pt, font=\small},
+  obs/.style={circle, draw, fill=black!12, minimum size=6.4mm, inner sep=0pt, font=\small},
+  fac/.style={rectangle, draw, fill=black, minimum size=1.8mm, inner sep=0pt},
+  box/.style={rectangle, draw, rounded corners=1.6pt, align=center,
+              inner sep=3.6pt, font=\small, text width=45mm},
+  lbl/.style={font=\small},
+  >={Stealth}, scale=0.95, every node/.style={transform shape}]
+
+% ---- clean chain -----------------------------------------------------
+\foreach \i in {0,1,2,3}{ \node[latent] (a\i) at (1.5*\i, 0) {$a_{\i}$}; }
+\foreach \i/\j in {0/1,1/2,2/3}{
+  \node[fac] (k\i) at (1.5*\i+0.75, 0) {};
+  \draw (a\i) -- (k\i) -- (a\j);
+}
+\node[lbl, left=2.5mm of a0, align=right] {clean\\chain};
+\node[lbl, above=0.6mm of k1] {$\kernel(a_{k}\mid a_{k-1})$};
+
+% ---- channel ---------------------------------------------------------
+\foreach \i in {0,1,2,3}{
+  \node[obs] (x\i) at (1.5*\i, -1.75) {$x_{\i}$};
+  \draw[->, thick] (a\i) -- (x\i);
+}
+\node[lbl, left=2.5mm of x0, align=right] {noised\\at time $t$};
+\node[lbl] at (2.25,-2.75) {$x_k = e^{-t}a_k + \sqrt{\Deltat}\,\varepsilon_k$};
+
+% ---- the two routes and the object they compute ----------------------
+\coordinate (j) at (6.1,-1.75);
+\node[box] (bp)    at (9.3, 0.15) {exact inference\\[1pt]
+  {\footnotesize BP, and EM--BP when $\kernel$ is unknown}};
+\node[box] (net)   at (9.3,-3.65) {trained network\\[1pt]
+  {\footnotesize denoising score matching}};
+\node[box] (score) at (9.3,-1.75) {joint score\\[1pt] $\nabla_x \log p_t(x)$};
+
+\draw[thick] (x3) -- (j);
+\draw[->, thick] (j) |- (bp.west);
+\draw[->, thick] (j) |- (net.west);
+\draw[->, thick] (j) -- (score.west);
+\draw[->, thick] (bp.south)  -- (score.north);
+\draw[->, thick] (net.north) -- (score.south);
+\node[lbl, right=2mm of score, align=left, font=\footnotesize]
+  {compared at\\equal data};
+\end{tikzpicture}
+\caption[What this thesis computes, and the comparison it makes]{The object of
+the thesis and the two ways it is obtained. A Markov chain generates a clean
+trajectory; the Ornstein--Uhlenbeck channel corrupts every coordinate
+independently, so each observation attaches to the latent chain on its own and
+the posterior stays a chain. That is what makes the joint score exactly
+computable by message passing --- with the transition kernel known
+(Chapters~\ref{ch:gaussian} and~\ref{ch:laplace}), or estimated from noised
+sequences alone when it is not (Chapter~\ref{ch:em-method}). The same score is
+what a denoising-score-matching network is trained to approximate without being
+given the chain structure. Chapter~\ref{ch:em-results} measures what supplying
+that structure is worth, at equal training data, and where it stops paying.}
+\label{fig:thesis-pipeline}
+\end{figure}
+
 which is the one object a model must learn in order to reverse a noising
 process: given the forward process, its schedule and its terminal law, the score
 determines the reverse drift \citep{anderson1982reverse}. In
@@ -38,7 +96,7 @@ formulas.
 This thesis works inside that programme, in a direction that is natural
 for data with \emph{temporal or sequential structure}: the data are not
 a cloud of independent points but a \emph{trajectory}
-$a_0, a_1, \dots, a_{K-1}$ of a Markov process, the prototype of a
+$a_0, a_1, \dots, a_{\nsites-1}$ of a Markov process, the prototype of a
 video, a time series, or any dynamic object. Each frame of the
 trajectory is corrupted independently by an Ornstein--Uhlenbeck (OU)
 channel, and the object of study is the \emph{joint} score of the whole

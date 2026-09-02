@@ -8,12 +8,12 @@ and the matrix-inversion identities used throughout the thesis.
 \label{sec:gauss-vectors}
 
 \begin{definition}[Multivariate Gaussian]\label{def:gaussian}
-A random vector $a \in \R^K$ is Gaussian with mean $m$ and (positive
+A random vector $a \in \R^L$ is Gaussian with mean $m$ and (positive
 definite) covariance $\Sigma$, written $a \sim \Nd(m, \Sigma)$, if its
 density is
 \begin{equation}
   \Nd(a;\, m, \Sigma)
-  \;=\; \frac{1}{(2\pi)^{K/2} \sqrt{\det \Sigma}}
+  \;=\; \frac{1}{(2\pi)^{L/2} \sqrt{\det \Sigma}}
   \exp\!\Big[ -\tfrac{1}{2} (a - m)^\T \Sigma^{-1} (a - m) \Big] .
   \label{eq:gauss-density}
 \end{equation}
@@ -74,8 +74,8 @@ linear-algebra facts the research chapters use constantly.
 
 \begin{theorem}[Spectral theorem for symmetric matrices]
 \label{thm:spectral}
-Every symmetric $A \in \R^{K \times K}$ has an orthonormal basis of
-eigenvectors: $A = U \operatorname{diag}(\omega_1, \dots, \omega_K)
+Every symmetric $A \in \R^{L \times L}$ has an orthonormal basis of
+eigenvectors: $A = U \operatorname{diag}(\omega_1, \dots, \omega_L)
 U^\T$ with $U^\T U = I$ and real eigenvalues $\omega_i$.
 \end{theorem}
 
@@ -94,7 +94,7 @@ level simultaneously. Third, for the symmetric
 Toeplitz covariances produced by stationary processes
 (Section~\ref{sec:stationarity}), the eigenvectors are asymptotically the
 Fourier modes of the sequence \citep{brockwell1991time}: stationary
-Gaussian problems decouple, in the large-$K$ limit, into independent
+Gaussian problems decouple, in the large-$L$ limit, into independent
 scalar problems per frequency.
 
 Inversion, when the inverse is not wanted eigenvalue by eigenvalue, has

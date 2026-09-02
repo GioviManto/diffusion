@@ -126,6 +126,42 @@ iterated, define \emph{loopy} BP, which is extraordinarily useful but
 approximate \citep{weiss2001correctness, malioutov2006walk}; none of that
 is needed in this thesis, because our graphs are trees.
 
+\begin{figure}[t]\centering
+\begin{tikzpicture}[
+  latent/.style={circle, draw, minimum size=7mm, inner sep=1pt},
+  obs/.style={circle, draw, fill=black!10, minimum size=7mm, inner sep=1pt},
+  fac/.style={rectangle, draw, fill=black, minimum size=2.2mm, inner sep=0pt},
+  node distance=9mm, scale=0.92, every node/.style={transform shape}]
+\foreach \i in {1,2,3,4}{
+  \node[latent] (a\i) at (2.1*\i, 0) {$a_{\i}$};
+  \node[fac] (f\i) at (2.1*\i, -1.0) {};
+  \node[obs] (x\i) at (2.1*\i, -2.0) {$x_{\i}$};
+  \draw (a\i) -- (f\i) -- (x\i);
+}
+\foreach \i/\j in {1/2,2/3,3/4}{
+  \node[fac] (w\i) at (2.1*\i+1.05, 0) {};
+  \draw (a\i) -- (w\i) -- (a\j);
+}
+\node[above=1mm of w1] {\small $\kernel(a_{k}\mid a_{k-1})$};
+\node[right=2mm of f4] {\small $\like(x_k\mid a_k)$};
+\draw[-{Stealth}, thick] (1.15,1.35) -- (2.55,1.35) node[midway,above] {\small $\lmsg$};
+\draw[-{Stealth}, thick] (9.35,1.35) -- (7.95,1.35) node[midway,above] {\small $\rmsg$};
+\end{tikzpicture}
+\caption[Posterior factor graph of a noised Markov chain]{The posterior factor
+graph of a Markov chain observed through the coordinatewise channel. Open
+circles are latent variables, shaded circles observations, squares factors. Each
+transition factor $\kernel(a_k \mid a_{k-1})$ joins two adjacent latent
+variables; each observation enters through a \emph{unary} factor attached to a
+single latent variable, because the channel corrupts every coordinate
+independently. Conditioning therefore reweights node potentials without creating
+any edge among the $a_k$, so the posterior graph is still a chain and
+Theorem~\ref{thm:tree-exact} applies to it. Arrows show the two message sweeps
+of \eqref{eq:bp-rules}. The construction fails as soon as the forward noise is
+correlated across coordinates: the likelihood then touches several $a_k$ at
+once and the graph acquires edges.}
+\label{fig:posterior-factor-graph}
+\end{figure}
+
 \paragraph{The representation problem.} For \emph{discrete} variables
 each message is a finite probability vector and each update in
 \eqref{eq:bp-rules} is finite arithmetic. For \emph{continuous} variables

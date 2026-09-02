@@ -13,13 +13,13 @@ compendium rather than in this document.
 
 Standard diffusion models generate \emph{static} objects; the data of
 interest here are \emph{dynamic}, a data point being a sequence of frames
-indexed by an internal time $u = 0, 1, \dots, K-1$ --- a video, a rotating
+indexed by an internal time $u = 0, 1, \dots, L-1$ --- a video, a rotating
 shape, a stochastic trajectory. Two times therefore appear from the outset,
 and keeping them apart is a permanent discipline of this thesis: the
 \emph{internal} time $u$ of the sequence, and the \emph{diffusion} time $t$
 of the noising channel, which acts independently on every frame.
 
-It is tempting to treat such a trajectory as $K$ separate samples, computing
+It is tempting to treat such a trajectory as $L$ separate samples, computing
 each frame's noisy marginal score independently. In the Gaussian model that
 carries most of this thesis, that is not merely lossy --- it is empty.
 
@@ -72,11 +72,11 @@ every one-frame marginal, under that model's rotational symmetry.
 
 A sequence is \emph{one} sample from a joint law, and the quantity that
 drives the reverse dynamics is the joint score of the whole noisy trajectory,
-the gradient of $\log P_t(x_0, \dots, x_{K-1})$, whose $k$-th component is a
+the gradient of $\log P_t(x_0, \dots, x_{L-1})$, whose $k$-th component is a
 conditional expectation over the \emph{full} posterior of the clean frames,
 as in \eqref{eq:tweedie-joint}. That is the object in which the temporal
 structure lives. Chapter~\ref{ch:gaussian} exhibits the contrast in closed form
-at $K = 2$.
+at $L = 2$.
 
 This also settles the shape of the structural question. One might hope that
 consecutive frame-blocks of the score are related by a fixed map, a
@@ -85,7 +85,7 @@ consecutive frame-blocks of the score are related by a fixed map, a
   \score_{:,u}(x, t) \;\approx\; \mathcal{P}_t\big( \score_{:,u-1}(x, t) \big),
   \label{eq:dev-propagator}
 \end{equation}
-so that a learning system could hold one block and one map instead of $K$
+so that a learning system could hold one block and one map instead of $L$
 blocks. What the joint view shows is that the structure worth studying is not
 a map between per-frame scores at all, but the coupling pattern of the joint
 score --- a statement about a matrix in the Gaussian case, and about a
@@ -96,7 +96,7 @@ exactly what a per-frame treatment throws away.
 
 \begin{figure}[t]\centering
 \includegraphics[width=\linewidth]{fig_toymodel_score.pdf}
-\caption[The coupling made visible at $K=2$]{The coupling made visible, in the smallest case where it exists:
+\caption[The coupling made visible at $L=2$]{The coupling made visible, in the smallest case where it exists:
 $x_1 = x_0 + c + \eta$ with a trimodal Gaussian-mixture prior on $x_0$, drift
 $c = 1$, innovation standard deviation $\sigma = 0.45$, after diffusion time
 $t = 0.15$. Left: the noised joint density $p_t(x_0, x_1)$. Right: the joint

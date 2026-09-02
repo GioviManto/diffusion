@@ -11,7 +11,7 @@ kinked at the origin, yet log-concave and analytically tractable, it is a
 minimal step outside the Gaussian family, so every deviation we find is
 attributable to non-Gaussianity alone. The chapter first establishes what
 remains exact (the score--posterior identity, the tree structure, one
-boundary integral, and a differential characterisation of the $K=1$
+boundary integral, and a differential characterisation of the $L=1$
 marginal), then locates precisely where closed forms stop, and finally
 measures, against a validated numerical reference, what a Gaussian
 message family costs.
@@ -25,7 +25,7 @@ second-order structure fixed:
   a_0 \sim \Nd(0,1), \qquad
   a_k = \alpha\, a_{k-1} + \varepsilon_k, \qquad
   \varepsilon_k \sim \mathrm{Laplace}(0, b) \ \text{i.i.d.}, \qquad
-  k = 1,\dots,K-1 ,
+  k = 1,\dots,L-1 ,
   \label{eq:l-chain-prior}
 \end{equation}
 observed through the same per-frame OU channel. The innovation scale is
@@ -54,7 +54,7 @@ precise.
 
 \section{One frame: the score becomes nonlinear}\label{sec:l-K1}
 
-For $K = 1$ there is no chain; the model isolates the ingredient
+For $L = 1$ there is no chain; the model isolates the ingredient
 ``non-Gaussian prior meets Gaussian channel''. Let
 $a \sim \mathrm{Laplace}(0, b)$, $p_0(a) = e^{-|a|/b}/2b$, and write
 $\mu := e^{-t}$. The noised marginal is the convolution
@@ -85,7 +85,7 @@ $(b, t, x)$, at the truncation floor of the finite difference.
 
 \begin{figure}[t]\centering
 \includegraphics[width=\linewidth]{fig_laplace_k1.pdf}
-\caption[One-frame Laplace density and score across the schedule]{The Laplace $K=1$ problem ($b = 1$). Left: noised marginal
+\caption[One-frame Laplace density and score across the schedule]{The Laplace $L=1$ problem ($b = 1$). Left: noised marginal
 $p_t^{(1)}$ at increasing diffusion times, from the kinked Laplace prior
 (dotted) to the Gaussian attractor (dashed). Right: the score at the same
 times; the dashed line is the attractor $-x$. The nonlinearity lives near
@@ -180,7 +180,7 @@ likelihood, the joint score is, componentwise,
 with the messages of Proposition~\ref{prop:bp-convA}.
 \end{theorem}
 
-This is a complexity statement: the $K$-dimensional posterior integral is
+This is a complexity statement: the $L$-dimensional posterior integral is
 replaced by two one-dimensional message recursions plus one
 one-dimensional integral per frame. Computational locality survives
 non-Gaussianity; what does not survive is the collapse of those
@@ -195,7 +195,7 @@ and OU evidence $\Nd(x'; \mu a', \Deltat)$,
   \;=\; p_t^{(1)}\big( x' - \mu\alpha\, a \big) :
   \label{eq:l-onestep}
 \end{equation}
-the first backward message of the chain is the $K = 1$ noised marginal
+the first backward message of the chain is the $L = 1$ noised marginal
 evaluated at a shifted argument.
 \end{proposition}
 
@@ -203,7 +203,7 @@ The proof is the innovation substitution $r := a' - \alpha a$, which
 turns the transition into the bare Laplace density at $r$ and the
 evidence into $\Nd(x' - \mu\alpha a;\, \mu r,\, \Deltat)$; the integral
 is then the definition \eqref{eq:l-pt1}. The shift $\mu\alpha a$ is what
-frame $a$ predicts for the next noisy observation, and the whole $K = 1$
+frame $a$ predicts for the next noisy observation, and the whole $L = 1$
 analysis, screened Poisson equation included, recycles as the chain's
 boundary building block.
 
@@ -227,9 +227,9 @@ artefact of the frame basis. In innovation coordinates $r_0 = a_0$,
 $r_k = a_k - \alpha a_{k-1}$ (unit Jacobian), the prior factorises into
 independent variables --- $r_0$ Gaussian and $r_{k\geq1}$ i.i.d.\
 Laplace --- but the likelihood becomes
-$p(x|r) \propto \exp(-\tfrac{\mu^2}{2\Deltat} r^\T L^\T L r
-+ \tfrac{\mu}{\Deltat} x^\T L r)$ with $L$ the unit lower-triangular
-map $a = Lr$, and $L^\T L$ is dense. The coupling does not disappear; it
+$p(x|r) \propto \exp(-\tfrac{\mu^2}{2\Deltat} r^\T B^\T B r
++ \tfrac{\mu}{\Deltat} x^\T B r)$ with $B$ the unit lower-triangular
+map $a = Br$, and $B^\T B$ is dense. The coupling does not disappear; it
 migrates from the prior to the likelihood. There is no basis in which
 both are diagonal at once.
 
@@ -259,7 +259,7 @@ reference score; outside it no claim is made.
 Three pairs are worth fixing before the numerical sections use them. The grid
 resolution is $\ngrid$ and the number of training \emph{sequences} is $\nseq$;
 they are independent, and every configuration states both. The chain length is
-$K$ and its internal index is $u$, never $t$, which is reserved for diffusion
+$L$ and its internal index is $u$, never $t$, which is reserved for diffusion
 time throughout. And $q$ always means the geometric decay rate $q(\alpha,t)$
 of Section~\ref{sec:g-bulk}; the innovation variance is $\ivar$, never $q$.
 The companion paper writes the sequence count $M$ where this thesis writes
@@ -434,7 +434,7 @@ with $t$ reflects the tilted posteriors becoming Gaussian --- consistent with
 the data, but not separated here from the attenuation of the Tweedie
 prefactor.
 Not concluded: closed forms for general (non-boundary) messages at
-$K \geq 2$; any locality law for the non-Gaussian score beyond the
+$L \geq 2$; any locality law for the non-Gaussian score beyond the
 structural delimitation above; and any statement about learned scores. No
-low-rank structure is asserted for the Laplace $K = 2$ posterior Hessian: it
+low-rank structure is asserted for the Laplace $L = 2$ posterior Hessian: it
 holds only in a narrow regime.
