@@ -343,7 +343,7 @@ Table~\ref{tab:l-closure} reports the median relative score error of the
 Gaussian closure on the Laplace chain:
 \begin{center}
 \begin{minipage}{\linewidth}\centering
-\captionof{table}[Gaussian-message error on the Laplace chain]{The Gaussian-message approximation against validated grid BP on the Laplace chain ($\alpha = 0.85$, $K = 32$, $60$ trials per $t$, reference $\ngrid = 801$). By Theorem~\ref{thm:l-lmmse} the first row is the price of discarding everything beyond second moments, not the error of one particular implementation. The second row is the share of trials exceeding $10\%$ relative error, which reaches zero an order of magnitude in $t$ before the median does.}
+\captionof{table}[Gaussian-message error on the Laplace chain]{The Gaussian-message approximation against validated grid BP on the Laplace chain ($\alpha = 0.85$, $\nsites = 32$, $60$ trials per $t$, reference $\ngrid = 801$). By Theorem~\ref{thm:l-lmmse} the first row is the price of discarding everything beyond second moments, not the error of one particular implementation. The second row is the share of trials exceeding $10\%$ relative error, which reaches zero an order of magnitude in $t$ before the median does.}
 \label{tab:l-closure}
 \begin{tabular}{@{}lccccc@{}}
 \toprule
@@ -385,7 +385,7 @@ theorems.
 \begin{figure}[t]\centering
 \includegraphics[width=0.74\linewidth]{fig_laplace_closure.pdf}
 \caption[Gaussian-closure score error against grid BP]{Gaussian-closure score error on the Laplace chain
-($\alpha = 0.85$, $K = 32$, $60$ trials per $t$; median and 10--90\%
+($\alpha = 0.85$, $\nsites = 32$, $60$ trials per $t$; median and 10--90\%
 band) against the grid error budget measured on identical data. The
 closure error exceeds the reference error by $10^4$ to $10^7$ at every
 $t$, so the measurement is trustworthy where it is used.}

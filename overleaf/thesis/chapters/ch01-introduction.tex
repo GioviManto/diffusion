@@ -216,90 +216,75 @@ main line rather than on it.
 
 \section{Contributions}
 
-\noindent Seven contributions follow, in the order the thesis presents them
-rather than the order in which the work matured. The first four concern scores
-under known dynamics, the next two the learning of dynamics that are unknown,
-and the last is a self-contained side result.
+\noindent This thesis makes four principal contributions, stated here in the
+order the body develops them.
 
 \begin{enumerate}
-  \item For the stationary Gaussian AR(1) chain under OU corruption, we
-  derive the joint score in closed form, diagonalise it for all
-  diffusion times in a single eigenbasis, and characterise the evolution
-  of its coupling structure: a band-fill law
-  $(\Qt)_{i,i+d} = (-1)^{d-1}(2t)^{d-1}(\Qz^d)_{i,i+d} + O(t^d)$ for
-  small $t$, a return to isotropy at rate $e^{-2t}$, and exact bulk
-  formulas for the posterior variance and the geometric decay rate
-  $q(\alpha, t)$ of posterior correlations, each verified numerically
-  (Chapter~\ref{ch:gaussian}).
+  \item \textbf{Exact scores for a noised Gaussian Markov chain.}
+  For the stationary Gaussian AR(1) chain under coordinatewise OU corruption we
+  derive the joint score in closed form, diagonalise it for all diffusion times
+  in a single eigenbasis, and characterise how its coupling structure changes
+  with $t$: a band-fill law
+  $(\Qt)_{i,i+d} = (-1)^{d-1}(2t)^{d-1}(\Qz^d)_{i,i+d} + O(t^d)$ at small $t$,
+  a return to isotropy at rate $e^{-2t}$, and exact bulk formulas for the
+  posterior variance and for the geometric decay rate $q(\alpha,t)$ of posterior
+  correlations. We show that belief propagation on the chain's factor graph is
+  exactly the Kalman filter followed by Rauch--Tung--Striebel smoothing, update
+  by update, and that it reproduces the matrix score to double-precision
+  rounding. We prove that the influence of evidence at distance $d$ decays as
+  $q(\alpha,t)^d$, and separately \emph{measure} that the radius-$r$ windowed
+  estimator's error decays at the same rate over $r = 2,\dots,13$ --- separately,
+  because windowing changes the boundary conditions of the recursion in a way
+  the influence-coefficient argument does not cover (Chapter~\ref{ch:gaussian}).
 
-  \item We derive the belief-propagation computation of the same score
-  on the chain's factor graph, show algebraically that Gaussian messages
-  are closed under the updates, identify the resulting recursion, update
-  by update, with the Kalman filter and the Rauch--Tung--Striebel
-  smoother, and verify that it reproduces the matrix score to within
-  double-precision rounding across a parameter grid
-  (Chapter~\ref{ch:gaussian}).
+  \item \textbf{A controlled non-Gaussian reference, and an exact reading of
+  Gaussian message closure.} For Laplace innovations, functional belief
+  propagation remains exact on the chain, but its messages no longer close in a
+  finite-dimensional family. We construct a numerically validated quadrature
+  reference and prove that moment-projected Gaussian messages return exactly the
+  LMMSE estimator of the covariance-matched Gaussian model, and the same
+  estimator for every innovation law sharing the first two moments
+  (Theorem~\ref{thm:l-lmmse}). The measured gap is therefore the price of
+  discarding everything beyond second moments, not the error of one
+  implementation: a median relative score error of $0.24$ at $t = 0.05$, below
+  $10^{-2}$ by $t \approx 1$ and below $10^{-3}$ by $t \approx 2.1$, with
+  direction recovered more accurately than magnitude (Chapter~\ref{ch:laplace}).
 
-  \item For Laplace-innovation chains we establish which identities
-  remain exact, locate the precise step at which closed forms stop, and
-  \emph{identify} what the Gaussian-message approximation computes: moment
-  projection applied inside the recursion returns exactly the LMMSE estimator
-  of the covariance-matched Gaussian model, and the same estimator for every
-  innovation law sharing the first two moments
-  (Theorem~\ref{thm:l-lmmse}). The measured gap between it and grid BP is
-  therefore not the error of one particular approximation but the price of
-  discarding everything beyond second moments. Against a numerically
-  validated grid implementation of the functional recursion, that price is a
-  median relative score error of $0.24$ at $t = 0.05$, falling below
-  $10^{-2}$ by $t \approx 1$ and below $10^{-3}$ by $t \approx 2.1$, with the
-  score direction substantially more accurate than its magnitude, in the
-  tested regimes (Chapter~\ref{ch:laplace}).
+  \item \textbf{Learning an unknown transition from noised sequences.}
+  We drop the assumption that the transition law is known. Fisher's identity
+  turns one forward--backward pass into the exact gradient of the marginal
+  log-likelihood, with no differentiation through the recursion; the E-step is
+  structurally exact for any innovation law, while the implementation uses
+  controlled grid quadrature and a generalised M-step. The convergence
+  experiments separate the mixture label's own latent-variable difficulty from
+  the additional missing information the observation channel introduces, and
+  measure the consequence: the fitted innovation shape settles at a median of
+  $\convshapemed$ updates against $\convrhomed$ for the correlation, so a
+  stopping rule read off the correlation trace certifies a kernel that has not
+  converged in the coordinate every non-Gaussian claim depends on
+  (Chapter~\ref{ch:em-method}).
 
-  \item In the Gaussian model we prove that the influence of evidence at
-  distance $d$ on the posterior mean decays exactly as $q(\alpha,t)^d$, and we
-  \emph{measure} that the error of the radius-$r$ windowed score estimator
-  decays at the same geometric rate over $r = 2,\dots,13$. The two are
-  separate claims: windowing changes the boundary conditions of the recursion
-  in a way the exact influence-coefficient argument does not cover, so the
-  second is a numerical law over the tested range rather than a corollary of
-  the first. We also measure that truncating the inference (windowed message
-  passing) is more accurate than truncating the score matrix (banding) at small
-  diffusion times (Chapter~\ref{ch:gaussian}).
-
-  \item We drop the assumption, held everywhere above, that the transition law
-  is known, and estimate it from noised sequences alone. Fisher's identity turns
-  one complete forward--backward pass into the exact gradient of the marginal
-  log-likelihood, with no differentiation through the recursion, so both
-  gradient ascent and a generalised M-step are available; the E-step is
-  structurally exact for any innovation law. Two facts about \emph{what it costs
-  to run} follow, and they are measurements rather than folklore: the fitted
-  innovation shape settles at a median of $\convshapemed$ updates against
-  $\convrhomed$ for the correlation coefficient, so a stopping rule read off the
-  correlation trace certifies a kernel that has not converged in the coordinate
-  every non-Gaussian claim depends on (Chapter~\ref{ch:em-method}).
-
-  \item We measure what supplying that structure is worth, against neural
-  denoisers trained by denoising score matching on identical data and given none
-  of it. At equal training-set size the structured estimator attains
-  $\ratiolo$--$\ratiohi\times$ lower pointwise denoising error than an
-  unstructured network across \nsizesused{} sizes; against a weight-shared
-  window head, itself selected by a screen over three architectures on disjoint
-  seeds, the advantage is $\structratiolo$--$\structratiohi\times$. Two
-  boundaries of that advantage are mapped rather than asserted: mixture capacity
-  beyond a single Gaussian innovation buys nothing for this estimator, and a
-  chain-structured estimator absorbs a rank-one violation of the Markov
-  assumption while failing on a long-range one by a coupling strength of roughly
-  one tenth (Chapter~\ref{ch:em-results}).
-
-  \item As a separate, self-contained result, we characterise the
-  per-node (AMP/TAP) closure on the same model: it returns the exact
-  score but a different posterior variance, with an existence boundary
-  in closed form, a breakdown time $t_c(\alpha)$, and a critical
-  coupling $\alpha_c = \sqrt{2} - 1$. All formulas are independently
-  re-verified; the material is placed in Appendix~\ref{app:amp} because
-  it branches off the main line (statement of results in
-  Section~\ref{sec:conclusions-amp}).
+  \item \textbf{The measured value and limits of supplied Markov structure.}
+  At equal training-set size, EM--BP attains $\ratiolo$--$\ratiohi\times$ lower
+  pointwise denoising error than an unstructured network across
+  \nsizesused{} sizes, and $\structratiolo$--$\structratiohi\times$ lower error
+  than a weight-shared window head selected by a screen over three
+  architectures on disjoint seeds. Controlled experiments then delimit that
+  advantage under finite-grid mixture capacity and under two departures from
+  the Markov assumption. All of these conclusions are restricted to the stated
+  numerical and statistical protocols (Chapter~\ref{ch:em-results}).
 \end{enumerate}
+
+\noindent Two further results sit alongside the main line rather than inside it.
+The rotating-ring model of Chapter~\ref{ch:ring} extends the state at each site
+from a scalar to a point on a circle and gives an exactly interpretable example
+in which a dynamical parameter is absent from every one-frame marginal yet
+identifiable from the trajectory. The per-node AMP/TAP closure on the Gaussian
+chain, developed in Appendix~\ref{app:amp}, returns the exact score but a
+different posterior variance, with an existence boundary in closed form, a
+breakdown time $t_c(\alpha)$, and a critical coupling
+$\alpha_c = \sqrt{2} - 1$ (statement of results in
+Section~\ref{sec:conclusions-amp}).
 
 \section{Methodology}\label{sec:method}
 
