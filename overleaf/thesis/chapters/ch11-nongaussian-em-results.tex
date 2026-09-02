@@ -162,6 +162,27 @@ confirmatory experiment below therefore compares EM--BP with the
 best-performing candidate in that screen. That scoping is carried in every
 claim that follows.
 
+\begin{figure}[t]\centering
+\includegraphics[width=\linewidth]{fig_value_of_structure.pdf}
+\caption[What supplying the chain is worth, against two baselines]{The two
+comparisons together. \emph{Left}: relative score error against training-set
+size for EM--BP and a network given no locality prior, with one standard error
+over the $\structseeds$ seeds. \emph{Right}: the paired per-seed ratio of
+window-head risk to EM--BP risk, against a baseline that \emph{does} have
+locality and weight sharing, with the break-even line drawn. The left gap is
+the headline $\ratiolo$--$\ratiohi\times$; the right one is
+$\structratiolo$--$\structratiohi\times$, and the difference between the two
+panels is how much of the headline margin does not survive supplying those two
+structural biases. Both ratios grow across the tested sizes. That is a
+description of four measured sizes, not a mechanism: different statistical
+rates and different optimisation limits produce the same signature, and no
+design here separates architecture, parameter sharing, capacity and
+optimisation, which change together when the baseline is swapped. Drawn from
+the same certified cells as Tables~\ref{tab:pointwise}
+and~\ref{tab:structured}.}
+\label{fig:em-value-of-structure}
+\end{figure}
+
 \input{../shared/sections/tab-structured}
 
 A ratio against a fully connected network is not comparable to this one: a

@@ -117,6 +117,7 @@ def read(path: Path) -> list[dict]:
 ADMITTED = {
     "fig_closure_vs_t",
     "fig_sample_efficiency",
+    "fig_value_of_structure",
     "fig_toymodel_score",
     "fig_capacity",
     "fig_nonmarkov",
@@ -271,6 +272,100 @@ def fig_sample_efficiency() -> None:
     save(fig, "fig_sample_efficiency")
     print(f"  fig_sample_efficiency: {len(seeds)} seeds, sizes {sizes}, "
           f"{len(rows)} cells (certified)")
+
+
+def fig_value_of_structure() -> None:
+    """The chapter's principal empirical figure: what supplying the chain buys.
+
+    Two panels, because the headline number alone is misleading. The left panel
+    is the gap against a network given no locality prior at all. The right is
+    the gap that remains once locality and weight sharing ARE supplied, through
+    the window head the screen selected -- the same comparison, against a
+    baseline that already has most of what the estimator has.
+
+    Reading them together is the point. The left gap is large and the right one
+    is small, and a reader shown only the left would attribute all of it to the
+    Markov model. Neither panel identifies a causal decomposition: architecture,
+    parameter sharing, capacity and optimisation all change when the baseline is
+    swapped. What the pair shows is how much of the headline margin survives
+    supplying the two structural biases that are easiest to supply.
+
+    Both panels read the same certified directories as the tables they sit
+    beside -- exp_07 for the left, exp_31's merged confirm for the right -- with
+    the same seed-first aggregation, so figure and table cannot drift apart.
+    """
+    import glob
+
+    fig, ax = plt.subplots(1, 2, figsize=(6.6, 2.7))
+
+    # ---- left: against a network with no locality prior -----------------
+    rows = []
+    for pattern in ("frozen/exp_07_certified_seed*/sample_efficiency_val.csv",
+                    "frozen/exp_07_n4096_seed*/sample_efficiency_val.csv"):
+        files = sorted(glob.glob(str(OUT / pattern)))
+        if not files:
+            raise SystemExit(f"fig_value_of_structure: no certified output at {pattern}")
+        for f in files:
+            seed = f.split("seed")[1].split("/")[0]
+            with open(f) as fh:
+                for r in csv.DictReader(fh):
+                    r["seed"] = seed
+                    rows.append(r)
+    rows = [r for r in rows if "em_resolved" not in r or int(r["em_resolved"])]
+    seeds = sorted({r["seed"] for r in rows}, key=int)
+    sizes = sorted({int(r["n_chains"]) for r in rows})
+
+    def per_seed(n, key):
+        g = [r for r in rows if int(r["n_chains"]) == n]
+        v = np.array([np.mean([float(r[key]) for r in g if r["seed"] == s])
+                      for s in seeds])
+        return v.mean(), v.std(ddof=1) / np.sqrt(v.size)
+
+    for key, style, label in (
+            ("em_bp_score_rel_l2", "em_bp", "EM\u2013BP"),
+            ("net_score_rel_l2_selected", "mlp", "network, no locality prior")):
+        m, se = zip(*(per_seed(n, key) for n in sizes))
+        st = dict(STYLE[style]); st["label"] = label
+        ax[0].errorbar(sizes, m, yerr=se, capsize=2, **st)
+    ax[0].set_xscale("log", base=2); ax[0].set_yscale("log")
+    ax[0].set_xlabel("training sequences")
+    ax[0].set_ylabel("relative score error")
+    ax[0].set_title("against an unstructured network")
+    ax[0].legend()
+
+    # ---- right: against the screened, locality-respecting baseline -------
+    conf = read(Path("frozen/exp_31_confirm_merged/confirm.csv"))
+    cseeds = sorted({r["seed"] for r in conf}, key=int)
+    csizes = sorted({int(r["n_chains"]) for r in conf})
+
+    def risks(n, method, region="all"):
+        out = []
+        for s in cseeds:
+            v = [float(r["risk"]) for r in conf if r["seed"] == s
+                 and int(r["n_chains"]) == n and r["method"] == method
+                 and r["region"] == region]
+            assert len(v) == 1, (s, n, method, v)
+            out.append(v[0])
+        return np.array(out)
+
+    m, se = [], []
+    for n in csizes:                      # paired per seed: both arms share a fit
+        v = risks(n, "window") / risks(n, "em_bp")
+        m.append(v.mean()); se.append(v.std(ddof=1) / np.sqrt(v.size))
+    st = dict(STYLE["cnn"]); st["label"] = "window head / EM\u2013BP"
+    ax[1].errorbar(csizes, m, yerr=se, capsize=2, **st)
+    ax[1].axhline(1.0, color="#222222", lw=1.0, ls="--", zorder=1)
+    ax[1].annotate("equal error", xy=(csizes[0], 1.0), xytext=(2, 4),
+                   textcoords="offset points", fontsize=8.5, color="#222222")
+    ax[1].set_xscale("log", base=2)
+    ax[1].set_xlabel("training sequences")
+    ax[1].set_ylabel("error ratio")
+    ax[1].set_title("against a locality-respecting baseline")
+    ax[1].legend()
+
+    save(fig, "fig_value_of_structure")
+    print(f"  fig_value_of_structure: left {len(seeds)} seeds sizes {sizes}; "
+          f"right {len(cseeds)} seeds sizes {csizes} (certified)")
 
 
 # ---------------------------------------------------------------------------
@@ -917,6 +1012,7 @@ FIGURES = {
     "fig_closure": fig_closure,
     "fig_ring": fig_ring,
     "fig_sample_efficiency": fig_sample_efficiency,
+    "fig_value_of_structure": fig_value_of_structure,
     "fig_toymodel_score": fig_toymodel_score,
     "fig_capacity": fig_capacity,
     "fig_nonmarkov": fig_nonmarkov,
