@@ -1,574 +1,201 @@
-\chapter{From Stationary Action to Generative Diffusion}
-\label{ch:statmech}\label{ch:background}\label{ch:stochproc}\label{ch:diffusion}
+\chapter{Background and Positioning}
+\label{ch:background}
 
-This chapter builds, in one arc, the background the thesis needs: a variational
-principle, the statistical mechanics that grew out of it, the stochastic
-processes that turn it into an algorithm, and the diffusion models that are the
-subject of the work. It is deliberately a narrative rather than a development.
-Every derivation it states is carried out in full in
-\compendium{}, which is unbounded in length; the body's job is the thread
-connecting them.
+This chapter fixes the four objects the rest of the thesis manipulates: the
+Markov sequence that generates the data, the Ornstein--Uhlenbeck channel that
+corrupts it, the time reversal that makes generation possible, and the identity
+that turns the reversal's one unknown term into a posterior expectation. It
+closes by stating what the surrounding literature settles and what it leaves
+open.
 
-A recurring technique organises the chapter, though it should not be
-mistaken for a single theorem. A physical trajectory is a stationary point of
-the action (\S\ref{sec:action}); an equilibrium distribution is a stationary
-point of the free energy; a diffusion model is
-trained by making a variational bound stationary
-; and the transition kernel of
-Chapter~\ref{ch:em-method} is estimated by making a likelihood stationary.
-These are four different variational problems over four different objects, and
-nothing here claims they are instances of one result --- what they share is a
-method of derivation, which is the reason the same calculus recurs throughout
-this thesis.
+The treatment is deliberately compressed. Every result below is standard, and
+each is derived in full in \compendium{}: the variational calculus and the
+statistical mechanics from which these models descend, the integrating-factor
+solution of the Ornstein--Uhlenbeck equation, the Fokker--Planck route to the
+reverse drift, and an extended review of the solvable-diffusion literature.
+Nothing in the body depends on those derivations. The body depends only on the
+statements collected here.
 
-\section{The principle of stationary action}\label{sec:action}
+\section{Markov sequences}\label{sec:stationarity}\label{sec:markov}
 
-Mechanics can be built from a single variational statement, and it is worth
-starting there rather than with Hamilton's equations. The same statement ---
-\emph{a physical trajectory is a stationary point of a functional} --- returns
-three more times in this thesis: as the free-energy principle of
-thermodynamics, as the variational bound that trains a diffusion model
-(\S\ref{sec:diffusion-idea}), and as the maximum-likelihood problem solved by
-expectation--maximisation in Chapter~\ref{ch:em-method}. The objects change; the shape of the argument
-does not.
-
-Let a system be described by generalised coordinates $q(t)$, let the
-\emph{Lagrangian} $L(q,\dot q,t)$ be the difference between kinetic and
-potential energy, and define the \emph{action} of a path joining fixed
-endpoints,
-\begin{equation}
-  S[q] \;=\; \int_{t_1}^{t_2} L\big(q(t), \dot q(t), t\big)\,\dd t .
-  \label{eq:action}
-\end{equation}
-The action assigns one number to a whole path, and Hamilton's principle states
-that the path actually taken is a \emph{stationary point} of it: $\delta S = 0$
-for every smooth variation vanishing at the endpoints. Carrying out that
-variation gives the Euler--Lagrange equations, which for
-$L = \sum_i \tfrac12 m_i\dot q_i^2 - U(q)$ return Newton's second law. What
-generalises is not the equations but the move: dynamics derived from a scalar
-functional made stationary.
-
-\begin{remark}[Stationary, not minimal]
-It is usually called the principle of \emph{least} action, and that is slightly
-wrong. The physical path is stationary, not necessarily minimal --- it can be a
-saddle. The same caution applies everywhere the pattern recurs:
-expectation--maximisation converges to a stationary point of the likelihood, not
-to a global maximum (Chapter~\ref{ch:em-method}), and reading ``the algorithm
-converged'' as ``the algorithm found the best answer'' is a recurring source of
-false confidence.
-\end{remark}
-
-\section{From the Ising model to neural networks}\label{sec:ising}
-
-Everything so far holds for arbitrary $H$; the physics, and the difficulty,
-enters when the energy couples many degrees of freedom. The canonical example
-is the \emph{Ising model} \citep{ising1925beitrag}: binary spins
-$\sigma_i \in \{-1, +1\}$ on the nodes of a graph $G = (V, \mathcal{E})$, with
-\begin{equation}
-  H(\sigma) \;=\; -\sum_{(i,j) \in \mathcal{E}} J_{ij}\, \sigma_i \sigma_j
-  \;-\; \sum_{i \in V} h_i\, \sigma_i ,
-  \label{eq:ising}
-\end{equation}
-and the Gibbs distribution $p(\sigma) \propto e^{-\beta H(\sigma)}$. Three
-features of it shape the rest of the thesis.
-
-\emph{The partition function is the hard part.}
-$Z = \sum_\sigma e^{-\beta H(\sigma)}$ runs over $2^{|V|}$ configurations and is
-\#P-hard on general graphs; all of approximate inference exists because of that
-wall. On \emph{trees}, however, $Z$ and every marginal are computable exactly
-in linear time by the transfer-matrix recursion --- the same recursion
-Chapter~\ref{ch:graphs} presents as belief propagation. That tractable island
-is precisely where the research model of this thesis lives.
-
-\emph{Collective order emerges.} Beyond a critical $\beta$ the two-dimensional
-model magnetises spontaneously and the symmetric state splits into two ergodic
-components. The dynamical counterpart of that symmetry breaking --- a
-generation trajectory committing to one mode of a multimodal distribution ---
-is the \emph{speciation} phenomenon of diffusion models
-\citep{biroli2024dynamical, raya2023spontaneous}.
-
-\emph{Disorder creates complexity.}\label{sec:spinglass} Draw the $J_{ij}$ at
-random with both signs \citep{edwards1975theory, sherrington1975solvable} and
-transparency collapses: a triangle with two positive and one negative bond
-cannot satisfy all three, and the large-$N$ consequence of this
-\emph{frustration} is a free-energy landscape shattered into exponentially many
-valleys. Controlling it took a decade of replica and cavity theory
-\citep{mezard1987spin} and the Thouless--Anderson--Palmer equations
-\citep{thouless1977solution}, and earned Parisi the 2021 Nobel Prize. Two
-exports matter here: a language of rugged landscapes and metastable states,
-which machine learning speaks whenever it discusses loss surfaces; and a
-technology, since the cavity and TAP equations are recursions on \emph{local}
-quantities solving a \emph{global} inference problem, and are the direct
-ancestors of the message-passing algorithms \citep{mezard2009information,
-zdeborova2016statistical, krzakala2024statphys} that Chapter~\ref{ch:graphs}
-develops. That connection is historical descent, not analogy.
-
-\paragraph{Memory as a phase of matter.}\label{sec:hopfield}
-\citet{hopfield1982neural} wired $N$ neurons to $P$ patterns by the Hebb rule
-\citep{hebb1949organization}, giving \eqref{eq:ising} with
-$J_{ij} = N^{-1}\sum_\mu \xi_i^\mu \xi_j^\mu$, and aligned each neuron with its
-local field. Two lines of algebra show that dynamics descends $H$ at every flip,
-so every initial condition falls into an attractor and retrieval \emph{is} that
-fall. How many memories fit is a phase-transition question: for random patterns
-with $P = \alpha N$, retrieval survives only below $\alpha_c \approx 0.138$
-\citep{amit1985storing}, beyond which they are crushed into a glassy phase.
-Memory is a phase of matter here in the technical sense --- entered and left
-through sharp transitions. The 2024 Nobel Prize in Physics went to Hopfield and
-Hinton \citep{nobel2024physics}, recognising the lineage as physics rather than
-as physics-inspired.
-
-\paragraph{Learning enters.}\label{sec:boltzmann-machines} The Hopfield network
-stores what its designer wires into it; the decisive step was to make the
-couplings the unknowns. Run the dynamics stochastically at temperature
-$1/\beta$ and its stationary law is exactly the Gibbs measure of
-\eqref{eq:ising}. A \emph{Boltzmann machine} \citep{ackley1985learning} is that
-object run backwards --- find the $J$ making the Gibbs measure reproduce a
-dataset --- and gradient ascent on the log-likelihood gives a rule of striking
-symmetry,
-\begin{equation}
-  \frac{\partial}{\partial J_{ij}} \,\E_{\text{data}}\big[\log p(\sigma)\big]
-  \;=\; \beta\,\Big(
-  \underbrace{\langle \sigma_i \sigma_j \rangle_{\text{data}}}_{\text{positive phase}}
-  \;-\;
-  \underbrace{\langle \sigma_i \sigma_j \rangle_{\text{model}}}_{\text{negative phase}}
-  \Big),
-  \label{eq:bm-learning}
-\end{equation}
-which stops when model and data correlations agree. This is the
-maximum-entropy principle turned into an algorithm,
-and it contains the field's central obstruction in miniature: the positive
-phase is a cheap average over data, while the negative phase is an average over
-the model's Gibbs measure --- a partition-function computation, approachable
-only by sampling. Restricting the couplings to a
-bipartite visible/hidden graph \citep{smolensky1986information} makes each
-layer conditionally independent given the other and made training practical
-\citep{hinton2002training, hinton2006fast}. The lineage then split: the
-supervised branch scaled through backpropagation and convolutional networks
-\citep{rumelhart1986learning, krizhevsky2012imagenet, lecun2015deep} and left
-equilibrium physics behind, while the \emph{generative} branch --- the one this
-thesis lives in --- kept the Gibbsian core, in which a model is an energy,
-learning is moment matching, and sampling is dynamics.
-
-\section{The statistical mechanics of learning}\label{sec:statmech-learning}
-
-Physics also built the theory of these machines' behaviour.
-\citet{gardner1988space} showed that learning itself is an equilibrium problem:
-compute, by replica methods, the volume of coupling space compatible with a set
-of examples, and capacity and generalisation come out as thermodynamics in
-\emph{weight} space. That programme matured into the modern statistical physics
-of inference \citep{zdeborova2016statistical}, whose central lesson recurs
-throughout this thesis: high-dimensional inference problems have phases, and
-algorithms fail or succeed at sharp boundaries.
-
-Two strands frame the research questions directly. The first is algorithmic:
-\citet{mezard2017meanfield} derived the TAP equations of the Hopfield model,
-exhibited the equivalence between Hopfield networks and restricted Boltzmann
-machines, and showed retrieval can be organised as message passing --- the same
-machinery, transplanted from memories to diffusion scores, that the research
-chapters run. The second is dynamical: training undergoes phase transitions.
-Gradient descent in linear networks learns the singular modes of the data
-covariance in sequence \citep{saxe2014exact}; an RBM's weight matrix aligns
-with the data's principal components early in training
-\citep{decelle2017spectral}, and hidden units acquire compositional receptive
-fields through condensation transitions \citep{tubiana2017emergence}. The
-sharpest result in this line, \citet{bachtis2024cascade}, examined in
-Section~\ref{sec:cascade}, shows RBM training to be an entire \emph{cascade} of
-second-order transitions, one per learned feature. Learning, like memory, is a
-sequence of symmetry breakings.
-
-One caveat travels with all of this and is used later. A phase transition is a
-statement about the thermodynamic limit, so in the finite models of
-Chapters~\ref{ch:gaussian} to~\ref{ch:ring} a correlation length that grows
-until it reaches the system size and then stops is a finite-size ceiling, not a
-divergence.
-
-\section{What this thesis takes from physics}
-
-A \emph{complex system} is, operationally, a system whose macroscopic
-behaviour is not readable off its microscopic rules: interactions
-generate collective phenomena (order, phases, transitions, slow dynamics)
-that must be derived, not postulated. Statistical mechanics is the
-toolbox for that derivation, and after this chapter's story its objects
-map one-to-one onto the objects of modern generative modelling
-(Table~\ref{tab:statmech-dictionary}):
-\begin{center}
-\begin{minipage}{\linewidth}\centering
-\captionof{table}[Statistical mechanics and generative modelling, term by term]{The dictionary this chapter builds. Each row is an identification used somewhere in the thesis, not an analogy: the left column names the statistical-mechanical object and the right the generative-modelling one it is the same object as.}
-\label{tab:statmech-dictionary}
-\begin{tabular}{ll}
-\toprule
-\textbf{Statistical mechanics} & \textbf{Generative modelling} \\
-\midrule
-microstate $x$ & data point / latent configuration \\
-energy $H(x)$ & negative log-density $-\log p(x)$ (up to $Z$) \\
-Boltzmann distribution $e^{-\beta H}/Z$ & model distribution \\
-partition function $Z$ & normalising constant / evidence \\
-free energy $F$ & negative ELBO (up to constants) \\
-Hebbian couplings, attractors & stored memories, retrieval \\
-moment matching \eqref{eq:bm-learning} & maximum-likelihood training \\
-Langevin dynamics & sampling / reverse diffusion \\
-phase transition & feature condensation, speciation \\
-cavity / TAP equations & belief propagation / AMP \\
-\bottomrule
-\end{tabular}
-\end{minipage}
-\end{center}
-The next chapter supplies the probabilistic dynamics, Markov chains and
-their continuous-time limits, that turn the static ensembles of this
-chapter into processes that move probability around, which is what a
-diffusion model ultimately is.
-\section{Stochastic processes and stationarity}\label{sec:stationarity}
-
-A \emph{stochastic process} is a collection of random variables indexed
-by time, $(X_k)_{k \geq 0}$ in discrete time or $(X_t)_{t \geq 0}$ in
-continuous time, defined on a common probability space; equivalently, a
-probability law on the space of trajectories. Two notions of time
-homogeneity are used constantly in this thesis and are worth stating
-precisely \citep{brockwell1991time}.
+A \emph{stochastic process} is a collection of random variables indexed by
+time, $(X_k)_{k \geq 0}$ in discrete time or $(X_t)_{t \geq 0}$ in continuous
+time, defined on a common probability space. Two notions of time homogeneity
+are used constantly below and are worth separating precisely
+\citep{brockwell1991time}.
 
 \begin{definition}[Strict and weak stationarity]\label{def:stationarity}
-A process $(X_k)$ is \emph{strictly stationary} if all its
-finite-dimensional laws are invariant under time shifts: for every $n$,
-every set of indices $k_1, \dots, k_n$, and every shift $h$,
+A process $(X_k)$ is \emph{strictly stationary} if all its finite-dimensional
+laws are invariant under time shifts: for every $n$, every set of indices
+$k_1, \dots, k_n$, and every shift $h$,
 \begin{equation*}
   (X_{k_1}, \dots, X_{k_n})
   \;\stackrel{d}{=}\;
   (X_{k_1 + h}, \dots, X_{k_n + h}) .
 \end{equation*}
-It is \emph{weakly (second-order) stationary} if its mean is constant and
-its autocovariance depends only on the lag,
+It is \emph{weakly (second-order) stationary} if its mean is constant and its
+autocovariance depends only on the lag,
 $\operatorname{Cov}(X_k, X_{k+d}) = \gamma(d)$.
 \end{definition}
 
-Strict stationarity implies weak stationarity whenever second moments
-exist; for \emph{Gaussian} processes the two notions coincide, because a
-Gaussian law is determined by its first two moments. Stationarity has an
-immediate matrix consequence that the research chapters exploit: the
-covariance matrix of $K$ consecutive observations of a weakly stationary
-process, $(\Sigma)_{ij} = \gamma(i - j)$, is constant along diagonals, a
-symmetric \emph{Toeplitz} matrix. Whenever a covariance in this thesis is
-Toeplitz, stationarity is the reason.
-
-\section{Markov chains: kernels, stationarity, reversibility}
-\label{sec:markov}
+Strict stationarity implies weak stationarity whenever second moments exist,
+and for \emph{Gaussian} processes the two coincide, because a Gaussian law is
+determined by its first two moments. The distinction matters here because
+Chapter~\ref{ch:laplace} replaces the Gaussian innovation with a Laplace one,
+at which point the two notions separate and only the strict one is preserved by
+the construction. Stationarity also has a matrix consequence the research
+chapters exploit: the covariance of $L$ consecutive observations of a weakly
+stationary process, $(\Sigma)_{ij} = \gamma(i - j)$, is constant along
+diagonals, a symmetric \emph{Toeplitz} matrix. Wherever a covariance in this
+thesis is Toeplitz, stationarity is the reason.
 
 \begin{definition}[Markov chain]
-A sequence of random variables $(X_k)_{k \geq 0}$ with values in a state
-space $\mathcal{X}$ is a \emph{Markov chain} if for every $k$ and every
-measurable $A \subseteq \mathcal{X}$,
+A sequence of random variables $(X_k)_{k \geq 0}$ with values in a state space
+$\mathcal{X}$ is a \emph{Markov chain} if for every $k$ and every measurable
+$A \subseteq \mathcal{X}$,
 \begin{equation}
   \Prob\big(X_{k+1} \in A \,\big|\, X_k, X_{k-1}, \dots, X_0\big)
   \;=\; \Prob\big(X_{k+1} \in A \,\big|\, X_k\big) .
   \label{eq:markov-property}
 \end{equation}
+The conditional law is encoded by a \emph{transition kernel}
+$\kernel(x' \,|\, x)$: a density, or a matrix for discrete $\mathcal{X}$, with
+$\int \kernel(x'|x)\,\dd x' = 1$ for every $x$.
+\end{definition}
 
-\noindent The running example of this thesis is the scalar Gaussian
-autoregression of order one,
+\begin{example}[The Gaussian AR(1) chain]\label{ex:ar1}
+The running example of this thesis is the scalar Gaussian autoregression of
+order one,
 \begin{equation}
   a_{k+1} \;=\; \alpha\, a_k + \eta_k ,
   \qquad
   \eta_k \stackrel{\text{iid}}{\sim} \Nd(0, \ivar),
-  \qquad k = 0, \dots, K-2 ,
+  \qquad k = 0, \dots, L-2 ,
   \label{eq:ar1}
 \end{equation}
-whose transition kernel is $M(a' \mid a) = \Nd(a'; \alpha a, \ivar)$. Taking
+with transition kernel $\kernel(a' \mid a) = \Nd(a'; \alpha a, \ivar)$. Taking
 $\ivar = 1 - \alpha^2$ and $a_0 \sim \Nd(0,1)$ makes it stationary with unit
 marginal variance and autocovariance $\gamma(d) = \alpha^{|d|}$, so its
 covariance is Toeplitz for the reason just given. Every chapter from
-Chapter~\ref{ch:gaussian} onwards is about \eqref{eq:ar1}, its non-Gaussian
-variants, or what an estimator can recover of it through noise.
-The conditional law is encoded by a \emph{transition kernel}
-$M(x' \,|\, x)$: a density (or matrix, for discrete $\mathcal{X}$) with
-$\int M(x'|x)\,\dd x' = 1$ for every $x$.
-\end{definition}
+Chapter~\ref{ch:gaussian} onwards concerns \eqref{eq:ar1}, one of its
+non-Gaussian variants, or what an estimator can recover of it through noise.
+\end{example}
 
-The Markov property \eqref{eq:markov-property} is exactly a statement
-about \emph{factorisation}: the joint law of the first $K$ states is
+The Markov property \eqref{eq:markov-property} is exactly a statement about
+\emph{factorisation}: the joint law of the first $L$ states is
 \begin{equation}
-  p(x_0, x_1, \dots, x_{K-1})
-  \;=\; p_0(x_0)\, \prod_{k=0}^{K-2} M(x_{k+1} \,|\, x_k) .
+  p(x_0, x_1, \dots, x_{L-1})
+  \;=\; p_0(x_0)\, \prod_{k=0}^{L-2} \kernel(x_{k+1} \,|\, x_k) .
   \label{eq:chain-factorisation}
 \end{equation}
-This factorisation is the most heavily used equation of the thesis. It says that the joint distribution of a Markov trajectory is a
-product of \emph{local} terms, each touching two consecutive variables:
-the structure that makes the chain a tree in the factor-graph sense of
-Chapter~\ref{ch:graphs}, that makes its precision matrix tridiagonal in
-the Gaussian case of Chapter~\ref{ch:gaussian}, and that makes belief
-propagation exact.
+This is the most heavily used equation of the thesis. It says the joint
+distribution of a Markov trajectory is a product of \emph{local} terms, each
+touching two consecutive variables: the structure that makes the chain a tree
+in the factor-graph sense of Chapter~\ref{ch:graphs}, that makes its precision
+matrix tridiagonal in the Gaussian case of Chapter~\ref{ch:gaussian}, and that
+makes belief propagation exact. Marginals evolve by integrating the kernel,
+$p_{k+1}(x') = \int \kernel(x'|x)\, p_k(x)\,\dd x$, and a law $\pi$ with
+$\pi = \kernel \pi$ is \emph{stationary}: a chain started in $\pi$ remains in
+it, and its trajectory is then strictly stationary in the sense of
+Definition~\ref{def:stationarity}.
 
-Marginal distributions evolve by integrating the kernel:
-$p_{k+1}(x') = \int M(x'|x)\, p_k(x)\,\dd x$, compactly
-$p_{k+1} = M p_k$. A distribution $\pi$ is \emph{stationary} (invariant)
-for $M$ if $\pi = M\pi$; a chain started in $\pi$ stays in $\pi$ forever,
-and the trajectory is then a strictly stationary process in the sense of
-Definition~\ref{def:stationarity}. The kernel satisfies \emph{detailed
-balance} with respect to $\pi$ if
-\begin{equation}
-  \pi(x)\, M(x' \,|\, x) \;=\; \pi(x')\, M(x \,|\, x')
-  \qquad \text{for all } x, x' :
-  \label{eq:detailed-balance}
-\end{equation}
-the equilibrium probability flux from $x$ to $x'$ equals the reverse
-flux, so the chain, watched in equilibrium, is statistically
-indistinguishable run forwards or backwards. Detailed balance implies
-stationarity (integrate \eqref{eq:detailed-balance} over $x$), and its
-power is practical: it is a local, pointwise condition, checkable without
-computing any integral.
+One change of perspective sets up the research problem. Markov chains are
+classically studied as \emph{algorithms}, where the stationary law is the target
+and the trajectory a means to reach it. From Chapter~\ref{ch:gaussian} onwards
+the chain \eqref{eq:ar1} plays the opposite role: it is the
+\emph{data-generating process}, one trajectory $(a_0, \dots, a_{L-1})$ is one
+data point, and the object of interest is the law of the whole trajectory after
+every coordinate has been independently corrupted. The factorisation
+\eqref{eq:chain-factorisation} then stops being a computational convenience and
+becomes the structure to be recovered.
 
-Stationarity alone does not guarantee that the chain \emph{finds} $\pi$;
-for that one needs the chain to be able to reach everywhere
-(\emph{irreducibility}) without getting trapped in cycles
-(\emph{aperiodicity}). Under these conditions the fundamental convergence
-theorem holds \citep{robert2004monte}: the marginal law of $X_k$
-converges to $\pi$ from any initial condition, and time averages converge
-to expectations under $\pi$ (the ergodic theorem),
-\begin{equation}
-  \frac{1}{N} \sum_{k=1}^{N} f(X_k)
-  \;\xrightarrow[N \to \infty]{\text{a.s.}}\;
-  \E_\pi[f] .
-  \label{eq:ergodic}
-\end{equation}
-Equation \eqref{eq:ergodic} is the rigorous form of the ergodic postulate
-invoked above, with the physical dynamics
-replaced by an algorithmic one.
-
-\section{The Ornstein--Uhlenbeck process: the corruption channel}
-\label{sec:ou}
+\section{The Ornstein--Uhlenbeck corruption channel}\label{sec:ou}
 
 The noising process used by diffusion models, and by every result of this
 thesis, is the \emph{Ornstein--Uhlenbeck process}
-\citep{uhlenbeck1930theory}: Brownian motion pulled back to the origin by
-a linear spring,
+\citep{uhlenbeck1930theory}: Brownian motion pulled back to the origin by a
+linear spring,
 \begin{equation}
   \dd X_t \;=\; -X_t\,\dd t \;+\; \sqrt{2}\;\dd W_t ,
   \qquad X_0 = a .
   \label{eq:ou-sde}
 \end{equation}
-(The drift and diffusion constants are a normalisation choice, the
-variance-preserving convention of the diffusion literature
-\citep{song2021scorebased}; any other choice rescales time.) The OU
-process is the unique Gaussian, Markov, stationary process in continuous
-time, and it is exactly solvable.
-
-\begin{toolbox}{Exact solution of the OU SDE by integrating factor}
-Multiply \eqref{eq:ou-sde} by $e^{t}$ and consider $Y_t = e^{t} X_t$. By
-It\^o's lemma with $\phi(x,t) = e^{t}x$ (here
-$\partial^2 \phi/\partial x^2 = 0$, so no correction term arises):
-\begin{equation*}
-  \dd Y_t
-  = e^{t} X_t\,\dd t + e^{t}\big( -X_t\,\dd t + \sqrt{2}\,\dd W_t \big)
-  = \sqrt{2}\, e^{t}\, \dd W_t .
-\end{equation*}
-The drift cancels exactly; that is what the integrating factor is for.
-Integrate from $0$ to $t$ and undo the substitution:
-\begin{equation*}
-  X_t \;=\; a\, e^{-t} \;+\; \sqrt{2} \int_0^t e^{-(t-s)}\, \dd W_s .
-\end{equation*}
-The integral is Gaussian (limit of Gaussian sums), with mean zero and
-variance given by the It\^o isometry:
-\begin{equation*}
-  \operatorname{Var}(X_t)
-  = 2 \int_0^t e^{-2(t-s)}\, \dd s
-  = 2\, e^{-2t}\, \frac{e^{2t} - 1}{2}
-  = 1 - e^{-2t} .
-\end{equation*}
-Hence the \emph{transition kernel} of the OU channel is
-\begin{equation*}
-  p(x_t \,|\, X_0 = a)
-  \;=\; \Nd\!\big( x_t;\; a\,e^{-t},\; \Deltat \big),
-  \qquad
-  \boxed{\;\Deltat \;=\; 1 - e^{-2t}\;} .
-\end{equation*}
-\hfill$\square$
-\end{toolbox}
-
-The boxed kernel is used on every page of the research chapters, so we
-fix its reading now. Corrupting a data point $a$ for a time $t$ produces
+The drift and diffusion constants are the variance-preserving normalisation of
+the diffusion literature \citep{song2021scorebased}; any other choice rescales
+time. The process is the unique Gaussian, Markov, stationary process in
+continuous time, and it is exactly solvable. Solving \eqref{eq:ou-sde} by
+integrating factor --- the derivation is routine and is carried out in
+\compendium{} --- gives a Gaussian transition kernel,
+$p(x_t \mid X_0 = a) = \Nd(x_t;\, a e^{-t},\, \Deltat)$ with
+$\Deltat = 1 - e^{-2t}$. Corrupting a data point $a$ for a time $t$ therefore
+produces
 \begin{equation}
   x \;=\; a\, e^{-t} \;+\; \sqrt{\Deltat}\;\varepsilon,
   \qquad \varepsilon \sim \Nd(0, 1):
   \label{eq:ou-channel}
 \end{equation}
-the signal is \emph{contracted} by $e^{-t}$ while isotropic noise of
-variance $\Deltat$ fills in. At $t = 0$: $x = a$ (no corruption); as
-$t \to \infty$: $x \sim \Nd(0, 1)$ regardless of $a$ (all information
-destroyed, the equilibrium of the spring). The signal-to-noise ratio
-$e^{-2t}/\Deltat$ sweeps continuously from $\infty$ to $0$, and it
-diverges as $1/2t$ for small $t$, a factor that reappears throughout the
-thesis as an error amplifier. The OU channel interpolates between the
-data distribution and a standard Gaussian, which is precisely what a
-diffusion model needs.
+the signal is \emph{contracted} by $e^{-t}$ while isotropic noise of variance
+$\Deltat$ fills in. At $t = 0$ the channel is the identity; as $t \to \infty$,
+$x \sim \Nd(0,1)$ regardless of $a$. The signal-to-noise ratio
+$e^{-2t}/\Deltat$ sweeps continuously from $\infty$ to $0$ and diverges as
+$1/2t$ for small $t$, a factor that reappears throughout the thesis as an error
+amplifier. The channel interpolates between the data distribution and a
+standard Gaussian, which is what a diffusion model needs.
 
-Two structural remarks, both used repeatedly later. First, the OU kernel is
-Gaussian \emph{in $a$ as well as in $x$}: viewed as a function of the
-clean variable,
+Two structural remarks are used repeatedly later. First, the kernel is Gaussian
+\emph{in $a$ as well as in $x$}: read as a function of the clean variable,
 $\Nd(x; a e^{-t}, \Deltat) \propto
-\exp[-(e^{-2t}/2\Deltat)(a - x e^{t})^2]$, a Gaussian likelihood factor
-of precision $e^{-2t}/\Deltat$ centred at the deconvolved observation
-$e^t x$. This is the fact that makes the posteriors of
-Chapter~\ref{ch:gaussian} jointly Gaussian and the messages of the BP
-computation closable. Second, if a random vector
-$a \sim \Nd(\mu, \Sigma_0)$ is pushed through \eqref{eq:ou-channel}
-coordinate-wise with \emph{independent} noises, the output is Gaussian
-with
+\exp[-(e^{-2t}/2\Deltat)(a - x e^{t})^2]$, a Gaussian likelihood factor of
+precision $e^{-2t}/\Deltat$ centred at the deconvolved observation $e^t x$.
+This is what makes the posteriors of Chapter~\ref{ch:gaussian} jointly Gaussian
+and the belief-propagation messages closable in a finite-dimensional family.
+Second, if $a \sim \Nd(\mu, \Sigma_0)$ is pushed through \eqref{eq:ou-channel}
+coordinate-wise with \emph{independent} noises, the output is Gaussian with
 \begin{equation}
   \mu_t = e^{-t}\mu,
   \qquad
   \Sigt \;=\; e^{-2t}\, \Sigma_0 \;+\; \Deltat\, I ,
   \label{eq:ou-cov-map}
 \end{equation}
-since means and covariances transform linearly and the added noise is
-white. Equation \eqref{eq:ou-cov-map}, shrink the covariance and add a
-multiple of the identity, is the entire forward process of this thesis in
-one line.
+since means and covariances transform linearly and the added noise is white.
+Equation \eqref{eq:ou-cov-map} --- shrink the covariance, add a multiple of the
+identity --- is the entire forward process of this thesis in one line.
 
-\section{Time reversal: Anderson's theorem}\label{sec:reversal}
+\section{Reverse diffusion}\label{sec:reversal}
 
-One last piece of SDE theory converts everything above into a generative
-method. Suppose data $X_0 \sim p_0$ are corrupted by a forward SDE
+Suppose data $X_0 \sim p_0$ are corrupted by a forward SDE
 \begin{equation}
   \dd X_t \;=\; f(X_t, t)\,\dd t \;+\; g(t)\, \dd W_t
   \label{eq:generic-sde}
 \end{equation}
-up to time $T$, producing marginals $p_t$ whose evolution is governed by the
-Fokker--Planck equation
-\begin{equation}
-  \frac{\partial p_t}{\partial t}
-  \;=\; -\frac{\partial}{\partial x}\big( f\, p_t \big)
-  \;+\; \frac{g^2}{2}\, \frac{\partial^2 p_t}{\partial x^2} .
-  \label{eq:fokker-planck}
-\end{equation}
-The Ornstein--Uhlenbeck channel \eqref{eq:ou-sde} is the case
-$f = -x$, $g = \sqrt{2}$. Can the
-corruption be undone? Can we find an SDE which, run from $X_T \sim p_T$
-backwards, reproduces the same marginals? The answer
-\citep{anderson1982reverse} is yes, and the reverse drift needs exactly
-one unknown object:
+up to time $T$, producing marginals $p_t$; the Ornstein--Uhlenbeck channel
+\eqref{eq:ou-sde} is the case $f = -x$, $g = \sqrt{2}$. Can the corruption be
+undone --- is there an SDE which, run from $X_T \sim p_T$ backwards, reproduces
+the same marginals? The answer \citep{anderson1982reverse} is yes, and the
+reverse drift needs exactly one object that the forward process does not
+supply:
 \begin{equation}
   \dd X_t \;=\;
   \Big[ f(X_t, t) \;-\; g(t)^2\, \nabla_x \log p_t(X_t) \Big]\,\dd t
   \;+\; g(t)\, \dd \bar W_t ,
   \label{eq:reverse-sde}
 \end{equation}
-where time runs backwards from $T$ to $0$ and $\bar W$ is a reverse-time
-Wiener process. The correction to the drift is the \emph{score}
-$\nabla_x \log p_t$ of the noised marginal: the object defined in
-\eqref{eq:intro-score} and computed exactly, for Markov-chain data, in
-the research chapters. A heuristic that makes \eqref{eq:reverse-sde}
-plausible follows from the Fokker--Planck equation: rewriting its
-diffusion term as a transport term,
-\begin{equation*}
-  \frac{g^2}{2} \frac{\partial^2 p_t}{\partial x^2}
-  = \frac{\partial}{\partial x}\!\left(
-      \frac{g^2}{2}\, p_t\, \frac{\partial \log p_t}{\partial x}
-    \right),
-\end{equation*}
-one sees that the density evolution of \eqref{eq:generic-sde} is
-\emph{identical} to that of the noise-free ODE with velocity
-$f - \tfrac{g^2}{2} \nabla \log p_t$ (the \emph{probability-flow ODE} of
-\citealp{song2021scorebased}); running that transport backwards, and
-re-injecting noise consistently, yields \eqref{eq:reverse-sde}. The
-rigorous statement and proof are in \citet{anderson1982reverse}.
-
-\section{From algorithmic chains to data chains}
-
-A closing change of perspective, to set up the research problem. In this
-chapter Markov chains began as \emph{algorithms}: their stationary law
-was the target, their trajectory a means to an end. From
-Chapter~\ref{ch:gaussian} onwards the chain \eqref{eq:ar1} plays the
-opposite role: it is the \emph{data-generating process}, its trajectory
-$(a_0, \dots, a_{K-1})$ is one data point (a video of $K$ frames), and
-the object of interest is the probability law of the whole trajectory
-after each frame has been independently corrupted by the OU channel
-\eqref{eq:ou-channel}. The factorisation \eqref{eq:chain-factorisation}
-then stops being a computational convenience and becomes the structure to
-be discovered: the research programme of this thesis asks how much of
-\eqref{eq:chain-factorisation} survives noising, and how an inference
-algorithm, or a neural network, can exploit what survives. In one
-sentence: the OU channel destroys data at a known rate, the
-Fokker--Planck equation describes the destruction at the level of
-densities, and Anderson's theorem says the destruction is invertible by
-anyone who knows the score, which is why the rest of this thesis is about
-computing that score exactly when the data have Markov structure.
-\section{The diffusion idea}\label{sec:diffusion-idea}
-
-Diffusion models \citep{sohl2015deep, ho2020denoising,
-song2021scorebased} solve the generative problem with a two-process
-design inspired by non-equilibrium thermodynamics: a fixed \emph{forward
-process} gradually corrupts data into pure noise, and a learned
-\emph{reverse process} undoes the corruption step by step. A recent
-book-length survey of the family is \citet{lai2025principles}. The
-forward process used throughout this thesis is the OU channel of
-Section~\ref{sec:ou}: at diffusion time $t$,
-\begin{equation}
-  x_t \;=\; a\, e^{-t} + \sqrt{\Deltat}\;\varepsilon,
-  \qquad a \sim p_0,\quad \varepsilon \sim \Nd(0, I),
-  \qquad \Deltat = 1 - e^{-2t},
-  \label{eq:forward-marginal}
-\end{equation}
-so that the noised marginal is the convolution
-\begin{equation}
-  p_t(x) \;=\; \int p_0(a)\; \Nd\!\big(x;\, a e^{-t},\, \Deltat I\big)\,
-  \dd a .
-  \label{eq:pt-convolution}
-\end{equation}
-As $t$ grows, $p_t$ interpolates from the data distribution to
-$\Nd(0, I)$. By Anderson's theorem (Section~\ref{sec:reversal}), the
-corruption is undone by the reverse SDE \eqref{eq:reverse-sde}, whose
-only unknown ingredient is the score $\nabla_x \log p_t(x)$ of the noised
-marginals. Generative diffusion is therefore, at bottom, \emph{score
-estimation}: whoever knows $\nabla \log p_t$ for all $t$ can sample from
-$p_0$. Note what this design buys relative to
-an energy-based model: no energy is ever normalised, no equilibrium
-is ever awaited. The Markov-chain convergence problem of MCMC is replaced
-by a \emph{fixed-horizon} integration of an SDE whose drift is learned.
-The partition-function problem has not been solved; it has been
-side-stepped, by working only with objects (scores) from which $Z$ has
-already been differentiated away.
-
-\subsection{The thermodynamic reading, and the direction of the arrow}
-\label{sec:diffusion-thermo}
-
-The appeal to non-equilibrium thermodynamics in \citet{sohl2015deep} is
-structural rather than decorative. Their forward process is a chain of small
-perturbations converting a structured distribution into a simple one --- an
-annealing schedule. The objective they derive is then a variational bound of
-the same algebraic form as the work identities of non-equilibrium statistical
-mechanics: the log-likelihood is bounded by an average of log-ratios along the
-forward path, exactly as free-energy differences are bounded in Jarzynski-type
-equalities and estimated in annealed importance sampling. That analogy is what
-supplies the training objective, and it is the reason the field speaks of
-temperature, annealing and entropy at all.
-
-The direction of the forward process is fixed by the second law, which for the
-Fokker--Planck equation \eqref{eq:fokker-planck} takes an exact form. Let $p_t$
-evolve with a gradient drift and stationary law $p_\infty \propto e^{-V}$, and
-consider the free energy $\mathcal F[p_t] = \kl{p_t}{p_\infty}$, which is the
-mean energy minus the entropy up to a constant. Writing the dynamics as
-$\partial_t p = \nabla \cdot \big(p \nabla \log (p/p_\infty)\big)$ and
-integrating by parts,
-\begin{equation}
-  \frac{\dd \mathcal F}{\dd t}
-  = \int \partial_t p \, \log \frac{p}{p_\infty}
-  = -\int p \,\Big\| \nabla \log \frac{p}{p_\infty} \Big\|^2 \;\le\; 0 ,
-  \label{eq:h-theorem}
-\end{equation}
-with equality only at $p_t = p_\infty$. This is the H-theorem: the free energy
-decreases monotonically and the relative entropy is consumed at a rate given by
-a relative Fisher information. The forward channel therefore destroys
-information about the data monotonically and irreversibly, and
-\eqref{eq:h-theorem} identifies the rate. The reverse direction is not
-forbidden, but it is not free either: by Anderson's theorem it requires the
-score of the intermediate laws to be supplied from outside. The entire
-modelling effort of a diffusion model is the estimation of that one object, and
-Chapters~\ref{ch:gaussian} to~\ref{ch:ring} are concerned with what that object
-looks like when the data are trajectories.
+where time runs backwards from $T$ to $0$ and $\bar W$ is a reverse-time Wiener
+process. The correction to the drift is the \emph{score} $\nabla_x \log p_t$ of
+the noised marginal. The forward process and the terminal law $p_T$ are known by
+construction; the score is not, and estimating it is the entire modelling effort
+of a diffusion model \citep{sohl2015deep, ho2020denoising, song2021scorebased}.
+A Fokker--Planck argument making \eqref{eq:reverse-sde} plausible, together
+with the probability-flow ODE it produces, is given in \compendium{}; the
+rigorous statement is \citet{anderson1982reverse}. A recent book-length survey
+of the model family is \citet{lai2025principles}.
 
 \section{The score as a posterior expectation}\label{sec:tweedie}
 
-The middle line of Vincent's derivation deserves its own section,
-because every result of this thesis passes through it. Rearranging
-$\nabla \log p_t(x) = \E[-(x - a e^{-t})/\Deltat \mid x]$:
+Every result of this thesis passes through one rearrangement of the score.
+Writing the noised marginal as the convolution of $p_0$ with the Gaussian
+channel and differentiating under the integral
+\citep{vincent2011connection}:
 \begin{equation}
   \boxed{\;
   \nabla_x \log p_t(x)
@@ -580,200 +207,97 @@ $\nabla \log p_t(x) = \E[-(x - a e^{-t})/\Deltat \mid x]$:
   \label{eq:tweedie}
 \end{equation}
 We refer to \eqref{eq:tweedie} throughout as the \emph{score--posterior
-identity}; in the empirical-Bayes literature it is known as Tweedie's
-formula \citep{robbins1956empirical, miyasawa1961empirical,
-efron2011tweedie}. The score of the noisy marginal and the Bayes-optimal
-denoiser $\E[a|x]$ determine each other exactly, with no assumption
-whatsoever on $p_0$. Three readings will recur:
-\begin{enumerate}
-  \item \emph{Geometric}: the score points from $x$ towards (the
-  contracted image of) the posterior mean of the clean data; denoising
-  direction and score direction coincide.
-  \item \emph{Statistical}: estimating the score is solving a Bayesian
-  inference problem, namely computing a posterior expectation. The score
-  is not \emph{like} an inference target; it \emph{is} one.
-  \item \emph{Algorithmic}: for sequence data with a Markov prior, that
-  inference problem lives on a tree-shaped graph, so the score is
-  computable by message passing, the programme made precise in
-  Chapter~\ref{ch:graphs} and executed in Chapter~\ref{ch:gaussian}.
-\end{enumerate}
+identity}; in the empirical-Bayes literature it is Tweedie's formula
+\citep{robbins1956empirical, miyasawa1961empirical, efron2011tweedie}. The
+score of the noisy marginal and the Bayes-optimal denoiser $\E[a|x]$ determine
+each other exactly, with no assumption on $p_0$. Two readings recur. The score
+points from $x$ towards the contracted image of the posterior mean, so denoising
+direction and score direction coincide; and estimating the score \emph{is}
+solving a Bayesian inference problem, not merely an analogue of one. For
+sequence data with a Markov prior that inference problem lives on a tree, which
+is why it is computable by message passing --- the programme made precise in
+Chapter~\ref{ch:graphs} and executed in Chapter~\ref{ch:gaussian}.
 
-For \emph{vector-valued} data $a \in \R^K$ noised coordinate-wise,
+For \emph{vector-valued} data $a \in \R^{L}$ noised coordinate-wise,
 \eqref{eq:tweedie} holds componentwise with the \emph{full} posterior:
 \begin{equation}
   \big( \nabla_x \log p_t(x) \big)_k
-  \;=\; \frac{e^{-t}\, \E[\,a_k \,|\, x_0, \dots, x_{K-1}\,] - x_k}{\Deltat}.
+  \;=\; \frac{e^{-t}\, \E[\,a_k \,|\, x_0, \dots, x_{L-1}\,] - x_k}{\Deltat}.
   \label{eq:tweedie-joint}
 \end{equation}
-The conditioning is on \emph{all} coordinates: even though the noise is
-independent across frames, the posterior mean of frame $k$, and hence the
-$k$-th score component, depends on every observation, because the prior
-couples the frames. Equation \eqref{eq:tweedie-joint} is the precise
-reason the \emph{joint} score differs from the per-frame marginal score
-(Chapter~\ref{ch:development}); Chapter~\ref{ch:gaussian} quantifies
-exactly how much coupling the conditioning induces, as a function of $t$.
+The conditioning is on \emph{all} coordinates. Even though the noise is
+independent across frames, the posterior mean of frame $k$, and hence the $k$-th
+score component, depends on every observation, because the prior couples the
+frames. Equation \eqref{eq:tweedie-joint} is the precise reason the \emph{joint}
+score differs from the per-frame marginal score
+(Chapter~\ref{ch:development}), and Chapter~\ref{ch:gaussian} quantifies how
+much coupling the conditioning induces as a function of $t$.
 
-\section{The statistical physics of generative diffusion}
-\label{sec:statphys-diffusion}
+\section{Positioning}\label{sec:gap}\label{sec:related}
 
-A line of work initiated by Biroli, M\'ezard, and collaborators analyses
-diffusion models with the tools of \S\S\ref{sec:action}--\ref{sec:statmech-learning}, in the
-regime where the score is \emph{exact}: either computed from a solvable
-$p_0$ or from the empirical measure of $n$ training points. Because this
-is the literature our research extends, we review it in some detail.
+Five lines of work bound the problem this thesis addresses. Each is summarised
+at the level of what it settles; the extended discussion, paper by paper, is in
+\compendium{}.
 
-\paragraph{High dimensions and the cost of asymmetry.}
-\citet{biroli2023generative} analyse generative diffusion in the
-high-dimensional limit for two controlled data models, a Gaussian model
-and the Curie--Weiss ferromagnet. In the latter, the reverse dynamics
-undergoes the symmetry-breaking mechanism of Section~\ref{sec:ising}: at
-a critical diffusion time the trajectory commits to one of the two
-low-temperature states. Their sharpest quantitative point concerns data
-requirements: to reconstruct the \emph{relative weights} of two
-asymmetric modes, the number of training samples must be much larger than
-the data dimension, and the paper characterises the scaling laws in
-dimension and sample size for efficient generation.
+\paragraph{Solvable diffusion models and phase transitions.} Treating the
+reverse process as a stochastic dynamics on a high-dimensional energy landscape
+has produced an exact picture for tractable priors: Gaussian mixtures and
+random-energy targets exhibit sharp times at which the backward trajectory
+commits to a class \citep{biroli2023generative, biroli2024dynamical,
+raya2023spontaneous, achilli2026speciation}, and the sampling problem itself
+admits a hardness analysis \citep{ghio2024sampling, cui2025solvable}. These
+analyses fix the prior to a form with no internal sequential structure, so the
+noised law factorises over coordinates or couples them only through a
+low-dimensional latent.
 
-\paragraph{The three regimes of the backward dynamics.}
-\citet{biroli2024dynamical} study the backward process when the score has
-been trained optimally on $n$ samples in dimension $d$, and identify
-three dynamical regimes separated by two transitions. Starting from pure
-noise, the trajectory first behaves as a free (Brownian-like) process;
-at the \emph{speciation} time it commits to the gross structure of the
-data (a class, a mode), through a mechanism analogous to spontaneous
-symmetry breaking; at the later \emph{collapse} time the trajectory is
-attracted to an individual memorised training point, through a mechanism
-analogous to condensation in a glass. The speciation time is computable
-from a spectral analysis of the data correlation matrix, and the collapse
-time from an excess-entropy estimate; the dependence of the collapse time
-on $n$ and $d$ quantifies the curse of dimensionality for diffusion
-models. Related transition phenomena along the generation trajectory were
-exhibited by \citet{raya2023spontaneous}.
+\paragraph{Memorisation and generalisation.} A second strand asks when a
+diffusion model reproduces its training set rather than the law behind it, and
+locates the transition in the ratio of data to capacity
+\citep{achilli2024losing, bonnaire2025memorize, kadkhodaie2024generalization,
+favero2025bigger}. The mechanism is again characterised for priors without a
+time axis internal to the data point.
 
-\paragraph{Speciation with general class structure.}
-\citet{achilli2026speciation} develop the general theory of the
-speciation transition: where earlier analyses required classes separated
-by their first moments (Gaussian mixtures with distinct means), they
-characterise speciation times for arbitrary class structures through a
-free-entropy difference criterion, recovering the known Gaussian-mixture
-results and extending them to classes that differ only through
-higher-order or collective features, with successive speciation events
-for multiple classes. A hierarchical counterpart is
-\citet{sclocchi2025phase}: in a hierarchical generative model of data,
-the backward process started from time $t$ exhibits a phase transition at
-a threshold time at which the probability of preserving the high-level
-class drops abruptly, while low-level features evolve smoothly; beyond
-the transition a regenerated sample can retain low-level elements of the
-original image while its class has changed. \citet{sclocchi2025probing}
-turn that transition into an instrument: forward--backward experiments
-around the threshold expose the latent hierarchy of real text and image
-data, since the correlated blocks that change together grow as the
-transition is approached. \citet{favero2025compositional} follow the same
-hierarchy through training rather than through the schedule, finding that
-grammatical rules are acquired level by level, each needing more data
-than the one below, so compositional generalisation and creativity
-improve in stages. The statistical-physics treatment of generative
-diffusion in solvable models is developed at book length in the doctoral
-thesis of \citet{achilli2026thesis}.
+\paragraph{Filtering and smoothing in state-space models.} Recovering a latent
+Markov trajectory from noisy observations is classical: the Kalman filter
+\citep{kalman1960new} and the Rauch--Tung--Striebel smoother
+\citep{rauch1965maximum} solve it exactly in the linear-Gaussian case, and
+expectation--maximisation \citep{dempster1977maximum} learns the transition when
+it is unknown. This literature fixes the observation noise at a single level.
+The diffusion setting instead requires the whole family indexed by $t$, and it
+is the deformation across $t$, not the solution at any one $t$, that carries the
+information a score model needs.
 
-\paragraph{Memorisation and generalisation.} When the score is learned
-from finitely many samples rather than computed exactly, the question
-becomes when generation generalises and when it memorises.
-\citet{bonnaire2025memorize} identify two timescales in the training
-dynamics: an early time $\tau_{\mathrm{gen}}$ at which the model begins
-to generate high-quality samples, and a later time $\tau_{\mathrm{mem}}$
-beyond which memorisation of training data emerges;
-$\tau_{\mathrm{mem}}$ grows linearly with the training-set size $n$ while
-$\tau_{\mathrm{gen}}$ stays constant, opening a widening window in which
-overparameterised models generalise, a form of implicit dynamical
-regularisation. \citet{garnierbrun2026biased} refine the picture by
-identifying a phase of \emph{biased} generalisation in between: the test
-loss still decreases while the model increasingly favours samples
-anomalously close to training points, so the standard early-stopping
-criterion does not certify genuine novelty. \citet{ghio2024sampling} map
-generative samplers (flows, diffusions, autoregressive networks) onto
-statistical-physics sampling problems and delimit where each is
-efficient, importing the algorithmic-hardness picture of spin glasses
-\citep{zdeborova2016statistical}.
+\paragraph{Exact inference on trees, and what happens off them.} Belief
+propagation is exact on tree-shaped factor graphs \citep{pearl1988probabilistic,
+mezard2009information}. On a chain with continuous variables the messages are
+functions rather than vectors, and they close in a finite-dimensional family
+only for special priors; moment projection \citep{minka2001} is the standard
+response. What the projection costs, for a specific non-Gaussian chain, is not
+generally known in closed form.
 
-Three further readings of the same puzzle are worth separating, because
-they locate the explanation in three different objects.
-\citet{favero2025bigger} place it in the training dynamics, as
-\citet{bonnaire2025memorize} do, and show that the safe window widens
-with overparameterisation rather than closing --- bigger models are not
-straightforwardly more prone to memorising.
-\citet{kadkhodaie2024generalization} place it instead in the learned
-\emph{representation}: two denoisers trained on disjoint halves of a
-dataset converge to nearly the same function, and the inductive bias they
-share is a geometry-adaptive harmonic basis, which is a property of the
-architecture and not of the samples. \citet{achilli2024losing} place it
-in the geometry of the empirical score itself, reading memorisation off
-the eigenvalue spectrum of its Jacobian as a progressive collapse of
-dimensions, so that memorisation is directional rather than global. A
-solvable two-layer model in which the whole trajectory can be tracked
-asymptotically is given by \citet{cui2025solvable}.
+\paragraph{Networks as amortised inference.} Score networks are trained to
+approximate a posterior expectation, which invites reading their architecture as
+an inference procedure, and cascade-style analyses show structure being acquired
+in stages \citep{bachtis2024cascade, sclocchi2025phase, favero2025compositional,
+garnierbrun2026biased, zdeborova2016statistical}. The reading is suggestive
+rather than established, and the comparison between a network and the exact
+inference procedure for the same prior is rarely available, because the exact
+procedure is rarely computable.
 
-The common obstacle is stated most clearly by putting these side by
-side: each compares a trained network against a target that is itself
-unavailable in closed form, so the network's error and the difficulty of
-its target cannot be separated. This is exactly the separation that
-Chapter~\ref{ch:gaussian} onwards buys by choosing a data model whose
-exact score is computable.
+\medskip
 
-\paragraph{The exactly solvable programme, and what it holds fixed.} The
-common method of these works is to choose $p_0$ rich enough to be
-interesting and simple enough that $\nabla \log p_t$ is available in
-closed form, then study the exact generation dynamics. What none of them
-vary is the \emph{internal structure of a single data point}: their
-coordinates are exchangeable or i.i.d.\ conditional on a mode. There is
-no ordering and no dynamics \emph{inside} the sample. That axis is
-precisely where this thesis works.
-
-\section{Learning as a cascade of phase transitions}\label{sec:cascade}
-
-The works above put phase transitions on the \emph{sampling} side of
-generative modelling. A complementary result, \citet{bachtis2024cascade},
-which this section examines in detail, puts them on the \emph{training}
-side, and completes the argument of Section~\ref{sec:statmech-learning}
-that learning itself is a sequence of symmetry breakings. The object of
-study is the restricted Boltzmann machine of
-Section~\ref{sec:boltzmann-machines}, the minimal trainable EBM, with
-energy $E(v, h) = -v^\T W h - b^\T v - c^\T h$ and the moment-matching
-gradient \eqref{eq:bm-learning}. The central idea is to track training as a
-sequence of symmetry breakings in the student's singular modes. An RBM
-learning a Hopfield teacher with two correlated patterns then undergoes not one
-transition but a \emph{cascade}: each singular direction condenses at its own
-critical time, in order of the strength of the data covariance along it, and
-each condensation is a second-order transition of Curie--Weiss type. The mapping onto Curie--Weiss, the two-rate argument that
-produces the ordering, and the confirmation on MNIST, CelebA and human-genome
-data are in \compendium{}.
-
-\paragraph{What this means for the thesis.} Phase transitions now appear
-on both faces of generative diffusion: in \emph{sampling}, as speciation
-events along the reverse trajectory \citep{biroli2024dynamical,
-achilli2026speciation}, and in \emph{training}, as the cascade just
-described. Both are hierarchies of symmetry breakings ordered by the
-data's spectrum. Our research adds the axis that both literatures hold
-fixed: the structure of the inference problem \emph{inside a single data
-point}, and how the diffusion time $t$ deforms it. The chain we solve is
-the minimal model in which that question is non-trivial and answerable
-exactly.
-
-\section{The gap, restated}\label{sec:gap}\label{sec:related}
-
-Real sequential data (video, audio, trajectories) have exactly the
-structure the solvable programme leaves out: an internal (frame) time
-with a Markovian dependence along it. For such data the score
-\eqref{eq:tweedie-joint} is a smoothing posterior on a chain, an object
-with seventy years of inference theory behind it. Yet the questions a
-diffusion modeller asks about it are not answered by the classical
-literature, which fixes the noise level, nor by the diffusion literature,
-which ignores internal structure: how does the coupling structure of
-$\nabla \log p_t$ deform with $t$? Can it be computed locally? What
-survives a Gaussian parametrisation of the messages when the data are not
-Gaussian? What limited guidance does that give for score architectures?
-Answering these questions, in the fully solvable setting of the AR(1)
-chain and its non-Gaussian perturbations, is the contribution of
-Chapters~\ref{ch:gaussian} and~\ref{ch:laplace}, with the inference tools
-prepared in Chapter~\ref{ch:graphs} and the path that led to the precise
+Real sequential data --- video, audio, trajectories --- have exactly the
+structure the solvable programme leaves out: an internal frame time with a
+Markovian dependence along it. For such data the score \eqref{eq:tweedie-joint}
+is a smoothing posterior on a chain, an object with seventy years of inference
+theory behind it. Yet the questions a diffusion modeller asks about it are
+answered neither by the classical literature, which fixes the noise level, nor
+by the diffusion literature, which sets internal structure aside: how does the
+coupling structure of $\nabla \log p_t$ deform with $t$; can it be computed
+locally; what survives a Gaussian parametrisation of the messages when the data
+are not Gaussian; can the transition itself be learned through the channel; and
+how does the resulting estimator compare with a network trained on the same
+data? Those five questions are the subject of
+Chapters~\ref{ch:gaussian} to~\ref{ch:em-results}, with the inference tools
+prepared in Chapter~\ref{ch:graphs} and the modelling choices that fixed the
 formulation recorded in Chapter~\ref{ch:development}.

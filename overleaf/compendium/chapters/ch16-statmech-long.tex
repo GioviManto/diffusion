@@ -371,3 +371,42 @@ The next chapter supplies the probabilistic dynamics, Markov chains and
 their continuous-time limits, that turn the static ensembles of this
 chapter into processes that move probability around, which is what a
 diffusion model ultimately is.
+
+\section{The correspondence, term by term}\label{sec:statmech-dictionary}
+
+The table below collects the correspondences this chapter builds
+(Table~\ref{tab:statmech-dictionary}). They are not all of the same kind, and
+the difference matters. Some rows are exact identifications under a stated
+convention: a Boltzmann distribution at $\beta = 1$ with $H = -\log p$ is the
+model distribution, and the partition function is its normalising constant.
+Others are correspondences that hold up to qualifications made where they are
+used: the free energy equals the negative ELBO only up to constants and a
+choice of variational family; Langevin dynamics and reverse diffusion coincide
+only for the specific drift of Anderson's theorem, not in general; and
+``phase transition'' names a family of distinct phenomena --- feature
+condensation, speciation, memorisation --- which share a mathematical signature
+but not a mechanism. The table is a reading aid for moving between two
+literatures, not a list of theorems.
+
+\begin{center}
+\begin{minipage}{\linewidth}\centering
+\captionof{table}[Statistical mechanics and generative modelling, term by term]{Correspondences between the statistical-mechanical and generative-modelling vocabularies. The rows are of mixed strength: some are exact identifications under the conventions fixed above, others hold up to constants or only in the special cases noted in the text.}
+\label{tab:statmech-dictionary}
+\begin{tabular}{ll}
+\toprule
+\textbf{Statistical mechanics} & \textbf{Generative modelling} \\
+\midrule
+microstate $x$ & data point / latent configuration \\
+energy $H(x)$ & negative log-density $-\log p(x)$ (up to $Z$) \\
+Boltzmann distribution $e^{-\beta H}/Z$ & model distribution \\
+partition function $Z$ & normalising constant / evidence \\
+free energy $F$ & negative ELBO (up to constants) \\
+Hebbian couplings, attractors & stored memories, retrieval \\
+moment matching \eqref{eq:bm-learning} & maximum-likelihood training \\
+Langevin dynamics & sampling / reverse diffusion \\
+phase transition & feature condensation, speciation \\
+cavity / TAP equations & belief propagation / AMP \\
+\bottomrule
+\end{tabular}
+\end{minipage}
+\end{center}

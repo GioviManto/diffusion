@@ -59,7 +59,7 @@ apart.
 \section{Positioning and gap}
 
 The literature this work builds on can be organised in three strands;
-Chapters~\ref{ch:statmech}--\ref{ch:graphs} review them in depth.
+Chapters~\ref{ch:background} and~\ref{ch:graphs} review them; the extended treatment is in \compendium{}.
 
 \paragraph{Statistical physics of learning machines.} Machine learning
 and statistical mechanics share a genealogy that runs from spin glasses
@@ -402,25 +402,21 @@ direction to the one the earlier design suggested.
 
 \section{Structure of the thesis}
 
-Chapters~\ref{ch:statmech}--\ref{ch:graphs} contain the background and
+Chapters~\ref{ch:background} and~\ref{ch:graphs} contain the background and
 literature review; Chapters~\ref{ch:development}--\ref{ch:em-results}
 contain the research. Throughout, each concept is developed once, in the
 chapter where it naturally belongs, and then used without repetition.
 
-Chapter~\ref{ch:background} runs from stationary action to generative
-diffusion in three movements. The first is the statistical mechanics this thesis
-uses and the lineage that carries it into machine learning: the Ising model,
-spin glasses, the Hopfield network, the Boltzmann machine and its restricted
-variant, and the statistical mechanics of learning. The second supplies the
-probabilistic dynamics: stochastic processes and stationarity, Markov chains
-and their kernels, the AR(1) running example, and the Ornstein--Uhlenbeck
-corruption channel with Anderson's time-reversal theorem. The third reaches
-modern generative modelling: the diffusion construction and its thermodynamic
-reading, the score--posterior identity, the statistical-physics analyses of
-diffusion, and the cascade of phase transitions in energy-based-model training.
-The longer derivations behind all three sit in
-\compendium{}, which carries the background derivations this thesis cites but
-does not reproduce.
+Chapter~\ref{ch:background} fixes the four objects the research chapters
+manipulate --- the Markov sequence that generates the data, the
+Ornstein--Uhlenbeck channel that corrupts it, the time reversal that makes
+generation possible, and the score--posterior identity that turns the
+reversal's unknown term into a posterior expectation --- and then states what
+the surrounding literature settles and what it leaves open. It is deliberately
+compressed to what the body uses. The statistical mechanics from which these
+models descend, the lineage that carries it into machine learning, and the
+step-by-step derivations behind each result quoted there are in \compendium{},
+at full length.
 Chapter~\ref{ch:graphs} builds the inference machinery this thesis reasons
 with: Markov random fields, factor graphs, the sum--product algorithm and the
 conditions under which it is exact, and the architectural mirror of locality in
@@ -452,9 +448,11 @@ structured estimator is compared against trained neural denoisers ---
 unstructured and structure-aware --- along axes of model capacity and of
 misspecification of the Markov assumption itself.
 Chapter~\ref{ch:conclusions} states findings per research question,
-limitations, and the questions that follow. The appendices collect the
-Gaussian identities with proofs, the AMP/TAP analysis with its exact
-phase boundary, the reproducibility protocol, the background derivations
-supporting Chapter~\ref{ch:background}, the graphical and rotating-ring
-derivations, and the robustness of both reported ratios to how they were
-aggregated.
+limitations, and the questions that follow. The appendices contain proofs,
+numerical checks, aggregation analyses and reproducibility material that
+directly support the thesis's original results: the Gaussian identities with
+proofs, the AMP/TAP analysis with its exact phase boundary, the linear-algebra
+and rotating-ring derivations, the reproducibility protocol, and the robustness
+of both reported ratios to how they were aggregated. Extended historical
+background, literature notes, alternative derivations and the development
+record are collected in \compendium{}.
