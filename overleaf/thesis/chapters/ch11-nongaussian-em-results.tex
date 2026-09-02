@@ -423,35 +423,43 @@ represent, and the two are not interchangeable amounts of "how wrong the
 model is": they are different in kind.
 \end{remark}
 
-\section{Shape is intrinsically harder to identify than correlation}
+\section{The channel removes shape information faster than correlation information}
 \label{sec:em-information}
 
 Section~\ref{sec:em-convergence} found that the innovation shape converges
 far slower than the autoregressive coefficient under EM. A direct
-information-theoretic measurement gives a structural reason.
+information-theoretic measurement runs alongside that finding.
+
+This calculation complements the convergence experiment but does not derive its
+iteration count. The table below measures how much statistical information
+about each coordinate survives the observation channel. Local EM convergence is
+governed instead by the fraction of missing information, equivalently by the
+Jacobian of the EM update near its fixed point. The two measurements point in
+the same direction here, but they answer different questions, and a flatter
+observed likelihood does not by itself entail a given number of updates.
 
 \paragraph{What is computed.} The innovation law is a generalised Gaussian
-$p(\varepsilon) \propto \exp(-|\varepsilon/s|^{\beta})$, with $s$ fixed by
-$\operatorname{Var}(\varepsilon) = \ivar = 1-\alpha^2$ at every $\beta$, so
-$\beta$ moves the fourth moment at \emph{exactly fixed} variance and is a
+$f_p(\varepsilon) \propto \exp(-|\varepsilon/s|^{p})$, with $s$ fixed by
+$\operatorname{Var}(\varepsilon) = \ivar = 1-\alpha^2$ at every $p$, so
+$p$ moves the fourth moment at \emph{exactly fixed} variance and is a
 genuine shape coordinate rather than a reparameterised scale. For a
-three-parameter vector $\theta = (\alpha, \ivar, \beta)$, Fisher's identity
+three-parameter vector $\theta = (\alpha, \ivar, p)$, Fisher's identity
 \eqref{eq:em-fisher} supplies the exact per-chain score of the marginal
 log-likelihood from one forward--backward pass, and the information matrix
 is estimated in \emph{outer-product} form, $J = D^{-1}\sum_d g_d g_d^\T$
-over $D=512$ chains of $n=32$ sites, at $M=401$, $A=8$. This is the
+over $D=512$ chains of $\nsites=32$ sites, at $\ngrid=401$, $A=8$. This is the
 outer-product estimator, not the observed negative Hessian, and it is an
 estimate at the true parameter rather than at a fitted one. The reported
 quantity is the \emph{efficient} information
-$I_{\beta\cdot(\alpha,\ivar)} = 1/(J^{-1})_{\beta\beta}$, which is what remains
-about $\beta$ once the nuisance coordinates must be estimated too --- equal
+$I_{p\cdot(\alpha,\ivar)} = 1/(J^{-1})_{pp}$, which is what remains
+about $p$ once the nuisance coordinates must be estimated too --- equal
 to the diagonal entry only when the coordinates are orthogonal and strictly
-smaller otherwise. The gap between $J_{\beta\beta}$ and this quantity is
+smaller otherwise. The gap between $J_{pp}$ and this quantity is
 recorded per cell as the nuisance cost, and the condition number of $J$ is
 recorded alongside it, since the inversion is where a near-singular $J$
 would show up.
 
-\paragraph{What it shows.} The efficient information for $\beta$ decays two
+\paragraph{What it shows.} The efficient information for $p$ decays two
 to three orders of magnitude faster with diffusion noise than the
 information for $\alpha$ itself. Table~\ref{tab:em-information} reads the loss
 between the smallest and largest diffusion time tested:
@@ -462,29 +470,28 @@ between the smallest and largest diffusion time tested:
 \label{tab:em-information}
 \begin{tabular}{@{}rrrr@{}}
 \toprule
-true $\beta$ & info loss, $\alpha$ & info loss, $\ivar$ & info loss, $\beta$ (shape) \\
+true $p$ & info loss, $\alpha$ & info loss, $\ivar$ & info loss, $p$ (shape) \\
 \midrule
-1.0 & $78\times$ & $235\times$ & $\mathbf{8{,}738\times}$ \\
-1.5 & $83\times$ & $459\times$ & $\mathbf{64{,}227\times}$ \\
-3.0 & $56\times$ & $522\times$ & $\mathbf{68{,}460\times}$ \\
+1.0 & $78\times$ & $235\times$ & $\mathbf{8.7\times10^{3}}$ \\
+1.5 & $83\times$ & $459\times$ & $\mathbf{6.4\times10^{4}}$ \\
+3.0 & $56\times$ & $522\times$ & $\mathbf{6.8\times10^{4}}$ \\
 \bottomrule
 \end{tabular}
 \end{minipage}
 \end{center}
-\noindent This is not merely a restatement of the convergence finding: it is
-a property of the noised likelihood itself, independent of any optimiser,
-and it explains \emph{why} the shape coordinate is slow --- there is
-structurally less information about it in noised data at any fixed sample
-size, at every diffusion time past the smallest ones. It is also the reason
+\noindent This is a property of the noised likelihood itself, independent of
+any optimiser: at any fixed sample size, and at every diffusion time past the
+smallest ones, there is less information about the shape coordinate in noised
+data than about the correlation. That is consistent with the shape coordinate
+being the slow one, though as noted above it does not derive the rate. It is also the reason
 the capacity sweep of Section~\ref{sec:em-capacity} is exactly the kind of
 measurement where an insufficient iteration budget is dangerous: the
 coordinate that is hardest to move is also the one with the least signal per
 observation.
 
 Two limits on how far these figures should be pushed. They are ratios of
-outer-product estimates at $D=512$ chains, so the leading digits carry
-Monte Carlo error and the right reading of $64{,}227$ is ``four to five
-orders of magnitude'', not a five-significant-figure measurement. And the
+outer-product estimates at $D=512$ chains, so only the order is meaningful
+and the entries are printed to two significant digits for that reason. And the
 comparison is across the tested noise grid rather than a limit: the decay
 is measured between $t=0.05$ and $t=1.6$, and how it continues past the
 schedule's end is not established here. What the table supports is the

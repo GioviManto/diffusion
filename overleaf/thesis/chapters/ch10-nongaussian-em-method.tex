@@ -313,10 +313,21 @@ separating: the correlation is essentially in place by thirty updates while the
 innovation shape is still climbing at a hundred and twenty, because the mixture
 label is a latent variable of its own and the channel compounds the missing
 information --- the mechanism of \citet{dempster1977maximum} appearing in the
-convergence rate, where the theory places it. The endpoints show that this is a
-cost in rate and not in where the fit lands: the clean and channel arms finish
-within $0.002$ of each other on the correlation and within a fifth of a unit on
-excess kurtosis, both close to the generating values.
+convergence rate, where the theory places it.
+
+The channel has two distinct effects, and they should not be collapsed into
+one. First, it changes the local rate of EM through the fraction of missing
+information, which is the effect the trace above displays. Second, at finite
+sample size it reduces the observed Fisher information and can therefore
+increase estimation uncertainty --- an effect measured directly, by coordinate,
+in Section~\ref{sec:em-information}. Under identifiability and correct
+specification it need not move the population optimum, and that is the limited
+sense in which the clean and channel arms may approach the same endpoint while
+doing so at different rates. The endpoints here are consistent with that
+reading: the two arms finish within $0.002$ of each other on the correlation
+and within a fifth of a unit on excess kurtosis, both close to the generating
+values. This is evidence of similar fitted endpoints in this configuration, not
+of an absent information or accuracy penalty.
 
 That is one configuration. A dedicated sweep measured the cost across sixteen
 seeds, recording for each fit the first update after which a coordinate stays
@@ -352,9 +363,12 @@ worse under a fixed iteration count, and a slower-converging configuration
 under-iterated by the same budget produces what looks like a genuine deficit
 rather than symmetric noise --- which is precisely the signature that makes it
 easy to mistake for a real effect. Compared correctly, at eight seeds and a
-fixed budget of 200 iterations, there is no channel penalty on converged
-shape recovery: the paired clean $-$ noised difference is
-$-0.052\pm0.217$, consistent with zero. A single non-converged draw would
+fixed budget of 200 updates, no channel penalty is resolved in the reported
+shape summary: the paired clean $-$ noised difference at that operating point
+is $-0.052\pm0.217$, consistent with zero. The operating point is not a
+converged one --- the chapter's own median settling time for the shape
+coordinate is $\convshapemed$ updates --- so this is a statement about the
+paired difference at $200$ updates, not about the converged estimators. A single non-converged draw would
 not have supported that comparison in either direction. Where Chapter~\ref{ch:em-results}
 reports a result obtained at a fixed, possibly insufficient budget, it says so
 explicitly and states which quantities are and are not affected.
@@ -372,7 +386,7 @@ measured. What is not free is optimisation time. Observing the chain only
 through the channel costs the autoregressive coefficient about an order of
 magnitude in iterations, and the innovation shape then settles some three times
 slower again, with a tail several times longer than its own median.
-Chapter~\ref{ch:em-results} reports what this estimator buys --- in data
-efficiency and, separately, in the fidelity of what it generates --- and where,
-along axes of model capacity and model misspecification, it stops buying
-anything.
+Chapter~\ref{ch:em-results} quantifies pointwise accuracy, capacity and
+robustness to controlled misspecification, and leaves the reverse-generation
+comparison open, because its fitted shape coordinates were not sufficiently
+settled under the available budget.

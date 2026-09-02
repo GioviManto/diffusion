@@ -30,11 +30,10 @@ property: for every node $i$,
 where $\partial i$ is the set of neighbours of $i$ in $G$.
 \end{definition}
 
-The fundamental structure theorem connects this
-conditional-independence definition to the energy picture of
-the energy picture: by the Hammersley--Clifford theorem
-\citep[proved in][]{besag1974spatial}, a strictly positive density is an
-MRF on $G$ if and only if it factorises over the \emph{cliques} of $G$,
+The Hammersley--Clifford theorem connects conditional independence to an
+energy representation \citep[proved in][]{besag1974spatial}: for a strictly
+positive density, the Markov property with respect to $G$ is equivalent to
+factorisation over the \emph{cliques} of $G$,
 \begin{equation}
   p(x) \;=\; \frac{1}{Z} \prod_{C \in \mathrm{cliques}(G)} \psi_C(x_C)
   \;=\; \frac{1}{Z}\, \exp\Big[ -\sum_C E_C(x_C) \Big] .
@@ -113,10 +112,11 @@ summarises everything node $i$ knows \emph{except} what it learned from
 $a$, so that no piece of evidence is ever counted twice along a path.
 
 \begin{theorem}[Tree exactness of sum--product]\label{thm:tree-exact}
-On a tree-shaped factor graph, the equations \eqref{eq:bp-rules} have a
-unique solution, reached after one inward and one outward pass, and the
-resulting beliefs are the exact marginals of $p$
-\citep[Theorem~14.1]{mezard2009information}.
+On a tree-shaped factor graph, one inward and one outward pass of
+\eqref{eq:bp-rules} compute the exact node and factor marginals of $p$
+\citep[Theorem~14.1]{mezard2009information}. The resulting beliefs are
+unique; the individual unnormalised messages are defined only up to positive
+multiplicative constants.
 \end{theorem}
 
 The reason is the separation property of trees: each edge splits the
