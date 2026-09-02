@@ -58,10 +58,19 @@ plt.rcParams.update(
         "figure.dpi": 140,
         "savefig.dpi": 300,
         "savefig.bbox": "tight",
-        "font.size": 8.5,
-        "axes.titlesize": 9,
-        "axes.labelsize": 8.5,
-        "legend.fontsize": 7.5,
+        # Sized for PRINT, not for the screen. The thesis text block is
+        # 453pt wide and the body is 12pt; a 7in-wide figure placed at
+        # \linewidth is scaled down by about a ninth, so every point set here
+        # loses that much on the page. Measured across the seventeen figures,
+        # the old 8.5pt base put tick labels on the page at 5.3pt against
+        # 12pt body text, and the four-panel grid diagnostic at 3.7pt.
+        # Nothing below is smaller than 8.5pt, so nothing prints below ~7.5pt.
+        "font.size": 9.5,
+        "axes.titlesize": 9.5,
+        "axes.labelsize": 9.5,
+        "xtick.labelsize": 8.5,
+        "ytick.labelsize": 8.5,
+        "legend.fontsize": 8.5,
         "legend.frameon": False,
         "axes.grid": True,
         "grid.alpha": 0.25,
@@ -92,11 +101,40 @@ def read(path: Path) -> list[dict]:
         return list(csv.DictReader(fh))
 
 
+# Figures admitted as evidence in the thesis, paper or workshop note. Anything
+# this script draws that is NOT in this set goes to a sibling directory instead.
+#
+# The separation is the point. This generator also draws withdrawn and
+# exploratory panels -- fig_pointwise_vs_generative rests on the retired
+# 40-iteration fits, and the sampler/cost/families panels were diagnostics that
+# never entered an argument. All of them used to be written into the same
+# directory the four documents include from, so a command advertised as
+# "generate every thesis figure" recreated a withdrawn artifact inside the
+# thesis's own include path. LaTeX only draws what it is told to draw, so this
+# was never a live defect; it was a defect waiting for someone to \includegraphics
+# the wrong basename. Keeping them apart makes that mistake impossible rather
+# than merely unlikely.
+ADMITTED = {
+    "fig_closure_vs_t",
+    "fig_sample_efficiency",
+    "fig_toymodel_score",
+    "fig_capacity",
+    "fig_nonmarkov",
+    "fig_screening",
+    "fig_grid_domain",
+    "fig_em_diagnostics",
+    "fig_innovation_density",
+}
+
+
 def save(fig, name: str) -> None:
+    out = FIG if name in ADMITTED else FIG / "exploratory"
+    out.mkdir(parents=True, exist_ok=True)
     for ext in ("pdf", "png"):
-        fig.savefig(FIG / f"{name}.{ext}")
+        fig.savefig(out / f"{name}.{ext}")
     plt.close(fig)
-    print(f"  wrote {name}.pdf / .png")
+    where = "" if name in ADMITTED else " (exploratory/)"
+    print(f"  wrote {name}.pdf / .png{where}")
 
 
 def _f(rows, key):
@@ -259,9 +297,11 @@ def _stamp_unconverged(fig) -> None:
     """Mark a figure whose fits used the withdrawn fixed 40-iteration budget.
 
     Every panel drawn from `outputs/exp_16/` rests on fits that stopped at 40 EM
-    iterations, and the shape coordinate needs of order 2,000 -- 93% of those
-    seed-configurations had not settled. The claim audit withdraws the capacity
-    attribution on exactly that basis.
+    iterations, far short of where the shape coordinate settles: the dedicated
+    convergence sweep puts its median at 229 updates, with a tail past 600. The
+    claim audit withdraws the capacity attribution on exactly that basis. (The
+    "2,000 iterations / 93% unsettled" figures this docstring used to quote came
+    from a superseded reading of a single run and are not the thesis's numbers.)
 
     The thesis says so in a remark next to the figure, which is necessary and
     not sufficient: a figure that leaves the document -- into a slide, a poster,
@@ -275,7 +315,7 @@ def _stamp_unconverged(fig) -> None:
         0.5, -0.06,
         "Fixed 40-iteration EM budget: shape-dependent curves are confounded "
         "with convergence rate (claim audit §corr-capacity).",
-        ha="center", va="top", fontsize=6.5, style="italic", color="#a03020",
+        ha="center", va="top", fontsize=8.5, style="italic", color="#a03020",
     )
 
 
@@ -531,7 +571,7 @@ def fig_pointwise_vs_generative() -> None:
             label=r"EM$-$BP, $C=2\ldots16$")
     for c, x, y in zip(cs, xs, ys):
         ax.annotate(f"$C={c}$", (x, y), textcoords="offset points",
-                    xytext=(4, 4), fontsize=6.5)
+                    xytext=(4, 4), fontsize=8.5)
     for arm in ("cnn", "mlp"):
         if arm not in point[cs[0]]:
             continue
@@ -608,7 +648,7 @@ def fig_grid_domain() -> None:
     ax[2].set_xlabel(r"half-width $A$")
     ax[2].set_ylabel("edge-cell mass")
     ax[2].set_title("(c) truncation")
-    ax[2].legend(fontsize=6)
+    ax[2].legend(fontsize=8.5)
 
     # (d) quadrature: interior column-normalisation residual against spacing.
     by_h = defaultdict(list)
@@ -868,7 +908,7 @@ def fig_ring() -> None:
     ax[0].set_ylabel(r"$p(\psi)$")
     # One legend for both density panels, placed outside so it never covers
     # the spikes it is describing.
-    ax[0].legend(loc="upper left", bbox_to_anchor=(0.0, 1.0), fontsize=6.5)
+    ax[0].legend(loc="upper left", bbox_to_anchor=(0.0, 1.0), fontsize=8.5)
 
     save(fig, "fig_ring")
 
