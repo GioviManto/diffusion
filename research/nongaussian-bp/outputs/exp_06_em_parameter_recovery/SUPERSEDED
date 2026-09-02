@@ -1,0 +1,17 @@
+Pre-migration run. Recorded at rho = 0.8.
+
+This directory predates the move of rho into experiments/frozen_config.py,
+which set a single rho = 0.85 for every experiment. The data here is internally
+consistent and was correct when it was produced; it simply describes a
+parameterisation the project no longer uses.
+
+Nothing in the thesis, paper, workshop note or compendium reads it. Do not add
+a reader: the frozen, certified equivalents are the ones to use --
+
+  outputs/exp_06_em_parameter_recovery/  ->  outputs/frozen/exp_06_rate16/
+  outputs/exp_07_em_vs_score_network/    ->  outputs/frozen/exp_07_certified_seed*/
+
+This file is what tools/audit_em_bp_provenance.py looks for before deciding
+whether a rho mismatch against current source is a defect or a fact about an
+archived run. It is kept rather than deleted because it is the record of how
+the measurement changed.

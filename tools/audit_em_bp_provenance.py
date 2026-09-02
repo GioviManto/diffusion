@@ -35,6 +35,7 @@ from __future__ import annotations
 import argparse
 import csv
 import json
+import pathlib
 import re
 import sys
 from pathlib import Path
@@ -42,16 +43,23 @@ from pathlib import Path
 # Truth constants each experiment declares in its own source. Audited against
 # both the manifests and the prose. Kept explicit rather than parsed so that a
 # silent edit to a source constant shows up here as a mismatch.
-EXPECTED_RHO_TRUE = {
-    "exp_02": 0.85,
-    "exp_03": 0.85,   # sweeps (0.5, 0.85, 0.95); 0.85 is the mid value quoted
-    "exp_06": 0.8,
-    "exp_07": 0.8,
-    "exp_08": 0.8,
-    "exp_16": 0.85,
-    "exp_18": 0.85,
-    "exp_22": 0.85,
-}
+# Which experiments this audit knows how to check. The VALUE each should carry
+# is not written here on purpose.
+#
+# It used to be, as a literal per experiment, and it went stale the moment the
+# project moved rho into experiments/frozen_config.py: six experiments changed
+# from a local 0.8 to FROZEN.rho = 0.85, the recorded data followed, and this
+# table did not. The audit then reported 174 blocking issues on correct data
+# for as long as nobody read past the first eight lines of its output -- which
+# is worse than not running, because a check that always fails is indistinguish-
+# able from one that never passes and gets ignored the same way.
+#
+# So the expected value is resolved from the experiment's own source, which
+# resolves in turn to frozen_config.py wherever the source says FROZEN.rho.
+# Same rule as the documents: derive it, do not retype it.
+AUDITED_EXPERIMENTS = (
+    "exp_02", "exp_03", "exp_06", "exp_07", "exp_08", "exp_16", "exp_18", "exp_22",
+)
 
 # Phrases that assert a single global truth. Any of these is a blanket claim and
 # is false while the repository uses two.
@@ -81,6 +89,7 @@ class Audit:
         self.root = root
         self.blocking: list[str] = []
         self.warnings: list[str] = []
+        self.archived = 0
 
     def block(self, msg: str) -> None:
         self.blocking.append(msg)
@@ -90,34 +99,71 @@ class Audit:
 
     # ---------------------------------------------------------------- checks
 
+    def _frozen_rho(self) -> float | None:
+        """The single rho declared in experiments/frozen_config.py."""
+        if getattr(self, "_frozen_rho_cache", "unset") != "unset":
+            return self._frozen_rho_cache
+        self._frozen_rho_cache = None
+        cfg = self.root / "experiments" / "frozen_config.py"
+        if cfg.exists():
+            m = re.search(r"^\s*rho:\s*float\s*=\s*([0-9.]+)", cfg.read_text(), re.M)
+            if m:
+                self._frozen_rho_cache = float(m.group(1))
+        return self._frozen_rho_cache
+
+    def source_rho(self, exp: str) -> set[float]:
+        """The rho values an experiment's own source declares.
+
+        A source may state a literal, sweep a tuple, or -- the current
+        convention -- defer to FROZEN.rho. All three resolve here, so the audit
+        compares recorded data against what the code actually says rather than
+        against a copy of it kept in this file.
+        """
+        matches = list((self.root / "experiments").glob(f"{exp}_*.py"))
+        if not matches:
+            self.warn(f"{exp}: no source file found")
+            return set()
+        text = matches[0].read_text()
+        vals: set[float] = set()
+
+        # deferred to the frozen config -- the convention every current
+        # experiment follows
+        if re.search(r"^\s*RHO(?:_TRUE)?\s*=\s*FROZEN\.rho\b", text, re.M):
+            frozen = self._frozen_rho()
+            if frozen is None:
+                self.block(f"{exp}: defers to FROZEN.rho, which this audit cannot read")
+            else:
+                vals.add(frozen)
+
+        found = re.findall(r"^RHO(?:_TRUE)?\s*=\s*([0-9.]+)", text, re.M)
+        found += re.findall(r'^\s*"rho":\s*([0-9.]+)', text, re.M)
+        found += re.findall(r"^RHOS\s*=\s*\(([^)]*)\)", text, re.M)
+        for f in found:
+            for piece in str(f).split(","):
+                piece = piece.strip()
+                if piece:
+                    try:
+                        vals.add(float(piece))
+                    except ValueError:
+                        pass
+        if not vals:
+            self.warn(f"{exp}: no rho constant found in {matches[0].name}")
+        return vals
+
     def check_source_truths(self) -> None:
-        """Each experiment's RHO_TRUE constant matches what this script expects."""
-        for exp, expected in EXPECTED_RHO_TRUE.items():
-            matches = list((self.root / "experiments").glob(f"{exp}_*.py"))
-            if not matches:
-                self.warn(f"{exp}: no source file found")
-                continue
-            text = matches[0].read_text()
-            found = re.findall(r"^RHO(?:_TRUE)?\s*=\s*([0-9.]+)", text, re.M)
-            found += re.findall(r'^\s*"rho":\s*([0-9.]+)', text, re.M)
-            found += re.findall(r"^RHOS\s*=\s*\(([^)]*)\)", text, re.M)
-            if not found:
-                self.warn(f"{exp}: no rho constant found in {matches[0].name}")
-                continue
-            vals = set()
-            for f in found:
-                for piece in str(f).split(","):
-                    piece = piece.strip()
-                    if piece:
-                        try:
-                            vals.add(float(piece))
-                        except ValueError:
-                            pass
-            if expected not in vals:
-                self.block(
-                    f"{exp}: source declares rho in {sorted(vals)}, "
-                    f"audit expects {expected}"
-                )
+        """Every audited experiment declares a rho this audit can resolve."""
+        for exp in AUDITED_EXPERIMENTS:
+            self.source_rho(exp)
+
+    def _superseded(self, manifest: pathlib.Path) -> bool:
+        """True if this manifest sits in, or under, a directory marked SUPERSEDED."""
+        d = manifest.parent
+        while True:
+            if (d / "SUPERSEDED").exists():
+                return True
+            if d == self.root or d.parent == d:
+                return False
+            d = d.parent
 
     def check_manifest_truths(self) -> None:
         """Every params*.json records a truth matching its experiment's source."""
@@ -131,12 +177,23 @@ class Audit:
             if rho is None:
                 continue
             exp = self._experiment_of(man)
-            if exp is None or exp not in EXPECTED_RHO_TRUE:
+            if exp is None or exp not in AUDITED_EXPERIMENTS:
                 continue
-            if abs(float(rho) - EXPECTED_RHO_TRUE[exp]) > 1e-12:
+            # A run recorded before rho moved into frozen_config.py is not a
+            # defect; it is a fact about an archived measurement. The directory
+            # says so in a SUPERSEDED file, which also names the frozen
+            # replacement. Marking beats deleting: the record survives, and
+            # nothing silently reads it thinking it is current.
+            if self._superseded(man):
+                self.archived += 1
+                continue
+            declared = self.source_rho(exp)
+            if not declared:
+                continue
+            if not any(abs(float(rho) - d) <= 1e-12 for d in declared):
                 self.block(
                     f"{self._rel(man)}: records rho={rho}, "
-                    f"but {exp} source uses {EXPECTED_RHO_TRUE[exp]}"
+                    f"but {exp} source declares {sorted(declared)}"
                 )
 
     def check_manifest_matches_data(self) -> None:
@@ -276,6 +333,8 @@ class Audit:
             print(f"\n{len(self.blocking)} blocking issue(s).")
             return 1
 
+        if self.archived:
+            print(f"({self.archived} manifest(s) skipped: directory marked SUPERSEDED.)")
         print("All provenance checks passed.")
         return 0
 

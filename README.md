@@ -23,6 +23,11 @@ cd overleaf && ./make_upload_bundle.sh    # Overleaf-ready zips in overleaf/uplo
 `build.sh` compiles in place and checks each document for undefined references,
 undefined citations and the paper's nine-page body limit.
 
+```bash
+cd research/nongaussian-bp && .venv/bin/python -m pytest -q   # 445 passed, 27 skipped (~14 min)
+cd research/nongaussian-bp && ./tools/check_all.sh --quick    # structural checks (~1 min)
+```
+
 `make_upload_bundle.sh` produces one self-contained folder and zip per document
 under `overleaf/upload/`. Upload `upload/thesis.zip` to Overleaf via **New
 Project -> Upload Project**; `main.tex` is the main document. The flattening is
@@ -36,11 +41,15 @@ its own directory before the zip is written.
 |---|---|
 | [`overleaf/`](overleaf) | the four documents — paper, workshop, compendium, thesis |
 | [`research/`](research) | the code and the experimental record |
-| [`sources/`](sources) | reference PDFs — papers, guides, background |
-| [`meetings/`](meetings) | supervision notes and call transcripts |
 | [`questions/`](questions) | open questions for advisors, and planning documents |
 | [`tools/`](tools) | repository-level scripts |
-| `archive/` | superseded work, kept locally, not tracked |
+| `sources/` | reference PDFs — local only, not tracked |
+| `meetings/` | supervision notes and call transcripts — local only, not tracked |
+| `archive/` | superseded work — local only, not tracked |
+
+The last three are gitignored: they hold third-party PDFs and private notes
+that do not belong in a public history. Everything needed to rebuild every
+document and reproduce every number is tracked.
 
 ## Where things are single-sourced
 

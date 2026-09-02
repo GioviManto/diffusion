@@ -883,7 +883,12 @@ def fig_cost() -> None:
 
 def fig_em_diagnostics() -> None:
     trace = read(Path("exp_18/em_trace.csv"))
-    rate = read(Path("exp_06_em_parameter_recovery/em_rate.csv"))
+    # The frozen rho=0.85 rate sweep, not outputs/exp_06_em_parameter_recovery/,
+    # which is a pre-migration run at rho=0.8. That directory was still being
+    # read here after the project moved rho into frozen_config.py, which put a
+    # 0.8 panel under a caption whose centre panel draws its true-value line at
+    # 0.85. Same columns, same sizes, sixteen seeds, and it passes the gate.
+    rate = read(Path("frozen/exp_06_rate16/em_rate.csv"))
     fig, ax = plt.subplots(1, 3, figsize=(7.2, 2.4))
 
     by = defaultdict(list)
