@@ -46,7 +46,13 @@ from frozen_config import FROZEN  # noqa: E402
 plt.rcParams.update(
     {
         "font.family": "serif",
-        "mathtext.fontset": "dejavuserif",
+        # Computer Modern for MATH, not DejaVu. The body text is Latin Modern and
+        # the other eleven figures in the thesis -- from gaussian-bp and the ring
+        # package -- render their math in CM, so DejaVu math here was the only
+        # place in the document where a symbol changed shape between figures on
+        # facing pages. Text stays DejaVu Serif, which is what those figures use
+        # too, so this makes all seventeen agree.
+        "mathtext.fontset": "cm",
         "pdf.fonttype": 42,
         "ps.fonttype": 42,
         "figure.dpi": 140,
