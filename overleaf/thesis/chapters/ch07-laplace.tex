@@ -36,7 +36,7 @@ as in the Gaussian case. This is what makes the comparison in this chapter
 a comparison: the Gaussian and Laplace chains agree on every second moment
 and differ \emph{only} beyond them, the innovation's excess kurtosis
 ($0$ against $+3$) being the single non-Gaussianity knob. The same
-convention --- Gaussian initial state, variance-matched innovations --- is
+convention, Gaussian initial state, variance-matched innovations, is
 used for every non-Gaussian family in this thesis, and carries forward
 unchanged to the estimated chain of \eqref{eq:em-chain}. Three structural facts
 survive unchanged, because none of them used Gaussianity of the prior.
@@ -120,7 +120,9 @@ The Laplace noised marginal solves the linear, constant-coefficient ODE
 \end{equation}
 \end{theorem}
 
-\begin{toolbox}{From the characteristic function to the screened Poisson
+\noindent The derivation is Toolbox~\ref{tb:l-screened}.
+
+\begin{toolbox}[tb:l-screened]{From the characteristic function to the screened Poisson
 equation}
 Multiply \eqref{eq:l-cf} by $(1 + b^2\mu^2 k^2)$:
 \begin{equation*}
@@ -199,7 +201,7 @@ the first backward message of the chain is the $L = 1$ noised marginal
 evaluated at a shifted argument.
 \end{proposition}
 
-The proof is the innovation substitution $r := a' - \alpha a$, which
+\emph{Proof.} The innovation substitution $r := a' - \alpha a$, which
 turns the transition into the bare Laplace density at $r$ and the
 evidence into $\Nd(x' - \mu\alpha a;\, \mu r,\, \Deltat)$; the integral
 is then the definition \eqref{eq:l-pt1}. The shift $\mu\alpha a$ is what
@@ -225,8 +227,8 @@ error to be measured, not an identity.
 A change of coordinates shows the obstruction is intrinsic, not an
 artefact of the frame basis. In innovation coordinates $r_0 = a_0$,
 $r_k = a_k - \alpha a_{k-1}$ (unit Jacobian), the prior factorises into
-independent variables --- $r_0$ Gaussian and $r_{k\geq1}$ i.i.d.\
-Laplace --- but the likelihood becomes
+independent variables, $r_0$ Gaussian and $r_{k\geq1}$ i.i.d.\
+Laplace, but the likelihood becomes
 $p(x|r) \propto \exp(-\tfrac{\mu^2}{2\Deltat} r^\T B^\T B r
 + \tfrac{\mu}{\Deltat} x^\T B r)$ with $B$ the unit lower-triangular
 map $a = Br$, and $B^\T B$ is dense. The coupling does not disappear; it
@@ -289,9 +291,9 @@ The object under test is Gaussian-projected BP: the same sweeps, with
 every message forced into the Gaussian family by moment matching. This is
 the algorithm one would deploy when quadrature is unaffordable, and the
 chain analogue of the per-node closures of statistical physics
-(Appendix~\ref{app:amp}).
+(\compendium{}).
 
-Before measuring its error it is worth identifying exactly what it computes,
+Before measuring its error, identify exactly what it computes,
 because the answer turns this from an implementation-specific approximation
 study into a precise question. Write $\Pi_{\mathrm{G}} f$ for the Gaussian
 density matching the mean and variance of $f/\!\int\! f$.
@@ -316,27 +318,122 @@ and it returns the same estimator for \emph{every} innovation law sharing the
 moments $(0, \ivar)$.
 \end{theorem}
 
-\begin{toolbox}{Why the projection cannot see past two moments}
-The recursion is linear in the message except at the projection, and
-$\Pi_{\mathrm{G}}$ retains only the first two moments of what it is given. A
-Gaussian message multiplied by a Gaussian likelihood and pushed through a
-linear-AR transition integral is Gaussian with mean and variance depending on
-the incoming mean and variance alone, so by induction along the chain every
-message the recursion carries is determined by second-order information ---
-and the second-order information of the Laplace chain is by construction
-\eqref{eq:l-chain-prior} identical to that of the Gaussian chain. The full
-induction, and the four hypotheses the argument requires (finite second
-moments, zero mean, $\alpha \neq 0$, and \emph{where} the projection is
-applied, since $\Pi_{\mathrm{G}}$ does not commute with multiplication by the
-likelihood), are given in the companion paper.
-\end{toolbox}
+\subsection{The hypotheses}\label{sec:lmmse-hyp}
+
+Four hypotheses are load-bearing and are worth separating, because three of
+them are easy to read as technical and are not.
+
+\emph{Finite second moments} are what make $\Pi_{\mathrm{G}}$ defined at all.
+
+\emph{Zero mean} is not cosmetic. The general LMMSE estimator is
+\begin{equation*}
+  \E[a] \;+\; \operatorname{Cov}(a,x)\,\operatorname{Cov}(x)^{-1}\big(x - \E[x]\big),
+\end{equation*}
+and \eqref{eq:l-lmmse} is its centred special case.
+
+\emph{$\alpha \neq 0$} is required because the backward map of the closure
+recursion divides by $\alpha$. At $\alpha = 0$ the chain has no edges, the
+sites are independent, and the claim holds trivially and separately, each
+site's posterior mean being the scalar Gaussian
+$e^{-t}\Sigz(e^{-2t}\Sigz + \Deltat)^{-1} x_i$.
+
+\emph{Where the projection is applied} matters because $\Pi_{\mathrm{G}}$ does
+not commute with multiplication by the likelihood. Theorem~\ref{thm:l-lmmse}
+fixes the order --- project immediately after each transition integral, then
+multiply by the site's unary likelihood --- and a different order is a
+different algorithm with a different fixed point.
+
+One further point of scope. The statement concerns exact message
+\emph{functions} on $\R$ and an analytic projection operator. \textbf{The grid
+of Section~\ref{sec:l-grid} plays no part in it.} Discretisation enters only
+when the \emph{unrestricted} non-Gaussian messages are represented
+numerically, which is what the closure is compared against. Conflating the two
+would turn a theorem about a closure into a claim about quadrature.
+
+\subsection{Proof of Theorem~\ref{thm:l-lmmse}}\label{sec:lmmse-proof}
+
+\begin{proof}
+Write $\lmsg_{i}$ for the forward message at site $i$ after projection and
+$\ell_i$ for the Gaussian unary likelihood at that site. We show by induction
+along the chain that every projected message coincides with the corresponding
+exact message of the covariance-matched Gaussian chain.
+
+\emph{Base.} The initial message is Gaussian by hypothesis, or is projected to
+the Gaussian with the same first two moments. Either way it equals the Gaussian
+chain's initial message, which has those same moments by construction.
+
+\emph{Forward step.} Suppose $\lmsg_{i-1}$ agrees with the Gaussian chain's
+message, so it is Gaussian with mean $m$ and variance $v$. Multiplying by
+$\ell_{i-1}$ is a product of two Gaussian densities and yields a Gaussian,
+with mean and variance given by the usual precision-weighted combination
+\eqref{eq:gauss-product}; this is identical in both chains, because the
+likelihood is the same object in both. Taking the transition integral against
+$a_i = \alpha a_{i-1} + \varepsilon_i$ convolves with the innovation law and
+scales by $\alpha$, which maps
+\begin{equation}
+  (m, v) \;\longmapsto\; \big(\alpha m,\; \alpha^2 v + \ivar\big).
+  \label{eq:lmmse-fwd-map}
+\end{equation}
+The mean and variance of a convolution depend on the innovation law
+\emph{only} through its own mean and variance. So \eqref{eq:lmmse-fwd-map} is
+the same map for every innovation with moments $(0, \ivar)$, and in particular
+the same as for the Gaussian chain. In the Gaussian chain the convolution of
+two Gaussians is already Gaussian and no projection occurs; here
+$\Pi_{\mathrm{G}}$ is applied, and since the pre-projection function has
+exactly the moments just computed, the projection returns precisely the
+Gaussian chain's message.
+
+\emph{Backward step.} The same argument runs with the transition map inverted,
+\begin{equation}
+  (m, v) \;\longmapsto\; \big(m/\alpha,\; (v + \ivar)/\alpha^2\big),
+  \label{eq:lmmse-bwd-map}
+\end{equation}
+which is where $\alpha \neq 0$ is used. Its base case needs one word of care.
+The terminal backward message is $\rmsg_{L-1} \equiv 1$, which is not a
+normalisable density and so is not in the domain of $\Pi_{\mathrm{G}}$. The
+induction therefore starts one step earlier, at the terminal unary likelihood
+$\ell_{L-1}$, which is Gaussian and normalisable; every subsequent backward
+message is a likelihood-weighted transition integral of a normalisable
+Gaussian and stays in the domain. Nothing is lost by starting there, because
+$\rmsg_{L-1} \equiv 1$ contributes no factor: the first object the recursion
+actually projects is $\ell_{L-1}$.
+
+\emph{Conclusion.} Every projected belief therefore equals the corresponding
+belief of the covariance-matched Gaussian chain, and the returned posterior
+mean is that chain's posterior mean. For jointly Gaussian zero-mean $(a, x)$
+the conditional mean is linear in $x$ and so coincides with the best linear
+estimator. Since $x = e^{-t} a + \sqrt{\Deltat}\, z$ with $z$ independent of
+$a$,
+\begin{equation}
+  \operatorname{Cov}(a, x) = e^{-t} \Sigz,
+  \qquad
+  \operatorname{Cov}(x) = e^{-2t} \Sigz + \Deltat I,
+  \label{eq:lmmse-covs}
+\end{equation}
+which substituted into
+$\operatorname{Cov}(a,x)\operatorname{Cov}(x)^{-1}x$ gives exactly
+\eqref{eq:l-lmmse}. Finally, the recursion never read the innovation law
+beyond its moments $(0, \ivar)$ --- neither \eqref{eq:lmmse-fwd-map} nor
+\eqref{eq:lmmse-bwd-map} involves anything else --- so the same estimator is
+returned for every innovation law with those moments.
+\end{proof}
+
+\begin{remark}[What the theorem does not say]
+It does not say the closure is a good approximation. It says what the closure
+\emph{computes}, which is a different and more useful kind of statement: the
+gap measured in Section~\ref{sec:l-closure} is the distance between
+full non-Gaussian posterior inference and the best second-order linear
+estimator of the matched Gaussian model. Whether that distance is small is an
+empirical question, answered there and not here.
+\end{remark}
+
 
 Theorem~\ref{thm:l-lmmse} fixes the meaning of every number below. The
 comparison is not ``grid BP against one particular approximation'': it is
 \emph{full non-Gaussian posterior inference against the best second-order
 linear estimator}, and the measured gap is precisely the price of discarding
 everything beyond second moments. It also explains why the errors reported
-here are attributable to non-Gaussianity alone --- the projected arm is
+here are attributable to non-Gaussianity alone, the projected arm is
 literally blind to the only thing that distinguishes the two chains.
 
 Table~\ref{tab:l-closure} reports the median relative score error of the
@@ -360,8 +457,8 @@ $\Prob(\mathrm{err} > 0.1)$ & $1.00$ & $0.08$ & $0.00$ & $0.00$ & $0.00$ \\
 because they are different statistics and sit an order of magnitude apart in
 $t$. The probability of a trial exceeding $10\%$ relative error first reaches
 zero at $t \approx 0.98$; the \emph{median} error first falls below $10^{-3}$
-only at $t \approx 2.1$. In between --- around $t \approx 1$, where the
-failure probability has already vanished --- the typical error is still
+only at $t \approx 2.1$. In between, around $t \approx 1$, where the
+failure probability has already vanished, the typical error is still
 $\sim\!7\times10^{-3}$.
 
 The closure error is of order tens of percent at small diffusion time and
@@ -410,31 +507,3 @@ error is $0.43$, $0.27$, $0.13$ at $\alpha = 0.5$, $0.85$, $0.95$;
 informative neighbours act like additional Gaussian observations, which is
 consistent with the local tilted posteriors becoming more Gaussian, again as
 an interpretation rather than a measurement.
-
-\section{What can and cannot be concluded}\label{sec:l-open}
-
-Classified in the vocabulary of Section~\ref{sec:method}.
-Exact, by derivation: the surviving structure of Section~\ref{sec:l-model}, the limits
-\eqref{eq:l-score-limits}, the factorisation \eqref{eq:l-cf}, the
-screened Poisson equation \eqref{eq:l-screened}, the curvature identity
-\eqref{eq:l-curvature}, the message form \eqref{eq:l-markov-score}, the
-boundary integral \eqref{eq:l-onestep}, the breakdown argument of
-Remark~\ref{rmk:l-breakdown}, the identification of Gaussian closure with the
-covariance-matched LMMSE estimator (Theorem~\ref{thm:l-lmmse}), and the error
-identity \eqref{eq:bp-master-error}. Exact for the discretised model: grid BP
-solves the finite-state chain that discretisation defines to floating-point
-accuracy --- a different statement from reproducing the continuum recursion,
-and the gap between them is what the calibration of
-Section~\ref{sec:l-grid} bounds. Numerical, within validated regimes: the
-quadrature audits of Section~\ref{sec:l-K1}, the grid-BP calibration, and
-the closure-error measurements, which are specific to the stated
-innovation laws, correlation levels, chain lengths, and diffusion times.
-Interpretation rather than measurement: that the decline of the closure error
-with $t$ reflects the tilted posteriors becoming Gaussian --- consistent with
-the data, but not separated here from the attenuation of the Tweedie
-prefactor.
-Not concluded: closed forms for general (non-boundary) messages at
-$L \geq 2$; any locality law for the non-Gaussian score beyond the
-structural delimitation above; and any statement about learned scores. No
-low-rank structure is asserted for the Laplace $L = 2$ posterior Hessian: it
-holds only in a narrow regime.

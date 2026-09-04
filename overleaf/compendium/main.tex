@@ -24,6 +24,17 @@
 
 \graphicspath{{../shared/figures/}}
 \input{../shared/notation}
+% The aggregation chapter (19) carries the generated robustness tables, which
+% are written through the same macros as the thesis' headline numbers. Without
+% these the chapter compiles to undefined control sequences.
+\input{../shared/sections/efficiency-numbers}
+\input{../shared/sections/structured-numbers}
+\input{../shared/sections/structured-aggregation-numbers}
+\input{../shared/sections/screening-numbers}
+% The generated tables reach these two by name. In the thesis they resolve to
+% its own appendices; here the material either lives in chapter 19 itself or in
+% the thesis, and saying which is more useful than a dangling number.
+\providecommand{\provenanceappendix}{the thesis' reproducibility appendix}
 
 
 % ---------- carried over with the background chapters -------------------
@@ -186,6 +197,10 @@ without it.
 
 \part{Case studies alongside the main line}
 \input{chapters/ch12-rotating-ring}
+% Held here rather than in the thesis: it is the working behind the
+% headline efficiency ratio, and at ten pages it cost the thesis more
+% length than a robustness check should.
+\input{chapters/ch19-aggregation}
 
 % ------------------------------------------------------------------------
 % Part VII exists because the thesis was cut to length and none of this was

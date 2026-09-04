@@ -1,0 +1,623 @@
+\chapter{The Model, and the Object of Study}\label{ch:model}
+\label{ch:background}\label{ch:graphs}\label{ch:graphical}\label{ch:development}
+
+This chapter fixes what the thesis computes and the language it computes in.
+A Markov chain generates a clean trajectory; an Ornstein--Uhlenbeck channel
+corrupts every frame independently; the object of study is the joint score of
+the corrupted sequence. Two justifications come before any analysis. The first
+is that the quantity worth studying is the joint score of a whole trajectory
+and not a per-frame score; the second is that the stationary AR(1) chain is the
+right model in which to study it. Both are settled here. The chapter closes with the representation the rest of
+the thesis reasons in: a distribution written as a product of local factors,
+and the recursion that returns its marginals exactly when those factors form a
+tree.
+
+\section{Markov sequences}\label{sec:stationarity}\label{sec:markov}
+
+Two notions of time homogeneity are used constantly below and have to be kept
+apart \citep{brockwell1991time}. A process $(X_k)$ is \emph{strictly
+stationary} if every finite-dimensional law is shift-invariant, and \emph{weakly
+stationary} if its mean is constant and its autocovariance depends only on the
+lag, $\operatorname{Cov}(X_k, X_{k+d}) = \gamma(d)$. Strict implies weak
+whenever second moments exist, and for Gaussian processes the two coincide. The
+distinction earns its place because Chapter~\ref{ch:laplace} replaces the
+Gaussian innovation with a Laplace one, at which point they separate and only
+the strict notion survives the construction. Weak stationarity also has the
+matrix consequence the research chapters exploit: the covariance of $L$
+consecutive observations, $(\Sigma)_{ij} = \gamma(i-j)$, is constant along
+diagonals. Wherever a covariance in this thesis is Toeplitz, stationarity is the
+reason.
+
+\begin{definition}[Markov chain]
+A sequence $(X_k)_{k \geq 0}$ on a state space $\mathcal{X}$ is a \emph{Markov
+chain} if for every $k$ and every measurable $A \subseteq \mathcal{X}$,
+\begin{equation}
+  \Prob\big(X_{k+1} \in A \,\big|\, X_k, X_{k-1}, \dots, X_0\big)
+  \;=\; \Prob\big(X_{k+1} \in A \,\big|\, X_k\big) .
+  \label{eq:markov-property}
+\end{equation}
+The conditional law is encoded by a \emph{transition kernel}
+$\kernel(x' \,|\, x)$, with $\int \kernel(x'|x)\,\dd x' = 1$ for every $x$.
+\end{definition}
+
+\begin{example}[The Gaussian AR(1) chain]\label{ex:ar1}
+The running example throughout is the scalar Gaussian autoregression of order
+one,
+\begin{equation}
+  a_{k+1} \;=\; \alpha\, a_k + \eta_k ,
+  \qquad
+  \eta_k \stackrel{\text{iid}}{\sim} \Nd(0, \ivar),
+  \qquad k = 0, \dots, L-2 ,
+  \label{eq:ar1}
+\end{equation}
+with kernel $\kernel(a' \mid a) = \Nd(a'; \alpha a, \ivar)$. Taking
+$\ivar = 1 - \alpha^2$ and $a_0 \sim \Nd(0,1)$ makes it stationary with unit
+marginal variance and $\gamma(d) = \alpha^{|d|}$, so its covariance is Toeplitz.
+Every chapter from Chapter~\ref{ch:gaussian} onwards concerns \eqref{eq:ar1},
+one of its non-Gaussian variants, or what an estimator can recover of it
+through noise.
+\end{example}
+
+The Markov property \eqref{eq:markov-property} is exactly a statement about
+\emph{factorisation}: the joint law of the first $L$ states is
+\begin{equation}
+  p(x_0, x_1, \dots, x_{L-1})
+  \;=\; p_0(x_0)\, \prod_{k=0}^{L-2} \kernel(x_{k+1} \,|\, x_k) .
+  \label{eq:chain-factorisation}
+\end{equation}
+This is the most heavily used equation of the thesis. It says the joint
+distribution of a Markov trajectory is a product of \emph{local} terms, each
+touching two consecutive variables: the structure that makes the chain a tree
+in the factor-graph sense of Chapter~\ref{ch:graphs}, that makes its precision
+matrix tridiagonal in the Gaussian case of Chapter~\ref{ch:gaussian}, and that
+makes belief propagation exact. Marginals evolve by integrating the kernel,
+$p_{k+1}(x') = \int \kernel(x'|x)\, p_k(x)\,\dd x$, and a law $\pi$ with
+$\pi = \kernel \pi$ is \emph{stationary}: a chain started in $\pi$ remains in
+it, and its trajectory is then strictly stationary.
+
+One change of perspective sets up the research problem. Markov chains are
+classically studied as \emph{algorithms}, where the stationary law is the target
+and the trajectory a means to reach it. From Chapter~\ref{ch:gaussian} onwards
+the chain \eqref{eq:ar1} plays the opposite role: it is the
+\emph{data-generating process}, one trajectory $(a_0, \dots, a_{L-1})$ is one
+data point, and the object of interest is the law of the whole trajectory after
+every coordinate has been independently corrupted. The factorisation
+\eqref{eq:chain-factorisation} then stops being a computational convenience and
+becomes the structure to be recovered.
+
+\section{The Ornstein--Uhlenbeck corruption channel}\label{sec:ou}
+
+The noising process used by diffusion models, and by every result of this
+thesis, is the \emph{Ornstein--Uhlenbeck process}
+\citep{uhlenbeck1930theory}: Brownian motion pulled back to the origin by a
+linear spring,
+\begin{equation}
+  \dd X_t \;=\; -X_t\,\dd t \;+\; \sqrt{2}\;\dd W_t ,
+  \qquad X_0 = a .
+  \label{eq:ou-sde}
+\end{equation}
+The drift and diffusion constants are the variance-preserving normalisation of
+the diffusion literature \citep{song2021scorebased}; any other choice rescales
+time. The process is the unique Gaussian, Markov, stationary process in
+continuous time, and it is exactly solvable. Solving \eqref{eq:ou-sde} by
+integrating factor, the derivation is routine and is carried out in
+\compendium{}, gives a Gaussian transition kernel,
+$p(x_t \mid X_0 = a) = \Nd(x_t;\, a e^{-t},\, \Deltat)$ with
+$\Deltat = 1 - e^{-2t}$. Corrupting a data point $a$ for a time $t$ therefore
+produces
+\begin{equation}
+  x \;=\; a\, e^{-t} \;+\; \sqrt{\Deltat}\;\varepsilon,
+  \qquad \varepsilon \sim \Nd(0, 1):
+  \label{eq:ou-channel}
+\end{equation}
+the signal is \emph{contracted} by $e^{-t}$ while isotropic noise of variance
+$\Deltat$ fills in. At $t = 0$ the channel is the identity; as $t \to \infty$,
+$x \sim \Nd(0,1)$ regardless of $a$. The signal-to-noise ratio
+$e^{-2t}/\Deltat$ sweeps continuously from $\infty$ to $0$ and diverges as
+$1/2t$ for small $t$, a factor that reappears throughout the thesis as an error
+amplifier. The channel interpolates between the data distribution and a
+standard Gaussian, which is what a diffusion model needs.
+
+Two structural remarks are used repeatedly later. First, the kernel is Gaussian
+\emph{in $a$ as well as in $x$}: read as a function of the clean variable,
+$\Nd(x; a e^{-t}, \Deltat) \propto
+\exp[-(e^{-2t}/2\Deltat)(a - x e^{t})^2]$, a Gaussian likelihood factor of
+precision $e^{-2t}/\Deltat$ centred at the deconvolved observation $e^t x$.
+This is what makes the posteriors of Chapter~\ref{ch:gaussian} jointly Gaussian
+and the belief-propagation messages closable in a finite-dimensional family.
+Second, if $a \sim \Nd(\mu, \Sigma_0)$ is pushed through \eqref{eq:ou-channel}
+coordinate-wise with \emph{independent} noises, the output is Gaussian with
+\begin{equation}
+  \mu_t = e^{-t}\mu,
+  \qquad
+  \Sigt \;=\; e^{-2t}\, \Sigma_0 \;+\; \Deltat\, I ,
+  \label{eq:ou-cov-map}
+\end{equation}
+since means and covariances transform linearly and the added noise is white.
+Equation \eqref{eq:ou-cov-map}, shrink the covariance, add a multiple of the
+identity, is the entire forward process of this thesis in one line.
+
+
+\section{How the object of study was arrived at}\label{sec:dev-history}
+
+The estimand of this thesis was not chosen at the outset. It was reached by
+getting it wrong first, and the sequence is worth recording, both because it
+explains the shape of what follows and because the correction is the single
+most consequential step in the project.
+
+\paragraph{The propagator hypothesis.} The work began from a structural guess
+about sequences. If a trajectory is generated by a fixed dynamical rule, the score at one frame
+ought to be obtainable from the score at the previous one by a fixed operator.
+Writing $S_{:,u}$ for the block of the score at internal time $u$, the
+conjecture was that some \emph{propagator} $P_t$ satisfies
+\begin{equation}
+  S_{:,u}(x) \;\approx\; P_t\big(S_{:,u-1}(x)\big).
+  \label{eq:dev-propagator}
+\end{equation}
+If such an operator existed and were cheap, generation over a long sequence
+would cost one solve plus $L-1$ applications of $P_t$. The programme adopted to
+test \eqref{eq:dev-propagator} was deliberately austere: exactly solvable
+models only, closed forms wherever possible, and no neural networks anywhere,
+so that any structure found could be attributed to the model and not to a
+fitting procedure.
+
+\paragraph{Six toy models, and a mistake they shared.} A sequence of solvable
+objects was built to probe \eqref{eq:dev-propagator}: a static Gaussian
+mixture under the channel; a two-frame joint law; a two-dimensional rotating
+process $a_{u+1} = R_{\Delta\theta}\, a_u + \xi_u$; a billiard in a box; a
+scalar AR(1) chain examined on the whole $(u,t)$ plane; and a diffusion on the
+circle. The rotating model and the circle are the direct ancestors of
+Chapter~\ref{ch:ring}, and the AR(1) study is the ancestor of
+Chapters~\ref{ch:gaussian} and~\ref{ch:gaussian-bp}.
+
+All but one of them computed the wrong object. What was evaluated was the
+\emph{per-frame marginal} score
+\begin{equation}
+  s(x_u, u, t) \;=\; \nabla_{x_u} \log p_t(x_u \mid u),
+  \label{eq:dev-marginal-score}
+\end{equation}
+which integrates out every other frame. Doing so is not a mild approximation.
+It is equivalent to asserting that the clean law factorises as
+$P_0(a_0,\dots,a_{L-1}) = \prod_u p_0(a_u \mid u)$, which is false for any
+correlated process and, in particular, false for every model in the list.
+The quantity being studied had the frames' dependence removed from it before
+the study began, so no propagator could have been found in it: there was
+nothing left for $P_t$ to propagate.
+
+\paragraph{The correction.} The object was corrected in a supervision meeting
+of March 2026 to the \emph{joint} score of the whole trajectory,
+$S(x,t) = \nabla_{(x_0,\dots,x_{L-1})} \log P_t(x_0,\dots,x_{L-1})$, whose
+$k$-th block is the posterior expectation
+\begin{equation}
+  S_k(x,t) \;=\; \frac{e^{-t}\,\E\big[a_k \,\big|\, x_0,\dots,x_{L-1}\big] - x_k}{\Deltat},
+  \label{eq:dev-joint-block}
+\end{equation}
+taken over the full posterior of the clean trajectory given all $L$
+observations. Equation~\eqref{eq:dev-joint-block} is
+\eqref{eq:tweedie-joint} of Chapter~\ref{ch:statmech}, and the conditioning on
+every coordinate is the whole of the difference between it and
+\eqref{eq:dev-marginal-score}. The remainder of this chapter makes the case for
+it directly, without reference to how it was reached.
+
+\paragraph{What the correction bought.} It made the stationary Gaussian AR(1)
+chain the natural testbed rather than one model among six. Under
+\eqref{eq:dev-joint-block} the posterior is Gaussian, so the conditional mean
+is available from a Kalman smoother, the joint score is linear in the whole of
+$x$, and the clean precision is tridiagonal. Each of these is a closed form
+that can be checked against another closed form, which is what
+Chapters~\ref{ch:gaussian} and~\ref{ch:gaussian-bp} do.
+
+\paragraph{The propagator question, answered.} The conjecture that started the project was then settled rather than
+abandoned, and the rest of the thesis is organised around the answer. A
+propagator does exist for the Gaussian chain, and it is exact: the
+Rauch--Tung--Striebel smoother reproduces the precision-matrix score to machine
+precision, which Chapter~\ref{ch:gaussian-bp} proves and measures. What is
+\emph{not} exact is the naive reading of \eqref{eq:dev-propagator} in which
+$P_t$ acts as a shift, one row of the precision matrix mapping to the next.
+That form holds only asymptotically: the precision is Toeplitz in the bulk but
+not at the boundaries, and its deviation from Toeplitz falls with both chain
+length and diffusion time, from a few per cent on short chains at low noise to
+a small fraction of one per cent on long chains at high noise. A related
+negative result closes the cheapest version of the idea: the joint law admits
+no exact factorisation into independent one-dimensional bonds for any $L \geq
+2$, because the cross term in the two-frame characteristic function is
+$-\alpha\Deltat$, which vanishes only when $\alpha = 0$ or $t = 0$.
+
+So the propagator is a smoother, not a shift. That is a less convenient answer
+than the one hoped for, and a considerably more useful one, because a smoother
+is exactly the object that generalises: it survives the loss of Gaussianity as
+belief propagation (Chapter~\ref{ch:laplace}), and it survives the loss of a
+known kernel as EM (Chapter~\ref{ch:em-method}).
+
+\section{Why the joint score}\label{sec:dev-correction}
+
+Standard diffusion models generate \emph{static} objects; the data of
+interest here are \emph{dynamic}, a data point being a sequence of frames
+indexed by an internal time $u = 0, 1, \dots, L-1$, a video, a rotating
+shape, a stochastic trajectory. Two times therefore appear from the outset,
+and keeping them apart is a permanent discipline of this thesis: the
+\emph{internal} time $u$ of the sequence, and the \emph{diffusion} time $t$
+of the noising channel, which acts independently on every frame.
+
+It is tempting to treat such a trajectory as $L$ separate samples, computing
+each frame's noisy marginal score independently. In the Gaussian model that
+carries most of this thesis, that is not merely lossy, it is empty.
+
+\begin{proposition}[One-frame marginals in the stationary Gaussian
+chain]\label{prop:dev-marginal}
+Let the clean chain be stationary Gaussian AR(1) with unit marginal variance,
+put through the variance-preserving channel
+$x = e^{-t} a + \sqrt{1 - e^{-2t}}\, z$, with $z \sim \Nd(0,1)$ independent of
+$a$. Then every noisy frame is marginally $\Nd(0,1)$ at every diffusion time,
+its per-frame marginal score is exactly $-x_k$, and the collection of one-frame
+marginals carries zero Fisher information about the coupling $\alpha$.
+\end{proposition}
+
+\noindent This is immediate: variance preservation gives
+$\operatorname{Var}(x) = e^{-2t}\operatorname{Var}(a) + (1 - e^{-2t}) = 1$, and a Gaussian $a$ makes $x$
+Gaussian, so the marginal law is $\Nd(0,1)$ whatever $\alpha$ is and cannot
+depend on it.
+
+\begin{remark}[The same statement is false off the Gaussian
+model]\label{rmk:dev-nongaussian}
+Variance preservation alone gives only $\operatorname{Var}(x) = 1$; it does not give
+Gaussianity, and the distinction matters because the non-Gaussian chains of
+Chapters~\ref{ch:laplace}--\ref{ch:em-results} are the ones the rest of this
+thesis measures. Writing $\varphi$ for characteristic functions,
+\begin{equation}
+  \varphi_{x}(u) \;=\; \varphi_a\!\big(e^{-t}u\big)\,
+  \exp\!\Big[-\tfrac{1 - e^{-2t}}{2}\,u^2\Big],
+  \label{eq:dev-cf}
+\end{equation}
+so if $x$ were exactly $\Nd(0,1)$ at some finite $t$, dividing by the Gaussian
+factor would force
+$\varphi_a(e^{-t}u) = \exp[-\tfrac{1}{2}e^{-2t}u^2]$, that is, $a$ Gaussian.
+A genuinely non-Gaussian frame therefore stays non-Gaussian under any finite
+amount of Gaussian corruption, and its one-frame score stays nonlinear;
+Section~\ref{sec:l-K1} computes that score for a Laplace prior and shows it
+approaching $-x$ only as $t \to \infty$.
+\end{remark}
+
+\noindent So the correct general statement is narrower than
+``per-frame is empty'', and it is about \emph{dependence} and not about
+information as such. One-frame marginals can see the innovation law, and can
+see a parameter that changes the marginals; what no collection of them can
+recover is how consecutive frames are coupled, since coupling is a property of
+the joint law and of no marginal of it. In the Gaussian case those two
+statements collapse into one, because the marginals are $\alpha$-free by
+Proposition~\ref{prop:dev-marginal}; off it they come apart, and
+Chapter~\ref{ch:ring} proves the sharper version for one specific parameter, that the rotation rate of the ring model has exactly zero Fisher information in
+every one-frame marginal, under that model's rotational symmetry.
+
+A sequence is \emph{one} sample from a joint law, and the quantity that
+drives the reverse dynamics is the joint score of the whole noisy trajectory,
+the gradient of $\log P_t(x_0, \dots, x_{L-1})$, whose $k$-th component is a
+conditional expectation over the \emph{full} posterior of the clean frames,
+as in \eqref{eq:tweedie-joint}. That is the object in which the temporal
+structure lives. Chapter~\ref{ch:gaussian} exhibits the contrast in closed form
+at $L = 2$.
+
+This also settles the shape of the structural question that opened
+Section~\ref{sec:dev-history}. The propagator \eqref{eq:dev-propagator} was
+hoped for so that a learning system could hold one block and one map instead of
+$L$ blocks. What the joint view shows is that the structure worth studying is
+not a map between per-frame scores at all, but the coupling pattern of the
+joint score: a statement about a matrix in the Gaussian case, and about a
+posterior in general. That is the object the rest of this thesis analyses.
+Figure~\ref{fig:toymodel} shows it in the smallest case where it exists: the
+diagonal tilt of the joint score field is the whole of the coupling, and it is
+exactly what a per-frame treatment throws away.
+
+\begin{figure}[t]\centering
+\includegraphics[width=\linewidth]{fig_toymodel_score.pdf}
+\caption[The coupling made visible at $L=2$]{The coupling made visible, in the smallest case where it exists:
+$x_1 = x_0 + c + \eta$ with a trimodal Gaussian-mixture prior on $x_0$, drift
+$c = 1$, innovation standard deviation $\sigma = 0.45$, after diffusion time
+$t = 0.15$. Left: the noised joint density $p_t(x_0, x_1)$. Right: the joint
+score field $\nabla \log p_t$ (arrows) over the same density (contours). Both
+panels are computed from the closed-form mixture expressions on a grid. The
+arrows point towards the modes and tilt along the diagonal, and that tilt is
+the entire effect of the coupling between frames, it is exactly what any
+per-frame treatment discards. Note that this prior is \emph{not} Gaussian, so
+by Remark~\ref{rmk:dev-nongaussian} its noised one-frame marginals are Gaussian
+mixtures with nonlinear scores rather than $\Nd(0,1)$ with score $-x_k$; what
+those marginals cannot see is the coupling, which is the point the figure
+makes.}
+\label{fig:toymodel}
+\end{figure}
+
+\section{The minimal model}\label{sec:dev-minimal}
+
+Several dynamic objects were candidates: rotations, coupled phases, bounded
+trajectories with reflections, and curved data manifolds. The stationary
+Gaussian AR(1) chain under coordinatewise OU noise is the minimal one in which
+the joint score is nontrivial yet exactly computable. one coupling
+parameter $\alpha$ for the internal dynamics against one noise parameter $t$
+for the corruption, linear algebra available at every step, and every
+structural question (coupling range, locality, message passing) posable in
+closed form.
+
+The requirement doing the work here is \emph{exact computability}. The whole
+programme of this thesis is to measure what approximations cost, Gaussian
+message closure in Chapter~\ref{ch:laplace}, an estimated transition kernel
+in Chapters~\ref{ch:em-method} and~\ref{ch:em-results}, a finite receptive
+field in Chapter~\ref{ch:gaussian}, and every one of those measurements
+needs a reference that is known rather than approximated. A model in which
+the answer is available in closed form is not a simplification of the
+question; it is what makes the question answerable at all.
+
+The nonlinear models are set aside at that point deliberately, as targets for
+after the solvable case is understood. Chapter~\ref{ch:ring} takes up the
+first of them.
+
+
+\section{Markov random fields and factor graphs}\label{sec:mrf}
+\label{sec:factor-graphs}
+
+Graphical models assign structure to distributions the way a precision matrix
+assigns it to a Gaussian, and for arbitrary variables. A collection
+$x = (x_i)_{i \in V}$ on an undirected graph $G$ is a \emph{Markov random field}
+if each variable is conditionally independent of the rest given its neighbours,
+$p(x_i \mid x_{V \setminus \{i\}}) = p(x_i \mid x_{\partial i})$. For a
+strictly positive density the Hammersley--Clifford theorem
+\citep{besag1974spatial} makes that equivalent to factorisation over the cliques
+of $G$,
+\begin{equation}
+  p(x) \;=\; \frac{1}{Z} \prod_{C \in \mathrm{cliques}(G)} \psi_C(x_C)
+  \;=\; \frac{1}{Z}\, \exp\Big[ -\sum_C E_C(x_C) \Big] ,
+  \label{eq:hammersley-clifford}
+\end{equation}
+so conditional independence, graphical locality and additive local energies are
+one thing seen three ways. For Gaussian fields it becomes matrix-concrete: the
+energy is $\tfrac12 a^\T J a - h^\T a$, and the graph is exactly the sparsity
+pattern of $J$. A Gaussian Markov chain therefore has a tridiagonal precision,
+which Chapter~\ref{ch:gaussian} derives and uses throughout.
+
+One consequence carries the whole thesis. If each variable is observed through
+its own independent channel, the likelihood factors touch one variable each and
+no clique is enlarged: \emph{the posterior of an MRF under per-node observations
+is an MRF on the same graph}. Observation changes the potentials, never the
+graph.
+
+An MRF records which variables interact but not how the joint factorises: a
+triangle of pairwise terms and one triple term have the same graph. The
+\emph{factor graph} makes the factorisation itself graphical
+\citep{kschischang2001factor}. Given
+$p(x) = \frac{1}{Z}\prod_a \psi_a(x_{\partial a})$, it is the bipartite graph
+with a variable node per $x_i$, a factor node per $\psi_a$, and an edge whenever
+$x_i \in x_{\partial a}$. A connected factor graph with one fewer edge than
+nodes is a \emph{tree}, and trees are the tractable case: on them marginals and
+partition functions are exact under the recursion of the next section, whatever
+the alphabet. The factor graph of a Markov chain observed through per-node
+noise is a tree of a particularly simple shape, a spine of variables and
+transition factors with one evidence leaf per variable, as
+Chapter~\ref{ch:gaussian} verifies by counting.
+
+\section{The sum--product algorithm}\label{sec:sum-product}
+
+On a factor graph, sum--product belief propagation (BP) passes messages
+along every edge \citep{pearl1988probabilistic, kschischang2001factor,
+mezard2009information}. Variable-to-factor messages multiply the
+incoming factor messages from all \emph{other} neighbours, and
+factor-to-variable messages integrate the factor against the incoming
+variable messages:
+\begin{equation}
+  \nu_{i \to a}(x_i) \propto
+    \prod_{b \in \partial i \setminus a} \hat\nu_{b \to i}(x_i),
+  \qquad
+  \hat\nu_{a \to i}(x_i) \propto
+    \int \psi_a(x_{\partial a})
+    \prod_{j \in \partial a \setminus i} \nu_{j \to a}(x_j)\;
+    \dd x_{\partial a \setminus i},
+  \label{eq:bp-rules}
+\end{equation}
+with the belief at node $i$ proportional to
+$\prod_{a \in \partial i} \hat\nu_{a \to i}(x_i)$. The ``exclude the
+recipient'' rule is the heart of the algorithm: the message $i \to a$
+summarises everything node $i$ knows \emph{except} what it learned from
+$a$, so that no piece of evidence is ever counted twice along a path.
+
+\begin{theorem}[Tree exactness of sum--product]\label{thm:tree-exact}
+On a tree-shaped factor graph, one inward and one outward pass of
+\eqref{eq:bp-rules} compute the exact node and factor marginals of $p$
+\citep[Theorem~14.1]{mezard2009information}. The resulting beliefs are
+unique; the individual unnormalised messages are defined only up to positive
+multiplicative constants.
+\end{theorem}
+
+\emph{Proof.} Each edge of a tree splits the graph into two disjoint halves, so
+the message crossing it summarises exactly the half behind it and no evidence
+reaches a node twice. The recursion terminates with every marginal having
+absorbed each factor once. \hfill$\square$
+
+ On graphs with cycles the same updates,
+iterated, define \emph{loopy} BP, which is extraordinarily useful but
+approximate \citep{weiss2001correctness, malioutov2006walk}; none of that
+is needed in this thesis, because our graphs are trees.
+
+\begin{figure}[t]\centering
+\begin{tikzpicture}[
+  latent/.style={circle, draw, minimum size=7mm, inner sep=1pt},
+  obs/.style={circle, draw, fill=black!10, minimum size=7mm, inner sep=1pt},
+  fac/.style={rectangle, draw, fill=black, minimum size=2.2mm, inner sep=0pt},
+  node distance=9mm, scale=0.92, every node/.style={transform shape}]
+\foreach \i in {1,2,3,4}{
+  \node[latent] (a\i) at (2.1*\i, 0) {$a_{\i}$};
+  \node[fac] (f\i) at (2.1*\i, -1.0) {};
+  \node[obs] (x\i) at (2.1*\i, -2.0) {$x_{\i}$};
+  \draw (a\i) -- (f\i) -- (x\i);
+}
+\foreach \i/\j in {1/2,2/3,3/4}{
+  \node[fac] (w\i) at (2.1*\i+1.05, 0) {};
+  \draw (a\i) -- (w\i) -- (a\j);
+}
+\node[above=1mm of w1] {\small $\kernel(a_{k}\mid a_{k-1})$};
+\node[right=2mm of f4] {\small $\like(x_k\mid a_k)$};
+\draw[-{Stealth}, thick] (1.15,1.35) -- (2.55,1.35) node[midway,above] {\small $\lmsg$};
+\draw[-{Stealth}, thick] (9.35,1.35) -- (7.95,1.35) node[midway,above] {\small $\rmsg$};
+\end{tikzpicture}
+\caption[Posterior factor graph of a noised Markov chain]{The posterior factor
+graph of a Markov chain observed through the coordinatewise channel. Open
+circles are latent variables, shaded circles observations, squares factors. Each
+transition factor $\kernel(a_k \mid a_{k-1})$ joins two adjacent latent
+variables; each observation enters through a \emph{unary} factor attached to a
+single latent variable, because the channel corrupts every coordinate
+independently. Conditioning therefore reweights node potentials without creating
+any edge among the $a_k$, so the posterior graph is still a chain and
+Theorem~\ref{thm:tree-exact} applies to it. Arrows show the two message sweeps
+of \eqref{eq:bp-rules}. The construction fails as soon as the forward noise is
+correlated across coordinates: the likelihood then touches several $a_k$ at
+once and the graph acquires edges.}
+\label{fig:posterior-factor-graph}
+\end{figure}
+
+\paragraph{The representation problem.} For \emph{discrete} variables
+each message is a finite probability vector and each update in
+\eqref{eq:bp-rules} is finite arithmetic. For \emph{continuous} variables
+each message is a probability \emph{density}, an infinite-dimensional
+object, and the update integrals must be carried out in function space.
+Tree exactness (a property of the graph) says nothing about
+representability of the messages (a property of the model's function
+class); keeping the two apart is essential, and the distinction is where
+all the difficulty of the non-Gaussian research chapter lives. There are
+three ways to make continuous BP computable: restrict to models whose
+messages close in a finite-dimensional family (the Gaussian route, next
+section); represent messages numerically on a grid (the route our
+non-Gaussian reference solver takes, Chapter~\ref{ch:laplace}); or
+project each message onto a tractable family and accept the error (the
+route whose cost this thesis measures).
+
+\section{The Gaussian toolkit}\label{app:gauss}\label{sec:gauss-toolkit}
+
+Five standard facts about Gaussian densities, collected here because
+Chapters~\ref{ch:gaussian} to~\ref{ch:laplace} use them repeatedly and each
+use is cleaner for pointing at a numbered identity than for restating it.
+Nothing in this section is original.
+
+This appendix collects, with proofs, the handful of Gaussian identities on
+which Chapter~\ref{ch:gaussian} relies. Notation: a Gaussian
+density in \emph{moment} parameters is $\Nd(a; m, v)$; in \emph{natural}
+parameters it is
+$\exp(-\tfrac{\lambda}{2} a^2 + \theta a + \mathrm{const})$ with
+$\lambda = 1/v$, $\theta = m/v$.
+
+\subsection{Quadratic forms and Gaussian normalisation}
+
+For $J \succ 0$ (symmetric positive definite) and any $h$,
+\begin{equation}
+  \int_{\R^L} \exp\!\Big( -\tfrac{1}{2} a^\T J a + h^\T a \Big)\, \dd a
+  = \frac{(2\pi)^{L/2}}{\sqrt{\det J}}
+    \exp\!\Big( \tfrac{1}{2} h^\T J^{-1} h \Big),
+  \label{eq:gauss-int}
+\end{equation}
+by completing the square, $-\tfrac{1}{2}a^\T J a + h^\T a =
+-\tfrac{1}{2}(a - J^{-1}h)^\T J (a - J^{-1}h) + \tfrac{1}{2} h^\T J^{-1}h$,
+and translating. Consequently a density
+$p(a) \propto \exp(-\tfrac{1}{2} a^\T J a + h^\T a)$ is the Gaussian with
+mean $m = J^{-1} h$ and covariance $J^{-1}$: \emph{reading off $(J, h)$
+from a log-density is the fastest route to posterior parameters}, used in
+Proposition~\ref{prop:g-posterior}.
+
+\subsection{Products of Gaussians in the same variable}
+
+\begin{equation}
+  \Nd(a; m_1, v_1)\, \Nd(a; m_2, v_2)
+  \;\propto\; \Nd\!\big(a;\, m, v\big),
+  \qquad
+  \frac{1}{v} = \frac{1}{v_1} + \frac{1}{v_2},
+  \qquad
+  \frac{m}{v} = \frac{m_1}{v_1} + \frac{m_2}{v_2}.
+  \label{eq:gauss-product}
+\end{equation}
+\emph{Proof.} Add the exponents; the sum of two quadratics in $a$ is a
+quadratic in $a$ whose $a^2$-coefficient is
+$-\tfrac{1}{2}(1/v_1 + 1/v_2)$ and whose linear coefficient is
+$m_1/v_1 + m_2/v_2$; apply \eqref{eq:gauss-int} in one dimension. In
+natural parameters the rule is addition:
+$(\lambda, \theta) = (\lambda_1 + \lambda_2, \theta_1 + \theta_2)$,
+which is why the BP updates of Chapter~\ref{ch:gaussian} are two
+additions per message. $\square$
+
+\subsection{Affine propagation (marginalisation)}
+
+If $a' = \alpha a + \eta$ with $\eta \sim \Nd(0, \sigma^2)$ independent of
+$a \sim \Nd(m, v)$, then
+\begin{equation}
+  \int \Nd(a'; \alpha a, \sigma^2)\, \Nd(a; m, v)\, \dd a
+  = \Nd\!\big(a';\, \alpha m,\, \alpha^2 v + \sigma^2\big).
+  \label{eq:gauss-predict}
+\end{equation}
+\emph{Proof.} $a'$ is a sum of independent Gaussians, hence Gaussian; its
+mean is $\alpha m$ and its variance $\alpha^2 v + \sigma^2$ by linearity
+of expectation and independence. Read in the reverse direction (solving
+for $a$ given a Gaussian summary of $a'$), the same computation gives
+$\Nd\big(a;\, m'/\alpha,\, (v' + \sigma^2)/\alpha^2\big)$, the backward
+half-step of the BP sweep. $\square$
+
+\subsection{Gaussian conditioning}
+
+For a jointly Gaussian pair with precision blocks
+$\begin{psmallmatrix} J_{11} & J_{12} \\ J_{12}^\T & J_{22}
+\end{psmallmatrix}$, the conditional of block $1$ given block $2$ is
+Gaussian with precision $J_{11}$ (conditioning \emph{reads off} the
+precision block) and mean shifted by $-J_{11}^{-1} J_{12}\, a_2$;
+marginalisation, dually, is trivial in covariance parameters. This
+precision/covariance duality (conditioning is local in $J$,
+marginalising is local in $\Sigma$) is the algebraic engine behind the
+cavity recursion recorded in \compendium{}: integrating a neighbour out of a
+tridiagonal precision produces the rank-one correction
+$-\beta^2/\lambda$ on the adjacent diagonal entry, by the Schur
+complement
+\begin{equation}
+  \begin{pmatrix} \lambda & \beta \\ \beta & J_d \end{pmatrix}
+  \;\longrightarrow\;
+  J_d - \frac{\beta^2}{\lambda}.
+  \label{eq:gauss-schur}
+\end{equation}
+
+\subsection{Woodbury and the two routes to the score}
+
+The Woodbury identity
+$(A + UCV)^{-1} = A^{-1} - A^{-1}U (C^{-1} + V A^{-1} U)^{-1} V A^{-1}$,
+specialised to $\Sigt = \Deltat I + e^{-2t} \Sigz$, connects the noisy
+precision $\Qt$ and the posterior precision
+$J = (e^{-2t}/\Deltat) I + \Qz$:
+\begin{equation}
+  \Qt
+  = \frac{1}{\Deltat}
+    \left( I - \frac{e^{-2t}}{\Deltat}\, J^{-1} \right),
+  \label{eq:gauss-woodbury}
+\end{equation}
+which is exactly the operator form of the score--posterior identity: substituting the
+posterior mean $m = J^{-1} h = J^{-1} (e^{-t}/\Deltat) x$ into
+$S = (e^{-t} m - x)/\Deltat$ gives $S = -\Qt x$ identically. The
+machine-precision agreement of the two score routes
+(Section~\ref{sec:g-score}) is the numerical shadow of
+\eqref{eq:gauss-woodbury}.
+
+\section{Locality, and what this thesis can check}\label{sec:cnn-locality}
+
+Section~\ref{sec:sm-unet} set out the reading of U-Nets as belief propagation,
+and the cross-architecture evidence for it. One consequence of that reading
+belongs here, because it is what makes the chain worth studying rather than a
+convenient simplification.
+
+Those results concern hierarchical data, where the graphical model is a
+balanced tree and the depth an architecture needs is logarithmic in the
+sequence length. A chain is a degenerate tree, of depth equal to its length and
+width two, so the same argument predicts a depth linear in the correlation
+length instead. That is a sharply different architectural prediction, on a model
+where it can be checked.
+
+This thesis works one step below the correspondence, on a model small enough
+that the locality of the score is a computable quantity and not an
+architectural hypothesis. For the Gaussian chain the exact score at frame $k$
+depends on the observation at frame $k \pm d$ with a weight decaying
+geometrically in $d$, at a rate $q(\alpha,t)$ available in closed form
+(Chapter~\ref{ch:gaussian-bp}); the error of the radius-$r$ windowed estimator
+is measured to decay at the same rate, which is a separate and weaker
+statement. Comparing truncation of the inference against truncation of the
+score matrix then quantifies, in one solvable case, how a local computation
+should be organised. All of this describes the function a network would have to
+learn and not the dynamics of learning it; the trained baselines of
+Chapter~\ref{ch:em-results} supply the other half.

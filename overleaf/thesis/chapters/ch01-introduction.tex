@@ -65,7 +65,7 @@ the thesis and the two ways it is obtained. A Markov chain generates a clean
 trajectory; the Ornstein--Uhlenbeck channel corrupts every coordinate
 independently, so each observation attaches to the latent chain on its own and
 the posterior stays a chain. That is what makes the joint score exactly
-computable by message passing --- with the transition kernel known
+computable by message passing, with the transition kernel known
 (Chapters~\ref{ch:gaussian} and~\ref{ch:laplace}), or estimated from noised
 sequences alone when it is not (Chapter~\ref{ch:em-method}). The same score is
 what a denoising-score-matching network is trained to approximate without being
@@ -116,111 +116,48 @@ apart.
 
 \section{Positioning and gap}
 
-The literature this work builds on can be organised in three strands;
-Chapters~\ref{ch:background} and~\ref{ch:graphs} review them; the extended treatment is in \compendium{}.
+Chapter~\ref{ch:statmech} reviews the literature this work builds on; the gap
+it leaves is stated here.
 
-\paragraph{Statistical physics of learning machines.} Machine learning
-and statistical mechanics share a genealogy that runs from spin glasses
-through the Hopfield network and the Boltzmann machine to today's
-generative models, a lineage recognised by the 2024 Nobel Prize in
-Physics \citep{hopfield1982neural, ackley1985learning, nobel2024physics}.
-Its modern branch produced closed-form analyses of diffusion generation
-for Gaussian mixtures, ferromagnets, and high-dimensional asymptotics:
-the regimes of the backward dynamics and their transitions
-\citep{biroli2023generative, biroli2024dynamical}, the general theory of
-speciation \citep{achilli2026speciation, sclocchi2025phase}, the
-dynamics of memorisation and generalisation in training
-\citep{bonnaire2025memorize, garnierbrun2026biased}, and, on the
-training side, the demonstration that energy-based models learn through
-a cascade of phase transitions \citep{bachtis2024cascade}. These works
-treat the data as unstructured collections of samples; the time axis
-they study is the diffusion (or training) time. The internal time of a
-\emph{sequence} --- a video frame being correlated with its neighbours through
-a dynamical rule --- is absent from these analyses.
+Three strands meet. The statistical physics of generative diffusion has
+produced closed-form analyses of the backward dynamics and their transitions
+\citep{biroli2023generative, biroli2024dynamical, achilli2026speciation,
+sclocchi2025phase, bonnaire2025memorize}. Exact posterior inference on
+Gauss--Markov chains is classical, through the Kalman filter and smoother and
+their formulation as sum--product message passing
+\citep{kalman1960new, rauch1965maximum, kschischang2001factor,
+mezard2009information}. And message passing with continuous variables closes
+its messages inside a parametric family, which is the step connecting belief
+propagation to AMP and to the TAP equations
+\citep{thouless1977solution, donoho2009message, zdeborova2016statistical}.
 
-\paragraph{Inference on chains.} Exact posterior inference on
-Gauss--Markov chains is classical: the Kalman filter and smoother
-\citep{kalman1960new, rauch1965maximum}, hidden Markov models
-\citep{rabiner1989tutorial}, and their unifying formulation as
-sum--product message passing on factor graphs
-\citep{kschischang2001factor, mezard2009information}. Continuous,
-non-Gaussian state spaces have a long literature of their own, and it is
-worth saying precisely how this work sits inside it, because the
-machinery is familiar enough to look like a reapplication. Kalman--RTS is
-exact only for linear-Gaussian models. Assumed-density filtering and
-expectation propagation keep tractability by projecting each message back
-into a parametric family, so the approximation is in the messages
-themselves. Gaussian-sum filters widen that family without removing the
-restriction. Particle filters and smoothers place no parametric
-restriction but substitute Monte Carlo error, which can be quantified but adds a
-second error term to every comparison, so that what an approximation costs and
-what the reference costs have to be disentangled before either can be read. Grid-based filtering for continuous-state HMMs is the closest
-relative of what is done here, and is normally treated as an
-approximation to be tolerated rather than as an object whose error is
-itself the measurement.
+Each strand stops short of the same place. The physics analyses treat data as
+unstructured collections of samples: the only time axis they carry is the
+diffusion time, and the \emph{internal} time of a sequence, a frame correlated
+with its neighbours by a dynamical rule, does not appear. The inference
+literature has the machinery for that internal time but does not ask what
+generative modelling forces it to ask, which is how the exact posterior, and
+so the exact score, deforms as the noise level is swept from zero to
+saturation. And the standard justification for closing messages in a Gaussian
+family is a central-limit argument that requires each node to receive many
+messages; on a chain each node receives exactly two, so the argument fails by
+construction and we are not aware of a quantitative assessment of what the
+closure costs on chain-structured diffusion posteriors.
 
-Two things distinguish the present use. Deterministic quadrature is
-adopted precisely so that the reference carries \emph{no} sampling error
-and its discretisation error can be bounded separately and reported,
-which is what makes it usable as a reference rather than as another
-competitor. And the target is not filtering: it is the diffusion score at
-every noise level, obtained from the same recursion that learns the
-kernel from noised sequences. What the classical literature does not ask
-is the question generative modelling forces --- how the exact posterior,
-and therefore the exact score, deforms as a function of the diffusion
-time, and what that deformation implies for anything, algorithm or
-network, that must compute it at every level.
+The gap this thesis addresses is the intersection: the joint score of a noised
+Markov sequence, computed exactly where that is possible, approximated in a
+controlled and measured way where it is not, and learned from noised data when
+the dynamics are unknown.
 
-\paragraph{Message passing with continuous variables.} BP is exact on
-trees for discrete variables, where messages are finite probability
-vectors. For continuous variables the messages become probability
-densities, and practical algorithms must close them within a parametric
-family, almost always the Gaussian one; this is the step that connects
-BP to AMP and to the TAP equations of statistical physics
-\citep{thouless1977solution, donoho2009message, zdeborova2016statistical,
-genovese2026amp}. The classical justification of the Gaussian closure is
-a central-limit argument valid when every node receives many messages.
-On a chain each node receives exactly two: the central-limit argument
-fails by construction, and we are not aware of a quantitative assessment
-of the Gaussian message closure on chain-structured diffusion
-posteriors.
-
-\paragraph{Amortising inference into a network.} The three strands above
-concern how the score can be \emph{computed}. A diffusion model does not
-compute it; it trains a network to reproduce it, and the distinction is
-one of kind rather than of accuracy. Sum--product on the posterior chain
-determines a whole distribution over the latent sequence, by making a
-free energy stationary over a family rich enough --- because the graph is
-a tree --- that the minimiser is exact rather than approximate. A score
-network is a fixed-depth feed-forward map: it spends the same computation
-on every input, whatever that input demands. The distinction is not that
-such a map cannot represent the \emph{result} of the inference --- a
-sufficiently expressive network can approximate the input--output function
-of an iterative algorithm, and Chapter~\ref{ch:graphical} discusses
-architectures argued to do exactly that on tree-structured data. It is
-that the network does not \emph{perform} instance-wise inference: it
-produces the answer directly rather than by a search whose length adapts
-to the instance. Reversal is iterative, over a horizon and a discretisation
-the sampler fixes, but each step's
-score still comes from the fixed-compute map, so the network stands to the
-inference as an \emph{amortisation} \citep{lecun2006tutorial}.
-
-Whether that amortisation is cheap or expensive is, in general,
-unmeasurable: it would require the very object the network was trained to
-stand in for. On the family of this thesis that object is available, so
-the question becomes an experiment. The works above do not measure it,
-because none of them combines a correlated non-Gaussian target computable across
-the whole noise schedule with an estimator that learns the transition from
-noised data and a baseline trained on the same data. What the measurement shows is reported in
-Chapter~\ref{ch:em-results}, including the respect in which it is
-\emph{not} a simple function of the sample size: the error ratio is not
-monotone in the training-set size, and no trend in it is claimed here.
-
-The gap, in one sentence: there is no end-to-end, exactly solvable
-account of the joint diffusion score of a structured sequence, covering
-its matrix structure, its message-passing computation, the price of the
-Gaussian closure when the sequence is not Gaussian, and the price of
-amortising the whole computation into a network.
+One methodological choice follows from the same reasoning and is worth stating
+early. Where no closed form exists, the reference used throughout is
+deterministic quadrature and not Monte Carlo. A particle smoother carries
+sampling error, which would add a second error term to every comparison and
+force the cost of an approximation and the cost of the reference to be
+disentangled before either could be read. Grid-based inference carries a
+discretisation error instead, which can be bounded separately and reported,
+and that is what makes it usable as a reference and not merely as another
+competitor.
 
 \section{Research questions}\label{sec:rq}
 
@@ -266,239 +203,105 @@ algorithms in general: the two arms are asymmetric in supplied
 information by construction, which is what makes the measurement
 meaningful and also what bounds it.
 
-Chapter~\ref{ch:ring} is a self-contained case study rather than a
-seventh question. It asks what joint observations can identify that no
-single-frame marginal can, on a rotating-ring model whose state space and
-estimand both differ from the chain's, and it is placed after the main line
-rather than inside it.
+Chapter~\ref{ch:ring} answers no numbered question. It comes first because it
+is where the work began, and because what it settles motivates the six: on a
+rotating-ring model, whose state space and estimand both differ from the
+chain's, it shows what joint observations can identify that no single-frame
+marginal can.
 
 \section{Contributions}
 
-\noindent This thesis makes four principal contributions, stated here in the
-order the body develops them.
+\noindent Four contributions, in the order the body develops them. Each is
+stated here as a claim and a kind of claim; the derivations are in the chapters
+named and the measured values are reported there and in
+Chapter~\ref{ch:conclusions}.
 
 \begin{enumerate}
-  \item \textbf{Exact scores for a noised Gaussian Markov chain.}
-  For the stationary Gaussian AR(1) chain under coordinatewise OU corruption we
-  derive the joint score in closed form, diagonalise it for all diffusion times
-  in a single eigenbasis, and characterise how its coupling structure changes
-  with $t$: a band-fill law
-  $(\Qt)_{i,i+d} = (-1)^{d-1}(2t)^{d-1}(\Qz^d)_{i,i+d} + O(t^d)$ at small $t$,
-  a return to isotropy at rate $e^{-2t}$, and exact bulk formulas for the
-  posterior variance and for the geometric decay rate $q(\alpha,t)$ of posterior
-  correlations. We show that belief propagation on the chain's factor graph is
-  exactly the Kalman filter followed by Rauch--Tung--Striebel smoothing, update
-  by update, and that it reproduces the matrix score to double-precision
-  rounding. We prove that the influence of evidence at distance $d$ decays as
-  $q(\alpha,t)^d$, and separately \emph{measure} that the radius-$r$ windowed
-  estimator's error decays at the same rate over $r = 2,\dots,13$ --- separately,
-  because windowing changes the boundary conditions of the recursion in a way
-  the influence-coefficient argument does not cover (Chapter~\ref{ch:gaussian}).
+  \item \textbf{The joint score of a noised Gaussian Markov chain, in closed
+  form.} For the stationary AR(1) chain under coordinatewise OU corruption we
+  derive the score, diagonalise it in a single eigenbasis valid at every
+  diffusion time, and give the law by which its couplings fill in at small $t$
+  and decay back to isotropy at large $t$, together with exact bulk formulas
+  for the posterior variance and the correlation decay rate $q(\alpha,t)$
+  (Chapter~\ref{ch:gaussian}). Computing the same score by message passing, we
+  show that belief propagation on the chain is the Kalman filter followed by
+  Rauch--Tung--Striebel smoothing, update by update, and prove that the
+  influence of evidence at distance $d$ falls as $q(\alpha,t)^d$. That the
+  radius-$r$ windowed estimator's error falls at the same rate is established
+  separately, and by measurement, because windowing changes the boundary
+  conditions of the recursion in a way the influence argument does not cover
+  (Chapter~\ref{ch:gaussian-bp}).
 
-  \item \textbf{A controlled non-Gaussian reference, and an exact reading of
-  Gaussian message closure.} For Laplace innovations, functional belief
-  propagation remains exact on the chain, but its messages no longer close in a
-  finite-dimensional family. We construct a numerically validated quadrature
-  reference and prove that moment-projected Gaussian messages return exactly the
-  LMMSE estimator of the covariance-matched Gaussian model, and the same
-  estimator for every innovation law sharing the first two moments
-  (Theorem~\ref{thm:l-lmmse}). The measured gap is therefore the price of
-  discarding everything beyond second moments, not the error of one
-  implementation: a median relative score error of $0.24$ at $t = 0.05$, below
-  $10^{-2}$ by $t \approx 1$ and below $10^{-3}$ by $t \approx 2.1$, with
-  direction recovered more accurately than magnitude (Chapter~\ref{ch:laplace}).
+  \item \textbf{An exact reading of what Gaussian message closure computes.}
+  For Laplace innovations the functional recursion stays exact on the chain but
+  its messages no longer close in any finite-dimensional family. We build a
+  numerically validated quadrature reference, and prove that moment-projected
+  messages return exactly the LMMSE estimator of the covariance-matched
+  Gaussian model (Theorem~\ref{thm:l-lmmse}). The measured departure is
+  therefore attributable: it is what discarding higher moments costs, for every
+  innovation law with the same first two moments, and not what one
+  implementation costs (Chapter~\ref{ch:laplace}).
 
-  \item \textbf{Learning an unknown transition from noised sequences.}
-  We drop the assumption that the transition law is known. Fisher's identity
-  turns one forward--backward pass into the exact gradient of the marginal
-  log-likelihood, with no differentiation through the recursion; the E-step is
-  structurally exact for any innovation law, while the implementation uses
-  controlled grid quadrature and a generalised M-step. The convergence
-  experiments separate the mixture label's own latent-variable difficulty from
-  the additional missing information the observation channel introduces, and
-  measure the consequence: the fitted innovation shape settles at a median of
-  $\convshapemed$ updates against $\convrhomed$ for the correlation, so a
-  stopping rule read off the correlation trace certifies a kernel that has not
-  converged in the coordinate every non-Gaussian claim depends on
-  (Chapter~\ref{ch:em-method}).
+  \item \textbf{Recovery of an unknown transition law from noised sequences.}
+  Dropping the assumption that the kernel is known, we show that Fisher's
+  identity makes one forward--backward pass yield the exact gradient of the
+  marginal log-likelihood, so no derivative is taken through the recursion and
+  the E-step stays structurally exact for any innovation law
+  (Chapter~\ref{ch:em-method}). Measuring what convergence costs then produces
+  a result rather than a diagnostic: the correlation and the innovation shape
+  settle at very different rates, so a stopping rule read off the first
+  certifies a kernel unconverged in the second (Chapter~\ref{ch:em-kernel}).
 
-  \item \textbf{The measured value and limits of supplied Markov structure.}
-  At equal training-set size, EM--BP attains $\ratiolo$--$\ratiohi\times$ lower
-  pointwise denoising error than an unstructured network across
-  \nsizesused{} sizes, and $\structratiolo$--$\structratiohi\times$ lower error
-  than a weight-shared window head selected by a screen over three
-  architectures on disjoint seeds. Controlled experiments then delimit that
-  advantage under finite-grid mixture capacity and under two departures from
-  the Markov assumption. All of these conclusions are restricted to the stated
-  numerical and statistical protocols (Chapter~\ref{ch:em-results}).
+  \item \textbf{The measured value of supplied Markov structure, and its
+  limit.} At equal training data the structured estimator is substantially more
+  accurate than networks trained by denoising score matching, and remains so
+  against a baseline given locality and weight sharing by an architecture
+  screen. The contribution is as much the boundary as the margin: controlled
+  departures from the Markov assumption locate where the advantage ends and the
+  networks overtake it (Chapter~\ref{ch:em-results}).
 \end{enumerate}
-
-\noindent Two further results sit alongside the main line rather than inside it.
-The rotating-ring model of Chapter~\ref{ch:ring} extends the state at each site
-from a scalar to a point on a circle and gives an exactly interpretable example
-in which a dynamical parameter is absent from every one-frame marginal yet
-identifiable from the trajectory. The per-node AMP/TAP closure on the Gaussian
-chain, developed in Appendix~\ref{app:amp}, returns the exact score but a
-different posterior variance, with an existence boundary in closed form, a
-breakdown time $t_c(\alpha)$, and a critical coupling
-$\alpha_c = \sqrt{2} - 1$ (statement of results in
-Section~\ref{sec:conclusions-amp}).
-
-\section{Methodology}\label{sec:method}
-
-The methodology is deliberate: closed forms first, numerics as audit.
-Analytical results lead, and every approximation is measured against a
-reference computed by an independent method rather than assumed small.
-Networks appear in exactly one role --- as the baseline RQ6 measures the
-structured estimator against --- and never as an instrument for
-establishing anything about the model itself. Claims in this thesis are
-established in three ways, and the difference is not cosmetic. Most are proved by explicit
-algebra (with the longer passages isolated in numbered \emph{toolboxes}).
-Others are verified by deterministic numerical checks against a reference
-computed by an independent method, in the spirit of the exactly solvable
-programme of \citet{biroli2023generative}. Where an approximation is introduced
---- the Gaussian closure of BP messages, local truncations --- its error is
-\emph{measured} against a reference computed either by matrix algebra or by
-dense grid quadrature validated on the solvable case. The latter is a
-numerically validated reference, not an exact one, and is used only inside the
-resolution regime where that validation holds. The learning chapters
-(\ref{ch:em-method} and~\ref{ch:em-results}) are neither: they are stochastic
-estimation experiments, reported with paired uncertainty over seeds, and their
-conclusions are statistical rather than certain. All numbers in the thesis are
-regenerated by deterministic scripts from frozen outputs, documented in
-Appendix~\ref{app:repro}; we regard this reproducibility as a strength of the
-method, not as a contribution in itself.
-
-\paragraph{The status a result then carries, in five labels.} How a claim is
-established is not quite the same as what it may afterwards be asserted to be,
-and ``exact'' is used for several different things in this literature. The
-thesis therefore fixes one vocabulary of five labels, finer than the three modes
-above, and each research chapter closes with a section classifying its own
-results in it.
-
-\begin{description}
-  \item[Exact, by derivation.] An identity of the continuum model, proved
-  algebraically. It holds for the mathematical object, whatever a computer
-  subsequently does with it.
-  \item[Exact for the discretised model.] A statement true of the finite
-  grid after a stated discretisation --- BP on the resulting chain-shaped
-  factor model, for instance, is exact up to floating point. This does
-  \emph{not} claim the discretisation reproduces the continuum answer; that is
-  the next category. Which discretised object is meant has to be said, since
-  more than one is available: Section~\ref{sec:em-numerical} states the
-  convention used here.
-  \item[Numerical, in a validated regime.] A measurement whose error is
-  bounded against an independently computed reference, over the stated grids,
-  tolerances and parameter ranges, and not beyond them.
-  \item[Statistical, over seeds.] An estimate from a stochastic experiment,
-  reported with paired uncertainty across replicates. It can be resolved,
-  unresolved, or resolved against a predeclared region, and none of those is
-  the same as proved. The learning chapters are almost entirely of this kind.
-  \item[Interpretation.] A reading of the measurements that is consistent
-  with them but not established by them. Kept where it is useful and labelled
-  wherever it appears.
-\end{description}
-
-\noindent The distinction between the first two matters most in
-Chapters~\ref{ch:laplace} and~\ref{ch:em-method}: sum--product on the
-posterior chain is exact by derivation as a recursion over functional
-messages, while what is computed is a grid approximation to it whose error is
-measured separately. Both statements are true, and they are not the same
-statement.
-
-\section{Scope and limitations}
-
-The exact results concern one-dimensional state per frame, linear AR(1)
-dynamics, and stationary initial conditions. The non-Gaussian results
-are numerical, valid within the validated resolution regime of the
-reference solver and the tested parameter ranges. The locality results
-are proved for the Gaussian bulk only.
-
-The learning results (RQ5, RQ6) carry their own limits, and they are
-tighter than the analytical ones. The estimator is given the Markov
-factorisation, the autoregressive form, homogeneity across sites, and an
-innovation family flexible enough to represent the truth closely; nothing
-here speaks to a setting where those do not hold. The last of these is a
-representation rather than an exact containment: a $C$-component Gaussian
-mixture does not contain a Laplace density for any finite $C$. What maximum
-likelihood approaches is therefore the best approximation within the fitted
-family, and the recovery statements of Chapter~\ref{ch:em-results} concern
-specific summaries --- $\alpha$, the innovation variance, its excess
-kurtosis --- rather than the transition density as a whole. The comparison in
-RQ6 is thus a measurement of what a correct structural assumption buys on one
-family. It is not evidence that likelihood learning through belief propagation
-is a better learning algorithm than score matching --- a distinction the thesis
-maintains wherever the numbers appear. Any implication for trained score
-networks in practice remains a hypothesis suggested by a controlled
-model, not an established property of practical systems.
-
-One line of experiment is reported as unresolved rather than as a finding:
-the reverse-generation study of Section~\ref{sec:em-generative}, whose fits used
-a fixed iteration budget far shorter than the innovation shape needs to settle,
-so that it scores converged estimators against unconverged ones on the one
-coordinate it measures. It supports no conclusion in
-Chapter~\ref{ch:conclusions}. A second question --- how much innovation-mixture
-capacity is worth having --- was unresolved for the same reason in an earlier
-and much smaller design; it was rerun to a convergence criterion at sixteen
-seeds and is answered in Section~\ref{sec:em-capacity}, in the opposite
-direction to the one the earlier design suggested.
 
 \section{Structure of the thesis}
 
-Chapters~\ref{ch:background} and~\ref{ch:graphs} contain the background and
-literature review; Chapters~\ref{ch:development}--\ref{ch:em-results}
-contain the research. Throughout, each concept is developed once, in the
-chapter where it naturally belongs, and then used without repetition.
+Chapter~\ref{ch:statmech} is the context: statistical mechanics and the
+variational principle behind the Boltzmann distribution, energy-based models as
+the same object with a learned energy, generative diffusion and the reverse-time
+SDE, and then the distinction the rest of the thesis turns on, between the
+exact, the empirical and the fitted score. It closes with the reading of U-Nets
+as belief propagation that makes exact inference a serious alternative to a
+trained network rather than a toy one. Chapter~\ref{ch:model} fixes the model
+and the estimand: the Markov sequence, the Ornstein--Uhlenbeck channel, the
+argument that the joint score and not a per-frame score is the object worth
+studying, and the factor-graph language the computations are written in.
 
-Chapter~\ref{ch:background} fixes the four objects the research chapters
-manipulate --- the Markov sequence that generates the data, the
-Ornstein--Uhlenbeck channel that corrupts it, the time reversal that makes
-generation possible, and the score--posterior identity that turns the
-reversal's unknown term into a posterior expectation --- and then states what
-the surrounding literature settles and what it leaves open. It is deliberately
-compressed to what the body uses. The statistical mechanics from which these
-models descend, the lineage that carries it into machine learning, and the
-step-by-step derivations behind each result quoted there are in \compendium{},
-at full length.
-Chapter~\ref{ch:graphs} builds the inference machinery this thesis reasons
-with: Markov random fields, factor graphs, the sum--product algorithm and the
-conditions under which it is exact, and the architectural mirror of locality in
-convolutional networks and U-Nets. The multivariate Gaussian and its
-precision-matrix reading, the spectral theorem, the identification of Gaussian
-BP with the Kalman filter, and the TAP/AMP closures are developed where they are
-used --- in Chapter~\ref{ch:gaussian} and Appendix~\ref{app:amp} --- rather than
-stockpiled here.
+Chapter~\ref{ch:ring} begins the research where the research began, with a
+planar trajectory near a circle. It shows that the rotation rate carries zero
+Fisher information in every one-frame marginal and positive information in the
+trajectory. That is the argument for the joint score in a single exact
+statement, and it is what sends the following chapters to a model where the
+joint score can be computed in full.
 
-Chapter~\ref{ch:development} settles the object of study: why the joint score of
-a trajectory rather than a per-frame score, and why the stationary AR(1) chain
-under coordinatewise OU noise is the minimal model in which that object is
-nontrivial yet exactly computable. Chapter~\ref{ch:gaussian} solves the
-Gaussian chain exactly (RQ1, RQ2, and the Gaussian half of RQ4), with
-the spectral form of the precision matrix as the organising object and
-belief propagation identified with the Kalman smoother.
-Chapter~\ref{ch:laplace} leaves Gaussianity in the most controlled way
-possible, Laplace innovations, and measures what the Gaussian message
-family costs when the data are no longer Gaussian (RQ3).
-Chapters~\ref{ch:em-method}--\ref{ch:em-results} leave the innovation law
-itself unknown: an EM procedure built on the exact chain inference of
-Chapter~\ref{ch:gaussian} estimates it from noised data alone, and the
-structured estimator is compared against trained neural denoisers ---
-unstructured and structure-aware --- along axes of model capacity and of
-misspecification of the Markov assumption itself. That closes the main line:
-one continuous argument from the Gaussian chain, through a controlled
-non-Gaussian departure, to a learned transition and its measured value.
-Chapter~\ref{ch:ring} then extends the state at each site from a scalar to a
-point on a rotating ring, a nonlinear dynamic object, and shows that a
-Cartesian surrogate is exactly solvable while the model as drawn is solvable
-numerically to a measured accuracy, both admitting the same structural
-description of the joint score. It is placed after the main results because it
-is an independent extension and nothing in them depends on it.
-Chapter~\ref{ch:conclusions} states findings per research question,
-limitations, and the questions that follow. The appendices contain proofs,
-numerical checks, aggregation analyses and reproducibility material that
-directly support the thesis's original results: the Gaussian identities with
-proofs, the AMP/TAP analysis with its exact phase boundary, the linear-algebra
-and rotating-ring derivations, the reproducibility protocol, and the robustness
-of both reported ratios to how they were aggregated. Extended historical
-background, literature notes, alternative derivations and the development
-record are collected in \compendium{}.
+Chapters~\ref{ch:gaussian} and~\ref{ch:gaussian-bp} do that for the stationary
+Gaussian chain, first with matrices and then with messages: the score in closed
+form, the lifecycle of its couplings, the identification of belief propagation
+with the Kalman filter and the Rauch--Tung--Striebel smoother, and the
+geometric decay that says how local an accurate approximation can be
+(RQ1, RQ2, RQ4). Chapter~\ref{ch:laplace} leaves Gaussianity in the most
+controlled way available, through Laplace innovations, builds a validated
+numerical reference, and measures exactly what a Gaussian message family
+discards (RQ3).
+
+Chapters~\ref{ch:em-method} and~\ref{ch:em-kernel} drop the assumption that the
+transition law is known and recover it from noised sequences alone, first two
+parameters and then a whole kernel, with the convergence schedule of the two
+coordinates as a result in its own right (RQ5). Chapter~\ref{ch:em-results}
+measures what supplying the Markov structure is worth against networks trained
+on identical data, and locates where it stops being worth anything (RQ6).
+Chapter~\ref{ch:conclusions} answers the six questions and states what is left
+open.
+
+Each concept is developed once, in the chapter where it is used. The
+appendices carry the Gaussian identities, the ring derivations, the
+reproducibility protocol and the aggregation robustness of the reported ratios.
+Extended background, alternative derivations, the AMP/TAP analysis and the
+development record are in \compendium{}.

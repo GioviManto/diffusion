@@ -28,8 +28,8 @@ the Markov assumption itself be wrong before the structure stops helping?
 \end{quote}
 
 \noindent Three are answered outright. The capacity question is answered for
-the estimator as implemented --- and in the opposite direction to the one a
-smaller design suggested --- but not for mixture capacity in the abstract, and
+the estimator as implemented, and in the opposite direction to the one a
+smaller design suggested, but not for mixture capacity in the abstract, and
 Section~\ref{sec:em-capacity} says exactly where that line falls. The
 generative-fidelity question is not answered at all, and the section that
 addresses it says why the experiment as run cannot settle it. The summary at the
@@ -49,6 +49,55 @@ and has no radius of its own to match. The comparison measures the value of the
 structure supplied, not a general claim about neural denoisers.
 
 \section{Pointwise data efficiency}\label{sec:em-pointwise}
+
+\subsection{What is being measured}\label{sec:em-estimand}
+
+Every number in this chapter is a ratio of two relative $L^2$ score errors, and
+because the ratio is what the conclusions rest on, the definition is written
+out here rather than deferred.
+
+Fix a diffusion time $t$ and a test set $\{x^{(j)}\}_{j=1}^{J}$ of noised
+sequences drawn from the model of Section~\ref{sec:em-model}. Let
+$\score^{\star}(x,t) = \nabla_x \log p_t(x)$ be the exact joint score, available
+in closed form for the Gaussian chain and from the validated grid reference of
+Section~\ref{sec:l-grid} otherwise. For an estimator $\widehat{\score}$, the
+error on that test set is
+\begin{equation}
+  \mathcal{E}\big[\widehat{\score}\big]
+  \;=\;
+  \frac{\Big(\sum_{j=1}^{J}\big\lVert \widehat{\score}(x^{(j)},t) - \score^{\star}(x^{(j)},t)\big\rVert_2^2\Big)^{1/2}}
+       {\Big(\sum_{j=1}^{J}\big\lVert \score^{\star}(x^{(j)},t)\big\rVert_2^2\Big)^{1/2}},
+  \label{eq:em-relerr}
+\end{equation}
+the ratio of two Euclidean norms over the whole test set, so that a value of
+$0.1$ means the estimate is wrong by a tenth of the signal's own size. This is
+\codefile{metrics.rel\_l2} applied to the stacked residual, and it is scale-free
+by construction: multiplying the data by a constant leaves it unchanged.
+
+The two arms are the EM--BP estimator of Chapter~\ref{ch:em-method}, which is
+given the Markov factorisation and estimates $\ivar$ and $\corr$ from the same
+$\nseq$ noised sequences the network sees, and a denoising-score-matching
+network trained on those sequences by \eqref{eq:sm-dsm} and given no structural
+information at all. Writing $\mathcal{E}_{\mathrm{net}}$ and
+$\mathcal{E}_{\mathrm{EM}}$ for their errors on a common test set, the reported
+quantity is
+\begin{equation}
+  R \;=\; \frac{\mathcal{E}_{\mathrm{net}}}{\mathcal{E}_{\mathrm{EM}}},
+  \qquad R > 1 \ \text{means the structured estimator is more accurate,}
+  \label{eq:em-ratio}
+\end{equation}
+evaluated cell by cell, where a cell is one (training-set size, seed) pair.
+Both arms are re-fitted independently in every cell.
+
+Two aggregation choices remain, and they matter because $R$ is a ratio of
+means and not a mean of ratios. This chapter reports the seed-first estimand:
+errors are averaged over seeds at fixed size, and the ratio is formed from
+those averages. Appendix~\ref{app:aggregation} recomputes the same frozen cells
+under four alternatives; the direction and the order of magnitude are the same
+in all of them, and the estimand quoted here is systematically the largest,
+which is stated wherever the number appears.
+
+\subsection{The measured advantage}
 
 Under the structural assumptions of Section~\ref{sec:em-model}, at the data
 budgets tested, the
@@ -72,7 +121,7 @@ shows that the generic-MLP comparison overstates what can be attributed
 specifically to the supplied Markov model. The relevant locality result is the
 influence decay of Chapter~\ref{ch:gaussian}.
 
-\input{../shared/sections/tab-efficiency}
+\input{sections/tab-efficiency}
 
 \begin{figure}[t]\centering
 \includegraphics[width=0.82\linewidth]{fig_sample_efficiency.pdf}
@@ -90,7 +139,7 @@ Table~\ref{tab:pointwise}.}
 Every tunable quantity either arm is allowed to choose is chosen on a
 validation bundle disjoint from both the training set and the test set, and the
 two arms are given the same privilege: the network selects its output
-parameterisation --- predicting the noise or the clean signal --- \emph{and} its
+parameterisation, predicting the noise or the clean signal, \emph{and} its
 training length, EM--BP its iteration count. That choice coincides with the
 test-set optimum in $\netagree\%$ of cells for the network and $\emagree\%$ for
 EM--BP. A dedicated audit of the selection rule, over $\valselcells$ cells at
@@ -117,15 +166,14 @@ screened on $\screendevseeds$ development seeds, disjoint from the
 $\structseeds$ used below: a weight-shared window head (which cannot propagate
 past its radius however much data it sees), a dilated convolutional stack, and a
 bidirectional message-passing network (both able, in principle, to propagate
-across the whole chain). Each was run over its own hyperparameter grid --- a
+across the whole chain). Each was run over its own hyperparameter grid, a
 shared learning-rate grid, both output parameterisations, and a common
-checkpoint ladder from $\screenckptlo$ to $\screenckpthi$ steps ---
-$\screenconfigs$ configurations in all, scored on the \screenregion{} region.
+checkpoint ladder from $\screenckptlo$ to $\screenckpthi$ steps, $\screenconfigs$ configurations in all, scored on the \screenregion{} region.
 \textbf{The window head won}, at radius $\screenwinnerradius$ and width
 $\screenwinnerwidth$, with the \screenrunnerup{} network next
 ($\screenwinnerrisk$ against $\screenrunneruprisk$).
 
-\input{../shared/sections/tab-screening}
+\input{sections/tab-screening}
 
 \begin{figure}[t]\centering
 \includegraphics[width=0.82\linewidth]{fig_screening.pdf}
@@ -144,22 +192,17 @@ it is the more useful object: the three architectures separate by parameter
 count far more cleanly than by risk, and the two arms built to propagate further
 occupy the expensive half of the axis without buying anything there.
 
-What that does and does not license is worth stating, because the two are
-easily confused. It is a \emph{model-selection} fact: under this search space,
-this training protocol and these development seeds, the simplest candidate
-scored best. It is not evidence that long-range propagation is intrinsically
-useless here, that radius $\screenwinnerradius$ is the population-optimal
-receptive field, or that a dilated or message-passing architecture could not
-overtake it under different tuning. It does establish that the long-range
-arms were not offered a smaller budget: the dilated stack carries
+This is a model-selection fact and not a claim about architectures: under this
+search space, protocol and development seeds, the simplest candidate scored
+best. It is not evidence that long-range propagation is useless here, that
+radius $\screenwinnerradius$ is population-optimal, or that either other
+architecture could not overtake it under different tuning. What it does rule
+out is that the long-range arms were starved: the dilated stack carries
 \screenconvparams{} parameters against the window head's
-\screenwindowparams{}, an order of magnitude more, and finished last of the
-three. A larger parameter count is not by itself proof of adequate optimisation
-or of a correct inductive bias, so this bounds one explanation rather than
-eliminating the class. Under the stated development screen the radius-
-\screenwinnerradius{} window head achieved the lowest validation risk, and the
-confirmatory experiment below therefore compares EM--BP with the
-best-performing candidate in that screen. That scoping is carried in every
+\screenwindowparams{}, an order of magnitude more, and finished last. Parameter
+count alone is not proof of adequate optimisation, so this bounds one
+explanation without eliminating the class. The comparison below is therefore
+against the best candidate in this screen, and that scoping travels with every
 claim that follows.
 
 \begin{figure}[t]\centering
@@ -183,17 +226,17 @@ and~\ref{tab:structured}.}
 \label{fig:em-value-of-structure}
 \end{figure}
 
-\input{../shared/sections/tab-structured}
+\input{sections/tab-structured}
 
 A ratio against a fully connected network is not comparable to this one: a
 large fraction of that headline margin disappears once locality and weight
-sharing are supplied. What survives against a baseline that has them --- the
-window head --- is $\structratiolo$--$\structratiohi\times$, all-site scored,
+sharing are supplied. What survives against a baseline that has them, the
+window head, is $\structratiolo$--$\structratiohi\times$, all-site scored,
 across the same four sizes as Table~\ref{tab:pointwise}. EM--BP is more
 accurate in every one of the $\structcells$ scored cells; that count is
 $\structseeds$ seeds $\times$ $\structsizes$ sizes $\times$ $\structregions$
 scoring regions (\structregionlist{}), of which the table displays two, and it
-is a descriptive diagnostic rather than a replication count --- the regions and
+is a descriptive diagnostic rather than a replication count, the regions and
 sizes share fitted models and training data, so the inferential unit behind each
 displayed row is the $\structseeds$ paired seeds.
 
@@ -213,11 +256,10 @@ measured; the mechanism is not.
 Both arms choose their budget symmetrically, on a validation bundle disjoint
 from test, \emph{within the budget grids on offer}: $\structcapem\%$ of EM--BP
 cells and $\structcapwindow\%$ of window-head cells select the last rung of
-their respective ladder. Selecting the last rung is not proof of convergence ---
-it is a sign that validation error was still falling where the grid ran out, and
+their respective ladder. Selecting the last rung is not proof of convergence, it is a sign that validation error was still falling where the grid ran out, and
 that a wider grid might have improved that arm further. So the reported values
 compare the two procedures at stated, validation-selected computational budgets,
-not at converged optima. Table~\ref{tab:aggregation-structured} reports the
+not at converged optima. Appendix~\ref{app:aggregation} reports the
 same ratio under $\structaggcount$ aggregations of the same cells; none of them,
 at any size, falls below $\structaggfloor\times$.
 
@@ -230,11 +272,11 @@ kernel the estimator would use if it did not model the innovation law at all ---
 on identical training and evaluation data within each cell, at $\capseeds$
 seeds and two training sizes, with three initialisations per cell and the
 reported one selected on validation. The fits are run to their
-plateau rather than to a fixed iteration count, because
+plateau and not to a fixed iteration count, because
 Section~\ref{sec:em-convergence} measures the fitted shape as settling far later
 than the correlation coefficient does, and shape is what capacity moves.
 
-\input{../shared/sections/tab-capacity}
+\input{sections/tab-capacity}
 
 \begin{figure}[t]\centering
 \includegraphics[width=\linewidth]{fig_capacity.pdf}
@@ -281,7 +323,7 @@ direction of worse held-out evidence and worse score risk for $C=16$.
 
 \begin{remark}[Two things this does not isolate]\label{rmk:em-capacity-caveats}
 Both point the same way, and both are reasons to read the table as a statement
-about this estimator on this grid rather than about mixture capacity as such.
+about this estimator on this grid and not about mixture capacity as such.
 First, every cell at $C \geq \capcappedfrom$ stopped at the
 $\capiterlimit$-iteration cap rather than at the convergence tolerance
 ($\capcappedcells$ of $\capcappedtotal$). The cap was placed at the measured
@@ -319,11 +361,9 @@ settled in the shape coordinate. Because a larger $C$ has more shape
 parameters to move within the same budget, under-iteration alone produces a
 curve that looks exactly like a capacity effect whether or not capacity is doing
 anything. This is why
-any quantity resting on fitted or generated \emph{shape} at a fixed budget --- in
-particular the reverse-dynamics comparison of
-Section~\ref{sec:em-generative}, which reuses forty-iteration fits --- is read
-here as evidence about an under-converged operating point rather than about the
-converged estimator.
+any quantity resting on fitted or generated \emph{shape} at a fixed budget, the
+withdrawn reverse-dynamics comparison included, is evidence about an
+under-converged operating point and not about the converged estimator.
 \end{remark}
 
 Per-iteration runtime changes little over the tested capacity range,
@@ -334,28 +374,6 @@ one iteration. It does not remove the confounds above: the higher-capacity fits
 are precisely the ones for which the iteration-cap and grid-resolution
 diagnostics become less favourable.
 
-\section{Pointwise accuracy and generative fidelity}
-\label{sec:em-generative}
-
-Whether the pointwise advantage transfers to generation is not settled by
-the experiments available here, and the reason is the budget rather than the
-measurement. Every fit in this comparison used a fixed budget of $\convbudget$ EM
-iterations, while Section~\ref{sec:em-convergence} measures the fitted
-innovation shape --- which is precisely what the generative metric scores --- as
-settling at a median of $\convshapemed$ iterations, and as still moving at
-$\convbudget$ in $\convunsettledpct\%$ of the configurations swept. The
-comparison therefore evaluates procedures whose fitted shape coordinates are
-unequally settled under the available budgets, on the one coordinate that
-carries the generative metric, and a dissociation between pointwise and
-generative quality cannot be separated from that asymmetry.
-
-The dissociation may well be real, and the design cannot distinguish it from
-its own iteration budget. No claim in either direction is made here. The
-measured values, the within-arm form of the comparison and the convergence
-diagnostic that settles it are recorded in the companion compendium's claim
-audit. What would settle the question is the same correction that
-Section~\ref{sec:em-capacity} applies: select both arms on a convergence
-criterion rather than a fixed count, then compare.
 
 \section{Where the Markov assumption stops paying}\label{sec:em-nonmarkov}
 
@@ -376,8 +394,7 @@ form; the Laplace arm carries the rank-one mechanism, where the same
 contamination can be applied to a non-Gaussian chain and the reference computed
 on the grid. Reading them together separates what is a property of the chain
 structure from what is a property of Gaussianity. On the rank-one mechanism the
-two agree in shape --- the same ordering, the same smooth decay, no crossing
---- and differ at the margin. At $\beta = \nmbetamax$ the Gaussian arm is still
+two agree in shape, the same ordering, the same smooth decay, no crossing, and differ at the margin. At $\beta = \nmbetamax$ the Gaussian arm is still
 ahead at every noise level against both baselines, worst ratio
 $\nmbetaminratio$; the Laplace arm is still ahead against the convolutional
 baseline, worst ratio $\nmlapbetaminratiocnn$, but reaches the break-even line
@@ -386,7 +403,7 @@ $\nmlapbetaminratio$. The ordering carries across both innovation laws tested;
 the size of the margin it leaves does not quite. Whether it carries beyond these
 two families is not established here.
 
-\input{../shared/sections/tab-nonmarkov}
+\input{sections/tab-nonmarkov}
 
 \begin{figure}[t]\centering
 \includegraphics[width=\linewidth]{fig_nonmarkov.pdf}
@@ -401,8 +418,7 @@ rank-one sweep, which shows that the rank-one result is not confined to the
 Gaussian experiment; its generality beyond these two innovation families
 remains open. The long-range panel is Gaussian only, since the contaminated
 Laplace model has no closed-form reference. Every curve is a mean
-over the noise schedule, so it shows the direction rather than the worst case
---- the tie reported in the text at $\beta = \nmbetamax$ is at one noise level
+over the noise schedule, so it shows the direction rather than the worst case, the tie reported in the text at $\beta = \nmbetamax$ is at one noise level
 and is not visible here. All fall because the estimator degrades, not because
 the baselines improve: the last row of each block in
 Table~\ref{tab:nonmarkov} carries EM--BP's own error.}
@@ -417,8 +433,8 @@ that correction within its own fitted coefficients: the fitted correlation
 climbs from $\nmrhoclean$ on the clean chain to $\nmrhobetamax$ at
 $\beta = \nmbetamax$: the fitted chain partially accommodates the rank-one
 perturbation by changing its effective lag-one correlation. This is partial
-accommodation over a measured range, not an exact representation --- a first-order Markov family does not contain the contaminated
-law --- but the residual it cannot represent stays small enough that the
+accommodation over a measured range, not an exact representation, a first-order Markov family does not contain the contaminated
+law, but the residual it cannot represent stays small enough that the
 advantage never inverts: at $\beta = \nmbetamax$, where half the marginal
 variance is a shared global constant, the ratio at its worst noise level is
 still $\nmbetaminratio$ against the weaker of the two baselines.
@@ -426,21 +442,22 @@ still $\nmbetaminratio$ against the weaker of the two baselines.
 Long-range coupling is only \emph{approximately} low rank, and a chain family
 cannot represent it at all. The advantage against the convolutional baseline is
 gone by $\gamma = \nmcrossover$, having survived $\gamma = \nmlastholding$, and
-by $\gamma = 0.2$ the estimator loses to both baselines rather than to one; at
-$\gamma = \nmgammamax$ its worst ratio is $\nmgammaminratio$ and its own
-relative score error reaches $\nmemworsterr\%$.
+by $\gamma = 0.2$ the estimator loses to both baselines and not to one; at
+$\gamma = \nmgammamax$ the ratio at its worst noise level is
+$\nmgammaminratio$, where Table~\ref{tab:nonmarkov} reports the larger
+schedule-averaged value, and its own relative score error reaches
+$\nmemworsterr\%$.
 
 Two rows of the table separate the mechanism from the outcome. The estimator's
-own error is what moves in both blocks --- the baselines barely change --- so
-neither column is a story about the networks improving. What distinguishes the
-two violations is the last row of each block: under rank-one contamination the
-fitted chain stays within $\nmcldevbeta$ of the Chow--Liu correlation, the best
-first-order approximation of the contaminated truth, so its fitted lag-one
-correlation remains close to the corresponding first-order projection --- one
-scalar agreeing, not the whole fitted law certified; under long-range coupling
-that gap is $\nmcldevfactor$ times
-larger, which is what it looks like when the family can no longer represent
-what generated the data. The uncontaminated controls of the two blocks are the
+own error is what moves in both blocks, the baselines barely change, so
+neither column is a story about the networks improving. The last row of each block is what
+distinguishes the two violations. Under rank-one contamination the fitted chain
+stays within $\nmcldevbeta$ of the Chow--Liu correlation, the best first-order
+approximation of the contaminated truth, so its fitted lag-one correlation
+tracks the corresponding first-order projection. That is one scalar agreeing,
+not the whole fitted law certified. Under long-range coupling the same gap is
+$\nmcldevfactor$ times larger, which is what it looks like when the family can
+no longer represent what generated the data. The uncontaminated controls of the two blocks are the
 same configuration reached from two directions, and they agree to within $2\%$
 ($\nmcontrolbeta$ and $\nmcontrolgamma$), which is what makes the rest of the
 table readable across blocks.
@@ -451,7 +468,7 @@ under a harder innovation law was the \emph{representability of messages} in
 a finite-dimensional family, while the tree, the two-sweep schedule, and the
 score--posterior identity survived unconditionally. Here, the further
 question is what breaks when the graph is not a tree to begin with. The
-answer is not "misspecification degrades the advantage" uniformly --- it is
+answer is not "misspecification degrades the advantage" uniformly, it is
 that a chain-structured estimator tolerates the one violation it can
 absorb into its own parameters and fails on the one it structurally cannot
 represent, and the two are not interchangeable amounts of "how wrong the
@@ -530,69 +547,6 @@ and the entries are printed to two significant digits for that reason. And the
 comparison is across the tested noise grid rather than a limit: the decay
 is measured between $t=0.05$ and $t=1.6$, and how it continues past the
 schedule's end is not established here. What the table supports is the
-direction and the order --- shape information collapses far faster than
-correlation information --- which is the claim the rest of the chapter
+direction and the order, shape information collapses far faster than
+correlation information, which is the claim the rest of the chapter
 rests on.
-
-\section{Scope not covered here}
-
-The estimator of Chapter~\ref{ch:em-method} was also extended, within the
-same research package, to video sequences and to natural-image patches, and
-to a wavelet-domain hidden-Markov-tree generalisation of the chain structure
-used throughout this thesis. Those extensions are reported in the package's
-own notebooks rather than reproduced here. The image comparison in
-particular fits the two kernel families with different and not directly
-comparable factories, so it does not support a ratio between them, and none
-is quoted in this thesis.
-
-\section{Summary}
-
-Three of the five questions this chapter opened with are answered outright, one
-is answered for the estimator as implemented rather than in general, and one is
-left open.
-
-\paragraph{Pointwise, against an unstructured network.} At equal training-set
-size the structured estimator attains relative denoising error lower than the
-MLP by a factor of $\ratiolo$--$\ratiohi$, across \nsizesused{} sizes and
-\nseedsused{} replicates. This is a ratio of errors at fixed data, not a ratio
-of the data required to reach a fixed error: the two curves do not cross in the
-range measured, so no data-equivalence factor is quoted.
-
-\paragraph{Pointwise, against a structure-aware network.} A large fraction of
-that margin is attributable to the MLP's lack of any locality prior rather than
-to the estimator. Against a weight-shared window head, at the same headline
-protocol and every site scored, the advantage is
-$\structratiolo$--$\structratiohi\times$, and it increases across the four sizes
-tested rather than falling. The increase is a description of those four
-measurements; an architecture with an approximation floor would produce the same
-signature, and this design does not separate the two
-(Section~\ref{sec:em-architecture}). The window head was itself the winner of a
-screen against two architectures built to propagate further across the chain,
-which bounds what the baseline is --- the strongest this screen found, not the
-strongest conceivable.
-
-\paragraph{Capacity, for this estimator.} Under this grid, this M-step and this
-iteration cap, no mixture capacity improves on a single Gaussian innovation at
-either training size, once fits are run to their plateau rather than to a fixed
-iteration count. Nothing here shows that a mixture cannot help a better-resolved
-or longer-run estimator. The predeclared equivalence test refuses
-``saturates by eight'' as well: at $\nseq = \capheadsize$ the $C=8 \to C=16$
-step is resolved against the region in the direction of $C=16$ being worse.
-Two things are not isolated --- the iteration cap and the grid's resolution
-floor, both of which disfavour the larger mixtures
-(Remark~\ref{rmk:em-capacity-caveats}) --- so the claim is about this estimator
-on this grid, not about mixture capacity in general.
-
-\paragraph{Misspecification.} The Markov structure the estimator relies on is
-not a single quantity of ``how much structure''. It survives a violation it can
-absorb into its own parameters --- a rank-one global latent, where the advantage
-never inverts even when half the marginal variance is a shared constant --- and
-fails, well before generic intuition about misspecification would suggest, on a
-long-range coupling it structurally cannot represent.
-
-\paragraph{Generation: open.} Whether the pointwise advantage transfers to
-generation is not resolved here. The comparison available evaluates procedures
-whose fitted shape coordinates are unequally settled on the single coordinate
-that carries the metric, so Section~\ref{sec:em-generative} withdraws the reading rather than
-reversing it. The correction is the one applied to capacity above: select on a
-convergence criterion, then compare.

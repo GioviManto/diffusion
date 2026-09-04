@@ -1,0 +1,96 @@
+\chapter{Learning the Kernel, and What Convergence Costs}\label{ch:em-kernel}
+
+Recovering two numbers is one problem; recovering a whole transition law is
+another. This chapter reports what happens when the innovation is represented
+nonparametrically, and the finding is not the recovery itself but its
+\emph{schedule}: the correlation and the innovation shape converge at very
+different rates, and a stopping rule read off the first certifies a kernel that
+has not converged in the second. Every non-Gaussian claim in this thesis
+depends on the coordinate that settles last, so this is a prerequisite for
+Chapter~\ref{ch:em-results} rather than a diagnostic beside it.
+
+\section{What the channel costs the E-step}\label{sec:em-convergence}
+
+What this chapter reports is not a theorem but a measurement, and it is the
+one that most directly qualifies the results of Chapter~\ref{ch:em-results}:
+how many EM iterations the algorithm of Section~\ref{sec:em-algorithm}
+actually needs.
+
+Table~\ref{tab:em-convergence} shows what the channel costs, in two parts: the
+through-channel fit at four updates, and where a clean and a channel arm each
+finish.
+
+\input{sections/tab-convergence}
+
+\noindent The two halves say different things. The trace shows the coordinates
+separating: the correlation is essentially in place by thirty updates while the
+innovation shape is still climbing at a hundred and twenty, because the mixture
+label is a latent variable of its own and the channel compounds the missing
+information, the mechanism of \citet{dempster1977maximum} appearing in the
+convergence rate, where the theory places it.
+
+The channel has two distinct effects, and they should not be collapsed into
+one. First, it changes the local rate of EM through the fraction of missing
+information, which is the effect the trace above displays. Second, at finite
+sample size it reduces the observed Fisher information and can therefore
+increase estimation uncertainty, an effect measured directly, by coordinate,
+in Section~\ref{sec:em-information}. Under identifiability and correct
+specification it need not move the population optimum, and that is the limited
+sense in which the clean and channel arms may approach the same endpoint while
+doing so at different rates. The endpoints here are consistent with that
+reading: the two arms finish within $0.002$ of each other on the correlation
+and within a fifth of a unit on excess kurtosis, both close to the generating
+values. This is evidence of similar fitted endpoints in this configuration, not
+of an absent information or accuracy penalty.
+
+\section{The convergence rates of the two coordinates}
+\label{sec:em-two-rates}
+
+That is one configuration. A dedicated sweep measured the cost across sixteen
+seeds, recording for each fit the first update after which a coordinate stays
+within a fixed relative tolerance of its value at the end of the run. At
+$\nseq = \convsize$, $C = \convcomps$ and the \convdesign{} noise design, over
+$\convseeds$ seeds run to $\convcap$ updates, the correlation coefficient
+settles at a median of $\convrhomed$ updates and the innovation shape at
+$\convshapemed$, the largest observed value being $\convshapemax$. Forming the
+ratio within each fit and then taking the median over fits gives $\convratio$;
+the quotient of the two medians is $\convratioofmedians$, and the paired figure
+is the one reported, because both coordinates are measured on the same fit.
+
+Two things about what that measures. ``Settled'' is trace stability, the
+first update after which a coordinate stays within $10^{-3}$ of its end-of-run
+value for $\alpha$, or $2\times10^{-2}$ for the excess kurtosis, and not
+distance to an optimiser; a coordinate can sit still while the density it
+belongs to moves along a shallow direction. And the run has to be long enough
+for the statistic to mean anything: the sweep was run at two lengths, and these
+medians come from the $\convcap$-update shard, the only one in which no
+configuration settles near its own cap. Against them, the fixed budget of
+$\convbudget$ iterations that several experiments in
+Chapter~\ref{ch:em-results} used as a default
+falls short of the shape coordinate's median by about a factor of six, and
+leaves $\convunsettled$ of the sweep's $\convunsettledof$ configurations
+unsettled in it. That count pools both shards, which is conservative:
+censoring can only shorten a measured settling time, so it cannot inflate
+the count.
+
+\section{The consequence for every non-Gaussian claim}
+\label{sec:em-stopping}
+
+\begin{remark}[Fixed budgets compare convergence rates, not estimators]
+\label{rmk:em-fixed-budget}
+This is the single methodological lesson of the chapter, and it recurs
+throughout the next one. Whatever coordinate of a fit converges slower looks
+worse under a fixed iteration count, and a slower-converging configuration
+under-iterated by the same budget produces what looks like a genuine deficit
+rather than symmetric noise, which is precisely the signature that makes it
+easy to mistake for a real effect. Compared correctly, at eight seeds and a
+fixed budget of 200 updates, no channel penalty is resolved in the reported
+shape summary: the paired clean $-$ noised difference at that operating point
+is $-0.052\pm0.217$, consistent with zero. The operating point is not a
+converged one, the chapter's own median settling time for the shape
+coordinate is $\convshapemed$ updates, so this is a statement about the
+paired difference at $200$ updates, not about the converged estimators. A single non-converged draw would
+not have supported that comparison in either direction. Where Chapter~\ref{ch:em-results}
+reports a result obtained at a fixed, possibly insufficient budget, it says so
+explicitly and states which quantities are and are not affected.
+\end{remark}

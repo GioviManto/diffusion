@@ -1,5 +1,5 @@
 % ============================================================
-% Chapter 9 — The rotating ring
+% Chapter 4 -- The rotating ring
 %
 % Original work of this thesis, reported here for the first time; there is
 % no external source to cite for the derivations, the diagnostics, or the
@@ -10,31 +10,34 @@
 \chapter{The Rotating Ring: A Two-Dimensional Dynamic Object}
 \label{ch:ring}
 
-The main line of the thesis closes with
-Chapter~\ref{ch:em-results}: a chain of scalar frames, its joint score computed
-exactly, its transition learned from noised data, and the value of that
-structure measured against trained networks. This chapter is a separate
-extension, placed after the main results because nothing in them depends on it.
+This is where the work started, and it is placed first because what it settles
+is the reason for everything that follows.
 
-Chapters~\ref{ch:gaussian} and~\ref{ch:laplace} studied the scalar chain, where
-the joint score is either exactly Gaussian or a controlled departure from it.
-Chapter~\ref{ch:development} set aside a second family of dynamic objects ---
-planar trajectories near a circle --- because they are nonlinear in the
-coordinates in which the diffusion acts. This chapter takes up the first of
-them. It shows that a Cartesian surrogate of the model is exactly solvable,
-that the model as drawn is solvable numerically to a measured accuracy, and
-that both admit the same structural description of the joint score.
+The object is a planar trajectory near a circle: a point that rotates by a
+fixed angle each step, held near the unit radius by a confining drift, and
+observed through the Ornstein--Uhlenbeck channel of
+Section~\ref{sec:sm-diffusion}. It is a dynamic object in the sense of
+Chapter~\ref{ch:model}, but a nonlinear one, and it was chosen before the
+scalar chain precisely because rotation is the simplest dynamics whose
+signature is not visible in a single frame.
 
-It is included because it settles, exactly and in a model
-where the calculation can be done, a question the chain model raises but cannot
-answer --- whether per-frame marginals can carry the information that
-distinguishes one dynamics from another. Chapter~\ref{ch:development} settles
-this for the stationary Gaussian chain, where the marginals are
-$\alpha$-free outright (Proposition~\ref{prop:dev-marginal}), and shows that the
-same argument does not extend to non-Gaussian innovations. Here it becomes a
-theorem of a different kind: for one specific dynamical parameter, in a model
-whose symmetry makes the calculation exact, the one-frame marginals carry
-\emph{zero} Fisher information while the trajectory carries a positive amount.
+That last point turns out to be a theorem. The rotation rate carries
+\emph{zero} Fisher information in every one-frame marginal, and positive
+information in the trajectory. A model that sees frames one at a time cannot
+estimate it at all, however many frames it sees and however long it is trained;
+a model that sees the trajectory can. Chapter~\ref{ch:model} gives the
+corresponding statement for the stationary Gaussian chain, where the marginals
+are $\alpha$-free outright (Proposition~\ref{prop:dev-marginal}), but the
+argument there does not extend beyond Gaussian innovations. Here the conclusion
+is exact, and it holds because of a symmetry rather than a calculation that
+happens to work out.
+
+This is the argument for studying the \emph{joint} score, and it is what sends
+the rest of the thesis to a model in which the joint score can be computed in
+full. The ring itself is only partly tractable: a Cartesian surrogate is exactly
+solvable, and the model as drawn is solvable numerically to a measured accuracy.
+Chapters~\ref{ch:gaussian} onwards trade this model's realism for a scalar
+chain in which every quantity has a closed form.
 
 The question the chapter answers is narrower than the models it uses.
 
@@ -402,14 +405,31 @@ parameter of this model about which the per-frame marginals carry not less
 information, but none.
 
 \begin{theorem}[Marginal blindness]\label{thm:ring-blindness}
-For the rotating ring with uniform initial phase, every single-frame marginal
-is independent of the rotation $\psi$, at every noise level. Consequently a
-model built from per-frame marginals carries exactly zero Fisher information
-about the rotation.
+Give the initial phase the uniform law on the circle. Then every single-frame
+marginal is independent of the rotation, at every noise level. This holds for
+the polar model
+\eqref{eq:ring-radial-sde}--\eqref{eq:ring-embedding} in its parameter
+$\omega$, and for the surrogate \eqref{eq:ring-sur-dynamics} in its parameter
+$\psi$. Consequently a model built from per-frame marginals carries exactly
+zero Fisher information about the rotation.
 \end{theorem}
 
 \begin{proof}
-Unrolling the recursion,
+\emph{The polar model.} The radial and angular diffusions
+\eqref{eq:ring-radial-sde}--\eqref{eq:ring-angular-sde} are independent, and
+integrating the second gives
+$\Theta_u = \Theta_0 + \omega u + \sqrt{2D_\theta}\, B^{(\theta)}_u$. The initial
+phase is uniform on the circle and independent of everything added to it, and
+convolving the uniform law on a compact group with any independent law returns
+the uniform law; so $\Theta_u$ is uniform for every $u$, whatever $\omega$ is.
+Since $R_u$ carries no $\omega$ and is independent of $\Theta_u$, the law of
+$a_u = R_u(\cos\Theta_u, \sin\Theta_u)$ does not depend on $\omega$. The
+confining drift is irrelevant to the argument precisely because it acts on the
+radius alone.
+
+\emph{The surrogate.} Here the dynamics are linear and the same conclusion
+follows by unrolling rather than by symmetry of the phase. Unrolling the
+recursion,
 $z_u = R_\psi^{\,u} z_0 + \sigma\sum_{k\le u} R_\psi^{\,u-k}\eta_k$. Each
 $\eta_k$ is isotropic Gaussian, and a rotation of an isotropic Gaussian has the
 same law, so $R_\psi^{\,u-k}\eta_k \stackrel{d}{=} \eta_k$ independently across $k$. The
@@ -443,33 +463,14 @@ every noise level. Radii are not evidence.
 
 \section{Three estimation targets}\label{sec:ring-estimation}
 
-The theorem furnishes an unusually clean experiment. This model carries a
-parameter the marginals can see --- the confining potential
-$V(r) = (r-r_*)^2/2\lambda$ --- and a parameter they provably cannot, so
-running both through the same estimator isolates the effect of the structure
-rather than of the method. Table~\ref{tab:ring-targets} sets out three targets,
-each run in two arms differing only in which likelihood scores a trajectory:
-
-\begin{center}
-\begin{minipage}{\linewidth}\small\centering
-\captionof{table}[Three estimation targets, and what marginals can see]{The three estimation targets of this chapter, and which of them a one-frame marginal can see. Target (a) is the control that makes the contrast readable and is not itself reported; (b) and (c) are what Theorem~\ref{thm:ring-blindness} makes invisible to marginals and the joint law nonetheless recovers.}
-\label{tab:ring-targets}
-\begin{tabular}{@{}llll@{}}
-\toprule
- & target & free parameters & visible to marginals? \\
-\midrule
-(a) & the potential $(\lambda, r_*)$ & two & \textbf{yes} \\
-(b) & a single rotation $\psi$ & one & \textbf{no} \\
-(c) & a law over rotations $p(\psi)$ & a distribution & \textbf{no} \\
-\bottomrule
-\end{tabular}
-\end{minipage}
-\end{center}
-
-\noindent Target~(a) defines the contrast rather than supplying a result: it is
-the marginal-visible control against which (b) and (c) are read, and it is what
-makes the design isolate the structure rather than the estimator. \textbf{No
-measurement of (a) is reported in this thesis.} What follows is (b) and (c).
+The theorem furnishes an unusually clean experiment, because this model carries
+both a parameter the marginals can see, the confining potential
+$V(r) = (r-r_*)^2/2\lambda$, and one they provably cannot. Running both through
+the same estimator isolates the effect of the structure and not of the method.
+The marginal-visible potential is the control that makes the contrast readable;
+no measurement of it is reported here. What follows is the two targets the
+marginals cannot see: a single rotation $\psi$, and a law over rotations
+$p(\psi)$.
 
 For (c) the estimator is expectation--maximisation over a grid of angles, with
 responsibilities $r_\mu(\psi)\propto p(\psi)P_t(x^\mu\mid\psi)$ and the
@@ -486,7 +487,7 @@ initialisation. If it moves, the implementation is wrong rather than the
 theorem.
 
 \paragraph{The blind arm returns exactly the null.} Over sixteen seeds, seven
-budgets and twelve noise levels --- $1344$ cells --- the per-frame arm's
+budgets and twelve noise levels, $1344$ cells, the per-frame arm's
 estimate moves $0.0000$ in total variation from its uniform initialisation,
 and over the $480$ cells of target (b) its profile likelihood in $\psi$ has
 range $0.00\times10^{0}$ nats. This is a machine-precision zero rather than a
@@ -549,76 +550,135 @@ because the null is known exactly rather than estimated.
 \begin{remark}[A normalisation that fails silently]
 The radial density of the confining well is naturally written unnormalised,
 and its normaliser depends on both $\lambda$ and $r_*$. While only $\psi$ is
-estimated the term is constant and cancels in every responsibility --- which
+estimated the term is constant and cancels in every responsibility, which
 is why it can be absent for a long time without anything appearing wrong. The
 moment $\lambda$ is estimated it stops being constant: a wider well contains
 more mass, the likelihood grows without bound in $\lambda$, and the estimate
 pins to the top of whatever grid it is given. The failure produces a smooth,
-confident, wrong answer rather than an error. It is recorded here because the
-same shape of mistake --- a quantity that is constant in the case one has been
-testing, and is not constant in the case one moves to --- is the most common
+confident, wrong answer and not an error. It is recorded here because the
+same shape of mistake, a quantity that is constant in the case one has been
+testing, and is not constant in the case one moves to, is the most common
 way a correct derivation becomes an incorrect measurement.
 \end{remark}
 
-\section{What this chapter establishes}\label{sec:ring-answers}
+\section{Derivations}\label{app:ring}\label{sec:ring-derivations}
 
-Three things, in increasing order of how much they constrain what a method can
-do.
+The four calculations the chapter relies on, in the order it uses them.
+The mechanics behind Chapter~\ref{ch:ring}. The chapter states the gauge
+reduction, the exact surrogate score and their consequences, which is what the
+argument needs; the algebra establishing them is here, where it can be checked
+without interrupting that argument.
 
-First, the rotation is a \emph{gauge}. Because $U_\psi$ is orthogonal it
-commutes with the isotropic channel, so at known $\psi$ the model reduces to
-$\psi = 0$ and the conditional density is closed form at any trajectory length
---- a quadratic form plus a single one-dimensional radial integral. There is a
-ground truth here, computed rather than estimated, and it is what everything
-else is measured against.
+\subsection{Rotations preserve the standard isotropic Gaussian}
 
-Second, the clean law is local but the noised score is not. For $t>0$,
-$\score_k(x,t)$ is not a function of $x_{k-1},x_k,x_{k+1}$ alone: integrating
-out uncertain latent states creates posterior correlations at every lag, and
-the anchor term of \eqref{eq:ring-surrogate-score} is rank one but touches
-every pair of frames. Clean Markovity buys a local \emph{generative} law, not a
-local score.
+Proof of Lemma~\ref{lem:ring-isotropy}.
 
-Third, and this is the result that does not have an analogue on the chain,
-there is a parameter of the model about which per-frame marginals carry
-\emph{exactly zero} information (Theorem~\ref{thm:ring-blindness}), and it is
-nonetheless recoverable from the joint. The blind arm of
-\S\ref{sec:ring-estimation} does not merely do worse; it cannot move off its
-initialisation, and over $1{,}824$ cells it does not, to machine precision.
-That is a sharper statement than a comparison of error rates, because the null
-is known exactly rather than estimated.
-Table~\ref{tab:ring-claims} places each result of the chapter in the vocabulary
-of Section~\ref{sec:method}, separating what is proved from what is measured and
-from what is left open.
+\begin{proof}
+A linear map of a Gaussian is Gaussian, so $R\eta$ is fixed by its first two
+moments: $\E[R\eta] = R\,\E[\eta] = 0$ and
+$\mathrm{Cov}(R\eta) = R\, I_2\, R^{\T} = R R^{\T} = I_2$. Equivalently, in
+terms of densities, $(2\pi)^{-1}e^{-\norm{z}^2/2}$ depends on $z$ only through
+$\norm{z}$, and the change of variables $z \mapsto Rz$ changes neither
+$\norm{R^{-1}z} = \norm{z}$ nor $|\det R^{-1}| = 1$: the level sets are circles
+centred at the origin and a rotation maps each circle to itself.
+\end{proof}
 
-\begin{table}[t]\centering
-\caption[Status of the rotating-ring results]{Status of the results of this chapter.}
-\label{tab:ring-claims}
-\begin{tabular}{@{}p{0.50\linewidth}p{0.46\linewidth}@{}}
-\toprule
-result & status \\
-\midrule
-Gauge reduction and score transformation
-  (Lemma~\ref{lem:ring-gauge}) & exact \\
-Exact surrogate score and rank-one response
-  (Proposition~\ref{prop:ring-exact}) & exact \\
-Marginal blindness (Theorem~\ref{thm:ring-blindness}) & exact \\
-Recovery of $p(\psi)$ from the joint, and its decay with $t$
-  & numerical, sixteen seeds \\
-The blind arm returning the null to machine precision
-  & numerical, $1{,}824$ cells; a consistency check on the estimator's
-    wiring, not on the theorem \\
-Paired sample-level controls: one-frame law invariant to $\psi$ below the
-  resampling floor, lag-one joint tracking $\sin\psi$
-  & numerical, independent of the estimator \\
-Recovery of the confining potential $(\lambda, r_*)$
-  & not reported here (defines the control, see
-    \S\ref{sec:ring-estimation}) \\
-Behaviour in $L$, and inference of the phase rather than its use
-  & open \\
-\bottomrule
-\end{tabular}
-\end{table}
+\subsection{The gauge reduction}
+
+Proof of Lemma~\ref{lem:ring-gauge}.
+
+\begin{proof}
+Substituting \eqref{eq:ring-sur-dynamics} and using the composition rule of
+\eqref{eq:ring-rot-props},
+\begin{equation*}
+  y_{k+1}
+  = R_{-(k+1)\psi}\big(R_\psi z_k + \sigma\eta_{k+1}\big)
+  = \underbrace{R_{-(k+1)\psi}R_\psi}_{= R_{-k\psi}} z_k
+    + \sigma R_{-(k+1)\psi}\eta_{k+1}
+  = y_k + \sigma\widetilde\eta_{k+1} ,
+\end{equation*}
+and by Lemma~\ref{lem:ring-isotropy} each
+$\widetilde\eta_{k+1} \sim \Nd(0,I_2)$; they stay independent because each is a
+fixed linear map of a different independent $\eta$. Next, $U_\psi$ is block
+diagonal with orthogonal blocks, so
+$U_\psi^{\T} U_\psi = \mathrm{diag}(I_2, \dots, I_2) = I_{2L}$ and
+$\det U_\psi = \prod_k \det R_{-k\psi} = 1$. Applying $U_\psi$ to
+\eqref{eq:ring-channel} gives
+$U_\psi x = e^{-t} U_\psi a + \sqrt{\Deltat}\, U_\psi \xi$ with
+$U_\psi \xi \sim \Nd(0, I_{2L})$, so $U_\psi x$ has exactly the law of the
+noised non-rotating trajectory: the de-rotation commutes with the channel. For
+the densities, $z = U_\psi^{\T} y$ and
+$P_t(z\,|\,\psi) = P^{(0)}_t(U_\psi z)\,|\det U_\psi|$, the Jacobian factor
+being one. Differentiating that identity componentwise, with
+$\partial y_b/\partial z_c = (U_\psi)_{bc}$,
+\begin{equation*}
+  \frac{\partial}{\partial z_c} \log P^{(0)}_t(U_\psi z)
+  = \sum_b (U_\psi)_{bc}\,
+    \big(\nabla \log P^{(0)}_t\big)_b (U_\psi z)
+  = \big[ U_\psi^{\T} \score^{(0)}(U_\psi z, t) \big]_c .
+\end{equation*}
+The transpose is not cosmetic: a score is a gradient, so it transforms with
+$U_\psi^{\T}$ while a point transforms with $U_\psi$.
+\end{proof}
+
+\subsection{The clean law after the gauge}
+
+Iterating \eqref{eq:ring-gauged-rw} and letting the intermediate terms cancel,
+\begin{equation}
+  y_k - y_0 = \sum_{r=1}^{k} (y_r - y_{r-1})
+            = \sigma \sum_{r=1}^{k} \widetilde\eta_r ,
+  \qquad\text{so}\qquad
+  y_k = A + \sigma \sum_{r=1}^{k} \widetilde\eta_r ,
+  \label{eq:ring-unrolled}
+\end{equation}
+with $A := y_0 \sim p_\lambda$ and the empty sum equal to zero. Every frame
+contains the \emph{same} random anchor, drawn once on the ring, plus a partial
+sum of independent innovations; the anchor is the only non-Gaussian ingredient
+of the model.
+
+The clean law factorises over the ring prior and the one-step transitions, so
+$\log P_0(y) = -(\norm{y_0}-1)^2/2\lambda
+- (2\sigma^2)^{-1}\sum_{k=0}^{L-2}\norm{y_{k+1}-y_k}^2 + \text{const}$.
+Differentiating is a counting exercise: an interior $y_k$ appears in exactly two
+summands, the edge arriving at it and the edge leaving it, whose derivatives are
+$-(y_k - y_{k-1})/\sigma^2$ and $+(y_{k+1} - y_k)/\sigma^2$. Adding them, and
+using $\nabla_y \norm{y} = y/\norm{y}$ for the ring term,
+\begin{align}
+  \score_0(y,0)
+    &= \frac{1-\norm{y_0}}{\lambda}\,\frac{y_0}{\norm{y_0}}
+       + \frac{y_1 - y_0}{\sigma^2},
+  \notag \\
+  \score_k(y,0)
+    &= \frac{y_{k-1} - 2y_k + y_{k+1}}{\sigma^2},
+       \qquad 1 \le k \le L-2,
+  \label{eq:ring-clean-score} \\
+  \score_{L-1}(y,0)
+    &= \frac{y_{L-2}-y_{L-1}}{\sigma^2} .
+  \notag
+\end{align} The interior clean score is a
+discrete second derivative along internal time, that is a discrete Laplacian:
+each block measures how far frame $k$ departs from the average of its
+neighbours. It is strictly local, and it vanishes identically on the model's
+own noiseless solution, because a trajectory rotating at radius exactly one
+maps under the gauge to a constant $y_k$, for which every second difference
+vanishes and, with $\norm{y_0} = 1$, so does the ring term. That vanishing is
+verified to machine zero (Table~\ref{tab:ring-validation}).
+
+\subsection{The exact surrogate score}
+
+Proof of Proposition~\ref{prop:ring-exact}.
+
+\begin{proof}
+Expanding the exponent of \eqref{eq:ring-Ct} in powers of $\alpha$, with the
+correlated covariance $C_t \otimes I_2$, gives
+\eqref{eq:ring-anchor-posterior}. Writing
+$\log P_t(x) = \text{const} - \tfrac12 x^{\T}(C_t^{-1}\otimes I_2)x
++ \log Z(h(x))$, the gradient of the first term is $-(C_t^{-1}x)_k$ in block
+$k$, while $\partial h/\partial x_k = e^{-t}q_k I_2$ and
+$\nabla_h \log Z = \E[A\,|\,x]$, the first cumulant identity for the
+exponential family in $h$. Differentiating once more, so that the second
+derivative of $\log Z$ returns $\mathrm{Cov}(A\,|\,x)$, gives the response.
+\end{proof}
 
 \section{Limitations}\label{sec:ring-limits}
 
@@ -642,7 +702,7 @@ Behaviour in $L$, and inference of the phase rather than its use
   \item \textbf{The marginal-visible control is not measured.} Target~(a) of
   \S\ref{sec:ring-estimation} specifies the contrast but no result for it is
   reported, so the claim that the two targets behave differently rests on the
-  theorem rather than on a matched pair of measurements. Nothing else in the
+  theorem and not on a matched pair of measurements. Nothing else in the
   chapter depends on it.
 \end{enumerate}
 

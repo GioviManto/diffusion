@@ -1,0 +1,440 @@
+% ============================================================
+% Chapter 2 -- Statistical mechanics, energy-based models, and diffusion
+%
+% The context chapter. It exists to make one distinction available to the rest
+% of the thesis: the exact score, the empirical score, and the fitted score are
+% three different objects, and the difficulties of generative diffusion are
+% properties of the gaps between them. Chapter 6 onwards adds a fourth.
+% ============================================================
+
+\chapter{Statistical Mechanics, Energy-Based Models, and Diffusion}
+\label{ch:statmech}
+
+\section{What statistical mechanics is, and why it is here}
+\label{sec:sm-what}
+
+Newton's second law is deterministic and complete. Given the positions and
+momenta of $N$ particles and the forces between them, the trajectory of the
+system is fixed for all time. For $N$ of order $10^{23}$ this completeness is
+useless: the initial condition cannot be written down, the equations cannot be
+integrated, and the answer, if it were available, would be a list of
+$6 \times 10^{23}$ numbers and not an explanation of anything. Yet the gas
+in a room has a temperature, a pressure and a heat capacity, and these are
+stable, reproducible, and predictable from a handful of parameters.
+
+Statistical mechanics is the resolution of that tension. It abandons the
+trajectory and keeps a probability distribution over microstates, and it fixes
+that distribution by a variational principle: among all distributions with a
+given mean energy, the one realised at equilibrium maximises the entropy
+\begin{equation}
+  S[p] \;=\; -\sum_{x} p(x) \log p(x),
+  \label{eq:sm-entropy}
+\end{equation}
+which is the unique measure of uncertainty consistent with a short list of
+consistency axioms \citep{jaynes1957information}. Carrying out the maximisation
+subject to $\sum_x p(x) E(x) = \bar{E}$ produces the Boltzmann distribution
+\begin{equation}
+  p(x) \;=\; \frac{1}{Z(\beta)}\, e^{-\beta E(x)},
+  \qquad
+  Z(\beta) \;=\; \sum_{x} e^{-\beta E(x)},
+  \label{eq:sm-boltzmann}
+\end{equation}
+with the inverse temperature $\beta$ appearing as the Lagrange multiplier of
+the energy constraint \citep{landau1980statistical, goldstein2002classical}.
+Everything thermodynamic follows from the normalising constant: the free energy
+is $F = -\beta^{-1}\log Z$, and its derivatives give the energy, the entropy and
+the response functions.
+
+Two features of this construction matter for what follows, and neither is
+specific to physics. The first is that the whole of the macroscopic behaviour
+is encoded in a single scalar function of the parameters, $\log Z$, which is a
+sum over exponentially many configurations and is therefore hard to compute.
+The second is that competition between energy, which orders, and entropy, which
+disorders, can produce \emph{phase transitions}: the equilibrium state can
+change character abruptly as a parameter is varied, even though the microscopic
+law does not change at all. A system with a symmetry can settle into a state
+that lacks it, and which of the equivalent states it settles into is decided by
+fluctuations. The canonical example is the Ising model \citep{ising1925beitrag},
+whose two-dimensional case \citet{onsager1944crystal} solved exactly, and which
+remains the reference picture for a transition driven by the competition between
+energy and entropy. Both features will reappear, unchanged in substance, in the
+generative models of the next sections.
+
+\section{Energy-based models: the same object, learned}
+\label{sec:sm-ebm}
+
+Traffic between statistical mechanics and learning machines runs in both
+directions and is old. The Hopfield network stored memories as minima of an
+energy \citep{hopfield1982neural}; its capacity was settled by spin-glass methods
+\citep{amit1985storing, mezard1987spin, gardner1988space}; and the Boltzmann
+machine and its restricted form made the Boltzmann distribution itself the model
+\citep{ackley1985learning, smolensky1986information}. The 2024 Nobel Prize in
+Physics recognised that lineage \citep{nobel2024physics}. What follows takes
+\eqref{eq:sm-boltzmann} and reads it in the opposite direction. Rather than deriving a distribution from a known energy, it
+posits a parametric energy $E_\theta$ and fits it so that the induced
+distribution matches data \citep{ackley1985learning, lecun2006tutorial}:
+\begin{equation}
+  p_\theta(x) \;=\; \frac{e^{-E_\theta(x)}}{Z(\theta)},
+  \qquad
+  Z(\theta) \;=\; \int_{\R^{d}} e^{-E_\theta(x)}\, \dd x .
+  \label{eq:sm-ebm}
+\end{equation}
+The microstate becomes a data point, the energy becomes a learnable scoring
+function, and the partition function keeps its role and its difficulty. Fitting
+by maximum likelihood gives a gradient with the structure of a competition,
+\begin{equation}
+  \nabla_\theta\, \E_{x \sim p_{\mathrm{data}}}\!\left[-\log p_\theta(x)\right]
+  \;=\;
+  \E_{x^{+} \sim p_{\mathrm{data}}}\!\left[\nabla_\theta E_\theta(x^{+})\right]
+  \;-\;
+  \E_{x^{-} \sim p_{\theta}}\!\left[\nabla_\theta E_\theta(x^{-})\right],
+  \label{eq:sm-ebm-grad}
+\end{equation}
+in which the first term lowers the energy of observed data and the second
+raises the energy of the model's own samples. The second expectation is over
+$p_\theta$, which cannot be sampled directly, so training requires Markov chain
+Monte Carlo, typically Langevin dynamics, whose stationary measure is
+$\propto e^{-E_\theta}$ \citep{hinton2002training, robert2004monte}. This is
+expensive, and its cost is the reason the family was, for a long time,
+outperformed by models that give up the explicit density in exchange for cheap
+sampling \citep{goodfellow2014generative, kingma2014auto,
+papamakarios2021normalizing}. \citet{carbone2025hitchhiker} surveys how the
+energy-based view relates to the rest of the generative family.
+
+The learning dynamics of these models are themselves a statistical mechanics
+problem, and one with a structure worth carrying forward. The spectral dynamics
+of the weights \citep{decelle2017spectral, mezard2017meanfield} and the
+emergence of compositional features \citep{tubiana2017emergence} are both
+statistical-mechanics accounts of training. \citet{bachtis2024cascade} show that
+training a restricted Boltzmann machine
+proceeds through a \emph{cascade of second-order phase transitions}: the model
+first encodes a coarse, centre-of-mass feature, and then resolves progressively
+finer sub-modes, each emergence accompanied by a diverging susceptibility. The
+features are learned in order, from the largest scale down. Section
+\ref{sec:sm-transitions} finds the same ordering in a different process, and
+Chapter~\ref{ch:model} onwards works in a model where the ordering is
+analytic.
+
+The connection to what follows is direct. Differentiating
+\eqref{eq:sm-ebm} gives
+\begin{equation}
+  \nabla_x \log p_\theta(x) \;=\; -\nabla_x E_\theta(x),
+  \label{eq:sm-score-energy}
+\end{equation}
+and the intractable $Z(\theta)$, being independent of $x$, has vanished. The
+gradient of the log-density carries all the information needed to \emph{sample}
+the model while requiring none of the information needed to \emph{normalise}
+it. That observation is the whole of the following section.
+
+\section{Generative diffusion}
+\label{sec:sm-diffusion}
+
+A diffusion model destroys structure in a controlled way and then learns to run
+the destruction backwards \citep{sohl2015deep, song2019generative,
+ho2020denoising, song2021scorebased}. Its deterministic counterparts, neural ODEs and flow matching
+\citep{chen2018neural, lipman2023flow}, transport the same measures along a
+probability-flow trajectory instead of a stochastic one. The forward process is a stochastic differential equation
+\begin{equation}
+  \dd X_t \;=\; f(X_t, t)\,\dd t \;+\; g(t)\,\dd W_t ,
+  \label{eq:sm-forward}
+\end{equation}
+started at $X_0 \sim p_0$, the data law, and producing marginals $p_t$ that
+approach a simple terminal measure. Throughout this thesis the choice is the
+Ornstein--Uhlenbeck channel, $f(x,t) = -x$ and $g = \sqrt{2}$, whose transition
+law is available in closed form,
+\begin{equation}
+  x \;=\; e^{-t} a \;+\; \sqrt{\Deltat}\,\varepsilon,
+  \qquad \varepsilon \sim \Nd(0, I),
+  \qquad \Deltat = 1 - e^{-2t},
+  \label{eq:sm-ou}
+\end{equation}
+and whose stationary law is the standard Gaussian
+\citep{uhlenbeck1930theory, gardiner2009stochastic}. Figure
+\ref{fig:sm-corruption} shows what \eqref{eq:sm-ou} does to a correlated
+sequence: the amplitude contracts, independent noise accumulates, and by
+$t \approx 2$ the trajectory is indistinguishable from white noise.
+
+\begin{figure}[t]\centering
+\includegraphics[width=\linewidth]{fig_forward_corruption.pdf}
+\caption[The forward channel applied to a correlated sequence]{One clean
+stationary AR(1) trajectory with $\alpha = 0.85$, in grey, and the same
+trajectory after the Ornstein--Uhlenbeck channel \eqref{eq:sm-ou} at four
+diffusion times. The signal contracts by $e^{-t}$ while independent noise of
+variance $\Deltat$ accumulates; correlation between neighbouring sites survives
+longer than amplitude. Generation runs this figure from right to left, and the
+score is the only quantity needed to do so.}
+\label{fig:sm-corruption}
+\end{figure}
+
+The reversal is a classical result. \citet{anderson1982reverse} shows that the
+process
+\begin{equation}
+  \dd X_t \;=\;
+  \Big[ f(X_t, t) - g(t)^2\, \nabla_x \log p_t(X_t) \Big]\,\dd t
+  \;+\; g(t)\,\dd \bar{W}_t ,
+  \label{eq:sm-reverse}
+\end{equation}
+run backwards from $T$ with $X_T \sim p_T$, reproduces the forward marginals.
+Every ingredient of \eqref{eq:sm-reverse} is known by construction except one.
+The drift correction is the \emph{score} $\nabla_x \log p_t$, and supplying it
+is the entire modelling effort of a diffusion model. A Fokker--Planck argument
+for \eqref{eq:sm-reverse} and the probability-flow ODE it induces are in
+\compendium{}; a book-length treatment of the model family is
+\citet{lai2025principles}.
+
+By \eqref{eq:sm-score-energy} the score is the negative gradient of an energy,
+so a diffusion model is an energy-based model that never forms its partition
+function and never runs an inner Monte Carlo loop. What it does instead is
+train against a target that is available in closed form, which is the content
+of the identity in the next section.
+
+\section{Three scores}
+\label{sec:sm-three-scores}\label{sec:tweedie}
+
+The word ``score'' is used for three different objects in this literature, and
+almost every difficulty in generative diffusion is a property of the gaps
+between them. The distinction is drawn sharply in \citet{biroli2023generative}
+and organises what follows.
+
+\paragraph{The exact score.} The score of the true noised law,
+$\nabla_x \log p_t$ with $p_t = p_0 * \Nd(0,\Deltat I)$ after contraction. It is
+the object \eqref{eq:sm-reverse} calls for. It has a form that will be used on
+every page of this thesis: writing $p_t$ as the channel convolution and
+differentiating under the integral gives
+\begin{equation}
+  \boxed{\;
+  \nabla_x \log p_t(x)
+  \;=\; \frac{e^{-t}\,\E[\,a \,|\, x\,] - x}{\Deltat}
+  \quad\Longleftrightarrow\quad
+  \E[\,a \,|\, x\,]
+  = e^{t}\big( x + \Deltat\, \nabla_x \log p_t(x) \big).
+  \;}
+  \label{eq:tweedie}
+\end{equation}
+We call \eqref{eq:tweedie} the \emph{score--posterior identity}; in the
+empirical-Bayes literature it is Tweedie's formula
+\citep{robbins1956empirical, miyasawa1961empirical, efron2011tweedie,
+vincent2011connection}. It holds for any $p_0$ whatever, and it says something
+stronger than an analogy: computing a score \emph{is} solving a Bayesian
+inference problem. The exact score is unavailable in practice for the plain
+reason that $p_0$ is unknown.
+
+For \emph{vector-valued} data $a \in \R^{L}$ noised coordinatewise,
+\eqref{eq:tweedie} holds componentwise but with the \emph{full} posterior:
+\begin{equation}
+  \big( \nabla_x \log p_t(x) \big)_k
+  \;=\; \frac{e^{-t}\, \E[\,a_k \,|\, x_0, \dots, x_{L-1}\,] - x_k}{\Deltat}.
+  \label{eq:tweedie-joint}
+\end{equation}
+The conditioning is on \emph{every} coordinate. The channel is independent
+across frames, but the prior is not, so the posterior mean of frame $k$, and
+with it the $k$-th component of the score, depends on all $L$ observations.
+Equation~\eqref{eq:tweedie-joint} is the exact sense in which the joint score
+of a trajectory differs from a stack of per-frame scores, and the reason this
+thesis studies the former.
+
+\paragraph{The empirical score.} Replace $p_0$ by the empirical measure of a
+training set $\{a^{(i)}\}_{i=1}^{N}$, which puts mass $1/N$ on each example.
+The convolution is then a finite Gaussian mixture and the score is available in
+closed form,
+\begin{equation}
+  \nabla_x \log p^{\mathrm{emp}}_t(x)
+  \;=\; \frac{1}{\Deltat}\left(
+  e^{-t} \sum_{i=1}^{N} w_i(x)\, a^{(i)} \;-\; x \right),
+  \qquad
+  w_i(x) \;=\; \frac{e^{-\lVert x - e^{-t} a^{(i)}\rVert^2 / 2\Deltat}}
+                    {\sum_{j} e^{-\lVert x - e^{-t} a^{(j)}\rVert^2 / 2\Deltat}},
+  \label{eq:sm-empirical}
+\end{equation}
+a softmax-weighted average of training points. This is exactly computable and
+exactly useless as a generative model: as $t \to 0$ the weights concentrate on
+the nearest training example and the reverse dynamics deposit the trajectory on
+top of it. Running \eqref{eq:sm-reverse} with \eqref{eq:sm-empirical} returns
+the training set. Figure~\ref{fig:sm-three-scores} shows the mechanism in one
+dimension.
+
+\paragraph{The fitted score.} A neural network $s_\phi(x,t)$ trained by
+denoising score matching \citep{hyvarinen2005estimation, vincent2011connection}
+to minimise
+\begin{equation}
+  \E_{t}\, \E_{a \sim p_{\mathrm{data}}}\, \E_{\varepsilon}
+  \left\lVert
+    s_\phi\big(e^{-t} a + \sqrt{\Deltat}\,\varepsilon,\; t\big)
+    + \frac{\varepsilon}{\sqrt{\Deltat}}
+  \right\rVert^{2}.
+  \label{eq:sm-dsm}
+\end{equation}
+The minimiser over all measurable functions is the exact score; the minimiser
+over a finite training set is the empirical score. Diffusion models work
+because the network reaches neither. It is constrained enough to be unable to
+represent \eqref{eq:sm-empirical}, and that failure to fit is what produces
+novel samples \citep{kadkhodaie2024generalization, kamb2024analytic}. The
+mechanism of generalisation is therefore an approximation-theoretic property of
+an architecture, which is a considerably less comfortable foundation than the
+variational principle of Section~\ref{sec:sm-what}.
+
+\begin{figure}[t]\centering
+\includegraphics[width=\linewidth]{fig_three_scores.pdf}
+\caption[The exact and empirical scores at three diffusion times]{The exact
+score of a standard Gaussian, which is linear in $x$, against the empirical
+score \eqref{eq:sm-empirical} built from $N=12$ samples of the same law; ticks
+mark the contracted training points $e^{-t}a^{(i)}$. At small $t$ the empirical
+score is a sawtooth that points at whichever training example is nearest, and
+reverse dynamics driven by it terminate on one of them. As $t$ grows the
+weights spread, the sawtooth flattens, and the two scores agree. The useful
+regime for a generative model lies between the two, and its width is what
+\citet{biroli2024dynamical} quantify.}
+\label{fig:sm-three-scores}
+\end{figure}
+
+\section{Transitions along the generation trajectory}
+\label{sec:sm-transitions}
+
+Because generation is a dynamical process, its failures are dated. Two
+crossover times structure the reverse trajectory, and both are statistical
+mechanics results in the sense of Section~\ref{sec:sm-what}: a competition
+between an entropic and an energetic term, resolved abruptly.
+
+\paragraph{Speciation.} Run backwards from noise, the trajectory commits to a
+broad class of outcomes long before it commits to a specific sample. For data
+with a covariance whose top eigenvalue is $\lambda$, the commitment happens at
+$t_{\mathrm{S}} \sim \tfrac12 \log \lambda$, when the contracted signal along
+that direction becomes comparable with the accumulated noise
+\citep{biroli2024dynamical, achilli2026speciation}. In high dimension the top
+eigenvalue grows with the dimension, so $t_{\mathrm{S}}$ diverges
+logarithmically. When the data are hierarchical there is not one such time but
+a \emph{ladder} of them, one per level of the hierarchy, and features are
+resolved coarse-to-fine \citep{sclocchi2025phase, sclocchi2025probing,
+favero2025compositional, favero2025bigger}:
+the same ordering that \citet{bachtis2024cascade} observe in the training of an
+energy-based model, appearing here along the generation trajectory instead.
+Figure~\ref{fig:sm-cascade} shows the ladder in a Gaussian hierarchical model
+where every rung can be predicted in closed form from the covariance spectrum
+and then measured.
+
+\begin{figure}[t]\centering
+\includegraphics[width=\linewidth]{fig_speciation_cascade.pdf}
+\caption[The speciation cascade, predicted and measured]{A Gaussian
+hierarchical prior has one covariance eigenvalue per level, and therefore a
+ladder of speciation times rather than a single one. \emph{Left:} for each
+level, the time predicted from the eigenvalue alone (diamonds) against the
+times at which the forward and reverse processes are measured to cross
+(circles, squares); the grey bar spans the two measurements. \emph{Right:} the
+same six levels as prediction against measurement, with the identity line.
+Worst-case relative disagreement across all twelve measurements is $3\%$. The
+ordering is coarse-to-fine: the largest eigenvalue resolves first.}
+\label{fig:sm-cascade}
+\end{figure}
+
+\paragraph{Collapse and memorisation.} Later in the reverse trajectory a second
+transition occurs, and it is the one that limits the whole construction.
+\citet{biroli2024dynamical} and \citet{bonnaire2025memorize} show that dynamics
+driven by the empirical score are captured by a single training example past a
+time $t_{\mathrm{C}}$, and that avoiding this requires a training set
+exponentially large in the data dimension. Memorisation need not be a collapse
+onto one example: \citet{achilli2024losing} identify a geometric form in which
+dimensions are lost without any single training point capturing the trajectory,
+and \citet{garnierbrun2026biased} show how the resulting generalisation can be
+biased. Solvable models of the learning problem itself
+\citep{cui2025solvable} complete the picture. The criterion is entropic: collapse
+occurs when the excess entropy of the noised law relative to the terminal
+measure falls below $\log N$, so the dataset size needed to postpone it grows
+as $e^{\,\text{(excess entropy)}}$. Figure~\ref{fig:sm-collapse} measures
+$t_{\mathrm{C}}$ against $N$ in the chain model of this thesis and compares it
+with that closed-form criterion.
+
+\begin{figure}[t]\centering
+\includegraphics[width=0.72\linewidth]{fig_collapse_time.pdf}
+\caption[Collapse time against dataset size]{Measured collapse time for
+empirical-score dynamics on the stationary AR(1) chain, at three chain lengths
+$L$, against the number of training sequences. Solid: the time at which the
+generated trajectory's nearest-training-neighbour distance falls below the
+distance to a fresh sample. Dotted: the excess-entropy criterion of
+\citet{biroli2024dynamical}, evaluated in closed form for this model, plotted
+where it has a solution. Postponing collapse costs exponentially many
+sequences, and the exponent is the excess entropy of the clean law.}
+\label{fig:sm-collapse}
+\end{figure}
+
+The two transitions bracket the useful part of the trajectory. Above
+$t_{\mathrm{S}}$ nothing has been decided; below $t_{\mathrm{C}}$ the empirical
+score reproduces its training data. A generative model earns its keep in
+between, and the fitted score of \eqref{eq:sm-dsm} is the only one of the three
+that operates there, for reasons, as noted above, that are properties of an
+architecture rather than of a principle.
+
+\section{Locality, architecture, and message passing}
+\label{sec:sm-unet}
+
+If the fitted score is doing the work, the natural question is what the
+architecture contributes, and here a second literature meets the first. The
+network in almost every image or video diffusion model is a U-Net
+\citep{ronneberger2015unet}: a convolutional encoder that repeatedly
+downsamples, a decoder that upsamples back, and long skip connections joining
+each encoder stage to the decoder stage of the same resolution. The design is
+almost universal and was, for a long time, justified anecdotally.
+
+\citet{mei2024unets} gives it a precise reading, and it is the reading this
+thesis works inside. For data generated by a tree-structured hierarchical
+model, the exact denoiser is computed by belief propagation, which consists of
+an upward pass that accumulates evidence from the leaves and a downward pass
+that redistributes it, the second reusing the messages formed by the first. A
+U-Net has exactly this shape: the encoder is the upward pass, the decoder is
+the downward pass, and the long skip connections are the reuse of the
+intermediate messages. On this account a U-Net is not merely a good inductive
+bias for denoising but an \emph{approximate implementation of the exact
+inference algorithm} for hierarchically structured data, which yields sample
+complexity bounds for learning the denoiser. Convolutional classifiers admit
+the corresponding reading for the upward pass alone.
+
+Two consequences frame this thesis. First, if the architecture is an inference
+algorithm, then running the inference algorithm directly is a legitimate
+alternative and not a toy substitute, and where the graph is a chain rather
+than a tree of higher degree, that algorithm is exact and cheap. Second, the
+question of \emph{how large a receptive field a score network needs} becomes
+quantitative: it is set by how fast the influence of distant evidence decays in
+the corresponding inference problem. Chapter~\ref{ch:gaussian-bp} answers that
+question in closed form for the chain. A related result on sequences is
+\citet{garnierbrun2024transformers}, who find that a transformer trained on
+hierarchically generated sequences reconstructs correlations sequentially,
+shortest length scale first, and who use exact belief propagation as the
+reference against which the network is measured.
+
+\section{Where this thesis sits}
+\label{sec:sm-position}\label{sec:related}\label{sec:gap}
+
+The three scores of Section~\ref{sec:sm-three-scores} exhaust the options
+usually considered: one is unavailable, one memorises, and one works for
+reasons that are hard to state. This thesis studies a fourth.
+
+For data with sequential structure, a trajectory of a Markov process noised
+frame by frame, the score--posterior identity \eqref{eq:tweedie} turns the
+score into a posterior expectation on a chain-structured factor graph, and that
+posterior is computable exactly by belief propagation. Call the result the
+\emph{BP score}. It differs from the other three in a way that is structural
+rather than a matter of degree:
+
+\begin{itemize}
+  \item Unlike the exact score, it is computable, because the model class is
+  specified and the graph is a tree.
+  \item Unlike the empirical score, its sufficient statistic is a transition
+  kernel, two numbers for a Gaussian AR(1) chain or a fixed grid for a
+  nonparametric one, and \emph{not} the training set. The data enter only
+  through an average. There is no training point for a trajectory to collapse
+  onto, so the memorisation axis of Section~\ref{sec:sm-transitions} does not
+  exist for it at any $N$.
+  \item Unlike the fitted score, it is transparent: every quantity in it has a
+  closed form or a validated numerical reference, so its errors can be
+  attributed rather than observed.
+\end{itemize}
+
+\noindent The price is an assumption. The BP score is only correct if the data
+really are Markov, and the value of the assumption is exactly its correctness:
+a claim that has to be measured, not asserted. Chapter~\ref{ch:ring} begins
+where the research began, with a two-dimensional dynamic object whose behaviour
+motivated studying the joint score at all; Chapters~\ref{ch:gaussian}
+to~\ref{ch:laplace} compute the BP score with the transition kernel known;
+Chapters~\ref{ch:em-method} and~\ref{ch:em-kernel} learn the kernel from noised
+sequences alone; and Chapter~\ref{ch:em-results} measures what the assumption
+is worth against fitted scores trained on identical data, and locates where it
+stops being worth anything.

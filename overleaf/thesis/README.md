@@ -1,37 +1,92 @@
 # thesis — the MSc thesis
 
-Compile `main.tex` from inside this folder. Chapters and appendices are in
-`chapters/`; `preamble.tex` holds the packages and the `\graphicspath` pointing
-at `../shared/figures/`.
+**This folder is self-contained.** Zip it and upload it to Overleaf on its own;
+nothing outside it is needed to compile. `figures/`, `sections/` and
+`references.bib` are local copies of the shared assets, refreshed by
+`./sync-assets.sh`.
 
-Submission 16 September 2026, defence October 2026. 169 pages at present.
+```bash
+tectonic main.tex        # builds main.pdf, runs bibtex automatically
+```
+
+Submission 16 September 2026, defence October 2026. 144 pages at present.
+
+## Uploading to Overleaf
+
+Upload the whole folder. Overleaf needs `main.tex` as the root document; it
+picks that up automatically. Files it does not need but that are harmless to
+include: `tools/`, `sync-assets.sh`, this README, and the build products
+(`main.aux`, `main.bbl`, …), which Overleaf regenerates.
+
+If the file-count limit is a problem, the folder compiles without `tools/`.
 
 ## Structure
 
-Two parts and a case study:
+Twelve chapters in three parts, following the order the research happened in.
 
-- **Exact scores under known dynamics** — the Gaussian chain solved exactly,
-  BP/Kalman/RTS equivalence, locality and truncation, the non-Gaussian chain,
-  Gaussian message closure and what it discards.
-- **Learning dynamics from noised data** — identifiability, the pairwise
-  statistic and Fisher's identity, EM and generalised EM, and what supplying the
-  Markov structure buys against trained denoisers.
-- **The rotating ring** (ch09) is a self-contained case study, not a research
-  question: what joint observations identify that no single-frame marginal can.
+**Part 0 — context.** Chapter 1 states the problem and the six research
+questions. Chapter 2 is the background: statistical mechanics and the Boltzmann
+distribution, energy-based models, generative diffusion and the reverse-time
+SDE, the distinction between the exact, empirical and fitted score, the
+speciation and collapse transitions, and the reading of U-Nets as belief
+propagation. Chapter 3 fixes the model and the estimand.
 
-Six research questions, stated in ch01 and answered one by one in ch12.
+**Part I — exact scores under known dynamics.** Chapter 4 is the rotating ring,
+placed first because it is where the work started and because its
+zero-Fisher-information result is the argument for studying the joint score at
+all. Chapters 5 and 6 solve the Gaussian chain twice, by linear algebra and by
+belief propagation, and prove the two agree. Chapter 7 leaves Gaussianity.
 
-## Two lines of work are reported as unresolved
+**Part II — learning dynamics that are not known.** Chapters 8 and 9 recover
+the transition law from noised sequences by EM, first two parameters and then a
+whole kernel. Chapter 10 measures what the structural assumption is worth
+against trained networks and where it stops paying. Chapter 11 concludes.
 
-The mixture-capacity sweep and the reverse-generation study both rest on fits
-that the convergence analysis showed had not settled. They are recorded as
-methodological negative results, not findings, and neither supports a conclusion
-in ch12. That is deliberate and it should stay that way unless they are rerun
-with certified estimators.
+Every proof and derivation is in the body: the Gaussian toolkit in Chapter 3,
+the ring derivations in Chapter 4, the Gaussian-closure proof in Chapter 7. The
+two appendices carry supporting material only --- reproducibility and
+provenance (A), and the aggregation robustness of the reported ratios (B),
+worked in full in the companion compendium, chapter 19.
+
+`./check.sh` builds and reports every defect class. It checks the build's exit
+status before reading `main.pdf`, because tectonic leaves the previous PDF in
+place when a run fails and a check that skips that step will report a stale
+document as clean.
+
+## Figures
+
+Six figures are built by this folder and live only here:
+
+```bash
+python3 tools/make_thesis_figures.py          # all of them
+python3 tools/make_thesis_figures.py fig_em_diagnostics
+```
+
+`tools/figstyle.py` holds the palette and layout conventions — one place, so
+every figure looks like it came from the same hand. Legends never sit inside
+the data area, panels use constrained layout, and widths are fixed to the
+text block so nothing is rescaled by LaTeX.
+
+The other twelve figures are shared with the paper, the workshop note and the
+compendium; `sync-assets.sh` keeps the local copies current and never
+overwrites the six built here.
+
+## What is not in this document
+
+The AMP/TAP analysis of the bulk fixed point, the textbook linear-algebra
+appendix, and the extended statistical-mechanics and stochastic-calculus
+derivations are in the companion compendium. They answer none of the six
+research questions, and at roughly fifty pages they lowered the fraction of the
+thesis that is this work.
+
+Two studies are withdrawn rather than reported: the reverse-generation
+comparison, whose fits used a fixed iteration budget shorter than the
+innovation shape needs to settle, and an earlier mixture-capacity design at too
+few seeds. The capacity question was rerun to a convergence criterion at
+sixteen seeds and **is** reported, in Section 10.3. The reverse-generation
+question is left open, and Chapter 11 says so.
 
 ## editorial/
 
 Notes about the document rather than the science: changelog, figure inventory,
-structural decisions, correctness checklist. Read its README first — those four
-files were restored from git history after an untracked-file deletion and may be
-missing edits made between 21 July and 18 August 2026.
+structural decisions, correctness checklist.

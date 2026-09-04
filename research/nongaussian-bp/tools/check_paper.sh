@@ -170,7 +170,7 @@ while IFS= read -r -d '' c; do CONSUMERS+=("$c"); done \
 
 for f in ../../overleaf/shared/sections/*.tex; do
     name=$(basename "$f" .tex)
-    hits=$(grep -l "input{../shared/sections/$name}" "${CONSUMERS[@]}" 2>/dev/null \
+    hits=$(grep -lE "input\{(\.\./shared/)?sections/$name\}" "${CONSUMERS[@]}" 2>/dev/null \
            | sed 's|.*/overleaf/||' | paste -sd, -)
     if [ -n "$hits" ]; then
         pass "sections/$name reached ($hits)"
@@ -206,9 +206,12 @@ fi
 # the generated macros. Length and placeholders stay ungated for the thesis --
 # it is allowed to be long and provisional -- but a stale headline number is not
 # a matter of taste.
+# Every thesis chapter, not one named file: naming ch12-conclusions.tex meant
+# that renaming it silently disabled this check, because `|| true` turns a
+# missing path into a pass. A guard that cannot fail is not a guard.
 typed=$(grep -nE 'between \$[0-9]+(\.[0-9])?\$ and \$[0-9]+(\.[0-9])?\$ ?(times|\\times)|\$[0-9]+(\.[0-9])?\$--\$[0-9]+(\.[0-9])?\$ ?\\times' \
         "$PAPER" ../../overleaf/workshop/main.tex \
-        ../../overleaf/thesis/chapters/ch12-conclusions.tex 2>/dev/null || true)
+        ../../overleaf/thesis/chapters/ch*.tex 2>/dev/null || true)
 if [ -z "$typed" ]; then
     pass "no hand-typed efficiency ratio ranges"
 else

@@ -40,7 +40,12 @@ for d in "${DOCS[@]}"; do
     done
     if [ -d "$d/chapters" ]; then
         cp -R "$d/chapters" "$b"/
-        rm -rf "$b/chapters/_superseded"       # archived drafts, not part of the document
+        # Any underscore-prefixed directory is a local archive: _superseded
+        # drafts, _withdrawn appendices. Nothing \input's them, so they do not
+        # break the build -- they just ship confusing dead material to Overleaf
+        # and eat into its 180-file cap. Matched by prefix rather than by name
+        # so the next archive folder is excluded without editing this script.
+        find "$b/chapters" -maxdepth 1 -type d -name '_*' -exec rm -rf {} +
     fi
 
     # Only what this document actually references. Copying all of shared/ was
@@ -50,18 +55,39 @@ for d in "${DOCS[@]}"; do
     # documents. Overleaf caps a project at 180 files, so the padding was not
     # free.
     mkdir -p "$b/figures" "$b/sections"
-    python3 - "$b" shared <<'PY'
+    # A document may carry its own figures/ and sections/ instead of reaching
+    # into shared/ -- the thesis does, so that restyling its figures cannot
+    # disturb the other three. Its own copy wins; shared/ is the fallback.
+    python3 - "$b" shared "$d" <<'PY'
 import re, shutil, sys, pathlib
-bundle, shared = pathlib.Path(sys.argv[1]), pathlib.Path(sys.argv[2])
+bundle, shared, doc = (pathlib.Path(a) for a in sys.argv[1:4])
 text = "\n".join(p.read_text() for p in bundle.rglob("*.tex"))
-for name in set(re.findall(r"includegraphics\[[^\]]*\]\{([^}]+)\}", text)):
-    src = shared / "figures" / pathlib.Path(name).name
-    if src.exists():
-        shutil.copy2(src, bundle / "figures" / src.name)
-for name in set(re.findall(r"\\input\{\.\./shared/sections/([^}]+)\}", text)):
-    src = (shared / "sections" / name).with_suffix(".tex")
-    if src.exists():
-        shutil.copy2(src, bundle / "sections" / src.name)
+
+def take(cands, dest):
+    for c in cands:
+        if c.exists():
+            shutil.copy2(c, dest / c.name)
+            return True
+    return False
+
+missing = []
+for name in set(re.findall(r"includegraphics(?:\[[^\]]*\])?\{([^}]+)\}", text)):
+    stem = pathlib.Path(name).name
+    if not stem.endswith(".pdf"):
+        stem += ".pdf"
+    if not take([doc / "figures" / stem, shared / "figures" / stem],
+                bundle / "figures"):
+        missing.append(stem)
+
+for name in set(re.findall(r"\\input\{(?:\.\./shared/)?sections/([^}]+)\}", text)):
+    f = pathlib.Path(name).with_suffix(".tex").name
+    if not take([doc / "sections" / f, shared / "sections" / f],
+                bundle / "sections"):
+        missing.append("sections/" + f)
+
+if missing:
+    sys.exit("  missing asset(s), nowhere in %s/ or shared/: %s"
+             % (doc, ", ".join(sorted(missing))))
 PY
     cp shared/notation.tex   "$b"/notation.tex
     cp shared/references.bib "$b"/references.bib

@@ -11,74 +11,6 @@
 % otherwise overfull, so normal paragraphs set normally.
 \setlength{\emergencystretch}{2em}
 
-\section{Repository layout}
-
-\noindent The background derivations this thesis cites but does not carry ---
-statistical mechanics, stochastic calculus and the diffusion-model
-constructions --- are in \compendium{}, at full length, together with the
-three background chapters as they were first written before being merged into
-Chapter~\ref{ch:background}. Nothing that was cut for length was discarded.
-
-All source material lives in a single repository, laid out as in
-Table~\ref{tab:repo-layout}.
-
-\begin{center}
-\begin{minipage}{\linewidth}\small\centering
-\captionof{table}[Repository layout]{Where each part of the work lives. Paths are relative to the repository root.}
-\label{tab:repo-layout}
-\begin{tabular}{@{}lp{0.46\linewidth}@{}}
-\toprule
-Path & Content \\
-\midrule
-\texttt{overleaf/} & the four documents, their shared figures and the
-generated table and macro files \\
-\texttt{research/gaussian-bp/} & Gaussian chain note, code, 72-check audit \\
-\texttt{research/bp-from-scratch/} & independent BP derivation and implementation \\
-\texttt{research/unified-note/} & consolidated working note, code, 55-check audit \\
-\texttt{research/nongaussian-bp/} & grid BP, EM, and the estimator comparisons \\
-\quad\texttt{src/}, \texttt{experiments/} & implementation and one driver per experiment \\
-\quad\texttt{hpc/}, \texttt{tools/} & deployment/provenance, and the table and figure generators \\
-\quad\texttt{outputs/frozen/} & the certified run directories the generators read \\
-\texttt{research/gaussian-ar1-bp/} & Gaussian AR(1) package (BP $=$ matrix score) \\
-\texttt{research/initial-experiments/} & early experiments and toy-model material \\
-\texttt{research/experiment1-rotating-ring/} & rotating-ring package: code, data, validation \\
-\bottomrule
-\end{tabular}
-\end{minipage}
-\end{center}
-
-\section{Audit protocol}
-
-Every closed-form claim is verified by a deterministic check against an
-independently computed reference (brute-force linear algebra, dense grid
-quadrature, or finite differences), collected in audit drivers that exit
-non-zero on any failure. The audit driver of
-\texttt{research/gaussian-bp} runs $72$ checks:
-assembly and inversion of $\Sigt$; the score--posterior route against the
-matrix score; the $L = 2$ closed forms; Convention-A BP against the
-matrix posterior (means, variances, scores); bulk variance, covariance
-decay $q^d$, and the recombination identity; AMP mean and score
-closure-independence; the AMP variance formula, existence boundary,
-breakdown time, and weak-coupling law; the locality slopes; the band-fill
-coefficients; spectral preservation and the large-$t$ return.
-The audit driver of \texttt{research/unified-note} runs $55$ checks on
-the consolidated note, including the Laplace $L = 1$ quadrature checks
-and the one-step boundary-message identity.
-\texttt{research/nongaussian-bp/} contains experiment drivers with logged
-master-error-identity residuals ($10^{-15}$--$10^{-12}$ throughout), grid
-self-convergence gates, and per-trial CSV outputs; the grid calibration
-of Section~\ref{sec:l-grid} is experiment~01, the closure measurement of
-Section~\ref{sec:l-closure} experiment~02.
-\texttt{research/experiment1-rotating-ring/} carries the package behind
-Chapter~\ref{ch:ring}: the exact surrogate score and Jacobian, the polar-grid
-recursion, the response diagnostics in a single module, and a validation driver
-that writes \texttt{validation.json} and exits non-zero on any failure. Its five
-checks are the ones reported in Table~\ref{tab:ring-validation}, and every
-number quoted in Chapter~\ref{ch:ring} is regenerated from the curated CSVs of
-that package rather than entered by hand. All checks were re-executed on
-the build machine at the time of writing: $72/72$, $55/55$ and $5/5$ pass, and
-all experiment gates are green.
-
 \section{Figure-to-code map}
 
 Every figure is committed as a vector PDF under
@@ -130,8 +62,6 @@ Figure & File & Numbers computed by \\
 \ref{fig:em-screening} & \texttt{fig\_screening.pdf} & \texttt{nongaussian-bp} exp.~31 screen, frozen \\
 \ref{fig:em-capacity} & \texttt{fig\_capacity.pdf} & \texttt{nongaussian-bp} exp.~32, frozen \\
 \ref{fig:em-nonmarkov} & \texttt{fig\_nonmarkov.pdf} & \texttt{nongaussian-bp} exp.~21, clean rerun \\
-\ref{fig:bp-bulkvar} & \texttt{fig\_bulk\_variance.pdf} & \texttt{gaussian-bp}, closed forms \\
-\ref{fig:bp-vs-amp} & \texttt{fig\_bp\_vs\_amp.pdf} & \texttt{gaussian-bp}, closed forms and iteration \\
 \ref{fig:ring-model} & \texttt{fig\_ring\_model.pdf} & ring package, closed forms and simulation \\
 \ref{fig:ring-gauge} & \texttt{fig\_ring\_gauge.pdf} & ring package, closed forms and simulation \\
 \ref{fig:ring-surrogate-response} & \texttt{fig\_ring\_surrogate\_response.pdf} & ring package, exact surrogate score \\
@@ -141,8 +71,8 @@ Figure & File & Numbers computed by \\
 \end{minipage}
 \end{center}
 
-\section{The learning experiments of Chapters~\ref{ch:em-method}
-and~\ref{ch:em-results}}\label{sec:repro-learning}
+\section[The learning experiments]{The learning experiments of
+Chapters~\ref{ch:em-method} and~\ref{ch:em-results}}\label{sec:repro-learning}
 
 The closed-form and quadrature studies above are deterministic and run on a
 laptop. The estimator comparisons are neither, and they are gated
@@ -165,7 +95,7 @@ does the work below, because the two are not equally serious.
 \paragraph{How each run is certified.} Not every experiment here was run after
 \texttt{deploy\_clean.sh} existed, so three routes to certification appear.
 Nothing cited in this thesis is uncertified. The development record behind each
-route --- which deployments failed, and why each check was added --- is in
+route, which deployments failed, and why each check was added, is in
 \compendium{}.
 
 \emph{Certified.} \texttt{exp\_31}, the architecture screen and the
@@ -173,8 +103,8 @@ confirmatory comparison, and \texttt{exp\_32}, capacity, were deployed by the
 script and pass \texttt{require\_clean} unmodified. Every number in
 Sections~\ref{sec:em-architecture} and~\ref{sec:em-capacity} comes from them.
 
-\emph{Legacy digest, empty intersection.} \texttt{exp\_07} --- the headline
-efficiency comparison and its validation-selection audit --- with
+\emph{Legacy digest, empty intersection.} \texttt{exp\_07}, the headline
+efficiency comparison and its validation-selection audit, with
 \texttt{exp\_27} behind the settling times of
 Section~\ref{sec:em-convergence}, and \texttt{exp\_18}, predate the script.
 They record a commit, a host, a job id and a resolved configuration, but no
@@ -183,10 +113,10 @@ narrower and checkable: the intersection of each run's recorded dirty list with
 its own import closure is \emph{empty}, so no uncommitted edit could have
 reached the code that produced the numbers.
 \texttt{make\_tab\_efficiency.py} recomputes that intersection on every run
-and refuses if it is ever non-empty, rather than resting on a check performed
+and refuses if it is ever non-empty, not resting on a check performed
 once by hand. The one \texttt{exp\_07} row where the intersection was
-\emph{not} empty --- $\nseq = 8192$, whose dirty list contained the
-experiment, the frozen configuration and \texttt{src/em.py} --- is withdrawn
+\emph{not} empty, $\nseq = 8192$, whose dirty list contained the
+experiment, the frozen configuration and \texttt{src/em.py}, is withdrawn
 and appears nowhere in this thesis.
 
 \emph{Certified after rerun.} \texttt{exp\_21}, behind
@@ -219,13 +149,13 @@ directly:
 
 \noindent The prose then cites the macro rather than the value, so tables,
 figures and text share a size grid and an aggregation rule by construction
-rather than by inspection.
+and not by inspection.
 
 \paragraph{What Table~\ref{tab:pointwise} covers.} Four qualifications, kept
-here rather than in the caption, which had grown into a methods subsection
+here and not in the caption, which had grown into a methods subsection
 set in small type. Both arms select their optimisation budget on a disjoint
-validation bundle --- the network its parameterisation \emph{and} training
-length, EM--BP its iteration count --- and that choice agrees with the
+validation bundle, the network its parameterisation \emph{and} training
+length, EM--BP its iteration count, and that choice agrees with the
 test-set optimum in $\netagree\%$ and $\emagree\%$ of cells respectively, so
 the protocol is symmetric and the selection is close to an oracle without
 being one. The $\nseq=\extendedn$ row uses a raised budget, the caps having
@@ -314,9 +244,9 @@ locality-respecting architectures) with an explicit
 so training is stochastic but reproducible from the recorded seed. Two
 optional dependencies are used and neither is on the exactness path: CuPy,
 selected by the \texttt{BP\_DEVICE} environment variable, runs the same
-single BP implementation on a GPU --- \texttt{tests/test\_backend\_parity.py}
+single BP implementation on a GPU, \texttt{tests/test\_backend\_parity.py}
 asserts the two devices agree, so a device change fails a test rather than
-moving a number quietly --- and PyTorch, imported lazily in
+moving a number quietly, and PyTorch, imported lazily in
 \texttt{src/fid.py} alone, for the generative metric. Arithmetic is float64
 throughout.
 

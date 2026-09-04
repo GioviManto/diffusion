@@ -21,10 +21,10 @@
 
 % ---------- graphics, tables, captions ----------
 \usepackage{graphicx}
-% Figures are shared with the other three documents rather than duplicated, so
-% \includegraphics takes a bare basename and this is the one place the location
-% is written down. The chapters used to carry a literal `figures/' prefix each.
-\graphicspath{{../shared/figures/}}
+% This folder is self-contained so it can be uploaded to Overleaf on its own:
+% figures/, sections/ and references.bib are local copies, refreshed from the
+% research repository by sync-assets.sh.
+\graphicspath{{figures/}}
 \usepackage{booktabs}
 \usepackage[font=small,labelfont=bf,margin=1em]{caption}
 \usepackage{subcaption}
@@ -94,8 +94,32 @@
   \renewcommand{\headrulewidth}{0pt}}
 
 % ---------- hyperlinks ----------
-\usepackage[hidelinks]{hyperref}
+% Coloured rather than hidden: every cross-reference, equation number, figure
+% reference and citation is clickable, and the reader can now see that it is.
+% The colours are dark enough to read as black on a monochrome printout.
+\definecolor{linkint}{RGB}{31,72,110}   % internal: chapters, figures, equations
+\definecolor{linkcite}{RGB}{31,95,91}   % citations
+\usepackage{hyperref}
+\hypersetup{
+  colorlinks=true,
+  linkcolor=linkint,
+  citecolor=linkcite,
+  urlcolor=linkcite,
+  bookmarks=true,
+  bookmarksnumbered=true,
+  bookmarksopen=true,
+  bookmarksopenlevel=1,
+  pdfstartview={FitH},
+  pdfpagemode=UseOutlines,
+  pdftitle={Belief Propagation for Generative Diffusion on Dynamic Objects},
+  pdfsubject={MSc thesis, Data Science and Business Analytics, Bocconi University}
+}
 \urlstyle{same}
+% cleveref must be loaded after hyperref. It prints the object's name with the
+% number, so a reference cannot drift out of step with what it points at.
+\usepackage[nameinlink,noabbrev]{cleveref}
+\crefname{toolbox}{Toolbox}{Toolboxes}
+\Crefname{toolbox}{Toolbox}{Toolboxes}
 
 % ---------- notation macros (consistent with the research notes) ----------
 % Same rendering as shared/notation.tex, which the thesis does not \input
@@ -138,6 +162,9 @@
 % cites but does not carry, and the development record. Written once here so
 % that the phrase is identical everywhere it appears.
 \newcommand{\compendium}{the companion compendium}
+% Sentence-initial form of the same phrase, so a reference that opens a
+% sentence does not have to be written out a second time and drift.
+\newcommand{\Compendium}{The companion compendium}
 \newcommand{\R}{\mathbb{R}}
 \newcommand{\E}{\mathbb{E}}
 \newcommand{\Prob}{\mathbb{P}}
